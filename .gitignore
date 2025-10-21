@@ -1,0 +1,17 @@
+# Ignore compiled artifacts
+/target/
+
+# For binaries like this CLI, Cargo.lock should be committed.
+# We will NOT ignore Cargo.lock.
+
+# Ignore editor and OS-specific files
+.DS_Store
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+.vscode/
+
+# Ignore local environment files
+.env

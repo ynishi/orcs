@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/orcs-cli",
+    "crates/orcs-interaction",
+    "crates/orcs-core",
+    "crates/orcs-execution",
+    "crates/orcs-types",
+]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Yutaka Nishimura <ytk.nishimura@gmail.com>"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/ynishi/orcs" # Placeholder
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"

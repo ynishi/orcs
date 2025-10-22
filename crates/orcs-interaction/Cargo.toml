@@ -1,0 +1,17 @@
+[package]
+name = "orcs-interaction"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+orcs-types = { path = "../orcs-types" }
+llm-toolkit = { workspace = true, features = ["agent"] }
+llm-toolkit-macros = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

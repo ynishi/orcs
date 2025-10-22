@@ -1,0 +1,8 @@
+[package]
+name = "orcs-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+orcs-types = { path = "../orcs-types" }
+uuid = { version = "1.0", features = ["v4"] }

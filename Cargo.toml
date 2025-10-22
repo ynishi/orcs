@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/orcs-cli",
     "crates/orcs-interaction",
     "crates/orcs-core",
     "crates/orcs-execution",

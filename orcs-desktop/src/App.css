@@ -1,0 +1,33 @@
+/*
+ * グローバルスタイル - Mantineテーマで対応できないもののみ
+ * フォント設定やコンポーネント固有のスタイルはtheme.tsで管理
+ */
+
+/* テキストレンダリングの最適化 */
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ロゴのホバーエフェクト（デモ用・必要に応じて削除可） */
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: 0.75s;
+}
+
+.logo.vite:hover {
+  filter: drop-shadow(0 0 2em #747bff);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafb);
+}
+
+.logo.tauri:hover {
+  filter: drop-shadow(0 0 2em #24c8db);
+}

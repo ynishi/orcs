@@ -243,6 +243,39 @@ async fn get_active_participants(
     manager.get_active_participants().await
 }
 
+/// Sets the execution strategy for the active session
+#[tauri::command]
+async fn set_execution_strategy(
+    strategy: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let manager = state.session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    manager.set_execution_strategy(strategy).await;
+
+    // Auto-save after changing strategy
+    let app_mode = state.app_mode.lock().await.clone();
+    let _ = state.session_manager.save_active_session(app_mode).await;
+
+    Ok(())
+}
+
+/// Gets the current execution strategy for the active session
+#[tauri::command]
+async fn get_execution_strategy(
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let manager = state.session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    Ok(manager.get_execution_strategy().await)
+}
+
 /// Gets the path to the configuration file, creating it if it doesn't exist
 #[tauri::command]
 async fn get_config_path() -> Result<String, String> {
@@ -375,6 +408,8 @@ fn main() {
                 add_participant,
                 remove_participant,
                 get_active_participants,
+                set_execution_strategy,
+                get_execution_strategy,
                 get_config_path,
                 handle_input,
             ])

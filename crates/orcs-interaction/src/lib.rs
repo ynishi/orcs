@@ -110,6 +110,8 @@ pub struct InteractionManager {
     persona_repository: Arc<dyn PersonaRepository>,
     /// Service for retrieving user information
     user_service: Arc<dyn UserService>,
+    /// Execution strategy for dialogue (e.g., "broadcast", "sequential")
+    execution_strategy: Arc<RwLock<String>>,
 }
 
 impl InteractionManager {
@@ -150,6 +152,7 @@ impl InteractionManager {
             persona_histories: Arc::new(RwLock::new(persona_histories_map)),
             persona_repository,
             user_service,
+            execution_strategy: Arc::new(RwLock::new("broadcast".to_string())),
         }
     }
 
@@ -184,6 +187,7 @@ impl InteractionManager {
             persona_histories: Arc::new(RwLock::new(migrated_histories)),
             persona_repository,
             user_service,
+            execution_strategy: Arc::new(RwLock::new("broadcast".to_string())),
         }
     }
 
@@ -258,11 +262,13 @@ impl InteractionManager {
             .map(domain_to_llm_persona)
             .collect();
 
+        let strategy = self.execution_strategy.read().await.clone();
+
         let blueprint = DialogueBlueprint {
             agenda: "Orcs AI Assistant Session".to_string(),
             context: "A collaborative session between the user and AI assistants Mai and Yui.".to_string(),
             participants: Some(participants),
-            execution_strategy: Some("broadcast".to_string()),
+            execution_strategy: Some(strategy),
         };
 
         // Create fresh agents for dialogue initialization
@@ -404,6 +410,27 @@ impl InteractionManager {
         Ok(participant_ids)
     }
 
+    /// Sets the execution strategy for the dialogue.
+    ///
+    /// # Arguments
+    ///
+    /// * `strategy` - The execution strategy to use (e.g., "broadcast", "sequential")
+    ///
+    /// # Note
+    ///
+    /// This will invalidate the current dialogue instance, which will be recreated
+    /// with the new strategy on the next interaction.
+    pub async fn set_execution_strategy(&self, strategy: String) {
+        *self.execution_strategy.write().await = strategy;
+        // Clear the dialogue to force recreation with new strategy
+        *self.dialogue.lock().await = None;
+    }
+
+    /// Gets the current execution strategy.
+    pub async fn get_execution_strategy(&self) -> String {
+        self.execution_strategy.read().await.clone()
+    }
+
     /// Handles user input based on the current application mode.
     ///
     /// # Arguments
@@ -443,15 +470,18 @@ impl InteractionManager {
         let user_name = self.user_service.get_user_name();
         self.add_to_history(&user_name, MessageRole::User, input).await;
 
-        // Run the dialogue with the user's input
+        // Run the dialogue with the user's input using partial_session for streaming
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
 
-        match dialogue.run(input.to_string()).await {
-            Ok(turns) => {
-                // Process the dialogue turns and add to history
-                let mut messages = Vec::new();
-                for turn in &turns {
+        // Create a partial session for incremental turn processing
+        let mut session = dialogue.partial_session(input.to_string());
+        let mut messages = Vec::new();
+
+        // Process each turn as it becomes available
+        while let Some(result) = session.next_turn().await {
+            match result {
+                Ok(turn) => {
                     // Convert participant_name (display name) to persona_id (UUID)
                     let persona_id = self.get_persona_id_by_name(&turn.participant_name)
                         .unwrap_or_else(|| turn.participant_name.clone());
@@ -465,11 +495,13 @@ impl InteractionManager {
                         content: turn.content.clone(),
                     });
                 }
-
-                InteractionResult::NewDialogueMessages(messages)
+                Err(e) => {
+                    return InteractionResult::NewMessage(format!("Error: {}", e));
+                }
             }
-            Err(e) => InteractionResult::NewMessage(format!("Error: {}", e)),
         }
+
+        InteractionResult::NewDialogueMessages(messages)
     }
 
     /// Handles input when awaiting plan confirmation.

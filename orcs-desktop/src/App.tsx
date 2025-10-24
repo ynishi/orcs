@@ -554,7 +554,7 @@ function App() {
                   </Group>
                 </Accordion.Control>
                 <Accordion.Panel>
-                  <PersonasList />
+                  <PersonasList onMessage={addMessage} />
                 </Accordion.Panel>
               </Accordion.Item>
             </Accordion>

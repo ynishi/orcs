@@ -1,24 +1,57 @@
 import { useState, useEffect } from 'react';
-import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip, Select } from '@mantine/core';
 import { IconSettings, IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
 
-export function PersonasList() {
+// Available execution strategies
+const STRATEGIES = [
+  { value: 'broadcast', label: 'Broadcast' },
+  { value: 'sequential', label: 'Sequential' },
+];
+
+interface PersonasListProps {
+  onStrategyChange?: (strategy: string) => void;
+  onMessage?: (type: 'system' | 'error', author: string, text: string) => void;
+}
+
+export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps) {
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfig[]>([]);
   const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPersona, setEditingPersona] = useState<Partial<PersonaConfig> | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<string>('default');
+
+  const handleStrategyChange = async (value: string | null) => {
+    const strategy = value || 'broadcast';
+    setSelectedStrategy(strategy);
+    onStrategyChange?.(strategy);
+
+    // Update backend
+    try {
+      await invoke('set_execution_strategy', { strategy });
+
+      // Show system message
+      const strategyLabel = STRATEGIES.find(s => s.value === strategy)?.label || strategy;
+      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+      onMessage?.('system', 'SYSTEM', `Execution strategy changed to: ${strategyLabel} [${timestamp}]`);
+    } catch (error) {
+      console.error('Failed to set execution strategy:', error);
+      onMessage?.('error', 'SYSTEM', `Failed to set execution strategy: ${error}`);
+    }
+  };
 
   // Fetch personas from backend
   const fetchPersonas = async () => {
     try {
       const personas = await invoke<PersonaConfig[]>('get_personas');
       const activeIds = await invoke<string[]>('get_active_participants');
+      const strategy = await invoke<string>('get_execution_strategy');
       setPersonaConfigs(personas);
       setActiveParticipantIds(activeIds);
+      setSelectedStrategy(strategy);
     } catch (error) {
       console.error('Failed to fetch personas:', error);
     }
@@ -171,26 +204,43 @@ export function PersonasList() {
   return (
     <Stack gap="md" h="100%">
       {/* ヘッダー */}
-      <Group justify="space-between" px="md" pt="md">
-        <Group gap="xs">
-          <Text size="lg" fw={700}>
-            Personas
+      <Stack gap="xs" px="md" pt="md">
+        <Group justify="space-between">
+          <Group gap="xs">
+            <Text size="lg" fw={700}>
+              Personas
+            </Text>
+            <Tooltip label="Add persona" withArrow>
+              <ActionIcon variant="subtle" color="blue" onClick={() => handleOpenModal()}>
+                <IconPlus size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Open config file" withArrow>
+              <ActionIcon variant="subtle" color="gray" onClick={handleOpenConfigFile}>
+                <IconSettings size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+          <Text size="sm" c="dimmed">
+            {activeParticipantIds.length} participating
           </Text>
-          <Tooltip label="Add persona" withArrow>
-            <ActionIcon variant="subtle" color="blue" onClick={() => handleOpenModal()}>
-              <IconPlus size={16} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Open config file" withArrow>
-            <ActionIcon variant="subtle" color="gray" onClick={handleOpenConfigFile}>
-              <IconSettings size={16} />
-            </ActionIcon>
-          </Tooltip>
         </Group>
-        <Text size="sm" c="dimmed">
-          {activeParticipantIds.length} participating
-        </Text>
-      </Group>
+
+        {/* Strategy Selection */}
+        <Box>
+          <Text size="xs" c="dimmed" mb={4}>
+            Execution Strategy
+          </Text>
+          <Select
+            size="xs"
+            data={STRATEGIES}
+            value={selectedStrategy}
+            onChange={handleStrategyChange}
+            placeholder="Select strategy"
+            allowDeselect={false}
+          />
+        </Box>
+      </Stack>
 
       {/* ペルソナリスト */}
       <ScrollArea style={{ flex: 1 }} px="sm">

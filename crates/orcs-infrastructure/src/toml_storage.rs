@@ -1,4 +1,4 @@
-use orcs_core::config::PersonaConfig;
+use orcs_core::persona::Persona;
 use crate::dto::{ConfigRootV1, ConfigRootV2, PersonaConfigV2};
 use std::fs;
 
@@ -11,11 +11,11 @@ use std::fs;
 ///
 /// # Returns
 ///
-/// - `Ok(Vec<PersonaConfig>)`: A vector of persona configs if the file is found and parsed.
+/// - `Ok(Vec<Persona>)`: A vector of persona configs if the file is found and parsed.
 ///   If the file does not exist, the config directory cannot be found, or the file is empty,
 ///   it returns an empty vector `Ok(vec![])`.
 /// - `Err(String)`: An error message if the file exists but cannot be read or parsed.
-pub fn load_personas() -> Result<Vec<PersonaConfig>, String> {
+pub fn load_personas() -> Result<Vec<Persona>, String> {
     match dirs::config_dir() {
         Some(config_dir) => {
             let config_path = config_dir.join("orcs").join("config.toml");
@@ -68,14 +68,14 @@ pub fn load_personas() -> Result<Vec<PersonaConfig>, String> {
 ///
 /// # Arguments
 ///
-/// * `personas` - A slice of PersonaConfig structs to save.
+/// * `personas` - A slice of Persona structs to save.
 ///
 /// # Returns
 ///
 /// - `Ok(())`: If the file was successfully written.
 /// - `Err(String)`: An error message if the config directory cannot be found,
 ///   the directory cannot be created, or the file cannot be written.
-pub fn save_personas(personas: &[PersonaConfig]) -> Result<(), String> {
+pub fn save_personas(personas: &[Persona]) -> Result<(), String> {
     match dirs::config_dir() {
         Some(config_dir) => {
             let orcs_config_dir = config_dir.join("orcs");
@@ -141,7 +141,7 @@ source = "System"
         let migration = PersonaV1ToV2Migration;
 
         let root_dto = toml::from_str::<ConfigRootV1>(&content).unwrap();
-        let personas: Vec<PersonaConfig> = root_dto.personas.into_iter()
+        let personas: Vec<Persona> = root_dto.personas.into_iter()
             .map(|v1_dto| {
                 let v2_dto = migration.migrate(v1_dto)
                     .expect("V1→V2 persona migration should not fail");

@@ -10,7 +10,7 @@ use crate::dto::{
     PERSONA_CONFIG_V2_VERSION,
 };
 use anyhow::Result;
-use orcs_core::config::{PersonaConfig, PersonaSource};
+use orcs_core::persona::{Persona, PersonaSource};
 use semver::Version;
 use uuid::Uuid;
 
@@ -113,9 +113,9 @@ impl From<PersonaSource> for PersonaSourceDTO {
 /// Convert PersonaConfigV1 DTO to domain model.
 ///
 /// Migrates through V2 to ensure UUID conversion.
-impl From<PersonaConfigV1> for PersonaConfig {
+impl From<PersonaConfigV1> for Persona {
     fn from(dto: PersonaConfigV1) -> Self {
-        // Migrate V1 -> V2 -> PersonaConfig to ensure UUID conversion
+        // Migrate V1 -> V2 -> Persona to ensure UUID conversion
         let v2_dto: PersonaConfigV2 = PersonaV1ToV2Migration.migrate(dto)
             .expect("V1→V2 migration should not fail");
         v2_dto.into()
@@ -126,17 +126,17 @@ impl From<PersonaConfigV1> for PersonaConfig {
 ///
 /// Note: This is only used for backward compatibility. New code should
 /// use V2 for persistence.
-impl From<&PersonaConfig> for PersonaConfigV1 {
-    fn from(config: &PersonaConfig) -> Self {
+impl From<&Persona> for PersonaConfigV1 {
+    fn from(persona: &Persona) -> Self {
         PersonaConfigV1 {
             schema_version: PERSONA_CONFIG_V1_VERSION.to_string(),
-            id: config.id.clone(),
-            name: config.name.clone(),
-            role: config.role.clone(),
-            background: config.background.clone(),
-            communication_style: config.communication_style.clone(),
-            default_participant: config.default_participant,
-            source: config.source.clone().into(),
+            id: persona.id.clone(),
+            name: persona.name.clone(),
+            role: persona.role.clone(),
+            background: persona.background.clone(),
+            communication_style: persona.communication_style.clone(),
+            default_participant: persona.default_participant,
+            source: persona.source.clone().into(),
         }
     }
 }
@@ -145,7 +145,7 @@ impl From<&PersonaConfig> for PersonaConfigV1 {
 ///
 /// If the ID is not a valid UUID (legacy data in V2 format), converts it
 /// using the same logic as V1→V2 migration.
-impl From<PersonaConfigV2> for PersonaConfig {
+impl From<PersonaConfigV2> for Persona {
     fn from(dto: PersonaConfigV2) -> Self {
         // Validate and fix ID if needed
         let id = if Uuid::parse_str(&dto.id).is_ok() {
@@ -160,7 +160,7 @@ impl From<PersonaConfigV2> for PersonaConfig {
             PersonaV1ToV2Migration::generate_uuid_from_name(&dto.name)
         };
 
-        PersonaConfig {
+        Persona {
             id,
             name: dto.name,
             role: dto.role,
@@ -175,17 +175,17 @@ impl From<PersonaConfigV2> for PersonaConfig {
 /// Convert domain model to PersonaConfigV2 DTO for persistence.
 ///
 /// Always saves with the current schema version (2.0.0).
-impl From<&PersonaConfig> for PersonaConfigV2 {
-    fn from(config: &PersonaConfig) -> Self {
+impl From<&Persona> for PersonaConfigV2 {
+    fn from(persona: &Persona) -> Self {
         PersonaConfigV2 {
             schema_version: PERSONA_CONFIG_V2_VERSION.to_string(),
-            id: config.id.clone(),
-            name: config.name.clone(),
-            role: config.role.clone(),
-            background: config.background.clone(),
-            communication_style: config.communication_style.clone(),
-            default_participant: config.default_participant,
-            source: config.source.clone().into(),
+            id: persona.id.clone(),
+            name: persona.name.clone(),
+            role: persona.role.clone(),
+            background: persona.background.clone(),
+            communication_style: persona.communication_style.clone(),
+            default_participant: persona.default_participant,
+            source: persona.source.clone().into(),
         }
     }
 }
@@ -257,7 +257,7 @@ mod tests {
             source: PersonaSourceDTO::System,
         };
 
-        let persona: PersonaConfig = v1.into();
+        let persona: Persona = v1.into();
 
         // ID should be converted to UUID
         assert!(
@@ -300,7 +300,7 @@ mod tests {
             source: PersonaSourceDTO::System,
         };
 
-        let persona: PersonaConfig = v2.into();
+        let persona: Persona = v2.into();
 
         assert_eq!(persona.id, "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c");
         assert_eq!(persona.name, "Mai");

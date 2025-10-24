@@ -55,7 +55,7 @@ impl MigrationManager {
         &self.session_registry
     }
 
-    /// Returns the migration registry for PersonaConfig entities.
+    /// Returns the migration registry for Persona entities.
     pub fn persona_registry(&self) -> &MigrationRegistry<PersonaConfigV2> {
         &self.persona_registry
     }
@@ -82,12 +82,12 @@ impl MigrationManager {
                         );
                     }
                 }
-                Entity::PersonaConfig => {
+                Entity::Persona => {
                     if self.persona_registry.is_empty() {
-                        tracing::warn!("PersonaConfig migration registry is empty");
+                        tracing::warn!("Persona migration registry is empty");
                     } else {
                         tracing::debug!(
-                            "PersonaConfig registry: {} migrations registered",
+                            "Persona registry: {} migrations registered",
                             self.persona_registry.len()
                         );
                     }
@@ -138,7 +138,7 @@ impl MigrationManagerBuilder {
         self
     }
 
-    /// Sets the migration registry for PersonaConfig entities.
+    /// Sets the migration registry for Persona entities.
     pub fn with_persona_registry(mut self, registry: MigrationRegistry<PersonaConfigV2>) -> Self {
         self.persona_registry = Some(registry);
         self
@@ -174,7 +174,7 @@ impl MigrationManagerBuilder {
 
         let persona_registry = self
             .persona_registry
-            .ok_or_else(|| anyhow::anyhow!("PersonaConfig migration registry not set"))?;
+            .ok_or_else(|| anyhow::anyhow!("Persona migration registry not set"))?;
 
         // Adding a new entity? Extract the registry here (or get unused field warning):
         // let dialogue_registry = self.dialogue_registry
@@ -214,8 +214,8 @@ mod tests {
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(
-            err_msg.contains("PersonaConfig"),
-            "Error should mention missing PersonaConfig registry"
+            err_msg.contains("Persona"),
+            "Error should mention missing Persona registry"
         );
     }
 

@@ -1,32 +1,10 @@
-use serde::{Deserialize, Serialize};
+//! Deprecated config module.
+//!
+//! This module is deprecated. Use `orcs_core::persona` instead.
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-pub enum PersonaSource {
-    System,
-    User,
-}
+// Re-export from persona module for backward compatibility
+#[deprecated(since = "0.2.0", note = "Use orcs_core::persona::Persona instead")]
+pub use crate::persona::Persona as PersonaConfig;
 
-impl Default for PersonaSource {
-    fn default() -> Self {
-        PersonaSource::User
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct ConfigRoot {
-    #[serde(rename = "persona")]
-    pub personas: Vec<PersonaConfig>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct PersonaConfig {
-    pub id: String,
-    pub name: String,
-    pub role: String,
-    pub background: String,
-    pub communication_style: String,
-    #[serde(default)]
-    pub default_participant: bool,
-    #[serde(default)]
-    pub source: PersonaSource,
-}
+#[deprecated(since = "0.2.0", note = "Use orcs_core::persona::PersonaSource instead")]
+pub use crate::persona::PersonaSource;

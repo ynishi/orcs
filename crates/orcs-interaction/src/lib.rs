@@ -1,5 +1,4 @@
 pub mod persona_agent;
-pub mod presets;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -7,20 +6,20 @@ use tokio::sync::{RwLock, Mutex};
 use orcs_types::{AppMode, Plan, ConversationMessage, MessageRole};
 use orcs_core::session::Session;
 use orcs_core::repository::PersonaRepository;
-use orcs_core::config::PersonaConfig;
+use orcs_core::persona::Persona as PersonaDomain;
 use orcs_core::user_service::UserService;
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, ClaudeCodeJsonAgent};
 use llm_toolkit::agent::dialogue::{Dialogue, DialogueBlueprint};
-use llm_toolkit::agent::persona::{Persona, PersonaTeam};
+use llm_toolkit::agent::persona::{Persona as LlmPersona, PersonaTeam};
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 
-/// Converts a PersonaConfig to a Persona.
-fn config_to_persona(config: &PersonaConfig) -> Persona {
-    Persona {
-        name: config.name.clone(),
-        role: config.role.clone(),
-        background: config.background.clone(),
-        communication_style: config.communication_style.clone(),
+/// Converts a Persona domain model to llm-toolkit Persona.
+fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
+    LlmPersona {
+        name: persona.name.clone(),
+        role: persona.role.clone(),
+        background: persona.background.clone(),
+        communication_style: persona.communication_style.clone(),
     }
 }
 
@@ -257,7 +256,7 @@ impl InteractionManager {
         let participants = all_configs
             .iter()
             .filter(|p| p.default_participant)
-            .map(config_to_persona)
+            .map(domain_to_llm_persona)
             .collect();
 
         let blueprint = DialogueBlueprint {
@@ -347,7 +346,7 @@ impl InteractionManager {
             .into_iter()
             .find(|p| p.id == persona_id)
             .ok_or_else(|| format!("Persona with id '{}' not found", persona_id))?;
-        let persona = config_to_persona(&persona_config);
+        let persona = domain_to_llm_persona(&persona_config);
 
         // Lock the dialogue and add participant
         let mut dialogue_guard = self.dialogue.lock().await;
@@ -376,7 +375,7 @@ impl InteractionManager {
             .into_iter()
             .find(|p| p.id == persona_id)
             .ok_or_else(|| format!("Persona with id '{}' not found", persona_id))?;
-        let persona = config_to_persona(&persona_config);
+        let persona = domain_to_llm_persona(&persona_config);
 
         // Lock the dialogue and remove participant
         let mut dialogue_guard = self.dialogue.lock().await;

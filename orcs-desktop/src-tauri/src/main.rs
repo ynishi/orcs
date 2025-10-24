@@ -5,12 +5,11 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use orcs_core::session::Session;
 use orcs_core::session_manager::SessionManager;
-use orcs_core::config::PersonaConfig;
+use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::user_service::{UserService, DefaultUserService};
 use orcs_infrastructure::repository::{TomlPersonaRepository, TomlSessionRepository};
 use orcs_interaction::{InteractionManager, InteractionResult};
-use orcs_interaction::presets::get_default_presets;
 use orcs_types::AppMode;
 use serde::Serialize;
 use tauri::State;
@@ -178,14 +177,14 @@ async fn get_active_session(
 #[tauri::command]
 async fn get_personas(
     state: State<'_, AppState>,
-) -> Result<Vec<PersonaConfig>, String> {
+) -> Result<Vec<Persona>, String> {
     state.persona_repository.get_all()
 }
 
 /// Saves persona configurations
 #[tauri::command]
 async fn save_persona_configs(
-    configs: Vec<PersonaConfig>,
+    configs: Vec<Persona>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state.persona_repository.save_all(&configs)

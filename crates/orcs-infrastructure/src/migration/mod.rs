@@ -16,7 +16,7 @@
 //! │  (Coordinates all entity migrations)                         │
 //! ├─────────────────────────────────────────────────────────────┤
 //! │  - Session Registry    (V0 → V1 → ...)                       │
-//! │  - PersonaConfig Registry (V1 → V2 → ...)                    │
+//! │  - Persona Registry (V1 → V2 → ...)                    │
 //! │  - [Future entities...]                                      │
 //! └─────────────────────────────────────────────────────────────┘
 //!          │                    │
@@ -97,7 +97,7 @@ pub use persona::PersonaV1ToV2Migration;
 pub use session::SessionV0ToV1Migration;
 
 use anyhow::Result;
-use orcs_core::config::PersonaConfig;
+use orcs_core::persona::Persona;
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::Session;
 use std::sync::Arc;
@@ -149,13 +149,13 @@ pub fn build_migration_manager(
     };
 
     // ========================================================================
-    // PersonaConfig Migrations
+    // Persona Migrations
     // ========================================================================
     // Note: PersonaConfigV2 (2.0.0) is currently the latest version.
     // PersonaV1→V2 migration is handled during load in the repository layer.
     // When PersonaConfigV3 is introduced, add PersonaV2ToV3Migration here.
     let persona_registry = {
-        let registry = MigrationRegistry::new(PersonaConfig::latest_version());
+        let registry = MigrationRegistry::new(Persona::latest_version());
 
         // Future migrations:
         // registry.register_all(vec![
@@ -180,19 +180,19 @@ pub fn build_migration_manager(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use orcs_core::config::{PersonaConfig, PersonaSource};
+    use orcs_core::persona::{Persona, PersonaSource};
     use std::sync::Mutex;
 
     // Mock PersonaRepository for testing
     struct MockPersonaRepository {
-        personas: Mutex<Vec<PersonaConfig>>,
+        personas: Mutex<Vec<Persona>>,
     }
 
     impl MockPersonaRepository {
         fn new() -> Self {
             Self {
                 personas: Mutex::new(vec![
-                    PersonaConfig {
+                    Persona {
                         id: "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c".to_string(),
                         name: "Mai".to_string(),
                         role: "Engineer".to_string(),
@@ -207,11 +207,11 @@ mod tests {
     }
 
     impl PersonaRepository for MockPersonaRepository {
-        fn get_all(&self) -> Result<Vec<PersonaConfig>, String> {
+        fn get_all(&self) -> Result<Vec<Persona>, String> {
             Ok(self.personas.lock().unwrap().clone())
         }
 
-        fn save_all(&self, _configs: &[PersonaConfig]) -> Result<(), String> {
+        fn save_all(&self, _configs: &[Persona]) -> Result<(), String> {
             Ok(())
         }
     }
@@ -243,7 +243,7 @@ mod tests {
                     // Registry exists (may be empty if already at latest version)
                     let _ = manager.session_registry();
                 }
-                Entity::PersonaConfig => {
+                Entity::Persona => {
                     // Registry exists (may be empty if already at latest version)
                     let _ = manager.persona_registry();
                 }

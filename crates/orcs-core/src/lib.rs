@@ -1,8 +1,12 @@
 pub mod session;
 pub mod session_manager;
-pub mod config;
+pub mod persona;
 pub mod repository;
 pub mod user_service;
+
+// Deprecated: Use orcs_core::persona instead
+#[deprecated(since = "0.2.0", note = "Use orcs_core::persona instead")]
+pub mod config;
 
 use orcs_types::{TaskContext, TaskStatus};
 use uuid::Uuid;

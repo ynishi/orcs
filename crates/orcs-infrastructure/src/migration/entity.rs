@@ -25,7 +25,7 @@ pub enum Entity {
     /// Session data (conversation history, state, etc.)
     Session,
     /// Persona configuration (AI assistant profiles)
-    PersonaConfig,
+    Persona,
     // Future entities:
     // DialogueHistory,
     // UserSettings,
@@ -37,7 +37,7 @@ impl Entity {
     /// When adding a new entity, you must add it here, or `validate()`
     /// in `MigrationManager` won't check it.
     pub const fn all() -> &'static [Entity] {
-        &[Entity::Session, Entity::PersonaConfig]
+        &[Entity::Session, Entity::Persona]
     }
 
     /// Returns the human-readable name of this entity.
@@ -47,7 +47,7 @@ impl Entity {
     pub const fn name(&self) -> &'static str {
         match self {
             Entity::Session => "Session",
-            Entity::PersonaConfig => "PersonaConfig",
+            Entity::Persona => "Persona",
             // Adding a new Entity variant will cause a compile error here
         }
     }
@@ -94,7 +94,7 @@ mod private {
 // ============================================================================
 
 use crate::dto::{PersonaConfigV2, SessionV1, PERSONA_CONFIG_V2_VERSION, SESSION_V1_VERSION};
-use orcs_core::config::PersonaConfig;
+use orcs_core::persona::Persona;
 use orcs_core::session::Session;
 
 impl private::Sealed for Session {}
@@ -107,10 +107,10 @@ impl MigratedEntity for Session {
     }
 }
 
-impl private::Sealed for PersonaConfig {}
-impl MigratedEntity for PersonaConfig {
+impl private::Sealed for Persona {}
+impl MigratedEntity for Persona {
     type Dto = PersonaConfigV2;
-    const ENTITY: Entity = Entity::PersonaConfig;
+    const ENTITY: Entity = Entity::Persona;
 
     fn latest_version() -> Version {
         Version::parse(PERSONA_CONFIG_V2_VERSION).expect("Invalid PERSONA_CONFIG_V2_VERSION")
@@ -136,7 +136,7 @@ mod tests {
         let all_count = Entity::all().len();
         assert!(
             all_count >= 2,
-            "Expected at least 2 entities (Session, PersonaConfig), got {}",
+            "Expected at least 2 entities (Session, Persona), got {}",
             all_count
         );
     }
@@ -147,7 +147,7 @@ mod tests {
         let session_version = Session::latest_version();
         assert!(session_version.major >= 1);
 
-        let persona_version = PersonaConfig::latest_version();
+        let persona_version = Persona::latest_version();
         assert!(persona_version.major >= 1);
     }
 }

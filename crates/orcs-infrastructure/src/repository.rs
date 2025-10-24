@@ -1,4 +1,4 @@
-use orcs_core::config::PersonaConfig;
+use orcs_core::persona::Persona;
 use orcs_core::repository::{PersonaRepository, SessionRepository};
 use orcs_core::session::Session;
 use anyhow::{Context, Result};
@@ -13,11 +13,11 @@ use crate::migration::{SessionV0ToV1Migration, TypedMigration};
 pub struct TomlPersonaRepository;
 
 impl PersonaRepository for TomlPersonaRepository {
-    fn get_all(&self) -> Result<Vec<PersonaConfig>, String> {
+    fn get_all(&self) -> Result<Vec<Persona>, String> {
         crate::toml_storage::load_personas()
     }
 
-    fn save_all(&self, configs: &[PersonaConfig]) -> Result<(), String> {
+    fn save_all(&self, configs: &[Persona]) -> Result<(), String> {
         crate::toml_storage::save_personas(configs)
     }
 }
@@ -242,7 +242,7 @@ impl SessionRepository for TomlSessionRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use orcs_core::config::{PersonaConfig, PersonaSource};
+    use orcs_core::persona::{Persona, PersonaSource};
     use orcs_types::{AppMode, MessageRole, ConversationMessage};
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
@@ -250,14 +250,14 @@ mod tests {
 
     // Mock PersonaRepository for testing
     struct MockPersonaRepository {
-        personas: Mutex<Vec<PersonaConfig>>,
+        personas: Mutex<Vec<Persona>>,
     }
 
     impl MockPersonaRepository {
         fn new() -> Self {
             Self {
                 personas: Mutex::new(vec![
-                    PersonaConfig {
+                    Persona {
                         id: "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c".to_string(),
                         name: "Mai".to_string(),
                         role: "Engineer".to_string(),
@@ -272,11 +272,11 @@ mod tests {
     }
 
     impl PersonaRepository for MockPersonaRepository {
-        fn get_all(&self) -> Result<Vec<PersonaConfig>, String> {
+        fn get_all(&self) -> Result<Vec<Persona>, String> {
             Ok(self.personas.lock().unwrap().clone())
         }
 
-        fn save_all(&self, _configs: &[PersonaConfig]) -> Result<(), String> {
+        fn save_all(&self, _configs: &[Persona]) -> Result<(), String> {
             Ok(())
         }
     }

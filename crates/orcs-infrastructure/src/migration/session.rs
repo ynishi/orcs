@@ -214,17 +214,17 @@ impl From<&Session> for SessionV1 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use orcs_core::config::{PersonaConfig, PersonaSource};
+    use orcs_core::persona::{Persona, PersonaSource};
     use orcs_types::{AppMode, MessageRole};
     use std::sync::Mutex;
 
     // Mock PersonaRepository for testing
     struct MockPersonaRepository {
-        personas: Mutex<Vec<PersonaConfig>>,
+        personas: Mutex<Vec<Persona>>,
     }
 
     impl MockPersonaRepository {
-        fn new(personas: Vec<PersonaConfig>) -> Self {
+        fn new(personas: Vec<Persona>) -> Self {
             Self {
                 personas: Mutex::new(personas),
             }
@@ -232,18 +232,18 @@ mod tests {
     }
 
     impl PersonaRepository for MockPersonaRepository {
-        fn get_all(&self) -> Result<Vec<PersonaConfig>, String> {
+        fn get_all(&self) -> Result<Vec<Persona>, String> {
             Ok(self.personas.lock().unwrap().clone())
         }
 
-        fn save_all(&self, _configs: &[PersonaConfig]) -> Result<(), String> {
+        fn save_all(&self, _configs: &[Persona]) -> Result<(), String> {
             Ok(())
         }
     }
 
-    fn create_test_personas() -> Vec<PersonaConfig> {
+    fn create_test_personas() -> Vec<Persona> {
         vec![
-            PersonaConfig {
+            Persona {
                 id: "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c".to_string(),
                 name: "Mai".to_string(),
                 role: "Engineer".to_string(),
@@ -252,7 +252,7 @@ mod tests {
                 default_participant: true,
                 source: PersonaSource::System,
             },
-            PersonaConfig {
+            Persona {
                 id: "2a9f5c3b-1e7d-5a4f-8b2c-6d3e9f1a7b4c".to_string(),
                 name: "Yui".to_string(),
                 role: "Architect".to_string(),

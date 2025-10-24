@@ -91,17 +91,34 @@ function App() {
   }, [messages]);
 
   // Listen for real-time dialogue turn events from backend
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
+  // Use ref to ensure only one listener is registered
+  const listenerRegistered = useRef(false);
 
-    listen<{ author: string; content: string }>('dialogue-turn', (event) => {
-      console.log('[STREAM] Received dialogue turn:', event.payload.author);
-      addMessage('ai', event.payload.author, event.payload.content);
-    }).then((unlistenFn) => {
-      unlisten = unlistenFn;
-    });
+  useEffect(() => {
+    // Skip if listener already registered (prevents duplicate in React Strict Mode)
+    if (listenerRegistered.current) {
+      console.log('[EFFECT] Listener already registered, skipping');
+      return;
+    }
+
+    let unlisten: (() => void) | undefined;
+    listenerRegistered.current = true;
+
+    console.log('[EFFECT] Setting up dialogue-turn listener');
+
+    const setupListener = async () => {
+      unlisten = await listen<{ author: string; content: string }>('dialogue-turn', (event) => {
+        console.log('[STREAM] Event received:', event.payload.author);
+        console.log('[STREAM] Adding message:', event.payload.author);
+        addMessage('ai', event.payload.author, event.payload.content);
+      });
+      console.log('[EFFECT] Listener setup complete');
+    };
+
+    setupListener();
 
     return () => {
+      console.log('[EFFECT] Cleanup: removing listener');
       if (unlisten) {
         unlisten();
       }

@@ -80,12 +80,16 @@ export function SessionList({
                 position: 'relative',
               }}
               onMouseEnter={(e) => {
-                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-                if (deleteBtn) deleteBtn.style.opacity = '1';
+                const actionBtns = e.currentTarget.querySelectorAll('.action-btn');
+                actionBtns.forEach((btn) => {
+                  (btn as HTMLElement).style.opacity = '1';
+                });
               }}
               onMouseLeave={(e) => {
-                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-                if (deleteBtn) deleteBtn.style.opacity = '0';
+                const actionBtns = e.currentTarget.querySelectorAll('.action-btn');
+                actionBtns.forEach((btn) => {
+                  (btn as HTMLElement).style.opacity = '0';
+                });
               }}
             >
               {editingSessionId === session.id ? (
@@ -135,7 +139,7 @@ export function SessionList({
 
                   {/* 編集ボタン */}
                   <ActionIcon
-                    className="delete-btn"
+                    className="action-btn"
                     size="sm"
                     color="blue"
                     variant="subtle"
@@ -143,6 +147,7 @@ export function SessionList({
                     style={{
                       opacity: 0,
                       transition: 'opacity 0.15s ease',
+                      flexShrink: 0,
                     }}
                   >
                     ✏️
@@ -150,7 +155,7 @@ export function SessionList({
 
                   {/* 削除ボタン */}
                   <ActionIcon
-                    className="delete-btn"
+                    className="action-btn"
                     size="sm"
                     color="red"
                     variant="subtle"
@@ -161,6 +166,7 @@ export function SessionList({
                     style={{
                       opacity: 0,
                       transition: 'opacity 0.15s ease',
+                      flexShrink: 0,
                     }}
                   >
                     🗑️

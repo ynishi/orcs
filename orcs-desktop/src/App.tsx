@@ -462,10 +462,11 @@ function App() {
       });
 
       // Process AI response
+      // Note: NewDialogueMessages are already streamed via 'dialogue-turn' events,
+      // so we skip processing them here to avoid duplicates
       if (result.type === 'NewDialogueMessages') {
-        for (const message of result.data) {
-          addMessage('ai', message.author, message.content);
-        }
+        // Messages already displayed via streaming events
+        console.log('[BATCH] Received', result.data.length, 'messages (already streamed)');
       }
 
       // Auto-save after interaction

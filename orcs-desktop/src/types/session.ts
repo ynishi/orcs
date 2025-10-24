@@ -24,11 +24,11 @@ export interface ConversationMessage {
 
 /**
  * アプリケーションモード
- * Matches Rust's AppMode enum (Rust enums serialize as tagged unions)
+ * Matches Rust's AppMode enum with #[serde(tag = "type", content = "data")]
  */
 export type AppMode =
-  | { Idle: null }
-  | { AwaitingConfirmation: { plan: Plan } };
+  | { type: 'Idle' }
+  | { type: 'AwaitingConfirmation'; data: { plan: Plan } };
 
 /**
  * プラン
@@ -102,15 +102,15 @@ export function generateSessionTitle(firstMessage: string): string {
  * AppModeがIdleかどうか判定
  */
 export function isIdleMode(mode: AppMode): boolean {
-  return 'Idle' in mode;
+  return mode.type === 'Idle';
 }
 
 /**
  * AppModeからPlanを取得（AwaitingConfirmationの場合）
  */
 export function getPlan(mode: AppMode): Plan | null {
-  if ('AwaitingConfirmation' in mode) {
-    return mode.AwaitingConfirmation.plan;
+  if (mode.type === 'AwaitingConfirmation') {
+    return mode.data.plan;
   }
   return null;
 }

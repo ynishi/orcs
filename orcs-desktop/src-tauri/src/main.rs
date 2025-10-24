@@ -324,7 +324,8 @@ async fn handle_input(
     // TODO: Implement Tauri v2 event emission for real-time streaming
     let result = manager.handle_input_with_streaming(&current_mode, &input, |turn| {
         // Log each dialogue turn as it becomes available (for now)
-        eprintln!("[TAURI] Streaming turn: {} - {}...", turn.author, &turn.content[..turn.content.len().min(50)]);
+        let preview: String = turn.content.chars().take(50).collect();
+        eprintln!("[TAURI] Streaming turn: {} - {}...", turn.author, preview);
         // TODO: Emit event to frontend when Tauri v2 API is implemented
     }).await;
 

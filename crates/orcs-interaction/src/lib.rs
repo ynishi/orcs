@@ -523,7 +523,8 @@ impl InteractionManager {
             match result {
                 Ok(turn) => {
                     // Log the turn for debugging sequential execution
-                    eprintln!("[DIALOGUE] Turn received: {} - {}", turn.participant_name, &turn.content[..turn.content.len().min(50)]);
+                    let preview: String = turn.content.chars().take(50).collect();
+                    eprintln!("[DIALOGUE] Turn received: {} - {}...", turn.participant_name, preview);
 
                     // Convert participant_name (display name) to persona_id (UUID)
                     let persona_id = self.get_persona_id_by_name(&turn.participant_name)

@@ -2,6 +2,7 @@ pub mod session;
 pub mod session_manager;
 pub mod config;
 pub mod repository;
+pub mod user_service;
 
 use orcs_types::{TaskContext, TaskStatus};
 use uuid::Uuid;

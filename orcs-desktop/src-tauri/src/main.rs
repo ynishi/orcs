@@ -7,6 +7,7 @@ use orcs_core::session::Session;
 use orcs_core::session_manager::SessionManager;
 use orcs_core::config::PersonaConfig;
 use orcs_core::repository::PersonaRepository;
+use orcs_core::user_service::{UserService, DefaultUserService};
 use orcs_infrastructure::repository::{TomlPersonaRepository, TomlSessionRepository};
 use orcs_interaction::{InteractionManager, InteractionResult};
 use orcs_interaction::presets::get_default_presets;
@@ -19,6 +20,7 @@ struct AppState {
     session_manager: Arc<SessionManager<InteractionManager>>,
     app_mode: Mutex<AppMode>,
     persona_repository: Arc<dyn PersonaRepository>,
+    user_service: Arc<dyn UserService>,
 }
 
 /// Serializable version of DialogueMessage for Tauri IPC
@@ -78,7 +80,7 @@ async fn create_session(
 ) -> Result<Session, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
     let manager = state.session_manager
-        .create_session(session_id.clone(), |sid| InteractionManager::new_session(sid, state.persona_repository.clone()))
+        .create_session(session_id.clone(), |sid| InteractionManager::new_session(sid, state.persona_repository.clone(), state.user_service.clone()))
         .await
         .map_err(|e| e.to_string())?;
 
@@ -109,7 +111,7 @@ async fn switch_session(
     state: State<'_, AppState>,
 ) -> Result<Session, String> {
     let manager = state.session_manager
-        .switch_session(&session_id, |data| InteractionManager::from_session(data, state.persona_repository.clone()))
+        .switch_session(&session_id, |data| InteractionManager::from_session(data, state.persona_repository.clone(), state.user_service.clone()))
         .await
         .map_err(|e| e.to_string())?;
 
@@ -307,6 +309,7 @@ fn main() {
     tauri::async_runtime::block_on(async {
         // Composition Root: Create the concrete repository instances
         let persona_repository = Arc::new(TomlPersonaRepository);
+        let user_service: Arc<dyn UserService> = Arc::new(DefaultUserService::default());
 
         // Seed the config file with default personas if it's empty on first run.
         if let Ok(configs) = persona_repository.get_all() {
@@ -332,7 +335,7 @@ fn main() {
 
         // Try to restore last session, otherwise create a new one
         let restored = session_manager
-            .restore_last_session(|data| InteractionManager::from_session(data, persona_repository.clone()))
+            .restore_last_session(|data| InteractionManager::from_session(data, persona_repository.clone(), user_service.clone()))
             .await
             .ok()
             .flatten();
@@ -341,7 +344,7 @@ fn main() {
             // Create initial session
             let initial_session_id = uuid::Uuid::new_v4().to_string();
             session_manager
-                .create_session(initial_session_id, |sid| InteractionManager::new_session(sid, persona_repository.clone()))
+                .create_session(initial_session_id, |sid| InteractionManager::new_session(sid, persona_repository.clone(), user_service.clone()))
                 .await
                 .expect("Failed to create initial session");
         }
@@ -354,6 +357,7 @@ fn main() {
                 session_manager,
                 app_mode,
                 persona_repository,
+                user_service,
             })
             .invoke_handler(tauri::generate_handler![
                 create_session,

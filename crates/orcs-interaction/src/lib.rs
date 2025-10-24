@@ -8,6 +8,7 @@ use orcs_types::{AppMode, Plan, ConversationMessage, MessageRole};
 use orcs_core::session::Session;
 use orcs_core::repository::PersonaRepository;
 use orcs_core::config::PersonaConfig;
+use orcs_core::user_service::UserService;
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, ClaudeCodeJsonAgent};
 use llm_toolkit::agent::dialogue::{Dialogue, DialogueBlueprint};
 use llm_toolkit::agent::persona::{Persona, PersonaTeam};
@@ -109,6 +110,8 @@ pub struct InteractionManager {
     persona_histories: Arc<RwLock<HashMap<String, Vec<ConversationMessage>>>>,
     /// Repository for persona configurations
     persona_repository: Arc<dyn PersonaRepository>,
+    /// Service for retrieving user information
+    user_service: Arc<dyn UserService>,
 }
 
 impl InteractionManager {
@@ -118,8 +121,15 @@ impl InteractionManager {
     ///
     /// * `session_id` - Unique identifier for this session
     /// * `persona_repository` - Repository for accessing persona configurations
-    pub fn new_session(session_id: String, persona_repository: Arc<dyn PersonaRepository>) -> Self {
+    /// * `user_service` - Service for retrieving user information
+    pub fn new_session(
+        session_id: String,
+        persona_repository: Arc<dyn PersonaRepository>,
+        user_service: Arc<dyn UserService>,
+    ) -> Self {
         let mut persona_histories_map = HashMap::new();
+        // Initialize with user's history and default personas
+        persona_histories_map.insert(user_service.get_user_name(), Vec::new());
         persona_histories_map.insert("mai".to_string(), Vec::new());
         persona_histories_map.insert("yui".to_string(), Vec::new());
 
@@ -133,6 +143,7 @@ impl InteractionManager {
             dialogue: Arc::new(Mutex::new(None)),
             persona_histories: Arc::new(RwLock::new(persona_histories_map)),
             persona_repository,
+            user_service,
         }
     }
 
@@ -142,12 +153,17 @@ impl InteractionManager {
     ///
     /// * `data` - The session data to restore
     /// * `persona_repository` - Repository for accessing persona configurations
+    /// * `user_service` - Service for retrieving user information
     ///
     /// # Note
     ///
     /// This creates new Agent instances. History is stored separately
     /// in persona_histories and included in prompts manually.
-    pub fn from_session(data: Session, persona_repository: Arc<dyn PersonaRepository>) -> Self {
+    pub fn from_session(
+        data: Session,
+        persona_repository: Arc<dyn PersonaRepository>,
+        user_service: Arc<dyn UserService>,
+    ) -> Self {
         let persona_histories_map = data.persona_histories.clone();
 
         Self {
@@ -157,6 +173,7 @@ impl InteractionManager {
             dialogue: Arc::new(Mutex::new(None)),
             persona_histories: Arc::new(RwLock::new(persona_histories_map)),
             persona_repository,
+            user_service,
         }
     }
 
@@ -348,15 +365,16 @@ impl InteractionManager {
             return InteractionResult::NewMessage(format!("Error initializing dialogue: {}", e));
         }
 
+        // Add user input to history BEFORE running dialogue (so timestamp is correct)
+        let user_name = self.user_service.get_user_name();
+        self.add_to_history(&user_name, MessageRole::User, input).await;
+
         // Run the dialogue with the user's input
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
 
         match dialogue.run(input.to_string()).await {
             Ok(turns) => {
-                // Add user input to history (using "mai" as default persona for compatibility)
-                self.add_to_history("mai", MessageRole::User, input).await;
-
                 // Process the dialogue turns and add to history
                 let mut messages = Vec::new();
                 for turn in &turns {

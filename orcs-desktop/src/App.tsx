@@ -499,16 +499,14 @@ function App() {
                   </Group>
                 </Accordion.Control>
                 <Accordion.Panel>
-                  <Box style={{ maxHeight: '400px' }}>
-                    <SessionList
-                      sessions={sessions}
-                      currentSessionId={currentSessionId || undefined}
-                      onSessionSelect={handleSessionSelect}
-                      onSessionDelete={handleSessionDelete}
-                      onSessionRename={handleSessionRename}
-                      onNewSession={handleNewSession}
-                    />
-                  </Box>
+                  <SessionList
+                    sessions={sessions}
+                    currentSessionId={currentSessionId || undefined}
+                    onSessionSelect={handleSessionSelect}
+                    onSessionDelete={handleSessionDelete}
+                    onSessionRename={handleSessionRename}
+                    onNewSession={handleNewSession}
+                  />
                 </Accordion.Panel>
               </Accordion.Item>
 

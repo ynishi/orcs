@@ -45,10 +45,10 @@ export function SessionList({
   };
 
   return (
-    <Stack gap="md" h="100%">
+    <Stack gap="xs" style={{ maxHeight: '400px' }}>
       {/* ヘッダー */}
-      <Group justify="space-between" px="md" pt="md">
-        <Text size="lg" fw={700}>
+      <Group justify="space-between" px="sm">
+        <Text size="sm" fw={600}>
           Sessions
         </Text>
         <Tooltip label="New session" withArrow>
@@ -56,7 +56,7 @@ export function SessionList({
             color="blue"
             variant="light"
             onClick={onNewSession}
-            size="sm"
+            size="xs"
           >
             ➕
           </ActionIcon>
@@ -64,7 +64,7 @@ export function SessionList({
       </Group>
 
       {/* セッションリスト */}
-      <ScrollArea style={{ flex: 1 }} px="sm">
+      <ScrollArea h={340} px="sm">
         <Stack gap={4}>
           {sortedSessions.map((session) => (
             <Group

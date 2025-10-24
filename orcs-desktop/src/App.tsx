@@ -323,6 +323,16 @@ function App() {
       }
 
       addMessage('system', 'System', `✅ Switched to session: ${session.title} (${restoredMessages.length} messages restored)`);
+
+      // Scroll to bottom after session switch
+      setTimeout(() => {
+        if (viewport.current) {
+          viewport.current.scrollTo({
+            top: viewport.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }, 100);
     } catch (err) {
       addMessage('error', 'System', `Failed to switch session: ${err}`);
     }

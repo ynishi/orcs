@@ -103,3 +103,87 @@ pub fn save_personas(personas: &[PersonaConfig]) -> Result<(), String> {
         None => Err("Cannot find config directory".to_string()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_load_and_save_v1_config_migrates_to_v2() {
+        // Create a temporary V1 config file
+        let v1_toml = r#"
+[[persona]]
+schema_version = "1.0.0"
+id = "mai"
+name = "Mai"
+role = "UX Engineer"
+background = "Background"
+communication_style = "Friendly"
+default_participant = true
+source = "System"
+"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(v1_toml.as_bytes()).unwrap();
+        temp_file.flush().unwrap();
+
+        // Read the V1 config
+        let content = fs::read_to_string(temp_file.path()).unwrap();
+
+        // Try to load as V1
+        let root_dto = toml::from_str::<ConfigRootV1>(&content).unwrap();
+        let personas: Vec<PersonaConfig> = root_dto.personas.into_iter()
+            .map(|v1_dto| {
+                let v2_dto: PersonaConfigV2 = v1_dto.into();
+                v2_dto.into()
+            })
+            .collect();
+
+        // Verify UUID conversion happened
+        assert!(uuid::Uuid::parse_str(&personas[0].id).is_ok(),
+                "ID should be UUID, got: {}", personas[0].id);
+        assert_ne!(personas[0].id, "mai", "ID should not be 'mai' anymore");
+
+        // Convert back to V2 DTO and serialize
+        let persona_dtos: Vec<PersonaConfigV2> = personas.iter()
+            .map(|p| p.into())
+            .collect();
+        let root_dto = ConfigRootV2 { personas: persona_dtos };
+        let toml_string = toml::to_string_pretty(&root_dto).unwrap();
+
+        // Verify V2 format in TOML output
+        assert!(toml_string.contains("schema_version = \"2.0.0\""),
+                "TOML should contain V2 schema version");
+        assert!(toml_string.contains("name = \"Mai\""),
+                "TOML should contain persona name");
+
+        // Verify it's not the old ID
+        assert!(!toml_string.contains("id = \"mai\""),
+                "TOML should not contain old ID 'mai'");
+    }
+
+    #[test]
+    fn test_v2_persona_serialization_includes_schema_version() {
+        use crate::dto::{PersonaConfigV2, PersonaSourceDTO, PERSONA_CONFIG_V2_VERSION};
+
+        let persona_v2 = PersonaConfigV2 {
+            schema_version: PERSONA_CONFIG_V2_VERSION.to_string(),
+            id: "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c".to_string(),
+            name: "Mai".to_string(),
+            role: "UX Engineer".to_string(),
+            background: "Background".to_string(),
+            communication_style: "Friendly".to_string(),
+            default_participant: true,
+            source: PersonaSourceDTO::System,
+        };
+
+        let toml_string = toml::to_string_pretty(&persona_v2).unwrap();
+
+        assert!(toml_string.contains("schema_version = \"2.0.0\""),
+                "Serialized TOML should contain schema_version");
+        assert!(toml_string.contains("id = \"8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c\""),
+                "Serialized TOML should contain UUID");
+    }
+}

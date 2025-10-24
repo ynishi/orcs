@@ -172,17 +172,74 @@ impl InteractionManager {
         persona_repository: Arc<dyn PersonaRepository>,
         user_service: Arc<dyn UserService>,
     ) -> Self {
-        let persona_histories_map = data.persona_histories.clone();
+        // Migrate persona_histories keys from old IDs to UUIDs
+        let migrated_histories = Self::migrate_persona_history_keys(
+            data.persona_histories,
+            &persona_repository,
+        );
 
         Self {
             session_id: data.id,
             title: Arc::new(RwLock::new(data.title)),
             created_at: data.created_at,
             dialogue: Arc::new(Mutex::new(None)),
-            persona_histories: Arc::new(RwLock::new(persona_histories_map)),
+            persona_histories: Arc::new(RwLock::new(migrated_histories)),
             persona_repository,
             user_service,
         }
+    }
+
+    /// Migrates persona_histories keys from non-UUID formats to UUID.
+    ///
+    /// This handles:
+    /// - Old string IDs ("mai", "yui") → UUID
+    /// - Display names ("Mai", "Yui") → UUID
+    /// - Already-UUID keys → pass through
+    fn migrate_persona_history_keys(
+        histories: HashMap<String, Vec<ConversationMessage>>,
+        persona_repository: &Arc<dyn PersonaRepository>,
+    ) -> HashMap<String, Vec<ConversationMessage>> {
+        let personas = persona_repository.get_all().unwrap_or_default();
+        let mut migrated = HashMap::new();
+
+        for (key, messages) in histories {
+            // Check if key is already a valid UUID
+            if uuid::Uuid::parse_str(&key).is_ok() {
+                // Already UUID - keep as is
+                migrated.insert(key, messages);
+                continue;
+            }
+
+            // Try to find persona by old ID or name (case-insensitive)
+            let key_lower = key.to_lowercase();
+            let matching_persona = personas.iter().find(|p| {
+                // Check old ID format (mai, yui, etc.)
+                let old_id_matches = p.name.to_lowercase() == key_lower;
+                // Check display name (Mai, Yui)
+                let name_matches = p.name == key;
+                old_id_matches || name_matches
+            });
+
+            if let Some(persona) = matching_persona {
+                // Use the UUID from the persona
+                migrated.insert(persona.id.clone(), messages);
+            } else {
+                // Unknown key - keep as is (might be user name)
+                migrated.insert(key, messages);
+            }
+        }
+
+        migrated
+    }
+
+    /// Resolves a persona name to its UUID.
+    ///
+    /// This is used to convert DialogueTurn participant names to persona IDs.
+    fn get_persona_id_by_name(&self, name: &str) -> Option<String> {
+        let personas = self.persona_repository.get_all().ok()?;
+        personas.iter()
+            .find(|p| p.name == name)
+            .map(|p| p.id.clone())
     }
 
     /// Ensures the dialogue is initialized. If not, creates it from a blueprint.
@@ -340,10 +397,10 @@ impl InteractionManager {
         let dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_ref().expect("Dialogue not initialized");
 
-        // Access the public `participants` field and get its keys
+        // Convert participant names to persona UUIDs
         let participant_ids = dialogue.participants()
             .iter()
-            .map(|persona| persona.name.to_lowercase()) // Convert names to lowercase IDs
+            .filter_map(|persona| self.get_persona_id_by_name(&persona.name))
             .collect();
 
         Ok(participant_ids)
@@ -397,10 +454,14 @@ impl InteractionManager {
                 // Process the dialogue turns and add to history
                 let mut messages = Vec::new();
                 for turn in &turns {
-                    // Add each response to history
-                    self.add_to_history(&turn.participant_name, MessageRole::Assistant, &turn.content).await;
+                    // Convert participant_name (display name) to persona_id (UUID)
+                    let persona_id = self.get_persona_id_by_name(&turn.participant_name)
+                        .unwrap_or_else(|| turn.participant_name.clone());
 
-                    // Create DialogueMessage
+                    // Add each response to history using persona_id
+                    self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content).await;
+
+                    // Create DialogueMessage (still using name for UI display)
                     messages.push(DialogueMessage {
                         author: turn.participant_name.clone(),
                         content: turn.content.clone(),

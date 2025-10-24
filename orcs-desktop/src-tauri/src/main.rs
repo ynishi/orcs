@@ -319,6 +319,12 @@ fn main() {
                     // This is a critical failure on startup, so we panic.
                     panic!("Failed to seed default personas into config file: {}", e);
                 }
+            } else {
+                // Auto-migrate: re-save to ensure V2 format
+                // This converts any V1 configs to V2 on startup
+                if let Err(e) = persona_repository.save_all(&configs) {
+                    eprintln!("Warning: Failed to auto-migrate persona config to V2: {}", e);
+                }
             }
         }
 

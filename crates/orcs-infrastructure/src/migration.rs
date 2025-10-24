@@ -82,21 +82,12 @@ impl From<PersonaSource> for PersonaSourceDTO {
 /// Convert PersonaConfigV1 DTO to domain model.
 ///
 /// Handles backward compatibility across V1.x versions.
+/// Migrates through V2 to ensure UUID conversion.
 impl From<PersonaConfigV1> for PersonaConfig {
     fn from(dto: PersonaConfigV1) -> Self {
-        // Parse version for future migration logic
-        let _version = Version::parse(&dto.schema_version)
-            .unwrap_or_else(|_| Version::new(1, 0, 0));
-
-        PersonaConfig {
-            id: dto.id,
-            name: dto.name,
-            role: dto.role,
-            background: dto.background,
-            communication_style: dto.communication_style,
-            default_participant: dto.default_participant,
-            source: dto.source.into(),
-        }
+        // Migrate V1 -> V2 -> PersonaConfig to ensure UUID conversion
+        let v2_dto: PersonaConfigV2 = dto.into();
+        v2_dto.into()
     }
 }
 
@@ -147,10 +138,22 @@ impl From<PersonaConfigV1> for PersonaConfigV2 {
 }
 
 /// Convert PersonaConfigV2 DTO to domain model.
+///
+/// If the ID is not a valid UUID (legacy data), converts it to UUID using V1→V2 logic.
 impl From<PersonaConfigV2> for PersonaConfig {
     fn from(dto: PersonaConfigV2) -> Self {
+        // Validate and fix ID if needed
+        let id = if Uuid::parse_str(&dto.id).is_ok() {
+            dto.id
+        } else {
+            // Legacy data: V2 schema but non-UUID ID
+            // Convert using same logic as V1→V2
+            let namespace = Uuid::NAMESPACE_OID;
+            Uuid::new_v5(&namespace, dto.name.as_bytes()).to_string()
+        };
+
         PersonaConfig {
-            id: dto.id,
+            id,
             name: dto.name,
             role: dto.role,
             background: dto.background,
@@ -176,5 +179,81 @@ impl From<&PersonaConfig> for PersonaConfigV2 {
             default_participant: config.default_participant,
             source: config.source.clone().into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_persona_config_v1_to_v2_migration_with_non_uuid_id() {
+        // Create a V1 persona with non-UUID ID
+        let v1 = PersonaConfigV1 {
+            schema_version: PERSONA_CONFIG_V1_VERSION.to_string(),
+            id: "mai".to_string(),
+            name: "Mai".to_string(),
+            role: "UX Engineer".to_string(),
+            background: "Background".to_string(),
+            communication_style: "Friendly".to_string(),
+            default_participant: true,
+            source: PersonaSourceDTO::System,
+        };
+
+        // Convert to V2
+        let v2: PersonaConfigV2 = v1.into();
+
+        // ID should be converted to UUID
+        assert!(Uuid::parse_str(&v2.id).is_ok(), "ID should be a valid UUID, got: {}", v2.id);
+        assert_ne!(v2.id, "mai", "ID should not be 'mai' anymore");
+        assert_eq!(v2.schema_version, PERSONA_CONFIG_V2_VERSION);
+        assert_eq!(v2.name, "Mai");
+    }
+
+    #[test]
+    fn test_persona_config_v1_to_v2_migration_with_existing_uuid() {
+        let existing_uuid = "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c";
+
+        // Create a V1 persona with UUID ID
+        let v1 = PersonaConfigV1 {
+            schema_version: PERSONA_CONFIG_V1_VERSION.to_string(),
+            id: existing_uuid.to_string(),
+            name: "Mai".to_string(),
+            role: "UX Engineer".to_string(),
+            background: "Background".to_string(),
+            communication_style: "Friendly".to_string(),
+            default_participant: true,
+            source: PersonaSourceDTO::System,
+        };
+
+        // Convert to V2
+        let v2: PersonaConfigV2 = v1.into();
+
+        // ID should remain the same
+        assert_eq!(v2.id, existing_uuid, "UUID should be preserved");
+        assert_eq!(v2.schema_version, PERSONA_CONFIG_V2_VERSION);
+    }
+
+    #[test]
+    fn test_persona_config_v1_to_domain_model_converts_uuid() {
+        // Create a V1 persona with non-UUID ID
+        let v1 = PersonaConfigV1 {
+            schema_version: PERSONA_CONFIG_V1_VERSION.to_string(),
+            id: "yui".to_string(),
+            name: "Yui".to_string(),
+            role: "Engineer".to_string(),
+            background: "Background".to_string(),
+            communication_style: "Professional".to_string(),
+            default_participant: true,
+            source: PersonaSourceDTO::System,
+        };
+
+        // Convert to domain model
+        let persona: PersonaConfig = v1.into();
+
+        // ID should be converted to UUID
+        assert!(Uuid::parse_str(&persona.id).is_ok(), "ID should be a valid UUID, got: {}", persona.id);
+        assert_ne!(persona.id, "yui", "ID should not be 'yui' anymore");
+        assert_eq!(persona.name, "Yui");
     }
 }

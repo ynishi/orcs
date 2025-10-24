@@ -8,7 +8,7 @@ use orcs_core::repository::PersonaRepository;
 use orcs_core::persona::Persona as PersonaDomain;
 use orcs_core::user::UserService;
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, ClaudeCodeJsonAgent};
-use llm_toolkit::agent::dialogue::{Dialogue, DialogueBlueprint};
+use llm_toolkit::agent::dialogue::{Dialogue, DialogueBlueprint, ExecutionModel};
 use llm_toolkit::agent::persona::{Persona as LlmPersona, PersonaTeam};
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 
@@ -19,6 +19,14 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
         role: persona.role.clone(),
         background: persona.background.clone(),
         communication_style: persona.communication_style.clone(),
+    }
+}
+
+/// Converts a string strategy name to ExecutionModel enum.
+fn string_to_execution_model(s: &str) -> ExecutionModel {
+    match s {
+        "sequential" => ExecutionModel::Sequential,
+        _ => ExecutionModel::Broadcast,
     }
 }
 
@@ -262,13 +270,14 @@ impl InteractionManager {
             .map(domain_to_llm_persona)
             .collect();
 
-        let strategy = self.execution_strategy.read().await.clone();
+        let strategy_str = self.execution_strategy.read().await.clone();
+        let strategy_model = string_to_execution_model(&strategy_str);
 
         let blueprint = DialogueBlueprint {
             agenda: "Orcs AI Assistant Session".to_string(),
             context: "A collaborative session between the user and AI assistants Mai and Yui.".to_string(),
             participants: Some(participants),
-            execution_strategy: Some(strategy),
+            execution_strategy: Some(strategy_model),
         };
 
         // Create fresh agents for dialogue initialization

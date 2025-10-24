@@ -1,5 +1,4 @@
 pub mod session;
-pub mod session_manager;
 pub mod persona;
 pub mod repository;
 pub mod user_service;

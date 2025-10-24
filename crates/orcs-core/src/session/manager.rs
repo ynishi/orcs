@@ -3,8 +3,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use anyhow::Result;
 use orcs_types::AppMode;
-use crate::session::Session;
-use crate::repository::SessionRepository;
+use super::model::Session;
+use super::repository::SessionRepository;
 
 // Forward declaration - orcs-interaction will provide this
 // We use dynamic dispatch to avoid circular dependencies

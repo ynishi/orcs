@@ -506,7 +506,7 @@ impl Default for InteractionManager {
 }
 
 // Implement trait required by SessionManager
-impl orcs_core::session_manager::InteractionManagerTrait for InteractionManager {
+impl orcs_core::session::InteractionManagerTrait for InteractionManager {
     fn session_id(&self) -> &str {
         &self.session_id
     }

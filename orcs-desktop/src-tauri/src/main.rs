@@ -3,8 +3,7 @@
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use orcs_core::session::Session;
-use orcs_core::session_manager::SessionManager;
+use orcs_core::session::{Session, SessionManager};
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::user_service::{UserService, DefaultUserService};

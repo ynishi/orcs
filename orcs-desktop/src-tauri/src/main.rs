@@ -5,7 +5,6 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use orcs_core::session::Session;
 use orcs_core::session_manager::SessionManager;
-use orcs_core::session_storage::SessionStorage;
 use orcs_core::config::PersonaConfig;
 use orcs_core::repository::PersonaRepository;
 use orcs_infrastructure::repository::{TomlPersonaRepository, TomlSessionRepository};
@@ -307,10 +306,11 @@ fn main() {
             }
         }
 
-        // Create SessionStorage and wrap it in TomlSessionRepository
-        let storage = SessionStorage::default_location()
-            .expect("Failed to create session storage");
-        let session_repository = Arc::new(TomlSessionRepository::new(storage));
+        // Create TomlSessionRepository at default location
+        let session_repository = Arc::new(
+            TomlSessionRepository::default_location()
+                .expect("Failed to create session repository")
+        );
 
         // Initialize SessionManager with the repository
         let session_manager: Arc<SessionManager<InteractionManager>> = Arc::new(

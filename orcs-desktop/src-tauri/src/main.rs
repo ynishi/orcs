@@ -330,7 +330,7 @@ fn main() {
 
         // Create TomlSessionRepository at default location
         let session_repository = Arc::new(
-            TomlSessionRepository::default_location()
+            TomlSessionRepository::default_location(persona_repository.clone())
                 .expect("Failed to create session repository")
         );
 

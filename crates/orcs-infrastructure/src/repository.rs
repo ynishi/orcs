@@ -3,9 +3,11 @@ use orcs_core::repository::{PersonaRepository, SessionRepository};
 use orcs_core::session::Session;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use semver::Version;
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::dto::SessionV1;
+use crate::dto::{SessionV0, SessionV1};
+use crate::migration::{SessionV0ToV1Migration, TypedMigration};
 
 /// A repository implementation for storing persona configurations in a TOML file.
 pub struct TomlPersonaRepository;
@@ -24,11 +26,12 @@ impl PersonaRepository for TomlPersonaRepository {
 ///
 /// This implementation follows Clean Architecture principles:
 /// - Uses DTOs (SessionV1) for persistence
-/// - Handles migration from older formats
+/// - Handles migration from older formats (V0→V1)
 /// - Converts between DTOs and domain models
 /// - Stores sessions as individual TOML files in a sessions directory
 pub struct TomlSessionRepository {
     base_dir: PathBuf,
+    persona_repository: std::sync::Arc<dyn PersonaRepository>,
 }
 
 impl TomlSessionRepository {
@@ -46,11 +49,15 @@ impl TomlSessionRepository {
     /// # Arguments
     ///
     /// * `base_dir` - The base directory for storing session data
+    /// * `persona_repository` - Required for V0→V1 migration (persona name→UUID resolution)
     ///
     /// # Errors
     ///
     /// Returns an error if the directory structure cannot be created.
-    pub fn new(base_dir: impl AsRef<Path>) -> Result<Self> {
+    pub fn new(
+        base_dir: impl AsRef<Path>,
+        persona_repository: std::sync::Arc<dyn PersonaRepository>,
+    ) -> Result<Self> {
         let base_dir = base_dir.as_ref().to_path_buf();
 
         // Create directory structure
@@ -58,20 +65,29 @@ impl TomlSessionRepository {
         fs::create_dir_all(&sessions_dir)
             .context("Failed to create sessions directory")?;
 
-        Ok(Self { base_dir })
+        Ok(Self {
+            base_dir,
+            persona_repository,
+        })
     }
 
     /// Creates a `TomlSessionRepository` instance at the default location (~/.orcs).
+    ///
+    /// # Arguments
+    ///
+    /// * `persona_repository` - Required for V0→V1 migration
     ///
     /// # Errors
     ///
     /// Returns an error if the home directory cannot be determined or if
     /// the directory structure cannot be created.
-    pub fn default_location() -> Result<Self> {
+    pub fn default_location(
+        persona_repository: std::sync::Arc<dyn PersonaRepository>,
+    ) -> Result<Self> {
         let home_dir = dirs::home_dir()
             .context("Failed to get home directory")?;
         let base_dir = home_dir.join(".orcs");
-        Self::new(base_dir)
+        Self::new(base_dir, persona_repository)
     }
 
     /// Returns the file path for a given session ID.
@@ -85,17 +101,47 @@ impl TomlSessionRepository {
     ///
     /// This method handles:
     /// 1. Reading the TOML file
-    /// 2. Deserializing to SessionV1 DTO
-    /// 3. Converting DTO to domain model
+    /// 2. Detecting schema version
+    /// 3. Migrating V0→V1 if necessary
+    /// 4. Converting DTO to domain model
     fn load_session_from_path(&self, path: &Path) -> Result<Session> {
         let toml_content = fs::read_to_string(path)
             .context(format!("Failed to read session file: {:?}", path))?;
 
-        // Deserialize DTO from TOML
-        let dto: SessionV1 = toml::from_str(&toml_content)
-            .context("Failed to deserialize session data from TOML")?;
+        // First, try to determine the schema version
+        let version_info: toml::Value = toml::from_str(&toml_content)
+            .context("Failed to parse TOML for version detection")?;
 
-        // Convert DTO to domain model using the From trait
+        let schema_version = version_info
+            .get("schema_version")
+            .and_then(|v: &toml::Value| v.as_str())
+            .unwrap_or("1.0.0");
+
+        let version = Version::parse(schema_version)
+            .unwrap_or_else(|_| Version::new(1, 0, 0));
+
+        // Load based on version and migrate if needed
+        let dto: SessionV1 = if version.major == 1 && version.minor == 0 {
+            // V1.0.0 format - this is actually V0 (legacy naming)
+            tracing::info!(
+                "Loading legacy SessionV0 format from {:?}, will migrate to V1",
+                path
+            );
+
+            let v0: SessionV0 = toml::from_str(&toml_content)
+                .context("Failed to deserialize SessionV0 from TOML")?;
+
+            // Migrate V0→V1 using the new migration framework
+            let migration = SessionV0ToV1Migration::new(self.persona_repository.clone());
+            migration.migrate(v0)
+                .context("Failed to migrate SessionV0 to SessionV1")?
+        } else {
+            // V1.1.0+ format - load directly
+            toml::from_str(&toml_content)
+                .context("Failed to deserialize SessionV1 from TOML")?
+        };
+
+        // Convert DTO to domain model
         Ok(Session::from(dto))
     }
 }
@@ -196,9 +242,44 @@ impl SessionRepository for TomlSessionRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use orcs_core::config::{PersonaConfig, PersonaSource};
     use orcs_types::{AppMode, MessageRole, ConversationMessage};
     use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
+
+    // Mock PersonaRepository for testing
+    struct MockPersonaRepository {
+        personas: Mutex<Vec<PersonaConfig>>,
+    }
+
+    impl MockPersonaRepository {
+        fn new() -> Self {
+            Self {
+                personas: Mutex::new(vec![
+                    PersonaConfig {
+                        id: "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c".to_string(),
+                        name: "Mai".to_string(),
+                        role: "Engineer".to_string(),
+                        background: "".to_string(),
+                        communication_style: "".to_string(),
+                        default_participant: true,
+                        source: PersonaSource::System,
+                    },
+                ]),
+            }
+        }
+    }
+
+    impl PersonaRepository for MockPersonaRepository {
+        fn get_all(&self) -> Result<Vec<PersonaConfig>, String> {
+            Ok(self.personas.lock().unwrap().clone())
+        }
+
+        fn save_all(&self, _configs: &[PersonaConfig]) -> Result<(), String> {
+            Ok(())
+        }
+    }
 
     fn create_test_session(id: &str) -> Session {
         let mut persona_histories = HashMap::new();
@@ -232,7 +313,8 @@ mod tests {
     #[tokio::test]
     async fn test_save_and_find_by_id() {
         let temp_dir = TempDir::new().unwrap();
-        let repository = TomlSessionRepository::new(temp_dir.path()).unwrap();
+        let persona_repo = Arc::new(MockPersonaRepository::new());
+        let repository = TomlSessionRepository::new(temp_dir.path(), persona_repo).unwrap();
 
         let session = create_test_session("test-session-1");
 
@@ -252,7 +334,8 @@ mod tests {
     #[tokio::test]
     async fn test_list_all() {
         let temp_dir = TempDir::new().unwrap();
-        let repository = TomlSessionRepository::new(temp_dir.path()).unwrap();
+        let persona_repo = Arc::new(MockPersonaRepository::new());
+        let repository = TomlSessionRepository::new(temp_dir.path(), persona_repo).unwrap();
 
         // Save multiple sessions
         repository.save(&create_test_session("session-1")).await.unwrap();
@@ -268,7 +351,8 @@ mod tests {
     #[tokio::test]
     async fn test_delete() {
         let temp_dir = TempDir::new().unwrap();
-        let repository = TomlSessionRepository::new(temp_dir.path()).unwrap();
+        let persona_repo = Arc::new(MockPersonaRepository::new());
+        let repository = TomlSessionRepository::new(temp_dir.path(), persona_repo).unwrap();
 
         let session = create_test_session("session-to-delete");
         repository.save(&session).await.unwrap();
@@ -286,7 +370,8 @@ mod tests {
     #[tokio::test]
     async fn test_active_session_id() {
         let temp_dir = TempDir::new().unwrap();
-        let repository = TomlSessionRepository::new(temp_dir.path()).unwrap();
+        let persona_repo = Arc::new(MockPersonaRepository::new());
+        let repository = TomlSessionRepository::new(temp_dir.path(), persona_repo).unwrap();
 
         // Initial state
         assert_eq!(repository.get_active_session_id().await.unwrap(), None);

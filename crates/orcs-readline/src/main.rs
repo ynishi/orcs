@@ -14,6 +14,7 @@ use tokio::sync::mpsc;
 use tokio::time::timeout;
 
 use orcs_core::TaskManager;
+use orcs_core::user_service::{UserService, DefaultUserService};
 use orcs_execution::TaskExecutor;
 use orcs_infrastructure::repository::TomlPersonaRepository;
 use orcs_interaction::{DialogueMessage, InteractionManager, InteractionResult};
@@ -111,7 +112,8 @@ async fn main() -> Result<()> {
     let _task_manager = TaskManager::new();
     let task_executor = TaskExecutor::new();
     let persona_repository = Arc::new(TomlPersonaRepository);
-    let interaction_manager = Arc::new(InteractionManager::new_session("cli-session".to_string(), persona_repository));
+    let user_service: Arc<dyn UserService> = Arc::new(DefaultUserService::default());
+    let interaction_manager = Arc::new(InteractionManager::new_session("cli-session".to_string(), persona_repository, user_service));
 
     // Create a channel for sending tasks to the background executor
     let (task_tx, mut task_rx) = mpsc::channel::<TaskContext>(100);

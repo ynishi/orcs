@@ -448,7 +448,35 @@ impl InteractionManager {
     /// * `input` - The user's input string
     pub async fn handle_input(&self, mode: &AppMode, input: &str) -> InteractionResult {
         match mode {
-            AppMode::Idle => self.handle_idle_mode(input).await,
+            AppMode::Idle => self.handle_idle_mode(input, None::<fn(&DialogueMessage)>).await,
+            AppMode::AwaitingConfirmation { plan } => {
+                self.handle_awaiting_confirmation(input, plan)
+            }
+        }
+    }
+
+    /// Handles user input with streaming support via callback.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode` - The current application mode
+    /// * `input` - The user's input string
+    /// * `on_turn` - Callback function called for each dialogue turn as it becomes available
+    ///
+    /// # Returns
+    ///
+    /// Returns an `InteractionResult` indicating the outcome of handling the input.
+    pub async fn handle_input_with_streaming<F>(
+        &self,
+        mode: &AppMode,
+        input: &str,
+        on_turn: F,
+    ) -> InteractionResult
+    where
+        F: Fn(&DialogueMessage),
+    {
+        match mode {
+            AppMode::Idle => self.handle_idle_mode(input, Some(on_turn)).await,
             AppMode::AwaitingConfirmation { plan } => {
                 self.handle_awaiting_confirmation(input, plan)
             }
@@ -456,7 +484,10 @@ impl InteractionManager {
     }
 
     /// Handles input when in Idle mode.
-    async fn handle_idle_mode(&self, input: &str) -> InteractionResult {
+    async fn handle_idle_mode<F>(&self, input: &str, on_turn: Option<F>) -> InteractionResult
+    where
+        F: Fn(&DialogueMessage),
+    {
         let trimmed = input.trim();
 
         if trimmed == "/plan" {
@@ -491,6 +522,9 @@ impl InteractionManager {
         while let Some(result) = session.next_turn().await {
             match result {
                 Ok(turn) => {
+                    // Log the turn for debugging sequential execution
+                    eprintln!("[DIALOGUE] Turn received: {} - {}", turn.participant_name, &turn.content[..turn.content.len().min(50)]);
+
                     // Convert participant_name (display name) to persona_id (UUID)
                     let persona_id = self.get_persona_id_by_name(&turn.participant_name)
                         .unwrap_or_else(|| turn.participant_name.clone());
@@ -499,10 +533,17 @@ impl InteractionManager {
                     self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content).await;
 
                     // Create DialogueMessage (still using name for UI display)
-                    messages.push(DialogueMessage {
+                    let message = DialogueMessage {
                         author: turn.participant_name.clone(),
                         content: turn.content.clone(),
-                    });
+                    };
+
+                    // Call the streaming callback if provided
+                    if let Some(ref callback) = on_turn {
+                        callback(&message);
+                    }
+
+                    messages.push(message);
                 }
                 Err(e) => {
                     return InteractionResult::NewMessage(format!("Error: {}", e));

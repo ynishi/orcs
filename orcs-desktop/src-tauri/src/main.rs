@@ -320,8 +320,13 @@ async fn handle_input(
     // Get the current mode
     let current_mode = state.app_mode.lock().await.clone();
 
-    // Handle the input
-    let result = manager.handle_input(&current_mode, &input).await;
+    // Handle the input with streaming support
+    // TODO: Implement Tauri v2 event emission for real-time streaming
+    let result = manager.handle_input_with_streaming(&current_mode, &input, |turn| {
+        // Log each dialogue turn as it becomes available (for now)
+        eprintln!("[TAURI] Streaming turn: {} - {}...", turn.author, &turn.content[..turn.content.len().min(50)]);
+        // TODO: Emit event to frontend when Tauri v2 API is implemented
+    }).await;
 
     // Update the mode if it changed
     if let InteractionResult::ModeChanged(ref new_mode) = result {

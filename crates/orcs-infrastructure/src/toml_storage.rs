@@ -43,9 +43,13 @@ pub fn load_personas() -> Result<Vec<PersonaConfig>, String> {
             // Fallback to V1 format
             if let Ok(root_dto) = toml::from_str::<ConfigRootV1>(&content) {
                 // V1 format - migrate to V2 then to domain models
+                use crate::migration::{PersonaV1ToV2Migration, TypedMigration};
+                let migration = PersonaV1ToV2Migration;
+
                 let personas = root_dto.personas.into_iter()
                     .map(|v1_dto| {
-                        let v2_dto: PersonaConfigV2 = v1_dto.into();
+                        let v2_dto = migration.migrate(v1_dto)
+                            .expect("V1→V2 persona migration should not fail");
                         v2_dto.into()
                     })
                     .collect();
@@ -133,10 +137,14 @@ source = "System"
         let content = fs::read_to_string(temp_file.path()).unwrap();
 
         // Try to load as V1
+        use crate::migration::{PersonaV1ToV2Migration, TypedMigration};
+        let migration = PersonaV1ToV2Migration;
+
         let root_dto = toml::from_str::<ConfigRootV1>(&content).unwrap();
         let personas: Vec<PersonaConfig> = root_dto.personas.into_iter()
             .map(|v1_dto| {
-                let v2_dto: PersonaConfigV2 = v1_dto.into();
+                let v2_dto = migration.migrate(v1_dto)
+                    .expect("V1→V2 persona migration should not fail");
                 v2_dto.into()
             })
             .collect();

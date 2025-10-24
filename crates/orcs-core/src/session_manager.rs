@@ -242,6 +242,33 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     pub async fn active_session_id(&self) -> Option<String> {
         self.active_session_id.read().await.clone()
     }
+
+    /// Renames a session by updating its title.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The ID of the session to rename
+    /// * `new_title` - The new title for the session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session doesn't exist or cannot be saved.
+    pub async fn rename_session(&self, session_id: &str, new_title: String) -> Result<()> {
+        // Load the session from storage
+        let mut session = self.repository.find_by_id(session_id).await?
+            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
+
+        // Update the title
+        session.title = new_title;
+
+        // Update timestamp
+        session.updated_at = chrono::Utc::now().to_rfc3339();
+
+        // Save back to storage
+        self.repository.save(&session).await?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

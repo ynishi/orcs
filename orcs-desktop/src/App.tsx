@@ -322,7 +322,7 @@ function App() {
         console.log('Session has AwaitingConfirmation mode:', fullSession.app_mode);
       }
 
-      addMessage('system', 'System', `✅ Switched to session: ${session.name} (${restoredMessages.length} messages restored)`);
+      addMessage('system', 'System', `✅ Switched to session: ${session.title} (${restoredMessages.length} messages restored)`);
     } catch (err) {
       addMessage('error', 'System', `Failed to switch session: ${err}`);
     }
@@ -558,9 +558,22 @@ function App() {
       <AppShell.Main>
         <Container size="md" h="100vh" p="md" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Stack style={{ flex: 1, minHeight: 0 }} gap="md">
-            <Group gap="sm">
-              <Burger opened={navbarOpened} onClick={toggleNavbar} size="sm" />
-              <Text size="xl" fw={700}>ORCS Chat Interface</Text>
+            <Group gap="sm" justify="space-between">
+              <Group gap="sm">
+                <Burger opened={navbarOpened} onClick={toggleNavbar} size="sm" />
+                <Text size="xl" fw={700}>ORCS</Text>
+              </Group>
+              {currentSessionId && (
+                <Group gap="xs">
+                  <Text size="sm" c="dimmed">Session:</Text>
+                  <Badge size="lg" variant="light">
+                    {sessions.find(s => s.id === currentSessionId)?.title || 'Untitled'}
+                  </Badge>
+                  <Badge size="sm" color="gray" variant="outline">
+                    {getMessageCount(sessions.find(s => s.id === currentSessionId)!) || 0} msgs
+                  </Badge>
+                </Group>
+              )}
             </Group>
 
             {/* メッセージエリア */}

@@ -76,10 +76,17 @@ export function useSessions() {
     }
   };
 
-  const renameSession = async (_sessionId: string, _newTitle: string): Promise<void> => {
-    // TODO: バックエンドにrenameエンドポイントを追加したら実装
-    console.warn('Session rename not yet implemented in backend');
-    // 将来的には: await invoke('rename_session', { sessionId, newName: newTitle });
+  const renameSession = async (sessionId: string, newTitle: string): Promise<void> => {
+    try {
+      await invoke('rename_session', { sessionId, newTitle });
+      // Update local state
+      setSessions(prev =>
+        prev.map(s => s.id === sessionId ? { ...s, title: newTitle } : s)
+      );
+    } catch (err) {
+      console.error('Failed to rename session:', err);
+      throw new Error(`Failed to rename session: ${err}`);
+    }
   };
 
   const saveCurrentSession = async () => {

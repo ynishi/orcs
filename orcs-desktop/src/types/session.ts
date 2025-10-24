@@ -4,7 +4,7 @@
  */
 export interface Session {
   id: string;
-  name: string;
+  title: string;
   created_at: string; // ISO 8601 timestamp
   updated_at: string; // ISO 8601 timestamp
   current_persona_id: string;

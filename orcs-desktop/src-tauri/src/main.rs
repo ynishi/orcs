@@ -133,6 +133,19 @@ async fn delete_session(
         .map_err(|e| e.to_string())
 }
 
+/// Renames a session
+#[tauri::command]
+async fn rename_session(
+    session_id: String,
+    new_title: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state.session_manager
+        .rename_session(&session_id, new_title)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Saves the current session
 #[tauri::command]
 async fn save_current_session(
@@ -347,6 +360,7 @@ fn main() {
                 list_sessions,
                 switch_session,
                 delete_session,
+                rename_session,
                 save_current_session,
                 get_active_session,
                 get_personas,

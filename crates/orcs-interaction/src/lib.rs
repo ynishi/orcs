@@ -99,6 +99,10 @@ pub enum InteractionResult {
 pub struct InteractionManager {
     /// Session ID for this manager instance
     session_id: String,
+    /// Session title (user-editable)
+    title: Arc<RwLock<String>>,
+    /// Session creation timestamp
+    created_at: String,
     /// Lazily-initialized dialogue instance
     dialogue: Arc<Mutex<Option<Dialogue>>>,
     /// Raw conversation history per persona (for persistence)
@@ -119,8 +123,13 @@ impl InteractionManager {
         persona_histories_map.insert("mai".to_string(), Vec::new());
         persona_histories_map.insert("yui".to_string(), Vec::new());
 
+        let now = chrono::Utc::now().to_rfc3339();
+        let default_title = format!("Session {}", &session_id[..8]);
+
         Self {
             session_id,
+            title: Arc::new(RwLock::new(default_title)),
+            created_at: now,
             dialogue: Arc::new(Mutex::new(None)),
             persona_histories: Arc::new(RwLock::new(persona_histories_map)),
             persona_repository,
@@ -143,6 +152,8 @@ impl InteractionManager {
 
         Self {
             session_id: data.id,
+            title: Arc::new(RwLock::new(data.title)),
+            created_at: data.created_at,
             dialogue: Arc::new(Mutex::new(None)),
             persona_histories: Arc::new(RwLock::new(persona_histories_map)),
             persona_repository,
@@ -197,14 +208,13 @@ impl InteractionManager {
     /// * `app_mode` - The current application mode
     pub async fn to_session(&self, app_mode: AppMode) -> Session {
         let persona_histories = self.persona_histories.read().await.clone();
-
-        let now = chrono::Utc::now().to_rfc3339();
+        let title = self.title.read().await.clone();
 
         Session {
             id: self.session_id.clone(),
-            title: format!("Session {}", &self.session_id[..8]),
-            created_at: now.clone(),
-            updated_at: now,
+            title,
+            created_at: self.created_at.clone(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
             current_persona_id: "mai".to_string(),
             persona_histories,
             app_mode,

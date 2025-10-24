@@ -29,7 +29,7 @@ export function SessionList({
   const handleStartEdit = (session: Session, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingSessionId(session.id);
-    setEditingTitle(session.name);
+    setEditingTitle(session.title);
   };
 
   const handleSaveEdit = (sessionId: string) => {
@@ -117,7 +117,7 @@ export function SessionList({
                   >
                     <Box>
                       <Text size="sm" fw={600} truncate>
-                        {session.name}
+                        {session.title}
                       </Text>
                       <Group gap="xs" mt={2}>
                         <Text size="xs" c="dimmed">

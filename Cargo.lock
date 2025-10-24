@@ -2608,6 +2608,7 @@ dependencies = [
  "dirs 5.0.1",
  "orcs-core",
  "orcs-types",
+ "semver",
  "serde",
  "tempfile",
  "tokio",

@@ -12,6 +12,7 @@ orcs-types = { path = "../orcs-types" }
 toml = "0.8"
 dirs = "5.0"
 serde = { version = "1.0", features = ["derive"] }
+semver = { version = "1.0", features = ["serde"] }
 anyhow = "1.0"
 async-trait = "0.1"
 

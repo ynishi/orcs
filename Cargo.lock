@@ -2485,6 +2485,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dirs 5.0.1",
+ "llm-toolkit",
  "orcs-types",
  "serde",
  "serde_json",
@@ -2518,6 +2519,7 @@ name = "orcs-execution"
 version = "0.1.0"
 dependencies = [
  "llm-toolkit",
+ "orcs-core",
  "orcs-types",
 ]
 

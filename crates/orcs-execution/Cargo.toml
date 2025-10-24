@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+orcs-core = { path = "../orcs-core" }
 orcs-types = { path = "../orcs-types" }
 llm-toolkit = { workspace = true }

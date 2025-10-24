@@ -1,6 +1,7 @@
 pub mod session;
 pub mod persona;
 pub mod user;
+pub mod task;
 pub mod repository;
 
 // Deprecated: Use orcs_core::persona instead
@@ -13,7 +14,7 @@ pub mod user_service {
     pub use crate::user::{DefaultUserService, UserService};
 }
 
-use orcs_types::{TaskContext, TaskStatus};
+use crate::task::{TaskContext, TaskStatus};
 use uuid::Uuid;
 
 /// The central state manager for tasks in the Orcs orchestration system.

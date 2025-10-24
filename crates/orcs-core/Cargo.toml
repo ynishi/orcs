@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 orcs-types = { path = "../orcs-types" }
+llm-toolkit = { workspace = true }
 uuid = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }

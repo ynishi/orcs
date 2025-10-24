@@ -1,8 +1,12 @@
+pub mod error;
 pub mod session;
 pub mod persona;
 pub mod user;
 pub mod task;
 pub mod repository;
+
+// Re-export common error type
+pub use error::OrcsError;
 
 // Deprecated: Use orcs_core::persona instead
 #[deprecated(since = "0.2.0", note = "Use orcs_core::persona instead")]

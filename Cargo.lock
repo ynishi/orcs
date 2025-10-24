@@ -2486,10 +2486,10 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "llm-toolkit",
- "orcs-types",
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror 1.0.69",
  "tokio",
  "uuid",
 ]
@@ -2504,7 +2504,6 @@ dependencies = [
  "orcs-execution",
  "orcs-infrastructure",
  "orcs-interaction",
- "orcs-types",
  "serde",
  "serde_json",
  "tauri",
@@ -2520,7 +2519,6 @@ version = "0.1.0"
 dependencies = [
  "llm-toolkit",
  "orcs-core",
- "orcs-types",
 ]
 
 [[package]]
@@ -2532,7 +2530,6 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "orcs-core",
- "orcs-types",
  "semver",
  "serde",
  "tempfile",
@@ -2553,22 +2550,10 @@ dependencies = [
  "llm-toolkit-macros",
  "orcs-core",
  "orcs-infrastructure",
- "orcs-types",
  "serde",
  "serde_json",
  "tokio",
  "uuid",
-]
-
-[[package]]
-name = "orcs-types"
-version = "0.1.0"
-dependencies = [
- "llm-toolkit",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
 ]
 
 [[package]]

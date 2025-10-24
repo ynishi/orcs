@@ -4,7 +4,6 @@ members = [
     "crates/orcs-interaction",
     "crates/orcs-core",
     "crates/orcs-execution",
-    "crates/orcs-types",
     "orcs-desktop/src-tauri",
     "crates/orcs-infrastructure",
 ]

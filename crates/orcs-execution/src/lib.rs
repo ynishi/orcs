@@ -1,5 +1,5 @@
 use orcs_core::task::TaskContext;
-use orcs_types::OrcsError;
+use orcs_core::OrcsError;
 
 /// Responsible for executing a single task.
 ///

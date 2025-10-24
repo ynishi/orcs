@@ -1,10 +1,16 @@
 use orcs_core::config::{PersonaConfig, PersonaSource};
 
+/// UUID for Mai persona (name-based UUID v5 from "Mai")
+const MAI_UUID: &str = "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c";
+
+/// UUID for Yui persona (name-based UUID v5 from "Yui")
+const YUI_UUID: &str = "2a9f5c3b-1e7d-5a4f-8b2c-6d3e9f1a7b4c";
+
 /// Returns the official preset persona configurations for the application.
 pub fn get_default_presets() -> Vec<PersonaConfig> {
     vec![
         PersonaConfig {
-            id: "mai".to_string(),
+            id: MAI_UUID.to_string(),
             name: "Mai".to_string(),
             role: "World-Class UX Engineer".to_string(),
             background: "Acts as a world-class product partner—uncovering true intent, clarifying scope, and guiding decisions with the rigor of a top-tier product owner or IT consultant.".to_string(),
@@ -13,7 +19,7 @@ pub fn get_default_presets() -> Vec<PersonaConfig> {
             source: PersonaSource::System,
         },
         PersonaConfig {
-            id: "yui".to_string(),
+            id: YUI_UUID.to_string(),
             name: "Yui".to_string(),
             role: "World-Class Pro Engineer".to_string(),
             background: "Serves as a world-class principal engineer—extracting precise requirements, leading architecture design, evaluating technical risks, and producing implementation-ready plans.".to_string(),

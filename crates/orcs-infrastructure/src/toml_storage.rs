@@ -1,4 +1,5 @@
-use orcs_core::config::{ConfigRoot, PersonaConfig};
+use orcs_core::config::PersonaConfig;
+use crate::dto::{ConfigRootV1, ConfigRootV2, PersonaConfigV2};
 use std::fs;
 
 /// Loads persona configurations from the default config file path.
@@ -30,10 +31,28 @@ pub fn load_personas() -> Result<Vec<PersonaConfig>, String> {
                 return Ok(Vec::new());
             }
 
-            let root: ConfigRoot = toml::from_str(&content)
-                .map_err(|e| format!("Failed to parse TOML from {:?}: {}", config_path, e))?;
+            // Try to deserialize as V2 first (current version)
+            if let Ok(root_dto) = toml::from_str::<ConfigRootV2>(&content) {
+                // V2 format - convert directly to domain models
+                let personas = root_dto.personas.into_iter()
+                    .map(|dto| dto.into())
+                    .collect();
+                return Ok(personas);
+            }
 
-            Ok(root.personas)
+            // Fallback to V1 format
+            if let Ok(root_dto) = toml::from_str::<ConfigRootV1>(&content) {
+                // V1 format - migrate to V2 then to domain models
+                let personas = root_dto.personas.into_iter()
+                    .map(|v1_dto| {
+                        let v2_dto: PersonaConfigV2 = v1_dto.into();
+                        v2_dto.into()
+                    })
+                    .collect();
+                return Ok(personas);
+            }
+
+            Err(format!("Failed to parse TOML from {:?}: unsupported schema version", config_path))
         }
         None => Ok(Vec::new()), // Cannot find config dir, return empty vec
     }
@@ -64,10 +83,15 @@ pub fn save_personas(personas: &[PersonaConfig]) -> Result<(), String> {
                     .map_err(|e| format!("Failed to create config directory at {:?}: {}", orcs_config_dir, e))?;
             }
 
-            let root = ConfigRoot { personas: personas.to_vec() };
+            // Convert domain models to V2 DTOs (always save as V2)
+            let persona_dtos: Vec<PersonaConfigV2> = personas.iter()
+                .map(|p| p.into())
+                .collect();
 
-            // Serialize personas to TOML
-            let toml_string = toml::to_string_pretty(&root)
+            let root_dto = ConfigRootV2 { personas: persona_dtos };
+
+            // Serialize V2 DTOs to TOML
+            let toml_string = toml::to_string_pretty(&root_dto)
                 .map_err(|e| format!("Failed to serialize personas to TOML: {}", e))?;
 
             // Write to file

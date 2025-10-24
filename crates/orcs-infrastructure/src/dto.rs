@@ -1,6 +1,6 @@
-//! Data Transfer Objects (DTOs) for session persistence.
+//! Data Transfer Objects (DTOs) for persistence.
 //!
-//! These DTOs represent the versioned schema for persisting session data.
+//! These DTOs represent the versioned schema for persisting data.
 //! They are private to the infrastructure layer and handle the evolution
 //! of the storage format over time.
 //!
@@ -11,9 +11,13 @@
 //! - **MINOR (1.X.0)**: Backward-compatible additions (new optional fields)
 //! - **PATCH (1.0.X)**: Backward-compatible fixes (not typically used for schema)
 //!
-//! ### Version History
+//! ### Session Version History
 //! - **1.0.0**: Initial V1 schema with `title` field (renamed from `name`)
 //! - **1.1.0**: Added optional `created_at` field for session creation timestamp
+//!
+//! ### PersonaConfig Version History
+//! - **1.0.0**: Initial V1 schema (string-based ID)
+//! - **2.0.0**: V2 schema (UUID-based ID)
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
@@ -71,4 +75,104 @@ pub struct SessionV1 {
     pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
     /// Current application mode.
     pub app_mode: AppMode,
+}
+
+// ============================================================================
+// PersonaConfig DTOs
+// ============================================================================
+
+/// Current schema version for PersonaConfigV1.
+pub const PERSONA_CONFIG_V1_VERSION: &str = "1.0.0";
+
+/// Current schema version for PersonaConfigV2.
+pub const PERSONA_CONFIG_V2_VERSION: &str = "2.0.0";
+
+/// Represents the source of a persona.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PersonaSourceDTO {
+    System,
+    User,
+}
+
+impl Default for PersonaSourceDTO {
+    fn default() -> Self {
+        PersonaSourceDTO::User
+    }
+}
+
+/// Represents V1 of the persona config schema for serialization.
+///
+/// This struct is what is actually written to and read from storage (e.g., config.toml).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersonaConfigV1 {
+    /// The schema version of this data structure.
+    #[serde(default = "default_persona_version")]
+    pub schema_version: String,
+
+    /// Unique persona identifier.
+    pub id: String,
+    /// Display name of the persona.
+    pub name: String,
+    /// Role or title of the persona.
+    pub role: String,
+    /// Background description of the persona.
+    pub background: String,
+    /// Communication style of the persona.
+    pub communication_style: String,
+    /// Whether this persona is a default participant in new sessions.
+    #[serde(default)]
+    pub default_participant: bool,
+    /// Source of the persona (System or User).
+    #[serde(default)]
+    pub source: PersonaSourceDTO,
+}
+
+fn default_persona_version() -> String {
+    PERSONA_CONFIG_V1_VERSION.to_string()
+}
+
+/// Represents V2 of the persona config schema for serialization.
+///
+/// V2 introduces UUID-based IDs for better internationalization and future extensibility.
+/// This struct is the current version used for new writes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersonaConfigV2 {
+    /// The schema version of this data structure.
+    #[serde(default = "default_persona_v2_version")]
+    pub schema_version: String,
+
+    /// Unique persona identifier (UUID format).
+    pub id: String,
+    /// Display name of the persona.
+    pub name: String,
+    /// Role or title of the persona.
+    pub role: String,
+    /// Background description of the persona.
+    pub background: String,
+    /// Communication style of the persona.
+    pub communication_style: String,
+    /// Whether this persona is a default participant in new sessions.
+    #[serde(default)]
+    pub default_participant: bool,
+    /// Source of the persona (System or User).
+    #[serde(default)]
+    pub source: PersonaSourceDTO,
+}
+
+fn default_persona_v2_version() -> String {
+    PERSONA_CONFIG_V2_VERSION.to_string()
+}
+
+/// Root configuration structure for personas (DTO V2).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigRootV2 {
+    #[serde(rename = "persona")]
+    pub personas: Vec<PersonaConfigV2>,
+}
+
+/// Root configuration structure for personas (DTO V1).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigRootV1 {
+    #[serde(rename = "persona")]
+    pub personas: Vec<PersonaConfigV1>,
 }

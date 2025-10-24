@@ -128,10 +128,18 @@ impl InteractionManager {
         user_service: Arc<dyn UserService>,
     ) -> Self {
         let mut persona_histories_map = HashMap::new();
-        // Initialize with user's history and default personas
+
+        // Initialize with user's history
         persona_histories_map.insert(user_service.get_user_name(), Vec::new());
-        persona_histories_map.insert("mai".to_string(), Vec::new());
-        persona_histories_map.insert("yui".to_string(), Vec::new());
+
+        // Initialize with default personas from repository
+        if let Ok(personas) = persona_repository.get_all() {
+            for persona in personas {
+                if persona.default_participant {
+                    persona_histories_map.insert(persona.id, Vec::new());
+                }
+            }
+        }
 
         let now = chrono::Utc::now().to_rfc3339();
         let default_title = format!("Session {}", &session_id[..8]);
@@ -227,12 +235,23 @@ impl InteractionManager {
         let persona_histories = self.persona_histories.read().await.clone();
         let title = self.title.read().await.clone();
 
+        // Use the first default participant as current_persona_id
+        let current_persona_id = self.persona_repository
+            .get_all()
+            .ok()
+            .and_then(|personas| {
+                personas.iter()
+                    .find(|p| p.default_participant)
+                    .map(|p| p.id.clone())
+            })
+            .unwrap_or_else(|| "unknown".to_string());
+
         Session {
             id: self.session_id.clone(),
             title,
             created_at: self.created_at.clone(),
             updated_at: chrono::Utc::now().to_rfc3339(),
-            current_persona_id: "mai".to_string(),
+            current_persona_id,
             persona_histories,
             app_mode,
         }

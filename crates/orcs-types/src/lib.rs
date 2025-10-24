@@ -1,7 +1,8 @@
+pub mod session_dto;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use llm_toolkit::orchestrator::StrategyMap;
-use std::collections::HashMap;
 
 /// A shared error type for the entire Orcs application.
 ///
@@ -97,6 +98,7 @@ pub struct Plan {
 
 /// Represents the current interaction mode of the application.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", content = "data")]
 pub enum AppMode {
     /// The application is waiting for user input in a normal chat mode.
     Idle,
@@ -180,28 +182,6 @@ pub struct PersonaInfo {
     pub role: String,
     /// Background description of the persona.
     pub background: String,
-}
-
-/// Session data for persistence.
-///
-/// This structure captures the complete state of a user session including
-/// conversation history, active persona, and application mode.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SessionData {
-    /// Unique session identifier.
-    pub id: String,
-    /// Human-readable session name.
-    pub name: String,
-    /// Timestamp when the session was created (ISO 8601 format).
-    pub created_at: String,
-    /// Timestamp when the session was last updated (ISO 8601 format).
-    pub updated_at: String,
-    /// The currently active persona ID.
-    pub current_persona_id: String,
-    /// Conversation history for each persona.
-    pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
-    /// Current application mode.
-    pub app_mode: AppMode,
 }
 
 #[cfg(test)]

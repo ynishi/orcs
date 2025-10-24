@@ -8,6 +8,9 @@ repository.workspace = true
 
 [dependencies]
 orcs-core = { path = "../orcs-core" }
+orcs-types = { path = "../orcs-types" }
 toml = "0.8"
 dirs = "5.0"
 serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0"
+async-trait = "0.1"

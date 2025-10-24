@@ -7,6 +7,7 @@ edition = "2024"
 orcs-types = { path = "../orcs-types" }
 uuid = { workspace = true }
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 dirs = { workspace = true }

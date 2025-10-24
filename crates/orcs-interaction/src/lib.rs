@@ -4,7 +4,7 @@ pub mod presets;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Mutex};
-use orcs_types::{AppMode, Plan, SessionData, ConversationMessage, MessageRole};
+use orcs_types::{AppMode, Plan, session_dto::Session, ConversationMessage, MessageRole};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::config::PersonaConfig;
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, ClaudeCodeJsonAgent};
@@ -137,7 +137,7 @@ impl InteractionManager {
     ///
     /// This creates new Agent instances. History is stored separately
     /// in persona_histories and included in prompts manually.
-    pub fn from_session_data(data: SessionData, persona_repository: Arc<dyn PersonaRepository>) -> Self {
+    pub fn from_session(data: Session, persona_repository: Arc<dyn PersonaRepository>) -> Self {
         let persona_histories_map = data.persona_histories.clone();
 
         Self {
@@ -189,19 +189,19 @@ impl InteractionManager {
         Ok(())
     }
 
-    /// Converts the current state to SessionData for persistence.
+    /// Converts the current state to Session for persistence.
     ///
     /// # Arguments
     ///
     /// * `app_mode` - The current application mode
-    pub async fn to_session_data(&self, app_mode: AppMode) -> SessionData {
+    pub async fn to_session(&self, app_mode: AppMode) -> Session {
         let persona_histories = self.persona_histories.read().await.clone();
 
         let now = chrono::Utc::now().to_rfc3339();
 
-        SessionData {
+        Session {
             id: self.session_id.clone(),
-            name: format!("Session {}", &self.session_id[..8]),
+            title: format!("Session {}", &self.session_id[..8]),
             created_at: now.clone(),
             updated_at: now,
             current_persona_id: "mai".to_string(),
@@ -403,8 +403,8 @@ impl orcs_core::session_manager::InteractionManagerTrait for InteractionManager 
         &self.session_id
     }
 
-    async fn to_session_data(&self, app_mode: AppMode) -> SessionData {
-        self.to_session_data(app_mode).await
+    async fn to_session(&self, app_mode: AppMode) -> Session {
+        self.to_session(app_mode).await
     }
 }
 
@@ -464,14 +464,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_to_session_data() {
+    async fn test_to_session() {
         let manager = InteractionManager::new_session("test-session".to_string());
 
-        let session_data = manager.to_session_data(AppMode::Idle).await;
+        let session = manager.to_session(AppMode::Idle).await;
 
-        assert_eq!(session_data.id, "test-session");
-        assert_eq!(session_data.current_persona_id, "mai");
-        assert_eq!(session_data.app_mode, AppMode::Idle);
+        assert_eq!(session.id, "test-session");
+        assert_eq!(session.current_persona_id, "mai");
+        assert_eq!(session.app_mode, AppMode::Idle);
     }
 }
 */

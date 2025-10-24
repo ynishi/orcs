@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use orcs_types::SessionData;
+use orcs_types::session_dto::Session;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -67,7 +67,7 @@ impl SessionStorage {
     /// # Errors
     ///
     /// Returns an error if serialization fails or if the file cannot be written.
-    pub fn save_session(&self, session: &SessionData) -> Result<()> {
+    pub fn save_session(&self, session: &Session) -> Result<()> {
         let file_path = self.session_file_path(&session.id);
         let json = serde_json::to_string_pretty(session)
             .context("Failed to serialize session data")?;
@@ -92,12 +92,12 @@ impl SessionStorage {
     ///
     /// Returns an error if the file doesn't exist, cannot be read, or
     /// contains invalid JSON.
-    pub fn load_session(&self, session_id: &str) -> Result<SessionData> {
+    pub fn load_session(&self, session_id: &str) -> Result<Session> {
         let file_path = self.session_file_path(session_id);
         let json = fs::read_to_string(&file_path)
             .context(format!("Failed to read session file: {:?}", file_path))?;
 
-        let session: SessionData = serde_json::from_str(&json)
+        let session: Session = serde_json::from_str(&json)
             .context("Failed to deserialize session data")?;
 
         Ok(session)
@@ -114,7 +114,7 @@ impl SessionStorage {
     /// # Errors
     ///
     /// Returns an error if the sessions directory cannot be read.
-    pub fn list_sessions(&self) -> Result<Vec<SessionData>> {
+    pub fn list_sessions(&self) -> Result<Vec<Session>> {
         let sessions_dir = self.base_dir.join("sessions");
         let mut sessions = Vec::new();
 
@@ -202,11 +202,11 @@ impl SessionStorage {
     }
 
     /// Loads a session from a specific file path.
-    fn load_session_from_path(&self, path: &Path) -> Result<SessionData> {
+    fn load_session_from_path(&self, path: &Path) -> Result<Session> {
         let json = fs::read_to_string(path)
             .context(format!("Failed to read session file: {:?}", path))?;
 
-        let session: SessionData = serde_json::from_str(&json)
+        let session: Session = serde_json::from_str(&json)
             .context("Failed to deserialize session data")?;
 
         Ok(session)
@@ -220,7 +220,7 @@ mod tests {
     use std::collections::HashMap;
     use tempfile::TempDir;
 
-    fn create_test_session(id: &str) -> SessionData {
+    fn create_test_session(id: &str) -> Session {
         let mut persona_histories = HashMap::new();
         persona_histories.insert(
             "mai".to_string(),
@@ -238,7 +238,7 @@ mod tests {
             ],
         );
 
-        SessionData {
+        Session {
             id: id.to_string(),
             name: format!("Test Session {}", id),
             created_at: "2024-01-01T00:00:00Z".to_string(),

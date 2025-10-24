@@ -10,6 +10,7 @@ repository.workspace = true
 anyhow = { workspace = true }
 orcs-core = { path = "../orcs-core" }
 orcs-execution = { path = "../orcs-execution" }
+orcs-infrastructure = { path = "../orcs-infrastructure" }
 orcs-interaction = { path = "../orcs-interaction" }
 orcs-types = { path = "../orcs-types" }
 tokio = { workspace = true }

@@ -1,34 +1,23 @@
-use orcs_interaction::personas;
+use orcs_core::repository::PersonaRepository;
+use orcs_infrastructure::repository::TomlPersonaRepository;
 
 #[test]
 fn test_get_all_personas() {
-    let personas = personas::get_all_personas();
+    let repo = TomlPersonaRepository;
+    let personas = repo.get_all().expect("Should load personas");
     assert!(!personas.is_empty(), "Should have at least one persona");
 }
 
 #[test]
-fn test_get_persona_by_id() {
-    let mai = personas::get_persona_by_id("mai");
-    assert!(mai.is_some(), "Mai persona should exist");
-
-    let yui = personas::get_persona_by_id("yui");
-    assert!(yui.is_some(), "Yui persona should exist");
-
-    let unknown = personas::get_persona_by_id("unknown");
-    assert!(unknown.is_none(), "Unknown persona should not exist");
-}
-
-#[test]
-fn test_get_default_participants() {
-    let default_participants = personas::get_default_participants();
-    assert!(!default_participants.is_empty(), "Should have at least one default participant");
-}
-
-#[test]
 fn test_persona_fields() {
-    let mai = personas::get_persona_by_id("mai").expect("Mai should exist");
-    assert_eq!(mai.name, "Mai");
-    assert_eq!(mai.role, "World-Class UX Engineer");
-    assert!(!mai.background.is_empty());
-    assert!(!mai.communication_style.is_empty());
+    let repo = TomlPersonaRepository;
+    let personas = repo.get_all().expect("Should load personas");
+
+    // Find a persona (we don't know which ones exist, so just check the first one)
+    if let Some(persona) = personas.first() {
+        assert!(!persona.name.is_empty(), "Persona should have a name");
+        assert!(!persona.role.is_empty(), "Persona should have a role");
+        assert!(!persona.background.is_empty(), "Persona should have a background");
+        assert!(!persona.communication_style.is_empty(), "Persona should have a communication style");
+    }
 }

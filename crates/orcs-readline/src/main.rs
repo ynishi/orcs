@@ -15,7 +15,8 @@ use tokio::time::timeout;
 
 use orcs_core::TaskManager;
 use orcs_execution::TaskExecutor;
-use orcs_interaction::{InteractionManager, InteractionResult};
+use orcs_infrastructure::repository::TomlPersonaRepository;
+use orcs_interaction::{DialogueMessage, InteractionManager, InteractionResult};
 use orcs_types::{AppMode, TaskContext};
 
 /// CLI helper for rustyline that provides completion, highlighting, and hints.
@@ -109,7 +110,8 @@ async fn main() -> Result<()> {
     // Initialize task management components
     let _task_manager = TaskManager::new();
     let task_executor = TaskExecutor::new();
-    let interaction_manager = Arc::new(InteractionManager::new());
+    let persona_repository = Arc::new(TomlPersonaRepository);
+    let interaction_manager = Arc::new(InteractionManager::new_session("cli-session".to_string(), persona_repository));
 
     // Create a channel for sending tasks to the background executor
     let (task_tx, mut task_rx) = mpsc::channel::<TaskContext>(100);
@@ -168,6 +170,16 @@ async fn main() -> Result<()> {
                     // Display the message to the user with AI color
                     for line in message.lines() {
                         println!("{}", line.bright_blue());
+                    }
+                }
+                InteractionResult::NewDialogueMessages(messages) => {
+                    // Display dialogue messages with author names
+                    for DialogueMessage { author, content } in messages {
+                        println!("{}", format!("[{}]", author).bright_magenta());
+                        for line in content.lines() {
+                            println!("{}", line.bright_blue());
+                        }
+                        println!(); // Add spacing between messages
                     }
                 }
                 InteractionResult::NoOp => {

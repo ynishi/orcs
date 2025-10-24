@@ -2723,6 +2723,7 @@ name = "orcs-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "dirs 5.0.1",
  "orcs-types",
@@ -2765,8 +2766,11 @@ dependencies = [
 name = "orcs-infrastructure"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "dirs 5.0.1",
  "orcs-core",
+ "orcs-types",
  "serde",
  "toml 0.8.2",
 ]
@@ -2781,6 +2785,7 @@ dependencies = [
  "llm-toolkit 0.34.1",
  "llm-toolkit-macros",
  "orcs-core",
+ "orcs-infrastructure",
  "orcs-types",
  "serde",
  "serde_json",
@@ -2796,6 +2801,7 @@ dependencies = [
  "colored",
  "orcs-core",
  "orcs-execution",
+ "orcs-infrastructure",
  "orcs-interaction",
  "orcs-types",
  "rustyline",

@@ -4,12 +4,13 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use orcs_core::session_manager::SessionManager;
+use orcs_core::session_storage::SessionStorage;
 use orcs_core::config::PersonaConfig;
 use orcs_core::repository::PersonaRepository;
-use orcs_infrastructure::repository::TomlPersonaRepository;
+use orcs_infrastructure::repository::{TomlPersonaRepository, TomlSessionRepository};
 use orcs_interaction::{InteractionManager, InteractionResult};
 use orcs_interaction::presets::get_default_presets;
-use orcs_types::{AppMode, SessionData};
+use orcs_types::{AppMode, session_dto::Session};
 use serde::Serialize;
 use tauri::State;
 
@@ -74,9 +75,9 @@ impl From<InteractionResult> for SerializableInteractionResult {
 #[tauri::command]
 async fn create_session(
     state: State<'_, AppState>,
-) -> Result<String, String> {
+) -> Result<Session, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
-    state.session_manager
+    let manager = state.session_manager
         .create_session(session_id.clone(), |sid| InteractionManager::new_session(sid, state.persona_repository.clone()))
         .await
         .map_err(|e| e.to_string())?;
@@ -84,16 +85,20 @@ async fn create_session(
     // Reset app mode
     *state.app_mode.lock().await = AppMode::Idle;
 
-    Ok(session_id)
+    // Get the full session data to return
+    let session = manager.to_session(AppMode::Idle).await;
+
+    Ok(session)
 }
 
 /// Lists all saved sessions
 #[tauri::command]
 async fn list_sessions(
     state: State<'_, AppState>,
-) -> Result<Vec<SessionData>, String> {
+) -> Result<Vec<Session>, String> {
     state.session_manager
         .list_sessions()
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -102,18 +107,18 @@ async fn list_sessions(
 async fn switch_session(
     session_id: String,
     state: State<'_, AppState>,
-) -> Result<SessionData, String> {
+) -> Result<Session, String> {
     let manager = state.session_manager
-        .switch_session(&session_id, |data| InteractionManager::from_session_data(data, state.persona_repository.clone()))
+        .switch_session(&session_id, |data| InteractionManager::from_session(data, state.persona_repository.clone()))
         .await
         .map_err(|e| e.to_string())?;
 
-    let session_data = manager.to_session_data(AppMode::Idle).await;
+    let session = manager.to_session(AppMode::Idle).await;
 
     // Update app mode
-    *state.app_mode.lock().await = session_data.app_mode.clone();
+    *state.app_mode.lock().await = session.app_mode.clone();
 
-    Ok(session_data)
+    Ok(session)
 }
 
 /// Deletes a session
@@ -144,11 +149,11 @@ async fn save_current_session(
 #[tauri::command]
 async fn get_active_session(
     state: State<'_, AppState>,
-) -> Result<Option<SessionData>, String> {
+) -> Result<Option<Session>, String> {
     if let Some(manager) = state.session_manager.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();
-        let session_data = manager.to_session_data(app_mode).await;
-        Ok(Some(session_data))
+        let session = manager.to_session(app_mode).await;
+        Ok(Some(session))
     } else {
         Ok(None)
     }
@@ -287,7 +292,7 @@ async fn handle_input(
 
 fn main() {
     tauri::async_runtime::block_on(async {
-        // Composition Root: Create the concrete repository instance
+        // Composition Root: Create the concrete repository instances
         let persona_repository = Arc::new(TomlPersonaRepository);
 
         // Seed the config file with default personas if it's empty on first run.
@@ -301,14 +306,19 @@ fn main() {
             }
         }
 
-        // Initialize SessionManager
-        let session_manager = Arc::new(
-            SessionManager::new().expect("Failed to create session manager")
+        // Create SessionStorage and wrap it in TomlSessionRepository
+        let storage = SessionStorage::default_location()
+            .expect("Failed to create session storage");
+        let session_repository = Arc::new(TomlSessionRepository::new(storage));
+
+        // Initialize SessionManager with the repository
+        let session_manager: Arc<SessionManager<InteractionManager>> = Arc::new(
+            SessionManager::new(session_repository)
         );
 
         // Try to restore last session, otherwise create a new one
         let restored = session_manager
-            .restore_last_session(|data| InteractionManager::from_session_data(data, persona_repository.clone()))
+            .restore_last_session(|data| InteractionManager::from_session(data, persona_repository.clone()))
             .await
             .ok()
             .flatten();

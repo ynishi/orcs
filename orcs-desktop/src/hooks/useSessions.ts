@@ -37,10 +37,11 @@ export function useSessions() {
 
   const createSession = async (): Promise<string> => {
     try {
-      const sessionId = await invoke<string>('create_session');
-      await loadSessions(); // リロード
-      setCurrentSessionId(sessionId);
-      return sessionId;
+      const newSession = await invoke<Session>('create_session');
+      // Update local state directly instead of reloading
+      setSessions(prev => [...prev, newSession]);
+      setCurrentSessionId(newSession.id);
+      return newSession.id;
     } catch (err) {
       console.error('Failed to create session:', err);
       throw new Error(`Failed to create session: ${err}`);

@@ -17,4 +17,5 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
+orcs-infrastructure = { path = "../orcs-infrastructure" }
 tokio = { workspace = true, features = ["macros", "rt"] }

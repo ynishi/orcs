@@ -310,6 +310,7 @@ async fn get_config_path() -> Result<String, String> {
 #[tauri::command]
 async fn handle_input(
     input: String,
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SerializableInteractionResult, String> {
     let manager = state.session_manager
@@ -321,12 +322,25 @@ async fn handle_input(
     let current_mode = state.app_mode.lock().await.clone();
 
     // Handle the input with streaming support
-    // TODO: Implement Tauri v2 event emission for real-time streaming
-    let result = manager.handle_input_with_streaming(&current_mode, &input, |turn| {
-        // Log each dialogue turn as it becomes available (for now)
+    let app_clone = app.clone();
+    let result = manager.handle_input_with_streaming(&current_mode, &input, move |turn| {
+        use tauri::Emitter;
+
+        // Log each dialogue turn as it becomes available with timestamp
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
         let preview: String = turn.content.chars().take(50).collect();
-        eprintln!("[TAURI] Streaming turn: {} - {}...", turn.author, preview);
-        // TODO: Emit event to frontend when Tauri v2 API is implemented
+        eprintln!("[TAURI] [{}.{:03}] Streaming turn: {} - {}...",
+            now.as_secs(),
+            now.subsec_millis(),
+            turn.author,
+            preview);
+
+        // Emit event to frontend for real-time streaming
+        if let Err(e) = app_clone.emit("dialogue-turn", turn) {
+            eprintln!("[TAURI] Failed to emit dialogue-turn event: {}", e);
+        }
     }).await;
 
     // Update the mode if it changed

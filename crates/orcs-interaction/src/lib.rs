@@ -3,6 +3,7 @@ pub mod persona_agent;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Mutex};
+use serde::Serialize;
 use orcs_core::session::{AppMode, ConversationMessage, MessageRole, Plan, Session};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::persona::Persona as PersonaDomain;
@@ -69,7 +70,7 @@ impl Agent for ClonableAgent {
 /// Represents a single message in a dialogue conversation.
 ///
 /// Each message has an author (participant name) and the content of the message.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct DialogueMessage {
     /// The name of the participant who authored this message.
     pub author: String,
@@ -522,9 +523,16 @@ impl InteractionManager {
         while let Some(result) = session.next_turn().await {
             match result {
                 Ok(turn) => {
-                    // Log the turn for debugging sequential execution
+                    // Log the turn for debugging sequential execution with timestamp
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap();
                     let preview: String = turn.content.chars().take(50).collect();
-                    eprintln!("[DIALOGUE] Turn received: {} - {}...", turn.participant_name, preview);
+                    eprintln!("[DIALOGUE] [{}.{:03}] Turn received: {} - {}...",
+                        now.as_secs(),
+                        now.subsec_millis(),
+                        turn.participant_name,
+                        preview);
 
                     // Convert participant_name (display name) to persona_id (UUID)
                     let persona_id = self.get_persona_id_by_name(&turn.participant_name)

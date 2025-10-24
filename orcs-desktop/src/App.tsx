@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   Textarea,
   Button,
@@ -88,6 +89,24 @@ function App() {
       });
     }
   }, [messages]);
+
+  // Listen for real-time dialogue turn events from backend
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen<{ author: string; content: string }>('dialogue-turn', (event) => {
+      console.log('[STREAM] Received dialogue turn:', event.payload.author);
+      addMessage('ai', event.payload.author, event.payload.content);
+    }).then((unlistenFn) => {
+      unlisten = unlistenFn;
+    });
+
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, []);
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
   useEffect(() => {

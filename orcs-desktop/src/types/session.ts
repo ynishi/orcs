@@ -45,6 +45,9 @@ export interface Plan {
  * セッションの総メッセージ数を取得
  */
 export function getMessageCount(session: Session): number {
+  if (!session || !session.persona_histories) {
+    return 0;
+  }
   return Object.values(session.persona_histories)
     .flat()
     .length;
@@ -77,6 +80,9 @@ export function sortSessionsByLastActive(sessions: Session[]): Session[] {
  * 現在のPersona IDの会話履歴を取得
  */
 export function getCurrentPersonaMessages(session: Session): ConversationMessage[] {
+  if (!session || !session.persona_histories || !session.current_persona_id) {
+    return [];
+  }
   return session.persona_histories[session.current_persona_id] || [];
 }
 
@@ -84,6 +90,9 @@ export function getCurrentPersonaMessages(session: Session): ConversationMessage
  * 全Personaの会話履歴を時系列順に統合
  */
 export function getAllMessages(session: Session): ConversationMessage[] {
+  if (!session || !session.persona_histories) {
+    return [];
+  }
   const allMessages = Object.values(session.persona_histories).flat();
   return allMessages.sort((a, b) =>
     new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()

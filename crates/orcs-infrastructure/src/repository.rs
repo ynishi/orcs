@@ -1,7 +1,7 @@
 use orcs_core::config::PersonaConfig;
 use orcs_core::repository::{PersonaRepository, SessionRepository};
+use orcs_core::session::Session;
 use orcs_core::session_storage::SessionStorage;
-use orcs_types::session_dto::Session;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::Arc;

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use orcs_types::session_dto::Session;
+use crate::session::Session;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -240,7 +240,7 @@ mod tests {
 
         Session {
             id: id.to_string(),
-            name: format!("Test Session {}", id),
+            title: format!("Test Session {}", id),
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
             current_persona_id: "mai".to_string(),
@@ -263,7 +263,7 @@ mod tests {
         let loaded = storage.load_session("test-session-1").unwrap();
 
         assert_eq!(loaded.id, session.id);
-        assert_eq!(loaded.name, session.name);
+        assert_eq!(loaded.title, session.title);
         assert_eq!(loaded.current_persona_id, session.current_persona_id);
     }
 

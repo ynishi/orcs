@@ -1,3 +1,5 @@
+pub mod dto;
+pub mod migration;
 pub mod repository;
 pub mod toml_storage;
 

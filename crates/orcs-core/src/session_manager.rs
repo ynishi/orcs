@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use anyhow::Result;
-use orcs_types::{session_dto::Session, AppMode};
+use orcs_types::AppMode;
+use crate::session::Session;
 use crate::repository::SessionRepository;
 
 // Forward declaration - orcs-interaction will provide this
@@ -274,7 +275,7 @@ mod tests {
         async fn to_session(&self, app_mode: AppMode) -> Session {
             Session {
                 id: self.session_id.clone(),
-                name: format!("Session {}", self.session_id),
+                title: format!("Session {}", self.session_id),
                 created_at: chrono::Utc::now().to_rfc3339(),
                 updated_at: chrono::Utc::now().to_rfc3339(),
                 current_persona_id: "mai".to_string(),

@@ -1,7 +1,7 @@
 use crate::config::PersonaConfig;
+use crate::session::Session;
 use anyhow::Result;
 use async_trait::async_trait;
-use orcs_types::session_dto::Session;
 
 /// An abstract repository for managing session persistence.
 ///

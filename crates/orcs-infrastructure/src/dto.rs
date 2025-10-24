@@ -1,27 +1,12 @@
-//! DTOs for session data persistence and the session domain model.
+//! Data Transfer Objects (DTOs) for session persistence.
+//!
+//! These DTOs represent the versioned schema for persisting session data.
+//! They are private to the infrastructure layer and handle the evolution
+//! of the storage format over time.
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use super::{ConversationMessage, AppMode};
-
-// --- Domain Model ---
-
-/// Represents the session concept in the application's core logic.
-/// This is the "pure" model that the business logic layer operates on.
-/// It is independent of any specific storage format or version.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Session {
-    pub id: String,
-    pub title: String,
-    pub created_at: String,
-    pub updated_at: String,
-    pub current_persona_id: String,
-    pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
-    pub app_mode: AppMode,
-}
-
-
-// --- Data Transfer Objects (DTOs) for Persistence ---
+use orcs_types::{ConversationMessage, AppMode};
 
 /// Represents V0 of the session data schema for serialization.
 /// This is the legacy schema with the 'name' field.
@@ -68,37 +53,4 @@ pub struct SessionV1 {
     pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
     /// Current application mode.
     pub app_mode: AppMode,
-}
-
-// --- Type Conversions ---
-
-/// Convert SessionV1 DTO to domain model.
-impl From<SessionV1> for Session {
-    fn from(dto: SessionV1) -> Self {
-        Session {
-            id: dto.id,
-            title: dto.title,
-            created_at: dto.created_at,
-            updated_at: dto.updated_at,
-            current_persona_id: dto.current_persona_id,
-            persona_histories: dto.persona_histories,
-            app_mode: dto.app_mode,
-        }
-    }
-}
-
-/// Convert domain model to SessionV1 DTO for persistence.
-impl From<&Session> for SessionV1 {
-    fn from(session: &Session) -> Self {
-        SessionV1 {
-            schema_version: "1".to_string(),
-            id: session.id.clone(),
-            title: session.title.clone(),
-            created_at: session.created_at.clone(),
-            updated_at: session.updated_at.clone(),
-            current_persona_id: session.current_persona_id.clone(),
-            persona_histories: session.persona_histories.clone(),
-            app_mode: session.app_mode.clone(),
-        }
-    }
 }

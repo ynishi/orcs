@@ -17,13 +17,13 @@ impl TaskExecutor {
     ///
     /// # Arguments
     ///
-    /// * `task_context` - Reference to the task context containing execution details
+    /// * `_task_context` - Reference to the task context containing execution details
     ///
     /// # Returns
     ///
     /// * `Ok(())` if the task executes successfully
     /// * `Err(OrcsError)` if an error occurs during execution
-    pub async fn execute(&self, task_context: &TaskContext) -> Result<(), OrcsError> {
+    pub async fn execute(&self, _task_context: &TaskContext) -> Result<(), OrcsError> {
         // TODO: Implement actual ParallelOrchestrator logic here
         // This will include:
         // - Parsing task steps

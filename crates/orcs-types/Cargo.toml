@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
+llm-toolkit = { path = "../../llm-toolkit/crates/llm-toolkit", features = ["agent"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }

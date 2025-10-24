@@ -16,6 +16,29 @@ export interface Agent {
 }
 
 /**
+ * ペルソナ情報（バックエンドから取得）
+ */
+export interface PersonaInfo {
+  id: string;
+  name: string;
+  role: string;
+  background: string;
+}
+
+/**
+ * ペルソナ設定(バックエンドのPersonaConfigに対応)
+ */
+export interface PersonaConfig {
+  id: string;
+  name: string;
+  role: string;
+  background: string;
+  communication_style: string;
+  default_participant: boolean;
+  source: 'System' | 'User';
+}
+
+/**
  * エージェントステータスに応じたアイコンを取得
  */
 export function getAgentIcon(status: AgentStatus): string {

@@ -1,29 +1,9 @@
 // PASTE THE USER-PROVIDED CODE HERE
-use llm_toolkit::{agent::{Agent, AgentError, Payload, PayloadContent}};
-use llm_toolkit_macros::ToPrompt;
+use llm_toolkit::{agent::{Agent, AgentError, Payload, PayloadContent, persona::Persona}};
 use async_trait::async_trait;
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-
-#[derive(ToPrompt, Serialize, Clone, Debug)]
-#[prompt(template = "
-# Persona Profile
-**Name**: {{ name }}
-**Role**: {{ role }}
-
-## Background
-{{ background }}
-
-## Communication Style
-{{ communication_style }}
-")]
-pub struct Persona {
-    pub name: &'static str,
-    pub role: &'static str,
-    pub background: &'static str,
-    pub communication_style: &'static str,
-}
 
 pub struct PersonaAgent<T: Agent> {
     inner_agent: T,
@@ -50,12 +30,14 @@ where
     type Output = T::Output;
 
     fn expertise(&self) -> &str {
-        self.persona.role
+        &self.persona.role
     }
 
     async fn execute(&self, intent: Payload) -> Result<Self::Output, AgentError> {
-        use llm_toolkit::ToPrompt;
-        let system_prompt = self.persona.to_prompt();
+        let system_prompt = format!(
+            "# Persona Profile\n**Name**: {}\n**Role**: {}\n\n## Background\n{}\n\n## Communication Style\n{}",
+            self.persona.name, self.persona.role, self.persona.background, self.persona.communication_style
+        );
         let user_request = intent.to_text();
 
         let history_prompt = {
@@ -151,10 +133,10 @@ mod tests {
     #[tokio::test]
     async fn persona_agent_preserves_attachments() {
         let persona = Persona {
-            name: "Tester",
-            role: "Attachment Checker",
-            background: "Validates payload handling.",
-            communication_style: "Direct and concise.",
+            name: "Tester".to_string(),
+            role: "Attachment Checker".to_string(),
+            background: "Validates payload handling.".to_string(),
+            communication_style: "Direct and concise.".to_string(),
         };
 
         let base_agent = RecordingAgent::new(String::from("ok"));
@@ -184,10 +166,10 @@ mod tests {
     #[tokio::test]
     async fn persona_agent_records_structured_history() {
         let persona = Persona {
-            name: "Tester",
-            role: "Structured Recorder",
-            background: "Ensures structured outputs are captured.",
-            communication_style: "Analytical.",
+            name: "Tester".to_string(),
+            role: "Structured Recorder".to_string(),
+            background: "Ensures structured outputs are captured.".to_string(),
+            communication_style: "Analytical.".to_string(),
         };
 
         let response = StructuredResponse {

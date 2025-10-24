@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput } from '@mantine/core';
-import { Session } from '../../types/session';
+import { Session, getMessageCount, getLastActive } from '../../types/session';
 import { useState } from 'react';
 
 interface SessionListProps {
@@ -23,13 +23,13 @@ export function SessionList({
   const [editingTitle, setEditingTitle] = useState<string>('');
 
   const sortedSessions = [...sessions].sort(
-    (a, b) => b.lastActive.getTime() - a.lastActive.getTime()
+    (a, b) => getLastActive(b).getTime() - getLastActive(a).getTime()
   );
 
   const handleStartEdit = (session: Session, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingSessionId(session.id);
-    setEditingTitle(session.title);
+    setEditingTitle(session.name);
   };
 
   const handleSaveEdit = (sessionId: string) => {
@@ -117,17 +117,17 @@ export function SessionList({
                   >
                     <Box>
                       <Text size="sm" fw={600} truncate>
-                        {session.title}
+                        {session.name}
                       </Text>
                       <Group gap="xs" mt={2}>
                         <Text size="xs" c="dimmed">
-                          {session.messageCount} msgs
+                          {getMessageCount(session)} msgs
                         </Text>
                         <Text size="xs" c="dimmed">
                           •
                         </Text>
                         <Text size="xs" c="dimmed">
-                          {formatDate(session.lastActive)}
+                          {formatDate(getLastActive(session))}
                         </Text>
                       </Group>
                     </Box>

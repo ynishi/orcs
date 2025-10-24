@@ -1,3 +1,8 @@
+pub mod session_storage;
+pub mod session_manager;
+pub mod config;
+pub mod repository;
+
 use orcs_types::{TaskContext, TaskStatus};
 use uuid::Uuid;
 
@@ -56,6 +61,8 @@ impl TaskManager {
             id: Uuid::new_v4().to_string(),
             status: TaskStatus::Pending,
             request: request.to_string(),
+            strategy: None,
+            result: None,
         };
 
         self.tasks.push(task);

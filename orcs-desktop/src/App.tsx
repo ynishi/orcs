@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { notifications } from '@mantine/notifications';
 import {
   Textarea,
   Button,
@@ -358,7 +359,13 @@ function App() {
         console.log('Session has AwaitingConfirmation mode:', fullSession.app_mode);
       }
 
-      addMessage('system', 'System', `✅ Switched to session: ${session.title} (${restoredMessages.length} messages restored)`);
+      // Show toast notification instead of adding to chat history
+      notifications.show({
+        title: 'Session Switched',
+        message: `${session.title} (${restoredMessages.length} messages restored)`,
+        color: 'blue',
+        icon: '✅',
+      });
 
       // Scroll to bottom after session switch
       setTimeout(() => {
@@ -377,7 +384,13 @@ function App() {
   const handleSessionDelete = async (sessionId: string) => {
     try {
       await deleteSession(sessionId);
-      addMessage('system', 'System', 'Session deleted');
+      // Show toast notification
+      notifications.show({
+        title: 'Session Deleted',
+        message: 'The session has been removed',
+        color: 'red',
+        icon: '🗑️',
+      });
     } catch (err) {
       addMessage('error', 'System', `Failed to delete session: ${err}`);
     }
@@ -395,7 +408,13 @@ function App() {
     try {
       await createSession();
       setMessages([]);
-      addMessage('system', 'System', 'Started new session');
+      // Show toast notification
+      notifications.show({
+        title: 'New Session Created',
+        message: 'Started a fresh conversation',
+        color: 'green',
+        icon: '✨',
+      });
     } catch (err) {
       addMessage('error', 'System', `Failed to create session: ${err}`);
     }

@@ -12,6 +12,7 @@
   "dependencies": {
     "@mantine/core": "^8.3.5",
     "@mantine/hooks": "^8.3.5",
+    "@mantine/notifications": "^8.3.5",
     "@tabler/icons-react": "^3.35.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",

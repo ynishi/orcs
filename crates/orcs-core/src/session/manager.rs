@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use anyhow::Result;
-use orcs_types::AppMode;
+use super::app_mode::AppMode;
 use super::model::Session;
 use super::repository::SessionRepository;
 

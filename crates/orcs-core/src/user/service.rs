@@ -6,30 +6,44 @@
 
 /// Service for managing user information.
 ///
-/// Future enhancements:
+/// This trait abstracts user-related operations, allowing different
+/// implementations for various scenarios (single-user, multi-user,
+/// configuration-based, etc.).
+///
+/// # Future Enhancements
 /// - Load from configuration file
 /// - Support user preferences
 /// - Multiple user profiles
+/// - User authentication
 pub trait UserService: Send + Sync {
     /// Returns the current user's display name.
+    ///
+    /// # Returns
+    ///
+    /// A string containing the user's display name.
     fn get_user_name(&self) -> String;
 }
 
 /// Default implementation that returns a constant user name.
 ///
-/// This is a simple implementation suitable for single-user scenarios.
-/// Future versions may load from configuration or allow runtime changes.
+/// This is a simple implementation suitable for single-user scenarios
+/// or development environments. For production use, consider implementing
+/// a configuration-based or authentication-based UserService.
+///
+/// # Example
+///
+/// ```
+/// use orcs_core::user::{UserService, DefaultUserService};
+///
+/// let service = DefaultUserService::default();
+/// assert_eq!(service.get_user_name(), "user");
+/// ```
+#[derive(Debug, Clone, Default)]
 pub struct DefaultUserService;
 
 impl UserService for DefaultUserService {
     fn get_user_name(&self) -> String {
         "user".to_string()
-    }
-}
-
-impl Default for DefaultUserService {
-    fn default() -> Self {
-        Self
     }
 }
 

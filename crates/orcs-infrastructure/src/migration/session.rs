@@ -8,7 +8,7 @@ use super::traits::{Migration, TypedMigration};
 use crate::dto::{SessionV0, SessionV1, SESSION_V1_VERSION};
 use anyhow::{Context, Result};
 use orcs_core::repository::PersonaRepository;
-use orcs_types::ConversationMessage;
+use orcs_core::session::ConversationMessage;
 use semver::Version;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -215,7 +215,7 @@ impl From<&Session> for SessionV1 {
 mod tests {
     use super::*;
     use orcs_core::persona::{Persona, PersonaSource};
-    use orcs_types::{AppMode, MessageRole};
+    use orcs_core::session::{AppMode, MessageRole};
     use std::sync::Mutex;
 
     // Mock PersonaRepository for testing

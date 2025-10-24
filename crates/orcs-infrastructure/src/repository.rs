@@ -243,7 +243,7 @@ impl SessionRepository for TomlSessionRepository {
 mod tests {
     use super::*;
     use orcs_core::persona::{Persona, PersonaSource};
-    use orcs_types::{AppMode, MessageRole, ConversationMessage};
+    use orcs_core::session::{AppMode, ConversationMessage, MessageRole};
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
     use tempfile::TempDir;

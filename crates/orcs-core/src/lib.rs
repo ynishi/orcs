@@ -1,11 +1,17 @@
 pub mod session;
 pub mod persona;
+pub mod user;
 pub mod repository;
-pub mod user_service;
 
 // Deprecated: Use orcs_core::persona instead
 #[deprecated(since = "0.2.0", note = "Use orcs_core::persona instead")]
 pub mod config;
+
+// Deprecated: Use orcs_core::user instead
+#[deprecated(since = "0.2.0", note = "Use orcs_core::user instead")]
+pub mod user_service {
+    pub use crate::user::{DefaultUserService, UserService};
+}
 
 use orcs_types::{TaskContext, TaskStatus};
 use uuid::Uuid;

@@ -3,13 +3,12 @@
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use orcs_core::session::{Session, SessionManager};
+use orcs_core::session::{AppMode, Session, SessionManager};
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
-use orcs_core::user_service::{UserService, DefaultUserService};
+use orcs_core::user::{UserService, DefaultUserService};
 use orcs_infrastructure::repository::{TomlPersonaRepository, TomlSessionRepository};
 use orcs_interaction::{InteractionManager, InteractionResult};
-use orcs_types::AppMode;
 use serde::Serialize;
 use tauri::State;
 

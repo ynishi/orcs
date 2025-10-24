@@ -87,25 +87,7 @@ pub enum UserInput {
     Dialogue(String),
 }
 
-/// Represents a proposed plan of action for user confirmation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Plan {
-    /// The individual steps that make up this plan.
-    pub steps: Vec<String>,
-}
-
-/// Represents the current interaction mode of the application.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", content = "data")]
-pub enum AppMode {
-    /// The application is waiting for user input in a normal chat mode.
-    Idle,
-    /// The application has proposed a plan and is waiting for user confirmation.
-    AwaitingConfirmation {
-        /// The plan awaiting confirmation.
-        plan: Plan,
-    },
-}
+// NOTE: AppMode and Plan have been moved to orcs_core::session
 
 /// Messages that can be sent between different domains in the application.
 #[derive(Debug)]
@@ -147,40 +129,8 @@ pub enum ExecutionMessage {
     },
 }
 
-/// Represents the role of a message in a conversation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MessageRole {
-    /// Message from the user.
-    User,
-    /// Message from the AI assistant.
-    Assistant,
-    /// System-generated message.
-    System,
-}
-
-/// A single message in a conversation history.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ConversationMessage {
-    /// The role of the message sender.
-    pub role: MessageRole,
-    /// The content of the message.
-    pub content: String,
-    /// Timestamp when the message was created (ISO 8601 format).
-    pub timestamp: String,
-}
-
-/// Information about a persona (AI agent personality).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PersonaInfo {
-    /// Unique identifier for the persona.
-    pub id: String,
-    /// Display name of the persona.
-    pub name: String,
-    /// Role or title of the persona.
-    pub role: String,
-    /// Background description of the persona.
-    pub background: String,
-}
+// NOTE: MessageRole and ConversationMessage have been moved to orcs_core::session
+// NOTE: PersonaInfo has been removed (use orcs_core::persona::Persona instead)
 
 #[cfg(test)]
 mod tests {

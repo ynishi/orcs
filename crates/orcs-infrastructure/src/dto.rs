@@ -21,7 +21,7 @@
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use orcs_types::{ConversationMessage, AppMode};
+use orcs_core::session::{AppMode, ConversationMessage};
 
 /// Current schema version for SessionV1.
 pub const SESSION_V1_VERSION: &str = "1.1.0";

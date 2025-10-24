@@ -5,7 +5,8 @@
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use orcs_types::{ConversationMessage, AppMode};
+use super::app_mode::AppMode;
+use super::message::ConversationMessage;
 
 /// Represents a user session in the application's domain layer.
 ///

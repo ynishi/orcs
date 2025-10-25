@@ -7,9 +7,11 @@ use orcs_core::session::{AppMode, Session, SessionManager};
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::user::UserService;
+use orcs_core::workspace::{Workspace, UploadedFile};
 use orcs_infrastructure::repository::{TomlPersonaRepository, TomlSessionRepository};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::toml_storage;
+use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_interaction::{InteractionManager, InteractionResult};
 use serde::Serialize;
 use tauri::State;
@@ -20,6 +22,7 @@ struct AppState {
     app_mode: Mutex<AppMode>,
     persona_repository: Arc<dyn PersonaRepository>,
     user_service: Arc<dyn UserService>,
+    workspace_manager: Arc<FileSystemWorkspaceManager>,
 }
 
 /// Serializable version of DialogueMessage for Tauri IPC
@@ -376,6 +379,44 @@ async fn handle_input(
     Ok(result.into())
 }
 
+/// Gets the current workspace for the application's working directory
+#[tauri::command]
+async fn get_current_workspace(
+    state: State<'_, AppState>,
+) -> Result<Workspace, String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    // Get the current working directory
+    let current_dir = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+
+    // Get or create workspace for the current directory
+    state.workspace_manager
+        .get_or_create_workspace(&current_dir)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Lists all files in a workspace
+#[tauri::command]
+async fn list_workspace_files(
+    workspace_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<UploadedFile>, String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    // Get the workspace
+    let workspace = state.workspace_manager
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Return uploaded files or empty vector if workspace not found
+    Ok(workspace
+        .map(|w| w.resources.uploaded_files)
+        .unwrap_or_default())
+}
+
 /// Gets Git repository information for the current directory
 #[tauri::command]
 fn get_git_info() -> GitInfo {
@@ -470,6 +511,17 @@ fn main() {
         let persona_repository = Arc::new(TomlPersonaRepository);
         let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
 
+        // Initialize FileSystemWorkspaceManager
+        let workspace_root = dirs::home_dir()
+            .expect("Failed to get home directory")
+            .join(".orcs")
+            .join("workspaces");
+        let workspace_manager = Arc::new(
+            FileSystemWorkspaceManager::new(workspace_root)
+                .await
+                .expect("Failed to initialize workspace manager")
+        );
+
         // Seed the config file with default personas if it's empty on first run.
         if let Ok(configs) = persona_repository.get_all() {
             if configs.is_empty() {
@@ -528,6 +580,7 @@ fn main() {
                 app_mode,
                 persona_repository,
                 user_service,
+                workspace_manager,
             })
             .invoke_handler(tauri::generate_handler![
                 create_session,
@@ -547,6 +600,8 @@ fn main() {
                 get_execution_strategy,
                 get_config_path,
                 get_git_info,
+                get_current_workspace,
+                list_workspace_files,
                 handle_input,
             ])
             .run(tauri::generate_context!())

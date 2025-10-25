@@ -1,33 +1,12 @@
-import { Stack, TextInput, ScrollArea, Group, Text, ActionIcon, UnstyledButton, Box } from '@mantine/core';
-import { useState } from 'react';
-
-interface FileItem {
-  path: string;
-  name: string;
-  type: 'file' | 'directory';
-  size?: number;
-}
+import { Stack, ScrollArea, Group, Text, UnstyledButton, Box } from '@mantine/core';
+import { UploadedFile } from '../../types/workspace';
 
 interface FileListProps {
-  onFileSelect?: (file: FileItem) => void;
+  files: UploadedFile[];
+  onFileSelect?: (file: UploadedFile) => void;
 }
 
-export function FileList({ onFileSelect }: FileListProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // TODO: Tauriバックエンドから取得
-  const [files] = useState<FileItem[]>([
-    { path: 'src/main.rs', name: 'main.rs', type: 'file', size: 1024 },
-    { path: 'src/lib.rs', name: 'lib.rs', type: 'file', size: 2048 },
-    { path: 'Cargo.toml', name: 'Cargo.toml', type: 'file', size: 512 },
-    { path: 'README.md', name: 'README.md', type: 'file', size: 4096 },
-    { path: 'src/', name: 'src', type: 'directory' },
-    { path: 'tests/', name: 'tests', type: 'directory' },
-  ]);
-
-  const filteredFiles = files.filter(file =>
-    file.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+export function FileList({ files, onFileSelect }: FileListProps) {
 
   const formatFileSize = (bytes?: number) => {
     if (!bytes) return '';
@@ -36,8 +15,7 @@ export function FileList({ onFileSelect }: FileListProps) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const getFileIcon = (file: FileItem) => {
-    if (file.type === 'directory') return '📁';
+  const getFileIcon = (file: UploadedFile) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
     switch (ext) {
       case 'rs': return '🦀';
@@ -54,30 +32,10 @@ export function FileList({ onFileSelect }: FileListProps) {
 
   return (
     <Stack gap="md" h="100%">
-      {/* ヘッダー */}
-      <Group justify="space-between" px="md" pt="md">
-        <Text size="lg" fw={700}>
-          Files
-        </Text>
-        <ActionIcon variant="subtle" size="sm">
-          🔄
-        </ActionIcon>
-      </Group>
-
-      {/* 検索バー */}
-      <Box px="md">
-        <TextInput
-          placeholder="Search files..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.currentTarget.value)}
-          size="sm"
-        />
-      </Box>
-
       {/* ファイルリスト */}
       <ScrollArea style={{ flex: 1 }} px="sm">
         <Stack gap="xs">
-          {filteredFiles.map((file) => (
+          {files.map((file) => (
             <UnstyledButton
               key={file.path}
               onClick={() => onFileSelect?.(file)}
@@ -100,11 +58,9 @@ export function FileList({ onFileSelect }: FileListProps) {
                   <Text size="sm" fw={500} truncate>
                     {file.name}
                   </Text>
-                  {file.type === 'file' && file.size && (
-                    <Text size="xs" c="dimmed">
-                      {formatFileSize(file.size)}
-                    </Text>
-                  )}
+                  <Text size="xs" c="dimmed">
+                    {formatFileSize(file.size)}
+                  </Text>
                 </Box>
               </Group>
             </UnstyledButton>
@@ -115,7 +71,7 @@ export function FileList({ onFileSelect }: FileListProps) {
       {/* フッター */}
       <Box px="md" pb="md">
         <Text size="xs" c="dimmed">
-          {filteredFiles.length} items
+          {files.length} items
         </Text>
       </Box>
     </Stack>

@@ -4,6 +4,7 @@ pub mod persona;
 pub mod user;
 pub mod task;
 pub mod repository;
+pub mod workspace;
 
 // Re-export common error type
 pub use error::OrcsError;

@@ -11,4 +11,16 @@ use thiserror::Error;
 pub enum OrcsError {
     #[error("An unknown error has occurred.")]
     Unknown,
+
+    #[error("IO error: {0}")]
+    Io(String),
+
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+
+    #[error("Security error: {0}")]
+    Security(String),
 }
+
+/// A type alias for `Result<T, OrcsError>`.
+pub type Result<T> = std::result::Result<T, OrcsError>;

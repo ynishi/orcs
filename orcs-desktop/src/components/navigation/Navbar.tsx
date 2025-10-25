@@ -3,7 +3,7 @@ import { Session } from '../../types/session';
 import { Task } from '../../types/task';
 import { MessageType } from '../../types/message';
 import { SessionList } from '../sessions/SessionList';
-import { FileList } from '../files/FileList';
+import { WorkspacePanel } from '../workspace/WorkspacePanel';
 import { TaskList } from '../tasks/TaskList';
 import { PersonasList } from '../personas/PersonasList';
 
@@ -68,18 +68,16 @@ export function Navbar({
             </Accordion.Panel>
           </Accordion.Item>
 
-          {/* ファイル */}
+          {/* ワークスペース */}
           <Accordion.Item value="files">
             <Accordion.Control>
               <Group gap="xs">
                 <Text>📁</Text>
-                <Text fw={600}>Files</Text>
+                <Text fw={600}>Workspace</Text>
               </Group>
             </Accordion.Control>
             <Accordion.Panel>
-              <FileList onFileSelect={(file) => {
-                onMessage('system', 'System', `Selected file: ${file.path}`);
-              }} />
+              <WorkspacePanel />
             </Accordion.Panel>
           </Accordion.Item>
 

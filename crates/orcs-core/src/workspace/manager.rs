@@ -1,0 +1,147 @@
+//! Workspace management trait definition.
+//!
+//! This module defines the `WorkspaceManager` trait, which provides an abstraction
+//! for managing workspaces, files, and their associations with sessions.
+
+use async_trait::async_trait;
+use std::path::Path;
+
+use crate::error::Result;
+use crate::workspace::model::{SessionWorkspace, TempFile, UploadedFile, Workspace};
+
+/// Trait for managing workspaces and their associated files.
+///
+/// The `WorkspaceManager` provides a high-level interface for:
+/// - Creating and retrieving workspaces
+/// - Managing files within workspaces
+/// - Creating temporary files
+/// - Reading file contents
+/// - Managing session-workspace associations
+///
+/// Implementations should ensure thread-safety and asynchronous operation.
+#[async_trait]
+pub trait WorkspaceManager: Send + Sync {
+    /// Gets an existing workspace or creates a new one for the given repository path.
+    ///
+    /// # Arguments
+    ///
+    /// * `repo_path` - The path to the repository
+    ///
+    /// # Returns
+    ///
+    /// Returns the workspace associated with the repository path, creating it if necessary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workspace cannot be created or retrieved.
+    async fn get_or_create_workspace(&self, repo_path: &Path) -> Result<Workspace>;
+
+    /// Retrieves a workspace by its ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The unique identifier of the workspace
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some(Workspace)` if found, `None` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    async fn get_workspace(&self, workspace_id: &str) -> Result<Option<Workspace>>;
+
+    /// Adds a file from the filesystem to a workspace.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace to add the file to
+    /// * `source_path` - The path to the source file
+    ///
+    /// # Returns
+    ///
+    /// Returns the `UploadedFile` record representing the added file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The file cannot be read
+    /// - The file cannot be copied to the workspace storage
+    /// - The database operation fails
+    async fn add_file_to_workspace(
+        &self,
+        workspace_id: &str,
+        source_path: &Path,
+    ) -> Result<UploadedFile>;
+
+    /// Creates a temporary file associated with a session and workspace.
+    ///
+    /// Temporary files are typically used for intermediate data during a session
+    /// and may be cleaned up when the session ends.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The ID of the session creating the file
+    /// * `workspace_id` - The ID of the workspace the file belongs to
+    /// * `filename` - The name of the temporary file
+    /// * `content` - The content to write to the file
+    ///
+    /// # Returns
+    ///
+    /// Returns the `TempFile` record representing the created temporary file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The file cannot be written to storage
+    /// - The database operation fails
+    async fn create_temp_file(
+        &self,
+        session_id: &str,
+        workspace_id: &str,
+        filename: &str,
+        content: &[u8],
+    ) -> Result<TempFile>;
+
+    /// Reads the content of a file in a workspace.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace containing the file
+    /// * `relative_path` - The relative path of the file within the workspace
+    ///
+    /// # Returns
+    ///
+    /// Returns the file content as a UTF-8 string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The file does not exist
+    /// - The file cannot be read
+    /// - The file content is not valid UTF-8
+    async fn read_file_content(
+        &self,
+        workspace_id: &str,
+        relative_path: &str,
+    ) -> Result<String>;
+
+    /// Retrieves the workspace association for a session.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The ID of the session
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some(SessionWorkspace)` if the session has an associated workspace,
+    /// `None` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    async fn get_session_workspace(&self, session_id: &str) -> Result<Option<SessionWorkspace>>;
+}

@@ -3,6 +3,7 @@ pub mod dto;
 pub mod repository;
 pub mod toml_storage;
 pub mod user_service;
+pub mod workspace_manager;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

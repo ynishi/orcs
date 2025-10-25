@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use orcs_core::session::{AppMode, Session, SessionManager};
@@ -417,6 +418,25 @@ async fn list_workspace_files(
         .unwrap_or_default())
 }
 
+/// Uploads a file to a workspace
+#[tauri::command]
+async fn upload_file_to_workspace(
+    workspace_id: String,
+    local_file_path: String,
+    state: State<'_, AppState>,
+) -> Result<UploadedFile, String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    // Convert the local file path to a Path reference
+    let file_path = Path::new(&local_file_path);
+
+    // Add the file to the workspace
+    state.workspace_manager
+        .add_file_to_workspace(&workspace_id, file_path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Gets Git repository information for the current directory
 #[tauri::command]
 fn get_git_info() -> GitInfo {
@@ -575,6 +595,7 @@ fn main() {
 
         tauri::Builder::default()
             .plugin(tauri_plugin_opener::init())
+            .plugin(tauri_plugin_dialog::init())
             .manage(AppState {
                 session_manager,
                 app_mode,
@@ -602,6 +623,7 @@ fn main() {
                 get_git_info,
                 get_current_workspace,
                 list_workspace_files,
+                upload_file_to_workspace,
                 handle_input,
             ])
             .run(tauri::generate_context!())

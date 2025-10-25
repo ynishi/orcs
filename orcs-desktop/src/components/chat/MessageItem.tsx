@@ -1,6 +1,6 @@
+import React, { useState } from 'react';
 import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip } from '@mantine/core';
 import { Message, getMessageStyle } from '../../types/message';
-import { useState } from 'react';
 
 interface MessageItemProps {
   message: Message;
@@ -9,7 +9,7 @@ interface MessageItemProps {
 // メンションをハイライト表示するヘルパー
 function renderTextWithMentions(text: string) {
   const mentionRegex = /@(\w+)/g;
-  const parts: (string | JSX.Element)[] = [];
+  const parts: (string | React.ReactElement)[] = [];
   let lastIndex = 0;
   let match;
   let key = 0;

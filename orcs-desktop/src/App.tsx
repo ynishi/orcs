@@ -33,6 +33,7 @@ import { MessageItem } from "./components/chat/MessageItem";
 import { StatusBar } from "./components/chat/StatusBar";
 import { CommandSuggestions } from "./components/chat/CommandSuggestions";
 import { AgentSuggestions } from "./components/chat/AgentSuggestions";
+import { ThinkingIndicator } from "./components/chat/ThinkingIndicator";
 import { Navbar } from "./components/navigation/Navbar";
 import { parseCommand, isValidCommand, getCommandHelp } from "./utils/commandParser";
 import { filterCommands, CommandDefinition } from "./types/command";
@@ -59,7 +60,7 @@ function App() {
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [currentDir, setCurrentDir] = useState<string>('.');
+  const [currentDir] = useState<string>('.');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userNickname, setUserNickname] = useState<string>('You');
   const [gitInfo, setGitInfo] = useState<GitInfo>({
@@ -67,6 +68,8 @@ function App() {
     branch: null,
     repo_name: null,
   });
+  const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
+  const [thinkingPersona, setThinkingPersona] = useState<string>('AI');
 
   // セッション管理をカスタムフックに切り替え
   const {
@@ -520,6 +523,10 @@ function App() {
     }
     addMessage('user', userNickname, messageText);
 
+    // Show thinking indicator
+    setIsAiThinking(true);
+    setThinkingPersona('AI Assistant');
+
     try {
       // Call Tauri backend
       const result = await invoke<InteractionResult>("handle_input", {
@@ -539,6 +546,9 @@ function App() {
     } catch (error) {
       console.error("Error calling backend:", error);
       addMessage('error', 'System', `Error: ${error}`);
+    } finally {
+      // Hide thinking indicator
+      setIsAiThinking(false);
     }
   };
 
@@ -613,6 +623,9 @@ function App() {
                   {messages.map((message) => (
                     <MessageItem key={message.id} message={message} />
                   ))}
+                  {isAiThinking && (
+                    <ThinkingIndicator personaName={thinkingPersona} />
+                  )}
                 </Stack>
               </ScrollArea>
 
@@ -677,7 +690,6 @@ function App() {
                   {showAgentSuggestions && (
                     <AgentSuggestions
                       agents={filteredAgents}
-                      filter=""
                       selectedIndex={selectedAgentIndex}
                       onSelect={selectAgent}
                     />

@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 
 interface AgentSuggestionsProps {
   agents: Agent[];
-  filter: string;
   selectedIndex: number;
   onSelect: (agent: Agent) => void;
   position?: { top: number; left: number };
@@ -12,12 +11,11 @@ interface AgentSuggestionsProps {
 
 export function AgentSuggestions({
   agents,
-  filter,
   selectedIndex,
   onSelect,
   position,
 }: AgentSuggestionsProps) {
-  const selectedRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
 
   // Auto-scroll to selected item
   useEffect(() => {

@@ -1,5 +1,5 @@
-import { Stack, ScrollArea, Group, Text, UnstyledButton, Box, Checkbox, ActionIcon } from '@mantine/core';
-import { Task, getTaskIcon, getTaskColor } from '../../types/task';
+import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon } from '@mantine/core';
+import { Task, getTaskColor } from '../../types/task';
 
 interface TaskListProps {
   tasks: Task[];

@@ -62,6 +62,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
       background: formData.background || '',
       communication_style: formData.communication_style || '',
       default_participant: formData.default_participant || false,
+      source: 'User',
     };
 
     onSave(validatedPersona);

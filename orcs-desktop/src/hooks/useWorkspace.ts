@@ -12,6 +12,8 @@ interface RawUploadedFile {
   mime_type: string;
   size: number;
   uploaded_at: number;
+  session_id?: string;
+  message_timestamp?: string;
 }
 
 /**
@@ -67,6 +69,8 @@ function convertWorkspace(raw: RawWorkspace): Workspace {
         mimeType: file.mime_type,
         size: file.size,
         uploadedAt: file.uploaded_at,
+        sessionId: file.session_id,
+        messageTimestamp: file.message_timestamp,
       })),
       generatedDocs: raw.resources.generated_docs.map(doc => ({
         id: doc.id,
@@ -175,6 +179,8 @@ export function useWorkspace(): UseWorkspaceResult {
           mimeType: file.mime_type,
           size: file.size,
           uploadedAt: file.uploaded_at,
+          sessionId: file.session_id,
+          messageTimestamp: file.message_timestamp,
         }));
 
         setFiles(convertedFiles);

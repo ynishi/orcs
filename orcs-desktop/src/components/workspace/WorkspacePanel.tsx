@@ -10,9 +10,10 @@ interface WorkspacePanelProps {
   onAttachFile?: (file: File) => void;
   includeInPrompt?: boolean;
   onToggleIncludeInPrompt?: (value: boolean) => void;
+  onGoToSession?: (sessionId: string) => void;
 }
 
-export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt }: WorkspacePanelProps) {
+export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession }: WorkspacePanelProps) {
   const { workspace, files, isLoading, error, refresh } = useWorkspace();
 
   // Handle file upload from file input
@@ -33,11 +34,13 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
         // Convert to regular array for Tauri IPC
         const fileData = Array.from(uint8Array);
 
-        // Upload the file to the workspace
+        // Upload the file to the workspace (no session info for manual uploads)
         await invoke('upload_file_from_bytes', {
           workspaceId: workspace.id,
           filename: file.name,
           fileData: fileData,
+          sessionId: null,
+          messageTimestamp: null,
         });
       }
 
@@ -116,6 +119,13 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
       await refresh();
     } catch (err) {
       console.error('Failed to delete file:', err);
+    }
+  };
+
+  // Handle navigating to session
+  const handleGoToSession = (file: UploadedFile) => {
+    if (file.sessionId) {
+      onGoToSession?.(file.sessionId);
     }
   };
 
@@ -234,6 +244,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
         onOpenFile={handleOpenFile}
         onRenameFile={handleRenameFile}
         onDeleteFile={handleDeleteFile}
+        onGoToSession={handleGoToSession}
       />
     </Stack>
   );

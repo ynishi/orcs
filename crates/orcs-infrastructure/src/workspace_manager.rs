@@ -361,6 +361,8 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             mime_type,
             size: file_size,
             uploaded_at,
+            session_id: None,
+            message_timestamp: None,
         };
 
         // Add to workspace's uploaded_files list
@@ -377,6 +379,8 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         workspace_id: &str,
         filename: &str,
         data: &[u8],
+        session_id: Option<String>,
+        message_timestamp: Option<String>,
     ) -> Result<UploadedFile> {
         // Load existing workspace metadata
         let mut workspace = self.load_workspace(workspace_id).await?;
@@ -431,6 +435,8 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             mime_type,
             size: file_size,
             uploaded_at,
+            session_id,
+            message_timestamp,
         };
 
         // Add to workspace's uploaded_files list
@@ -925,7 +931,7 @@ mod tests {
 
         // Add file from bytes
         let uploaded_file = manager
-            .add_file_from_bytes(&workspace.id, filename, test_content)
+            .add_file_from_bytes(&workspace.id, filename, test_content, None, None)
             .await
             .unwrap();
 

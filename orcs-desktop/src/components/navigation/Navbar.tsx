@@ -25,6 +25,7 @@ interface NavbarProps {
   onAttachFile?: (file: File) => void;
   includeWorkspaceInPrompt?: boolean;
   onToggleIncludeWorkspaceInPrompt?: (value: boolean) => void;
+  onGoToSession?: (sessionId: string) => void;
 
   // Common
   onMessage: (type: MessageType, author: string, text: string) => void;
@@ -43,6 +44,7 @@ export function Navbar({
   onAttachFile,
   includeWorkspaceInPrompt,
   onToggleIncludeWorkspaceInPrompt,
+  onGoToSession,
   onMessage,
 }: NavbarProps) {
   return (
@@ -89,6 +91,7 @@ export function Navbar({
                 onAttachFile={onAttachFile}
                 includeInPrompt={includeWorkspaceInPrompt}
                 onToggleIncludeInPrompt={onToggleIncludeWorkspaceInPrompt}
+                onGoToSession={onGoToSession}
               />
             </Accordion.Panel>
           </Accordion.Item>

@@ -443,13 +443,15 @@ async fn upload_file_from_bytes(
     workspace_id: String,
     filename: String,
     file_data: Vec<u8>,
+    session_id: Option<String>,
+    message_timestamp: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<UploadedFile, String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
     // Directly add the file from bytes - no temporary file needed
     state.workspace_manager
-        .add_file_from_bytes(&workspace_id, &filename, &file_data)
+        .add_file_from_bytes(&workspace_id, &filename, &file_data, session_id, message_timestamp)
         .await
         .map_err(|e| e.to_string())
 }

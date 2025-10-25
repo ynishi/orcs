@@ -19,6 +19,10 @@ export interface UploadedFile {
   size: number;
   /** Timestamp when the file was uploaded (Unix timestamp in seconds) */
   uploadedAt: number;
+  /** Session ID if this file was saved from a chat message */
+  sessionId?: string;
+  /** Message timestamp if this file was saved from a chat message (ISO 8601) */
+  messageTimestamp?: string;
 }
 
 /**

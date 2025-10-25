@@ -45,6 +45,10 @@ pub struct UploadedFile {
     pub size: u64,
     /// Timestamp when the file was uploaded
     pub uploaded_at: i64,
+    /// Session ID if this file was saved from a chat message
+    pub session_id: Option<String>,
+    /// Message timestamp if this file was saved from a chat message (ISO 8601)
+    pub message_timestamp: Option<String>,
 }
 
 /// Represents an AI-generated document or artifact.

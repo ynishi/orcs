@@ -19,12 +19,17 @@
 //! - **1.0.0**: Initial V1 schema (string-based ID)
 //! - **2.0.0**: V2 schema (UUID-based ID)
 
+mod uploaded_file;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use orcs_core::session::{AppMode, ConversationMessage};
 use version_migrate::{Versioned, MigratesTo, IntoDomain};
 use uuid::Uuid;
+
+// Re-export uploaded_file DTOs
+pub use uploaded_file::{UploadedFileV1_0_0, UploadedFileV1_1_0};
 
 /// Current schema version for SessionV1.
 pub const SESSION_V1_VERSION: &str = "1.1.0";
@@ -108,9 +113,6 @@ pub const WORKSPACE_V1_VERSION: &str = "1.0.0";
 /// Current schema version for WorkspaceResourcesV1.
 pub const WORKSPACE_RESOURCES_V1_VERSION: &str = "1.0.0";
 
-/// Current schema version for UploadedFileV1.
-pub const UPLOADED_FILE_V1_VERSION: &str = "1.0.0";
-
 /// Current schema version for GeneratedDocV1.
 pub const GENERATED_DOC_V1_VERSION: &str = "1.0.0";
 
@@ -145,32 +147,6 @@ pub struct TempFileV1 {
 
 fn default_temp_file_v1_version() -> String {
     TEMP_FILE_V1_VERSION.to_string()
-}
-
-/// Represents a file uploaded to the workspace (DTO V1).
-#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
-#[versioned(version = "1.0.0")]
-pub struct UploadedFileV1 {
-    /// The schema version of this data structure.
-    #[serde(default = "default_uploaded_file_v1_version")]
-    pub schema_version: String,
-
-    /// Unique identifier for the uploaded file
-    pub id: String,
-    /// Original filename
-    pub name: String,
-    /// Path to the stored file
-    pub path: PathBuf,
-    /// MIME type of the file
-    pub mime_type: String,
-    /// File size in bytes
-    pub size: u64,
-    /// Timestamp when the file was uploaded
-    pub uploaded_at: i64,
-}
-
-fn default_uploaded_file_v1_version() -> String {
-    UPLOADED_FILE_V1_VERSION.to_string()
 }
 
 /// Represents an AI-generated document or artifact (DTO V1).
@@ -238,7 +214,7 @@ pub struct WorkspaceResourcesV1 {
 
     /// Files uploaded by the user or system
     #[serde(default)]
-    pub uploaded_files: Vec<UploadedFileV1>,
+    pub uploaded_files: Vec<UploadedFileV1_1_0>,
     /// AI-generated documentation and artifacts
     #[serde(default)]
     pub generated_docs: Vec<GeneratedDocV1>,
@@ -515,7 +491,7 @@ impl MigratesTo<UserProfileV1_1> for UserProfileV1_0 {
 use orcs_core::persona::{Persona, PersonaSource};
 use orcs_core::session::Session;
 use orcs_core::workspace::{
-    Workspace, WorkspaceResources, UploadedFile, GeneratedDoc,
+    Workspace, WorkspaceResources, GeneratedDoc,
     ProjectContext, SessionWorkspace, TempFile,
 };
 
@@ -643,35 +619,6 @@ impl From<&TempFile> for TempFileV1 {
     }
 }
 
-/// Convert UploadedFileV1 DTO to domain model.
-impl IntoDomain<UploadedFile> for UploadedFileV1 {
-    fn into_domain(self) -> UploadedFile {
-        UploadedFile {
-            id: self.id,
-            name: self.name,
-            path: self.path,
-            mime_type: self.mime_type,
-            size: self.size,
-            uploaded_at: self.uploaded_at,
-        }
-    }
-}
-
-/// Convert domain model to UploadedFileV1 DTO for persistence.
-impl From<&UploadedFile> for UploadedFileV1 {
-    fn from(uploaded_file: &UploadedFile) -> Self {
-        UploadedFileV1 {
-            schema_version: UPLOADED_FILE_V1_VERSION.to_string(),
-            id: uploaded_file.id.clone(),
-            name: uploaded_file.name.clone(),
-            path: uploaded_file.path.clone(),
-            mime_type: uploaded_file.mime_type.clone(),
-            size: uploaded_file.size,
-            uploaded_at: uploaded_file.uploaded_at,
-        }
-    }
-}
-
 /// Convert GeneratedDocV1 DTO to domain model.
 impl IntoDomain<GeneratedDoc> for GeneratedDocV1 {
     fn into_domain(self) -> GeneratedDoc {
@@ -751,7 +698,7 @@ impl From<&WorkspaceResources> for WorkspaceResourcesV1 {
         WorkspaceResourcesV1 {
             schema_version: WORKSPACE_RESOURCES_V1_VERSION.to_string(),
             uploaded_files: resources.uploaded_files.iter()
-                .map(UploadedFileV1::from)
+                .map(UploadedFileV1_1_0::from)
                 .collect(),
             generated_docs: resources.generated_docs.iter()
                 .map(GeneratedDocV1::from)

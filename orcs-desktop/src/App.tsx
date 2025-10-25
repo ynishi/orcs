@@ -355,7 +355,24 @@ function App() {
   // Workspace からファイルをアタッチするハンドラー
   const handleAttachFileFromWorkspace = (file: File) => {
     setAttachedFiles((prev) => [...prev, file]);
-    addMessage('system', 'System', `📎 Attached file from workspace: ${file.name}`);
+
+    // Show toast notification instead of adding to chat history
+    notifications.show({
+      title: 'File Attached',
+      message: `${file.name} from workspace`,
+      color: 'blue',
+      icon: '📎',
+    });
+  };
+
+  // ワークスペースファイルからセッションに移動するハンドラー
+  const handleGoToSessionFromFile = (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      handleSessionSelect(session);
+    } else {
+      addMessage('error', 'System', `Session not found: ${sessionId}`);
+    }
   };
 
   // メッセージをワークスペースに保存するハンドラー
@@ -373,11 +390,13 @@ function App() {
       // ワークスペースIDを取得
       const workspace = await invoke<{ id: string }>('get_current_workspace');
 
-      // ワークスペースに保存
+      // ワークスペースに保存（セッションIDとメッセージタイムスタンプを含める）
       await invoke('upload_file_from_bytes', {
         workspaceId: workspace.id,
         filename: filename,
         fileData: fileData,
+        sessionId: currentSessionId || null,
+        messageTimestamp: message.timestamp.toISOString(),
       });
 
       // ワークスペースのファイルリストを更新
@@ -651,6 +670,7 @@ function App() {
           onAttachFile={handleAttachFileFromWorkspace}
           includeWorkspaceInPrompt={includeWorkspaceInPrompt}
           onToggleIncludeWorkspaceInPrompt={setIncludeWorkspaceInPrompt}
+          onGoToSession={handleGoToSessionFromFile}
           onMessage={addMessage}
         />
       </AppShell.Navbar>

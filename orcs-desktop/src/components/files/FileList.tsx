@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, TextInput } from '@mantine/core';
-import { IconMessage, IconExternalLink, IconTrash, IconPencil } from '@tabler/icons-react';
+import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle } from '@tabler/icons-react';
 import { useState } from 'react';
 import { UploadedFile } from '../../types/workspace';
 
@@ -9,9 +9,10 @@ interface FileListProps {
   onOpenFile?: (file: UploadedFile) => void;
   onRenameFile?: (file: UploadedFile, newName: string) => void;
   onDeleteFile?: (file: UploadedFile) => void;
+  onGoToSession?: (file: UploadedFile) => void;
 }
 
-export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile }: FileListProps) {
+export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession }: FileListProps) {
   const [hoveredFile, setHoveredFile] = useState<string | null>(null);
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
@@ -117,6 +118,22 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
                     {/* Action buttons - show on hover */}
                     {hoveredFile === file.id && (
                       <Group gap={4}>
+                        {file.sessionId && (
+                          <Tooltip label="Go to conversation">
+                            <ActionIcon
+                              variant="subtle"
+                              color="violet"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onGoToSession?.(file);
+                              }}
+                            >
+                              <IconMessageCircle size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+
                         <Tooltip label="Attach to chat">
                           <ActionIcon
                             variant="subtle"

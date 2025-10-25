@@ -82,6 +82,8 @@ pub trait WorkspaceManager: Send + Sync {
     /// * `workspace_id` - The ID of the workspace to add the file to
     /// * `filename` - The name of the file
     /// * `data` - The file content as bytes
+    /// * `session_id` - Optional session ID if file was saved from a chat message
+    /// * `message_timestamp` - Optional message timestamp if file was saved from a chat message
     ///
     /// # Returns
     ///
@@ -98,6 +100,8 @@ pub trait WorkspaceManager: Send + Sync {
         workspace_id: &str,
         filename: &str,
         data: &[u8],
+        session_id: Option<String>,
+        message_timestamp: Option<String>,
     ) -> Result<UploadedFile>;
 
     /// Deletes a file from a workspace.

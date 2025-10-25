@@ -48,7 +48,7 @@ fn load_config() -> Result<ConfigRootV2, String> {
             if let Ok(root_v1) = toml::from_str::<ConfigRootV1>(&content) {
                 use version_migrate::MigratesTo;
 
-                let personas = root_v1.personas.into_iter()
+                let personas: Vec<PersonaConfigV2> = root_v1.personas.into_iter()
                     .map(|v1_dto| v1_dto.migrate())  // PersonaConfigV1 -> PersonaConfigV2
                     .collect();
 
@@ -125,7 +125,7 @@ pub fn load_personas() -> Result<Vec<Persona>, String> {
     use version_migrate::IntoDomain;
 
     let config = load_config()?;
-    let personas = config.personas.into_iter()
+    let personas: Vec<Persona> = config.personas.into_iter()
         .map(|dto| dto.into_domain())
         .collect();
     Ok(personas)

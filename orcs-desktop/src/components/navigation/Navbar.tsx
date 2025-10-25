@@ -11,6 +11,7 @@ interface NavbarProps {
   // Sessions
   sessions: Session[];
   currentSessionId: string | null;
+  currentWorkspaceId?: string;
   onSessionSelect: (session: Session) => void;
   onSessionDelete: (sessionId: string) => void;
   onSessionRename: (sessionId: string, newTitle: string) => void;
@@ -34,6 +35,7 @@ interface NavbarProps {
 export function Navbar({
   sessions,
   currentSessionId,
+  currentWorkspaceId,
   onSessionSelect,
   onSessionDelete,
   onSessionRename,
@@ -70,6 +72,7 @@ export function Navbar({
               <SessionList
                 sessions={sessions}
                 currentSessionId={currentSessionId || undefined}
+                currentWorkspaceId={currentWorkspaceId}
                 onSessionSelect={onSessionSelect}
                 onSessionDelete={onSessionDelete}
                 onSessionRename={onSessionRename}

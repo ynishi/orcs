@@ -15,6 +15,7 @@ use super::message::ConversationMessage;
 /// - The currently active persona
 /// - Application mode (Idle, Planning, etc.)
 /// - Timestamps for creation and last update
+/// - Optional workspace association for filtering
 ///
 /// This is the "pure" domain model that business logic operates on,
 /// independent of any specific storage format or version.
@@ -34,4 +35,6 @@ pub struct Session {
     pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
     /// Current application mode
     pub app_mode: AppMode,
+    /// Workspace ID if this session is associated with a workspace
+    pub workspace_id: Option<String>,
 }

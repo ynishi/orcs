@@ -10,7 +10,7 @@ use super::repository::SessionRepository;
 // We use dynamic dispatch to avoid circular dependencies
 pub trait InteractionManagerTrait: Send + Sync {
     fn session_id(&self) -> &str;
-    fn to_session(&self, app_mode: AppMode) -> impl std::future::Future<Output = Session> + Send;
+    fn to_session(&self, app_mode: AppMode, workspace_id: Option<String>) -> impl std::future::Future<Output = Session> + Send;
 }
 
 /// Manages multiple sessions and their lifecycle.
@@ -162,7 +162,12 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
             .await
             .ok_or_else(|| anyhow::anyhow!("No active session"))?;
 
-        let session = manager.to_session(app_mode).await;
+        // Load existing session to preserve workspace_id
+        let session_id = manager.session_id();
+        let existing_workspace_id = self.repository.find_by_id(session_id).await?
+            .and_then(|s| s.workspace_id);
+
+        let session = manager.to_session(app_mode, existing_workspace_id).await;
         self.repository.save(&session).await?;
 
         Ok(())
@@ -299,7 +304,7 @@ mod tests {
             &self.session_id
         }
 
-        async fn to_session(&self, app_mode: AppMode) -> Session {
+        async fn to_session(&self, app_mode: AppMode, workspace_id: Option<String>) -> Session {
             Session {
                 id: self.session_id.clone(),
                 title: format!("Session {}", self.session_id),
@@ -308,6 +313,7 @@ mod tests {
                 current_persona_id: "mai".to_string(),
                 persona_histories: HashMap::new(),
                 app_mode,
+                workspace_id,
             }
         }
     }

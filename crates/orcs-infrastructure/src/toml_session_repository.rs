@@ -1,33 +1,20 @@
-use orcs_core::persona::Persona;
+//! TOML-based SessionRepository implementation
+
 use orcs_core::repository::{PersonaRepository, SessionRepository};
 use orcs_core::session::{Session, ConversationMessage};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use semver::Version;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use crate::dto::{SessionV0, SessionV1};
+use crate::dto::{SessionV1_0_0, SessionV1_1_0, SessionV2_0_0};
 use version_migrate::{MigratesTo, IntoDomain};
-
-/// A repository implementation for storing persona configurations in a TOML file.
-pub struct TomlPersonaRepository;
-
-impl PersonaRepository for TomlPersonaRepository {
-    fn get_all(&self) -> Result<Vec<Persona>, String> {
-        crate::toml_storage::load_personas()
-    }
-
-    fn save_all(&self, configs: &[Persona]) -> Result<(), String> {
-        crate::toml_storage::save_personas(configs)
-    }
-}
 
 /// A repository implementation for storing session data in TOML files.
 ///
 /// This implementation follows Clean Architecture principles:
-/// - Uses DTOs (SessionV1) for persistence
-/// - Handles migration from older formats (V0→V1)
+/// - Uses DTOs (SessionV2_0_0) for persistence
+/// - Handles migration from older formats (V1.0.0→V1.1.0→V2.0.0)
 /// - Converts between DTOs and domain models
 /// - Stores sessions as individual TOML files in a sessions directory
 pub struct TomlSessionRepository {
@@ -168,49 +155,31 @@ impl TomlSessionRepository {
     ///
     /// This method handles:
     /// 1. Reading the TOML file
-    /// 2. Detecting schema version
-    /// 3. Migrating V0→V1 if necessary
-    /// 4. Converting DTO to domain model
+    /// 2. Auto-detecting version and migrating if necessary
+    /// 3. Converting DTO to domain model
     fn load_session_from_path(&self, path: &Path) -> Result<Session> {
         let toml_content = fs::read_to_string(path)
             .context(format!("Failed to read session file: {:?}", path))?;
 
-        // First, try to determine the schema version
-        let version_info: toml::Value = toml::from_str(&toml_content)
-            .context("Failed to parse TOML for version detection")?;
-
-        let schema_version = version_info
-            .get("schema_version")
-            .and_then(|v: &toml::Value| v.as_str())
-            .unwrap_or("1.0.0");
-
-        let version = Version::parse(schema_version)
-            .unwrap_or_else(|_| Version::new(1, 0, 0));
-
-        // Load based on version and migrate if needed
-        let dto: SessionV1 = if version.major == 1 && version.minor == 0 {
-            // V1.0.0 format - this is actually V0 (legacy naming)
-            tracing::info!(
-                "Loading legacy SessionV0 format from {:?}, will migrate to V1",
-                path
-            );
-
-            let v0: SessionV0 = toml::from_str(&toml_content)
-                .context("Failed to deserialize SessionV0 from TOML")?;
-
-            // Migrate V0→V1 using MigratesTo
-            let mut v1 = v0.migrate();
-
-            // Additional migration: migrate persona_histories keys from names to UUIDs
-            v1.persona_histories = self.migrate_persona_history_keys(v1.persona_histories)?;
-            v1.current_persona_id = self.migrate_persona_id(&v1.current_persona_id)?;
-
-            v1
+        // Try to load as SessionV2_0_0 first (latest version)
+        let mut dto: SessionV2_0_0 = if let Ok(v2_0_0) = toml::from_str::<SessionV2_0_0>(&toml_content) {
+            v2_0_0
+        } else if let Ok(v1_1_0) = toml::from_str::<SessionV1_1_0>(&toml_content) {
+            // V1.1.0 format - migrate to V2.0.0
+            tracing::info!("Migrating session from V1.1.0 to V2.0.0: {:?}", path);
+            v1_1_0.migrate()
+        } else if let Ok(v1_0_0) = toml::from_str::<SessionV1_0_0>(&toml_content) {
+            // V1.0.0 format - migrate to V1.1.0 then V2.0.0
+            tracing::info!("Migrating session from V1.0.0 to V2.0.0: {:?}", path);
+            let v1_1_0: SessionV1_1_0 = v1_0_0.migrate();
+            v1_1_0.migrate()
         } else {
-            // V1.1.0+ format - load directly
-            toml::from_str(&toml_content)
-                .context("Failed to deserialize SessionV1 from TOML")?
+            return Err(anyhow::anyhow!("Failed to parse session file: {:?}", path));
         };
+
+        // Additional migration: migrate persona_histories keys from names to UUIDs if needed
+        dto.persona_histories = self.migrate_persona_history_keys(dto.persona_histories)?;
+        dto.current_persona_id = self.migrate_persona_id(&dto.current_persona_id)?;
 
         // Convert DTO to domain model
         Ok(dto.into_domain())
@@ -243,8 +212,8 @@ impl SessionRepository for TomlSessionRepository {
     async fn save(&self, session: &Session) -> Result<()> {
         let file_path = self.session_file_path(&session.id);
 
-        // Convert domain model to DTO
-        let dto: SessionV1 = SessionV1::from(session);
+        // Convert domain model to DTO (always use latest version)
+        let dto: SessionV2_0_0 = SessionV2_0_0::from(session);
 
         // Serialize DTO to TOML
         let toml_content = toml::to_string_pretty(&dto)
@@ -378,6 +347,7 @@ mod tests {
             current_persona_id: "mai".to_string(),
             persona_histories,
             app_mode: AppMode::Idle,
+            workspace_id: None,
         }
     }
 

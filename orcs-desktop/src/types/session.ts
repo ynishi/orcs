@@ -10,6 +10,7 @@ export interface Session {
   current_persona_id: string;
   persona_histories: Record<string, ConversationMessage[]>;
   app_mode: AppMode;
+  workspace_id?: string; // Optional workspace ID for filtering
 }
 
 /**

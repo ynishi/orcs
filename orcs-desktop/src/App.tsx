@@ -660,6 +660,7 @@ function App() {
         <Navbar
           sessions={sessions}
           currentSessionId={currentSessionId}
+          currentWorkspaceId={workspace?.id}
           onSessionSelect={handleSessionSelect}
           onSessionDelete={handleSessionDelete}
           onSessionRename={handleSessionRename}

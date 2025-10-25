@@ -21,6 +21,22 @@ use crate::workspace::model::{SessionWorkspace, TempFile, UploadedFile, Workspac
 /// Implementations should ensure thread-safety and asynchronous operation.
 #[async_trait]
 pub trait WorkspaceManager: Send + Sync {
+    /// Gets the workspace for the current working directory.
+    ///
+    /// This method determines the current working directory and returns the workspace
+    /// associated with it, creating one if necessary.
+    ///
+    /// # Returns
+    ///
+    /// Returns the workspace for the current working directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The current directory cannot be determined
+    /// - The workspace cannot be created or retrieved
+    async fn get_current_workspace(&self) -> Result<Workspace>;
+
     /// Gets an existing workspace or creates a new one for the given repository path.
     ///
     /// # Arguments

@@ -1,5 +1,5 @@
 use orcs_core::repository::PersonaRepository;
-use orcs_infrastructure::repository::TomlPersonaRepository;
+use orcs_infrastructure::TomlPersonaRepository;
 
 #[test]
 fn test_get_all_personas() {

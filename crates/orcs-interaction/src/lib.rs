@@ -111,6 +111,8 @@ pub struct InteractionManager {
     title: Arc<RwLock<String>>,
     /// Session creation timestamp
     created_at: String,
+    /// Optional workspace ID for filtering sessions by workspace
+    workspace_id: Option<String>,
     /// Lazily-initialized dialogue instance
     dialogue: Arc<Mutex<Option<Dialogue>>>,
     /// Raw conversation history per persona (for persistence)
@@ -157,6 +159,7 @@ impl InteractionManager {
             session_id,
             title: Arc::new(RwLock::new(default_title)),
             created_at: now,
+            workspace_id: None, // Will be set by the caller if needed
             dialogue: Arc::new(Mutex::new(None)),
             persona_histories: Arc::new(RwLock::new(persona_histories_map)),
             persona_repository,
@@ -192,6 +195,7 @@ impl InteractionManager {
             session_id: data.id,
             title: Arc::new(RwLock::new(data.title)),
             created_at: data.created_at,
+            workspace_id: data.workspace_id,
             dialogue: Arc::new(Mutex::new(None)),
             persona_histories: Arc::new(RwLock::new(migrated_histories)),
             persona_repository,
@@ -302,7 +306,8 @@ impl InteractionManager {
     /// # Arguments
     ///
     /// * `app_mode` - The current application mode
-    pub async fn to_session(&self, app_mode: AppMode) -> Session {
+    /// * `workspace_id` - Optional workspace ID to associate with this session (overrides instance workspace_id if provided)
+    pub async fn to_session(&self, app_mode: AppMode, workspace_id: Option<String>) -> Session {
         let persona_histories = self.persona_histories.read().await.clone();
         let title = self.title.read().await.clone();
 
@@ -317,6 +322,9 @@ impl InteractionManager {
             })
             .unwrap_or_else(|| "unknown".to_string());
 
+        // Use provided workspace_id, fallback to instance workspace_id
+        let final_workspace_id = workspace_id.or_else(|| self.workspace_id.clone());
+
         Session {
             id: self.session_id.clone(),
             title,
@@ -325,6 +333,7 @@ impl InteractionManager {
             current_persona_id,
             persona_histories,
             app_mode,
+            workspace_id: final_workspace_id,
         }
     }
 
@@ -601,8 +610,8 @@ impl orcs_core::session::InteractionManagerTrait for InteractionManager {
         &self.session_id
     }
 
-    async fn to_session(&self, app_mode: AppMode) -> Session {
-        self.to_session(app_mode).await
+    async fn to_session(&self, app_mode: AppMode, workspace_id: Option<String>) -> Session {
+        self.to_session(app_mode, workspace_id).await
     }
 }
 
@@ -665,7 +674,7 @@ mod tests {
     async fn test_to_session() {
         let manager = InteractionManager::new_session("test-session".to_string());
 
-        let session = manager.to_session(AppMode::Idle).await;
+        let session = manager.to_session(AppMode::Idle, None).await;
 
         assert_eq!(session.id, "test-session");
         assert_eq!(session.current_persona_id, "mai");

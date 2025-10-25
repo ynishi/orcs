@@ -9,7 +9,7 @@ use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::{Workspace, UploadedFile};
-use orcs_infrastructure::repository::{TomlPersonaRepository, TomlSessionRepository};
+use orcs_infrastructure::{TomlPersonaRepository, TomlSessionRepository};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::toml_storage;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
@@ -92,6 +92,8 @@ impl From<InteractionResult> for SerializableInteractionResult {
 async fn create_session(
     state: State<'_, AppState>,
 ) -> Result<Session, String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
     let session_id = uuid::Uuid::new_v4().to_string();
     let manager = state.session_manager
         .create_session(session_id.clone(), |sid| InteractionManager::new_session(sid, state.persona_repository.clone(), state.user_service.clone()))
@@ -101,8 +103,15 @@ async fn create_session(
     // Reset app mode
     *state.app_mode.lock().await = AppMode::Idle;
 
+    // Get current workspace ID to associate with this session
+    let workspace_id = state.workspace_manager
+        .get_current_workspace()
+        .await
+        .ok()
+        .map(|ws| ws.id);
+
     // Get the full session data to return
-    let session = manager.to_session(AppMode::Idle).await;
+    let session = manager.to_session(AppMode::Idle, workspace_id).await;
 
     Ok(session)
 }
@@ -129,7 +138,8 @@ async fn switch_session(
         .await
         .map_err(|e| e.to_string())?;
 
-    let session = manager.to_session(AppMode::Idle).await;
+    // InteractionManager preserves workspace_id from the loaded session
+    let session = manager.to_session(AppMode::Idle, None).await;
 
     // Update app mode
     *state.app_mode.lock().await = session.app_mode.clone();
@@ -181,7 +191,7 @@ async fn get_active_session(
 ) -> Result<Option<Session>, String> {
     if let Some(manager) = state.session_manager.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();
-        let session = manager.to_session(app_mode).await;
+        let session = manager.to_session(app_mode, None).await;
         Ok(Some(session))
     } else {
         Ok(None)
@@ -387,13 +397,9 @@ async fn get_current_workspace(
 ) -> Result<Workspace, String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
-    // Get the current working directory
-    let current_dir = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
-
-    // Get or create workspace for the current directory
+    // Delegate to WorkspaceManager - all logic is in the core layer
     state.workspace_manager
-        .get_or_create_workspace(&current_dir)
+        .get_current_workspace()
         .await
         .map_err(|e| e.to_string())
 }

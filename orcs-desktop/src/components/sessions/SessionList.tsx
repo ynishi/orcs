@@ -5,6 +5,7 @@ import { useState } from 'react';
 interface SessionListProps {
   sessions: Session[];
   currentSessionId?: string;
+  currentWorkspaceId?: string;
   onSessionSelect?: (session: Session) => void;
   onSessionDelete?: (sessionId: string) => void;
   onSessionRename?: (sessionId: string, newTitle: string) => void;
@@ -14,6 +15,7 @@ interface SessionListProps {
 export function SessionList({
   sessions,
   currentSessionId,
+  currentWorkspaceId,
   onSessionSelect,
   onSessionDelete,
   onSessionRename,
@@ -21,8 +23,14 @@ export function SessionList({
 }: SessionListProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
+  const [filterByWorkspace, setFilterByWorkspace] = useState<boolean>(false);
 
-  const sortedSessions = [...sessions].sort(
+  // フィルタリングされたセッション
+  const filteredSessions = filterByWorkspace && currentWorkspaceId
+    ? sessions.filter(s => s.workspace_id === currentWorkspaceId)
+    : sessions;
+
+  const sortedSessions = [...filteredSessions].sort(
     (a, b) => getLastActive(b).getTime() - getLastActive(a).getTime()
   );
 
@@ -51,16 +59,31 @@ export function SessionList({
         <Text size="sm" fw={600}>
           Sessions
         </Text>
-        <Tooltip label="New session" withArrow>
-          <ActionIcon
-            color="blue"
-            variant="light"
-            onClick={onNewSession}
-            size="xs"
-          >
-            ➕
-          </ActionIcon>
-        </Tooltip>
+        <Group gap="xs">
+          {/* ワークスペースフィルタートグル */}
+          {currentWorkspaceId && (
+            <Tooltip label={filterByWorkspace ? "Show all sessions" : "Filter by current workspace"} withArrow>
+              <ActionIcon
+                color={filterByWorkspace ? "blue" : "gray"}
+                variant={filterByWorkspace ? "filled" : "light"}
+                onClick={() => setFilterByWorkspace(!filterByWorkspace)}
+                size="xs"
+              >
+                🗂️
+              </ActionIcon>
+            </Tooltip>
+          )}
+          <Tooltip label="New session" withArrow>
+            <ActionIcon
+              color="blue"
+              variant="light"
+              onClick={onNewSession}
+              size="xs"
+            >
+              ➕
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Group>
 
       {/* セッションリスト */}
@@ -193,7 +216,9 @@ export function SessionList({
       {/* フッター */}
       <Box px="md" pb="md">
         <Text size="xs" c="dimmed">
-          {sessions.length} total sessions
+          {filterByWorkspace && currentWorkspaceId
+            ? `${sortedSessions.length} / ${sessions.length} sessions (filtered by workspace)`
+            : `${sessions.length} total sessions`}
         </Text>
       </Box>
     </Stack>

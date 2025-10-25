@@ -1,5 +1,5 @@
 use orcs_core::persona::Persona;
-use crate::dto::{ConfigRootV1, ConfigRootV2, PersonaConfigV2, UserProfileDTO, USER_PROFILE_V1_1_VERSION};
+use crate::dto::{ConfigRootV1, ConfigRootV2, PersonaConfigV2, UserProfileDTO};
 use std::fs;
 
 // ============================================================================
@@ -164,30 +164,14 @@ pub fn save_personas(personas: &[Persona]) -> Result<(), String> {
 ///
 /// # Returns
 ///
-/// - `Ok(())`: If the profile exists or was successfully initialized and migrated.
+/// - `Ok(())`: If the profile exists or was successfully initialized.
 /// - `Err(String)`: An error message if the operation failed.
 pub fn ensure_user_profile_initialized() -> Result<(), String> {
     let mut config = load_config()?;
-    let mut needs_save = false;
 
     // Initialize if missing
     if config.user_profile.is_none() {
         config.user_profile = Some(UserProfileDTO::default());
-        needs_save = true;
-    } else {
-        // Auto-migrate: check if schema_version needs update
-        if let Some(ref profile) = config.user_profile {
-            if profile.schema_version != USER_PROFILE_V1_1_VERSION {
-                // Update to latest version
-                let mut updated_profile = profile.clone();
-                updated_profile.schema_version = USER_PROFILE_V1_1_VERSION.to_string();
-                config.user_profile = Some(updated_profile);
-                needs_save = true;
-            }
-        }
-    }
-
-    if needs_save {
         save_config(&config)?;
     }
 
@@ -263,9 +247,7 @@ source = "System"
         };
         let toml_string = toml::to_string_pretty(&root_dto).unwrap();
 
-        // Verify V2 format in TOML output
-        assert!(toml_string.contains("schema_version = \"2.0.0\""),
-                "TOML should contain V2 schema version");
+        // Verify migrated content
         assert!(toml_string.contains("name = \"Mai\""),
                 "TOML should contain persona name");
 
@@ -275,11 +257,10 @@ source = "System"
     }
 
     #[test]
-    fn test_v2_persona_serialization_includes_schema_version() {
-        use crate::dto::{PersonaConfigV2, PersonaSourceDTO, PERSONA_CONFIG_V2_VERSION};
+    fn test_v2_persona_serialization() {
+        use crate::dto::{PersonaConfigV2, PersonaSourceDTO};
 
         let persona_v2 = PersonaConfigV2 {
-            schema_version: PERSONA_CONFIG_V2_VERSION.to_string(),
             id: "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c".to_string(),
             name: "Mai".to_string(),
             role: "UX Engineer".to_string(),
@@ -291,9 +272,9 @@ source = "System"
 
         let toml_string = toml::to_string_pretty(&persona_v2).unwrap();
 
-        assert!(toml_string.contains("schema_version = \"2.0.0\""),
-                "Serialized TOML should contain schema_version");
         assert!(toml_string.contains("id = \"8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c\""),
                 "Serialized TOML should contain UUID");
+        assert!(toml_string.contains("name = \"Mai\""),
+                "Serialized TOML should contain name");
     }
 }

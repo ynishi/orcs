@@ -770,6 +770,9 @@ impl IntoDomain<Workspace> for WorkspaceV1 {
             id: self.id,
             name: self.name,
             root_path: self.root_path,
+            // workspace_dir is calculated from workspace_id, not stored in DTO
+            // The caller (load_workspace) must set this field after conversion
+            workspace_dir: PathBuf::new(),
             resources: self.resources.into_domain(),
             project_context: self.project_context.into_domain(),
         }

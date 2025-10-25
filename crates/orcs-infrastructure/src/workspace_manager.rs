@@ -179,7 +179,12 @@ impl FileSystemWorkspaceManager {
             ))
         })?;
 
-        Ok(workspace_dto.into_domain())
+        let mut workspace = workspace_dto.into_domain();
+
+        // Set workspace_dir (calculated from workspace_id, not stored in metadata)
+        workspace.workspace_dir = self.get_workspace_dir(workspace_id);
+
+        Ok(workspace)
     }
 
     /// Saves workspace metadata to the metadata.toml file.
@@ -256,10 +261,12 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         }
 
         // Create new workspace
+        let workspace_dir = self.get_workspace_dir(&workspace_id);
         let workspace = Workspace {
             id: workspace_id.clone(),
             name: Self::get_workspace_name(repo_path),
             root_path: repo_path.to_path_buf(),
+            workspace_dir,
             resources: WorkspaceResources::default(),
             project_context: ProjectContext::default(),
         };

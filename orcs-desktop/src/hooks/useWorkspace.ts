@@ -22,6 +22,7 @@ interface RawWorkspace {
   id: string;
   name: string;
   root_path: string;
+  workspace_dir: string;
   resources: {
     uploaded_files: RawUploadedFile[];
     generated_docs: Array<{
@@ -57,6 +58,7 @@ function convertWorkspace(raw: RawWorkspace): Workspace {
     id: raw.id,
     name: raw.name,
     rootPath: raw.root_path,
+    workspaceDir: raw.workspace_dir,
     resources: {
       uploadedFiles: raw.resources.uploaded_files.map(file => ({
         id: file.id,

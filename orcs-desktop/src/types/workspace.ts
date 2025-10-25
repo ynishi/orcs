@@ -94,6 +94,8 @@ export interface Workspace {
   name: string;
   /** Root directory path of the project */
   rootPath: string;
+  /** Directory where workspace data is stored (e.g., ~/.orcs/workspaces/{id}) */
+  workspaceDir: string;
   /** Collection of all workspace resources */
   resources: WorkspaceResources;
   /** Project-specific context and metadata */

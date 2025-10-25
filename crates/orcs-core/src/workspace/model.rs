@@ -11,6 +11,8 @@ pub struct Workspace {
     pub name: String,
     /// Root directory path of the project
     pub root_path: PathBuf,
+    /// Directory where workspace data is stored (e.g., ~/.orcs/workspaces/{id})
+    pub workspace_dir: PathBuf,
     /// Collection of all workspace resources
     pub resources: WorkspaceResources,
     /// Project-specific context and metadata

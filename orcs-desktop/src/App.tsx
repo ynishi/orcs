@@ -569,13 +569,17 @@ function App() {
 
     // Add workspace files list if enabled
     if (includeWorkspaceInPrompt && workspaceFiles.length > 0) {
+      const uploadedDir = workspace?.workspaceDir
+        ? `${workspace.workspaceDir}/resources/uploaded/`
+        : '~/.orcs/workspaces/{workspace-id}/resources/uploaded/';
+
       const workspaceInfo = [
         '',
         '---',
         'Available workspace files:',
         ...workspaceFiles.map(f => `  - ${f.name} (${(f.size / 1024).toFixed(1)} KB)`),
         '',
-        `Workspace location: ${workspace?.rootPath || '~/.orcs/workspaces'}/resources/uploaded/`,
+        `Workspace location: ${uploadedDir}`,
       ].join('\n');
       messageText = messageText + workspaceInfo;
     }

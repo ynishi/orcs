@@ -39,6 +39,7 @@ import { parseCommand, isValidCommand, getCommandHelp } from "./utils/commandPar
 import { filterCommands, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
 import { useSessions } from "./hooks/useSessions";
+import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages, isIdleMode } from "./types/session";
 
 type InteractionResult =
@@ -82,6 +83,10 @@ function App() {
     renameSession,
     saveCurrentSession,
   } = useSessions();
+
+  // ワークスペース管理
+  const { workspace, files: workspaceFiles, refresh: refreshWorkspace } = useWorkspace();
+  const [includeWorkspaceInPrompt, setIncludeWorkspaceInPrompt] = useState<boolean>(false);
 
   const [autoMode, setAutoMode] = useState<boolean>(false);
   const viewport = useRef<HTMLDivElement>(null);
@@ -347,6 +352,44 @@ function App() {
     }
   };
 
+  // Workspace からファイルをアタッチするハンドラー
+  const handleAttachFileFromWorkspace = (file: File) => {
+    setAttachedFiles((prev) => [...prev, file]);
+    addMessage('system', 'System', `📎 Attached file from workspace: ${file.name}`);
+  };
+
+  // メッセージをワークスペースに保存するハンドラー
+  const handleSaveMessageToWorkspace = async (message: Message) => {
+    try {
+      // ファイル名を生成（タイムスタンプ + 作者名）
+      const timestamp = message.timestamp.toISOString().replace(/[:.]/g, '-');
+      const filename = `${timestamp}_${message.author}_${message.type}.txt`;
+
+      // メッセージテキストをバイト配列に変換
+      const encoder = new TextEncoder();
+      const data = encoder.encode(message.text);
+      const fileData = Array.from(data);
+
+      // ワークスペースIDを取得
+      const workspace = await invoke<{ id: string }>('get_current_workspace');
+
+      // ワークスペースに保存
+      await invoke('upload_file_from_bytes', {
+        workspaceId: workspace.id,
+        filename: filename,
+        fileData: fileData,
+      });
+
+      // ワークスペースのファイルリストを更新
+      await refreshWorkspace();
+
+      addMessage('system', 'System', `💾 Saved message to workspace: ${filename}`);
+    } catch (err) {
+      console.error('Failed to save message to workspace:', err);
+      addMessage('error', 'System', `Failed to save message: ${err}`);
+    }
+  };
+
   // タスク操作ハンドラー
   const handleTaskToggle = (taskId: string) => {
     setTasks((prev) =>
@@ -517,10 +560,26 @@ function App() {
 
     // 通常のメッセージ処理
     let messageText = currentInput;
+
+    // Add attached files info
     if (currentFiles.length > 0) {
       const fileInfo = currentFiles.map(f => `📎 ${f.name} (${(f.size / 1024).toFixed(1)} KB)`).join('\n');
       messageText = currentInput ? `${currentInput}\n\n${fileInfo}` : fileInfo;
     }
+
+    // Add workspace files list if enabled
+    if (includeWorkspaceInPrompt && workspaceFiles.length > 0) {
+      const workspaceInfo = [
+        '',
+        '---',
+        'Available workspace files:',
+        ...workspaceFiles.map(f => `  - ${f.name} (${(f.size / 1024).toFixed(1)} KB)`),
+        '',
+        `Workspace location: ${workspace?.rootPath || '~/.orcs/workspaces'}/resources/uploaded/`,
+      ].join('\n');
+      messageText = messageText + workspaceInfo;
+    }
+
     addMessage('user', userNickname, messageText);
 
     // Show thinking indicator
@@ -585,6 +644,9 @@ function App() {
           tasks={tasks}
           onTaskToggle={handleTaskToggle}
           onTaskDelete={handleTaskDelete}
+          onAttachFile={handleAttachFileFromWorkspace}
+          includeWorkspaceInPrompt={includeWorkspaceInPrompt}
+          onToggleIncludeWorkspaceInPrompt={setIncludeWorkspaceInPrompt}
           onMessage={addMessage}
         />
       </AppShell.Navbar>
@@ -621,7 +683,11 @@ function App() {
               <ScrollArea h="100%" viewportRef={viewport}>
                 <Stack gap="sm" p="md">
                   {messages.map((message) => (
-                    <MessageItem key={message.id} message={message} />
+                    <MessageItem
+                      key={message.id}
+                      message={message}
+                      onSaveToWorkspace={handleSaveMessageToWorkspace}
+                    />
                   ))}
                   {isAiThinking && (
                     <ThinkingIndicator personaName={thinkingPersona} />

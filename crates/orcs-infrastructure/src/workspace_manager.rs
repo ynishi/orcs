@@ -365,6 +365,181 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         Ok(uploaded_file)
     }
 
+    async fn add_file_from_bytes(
+        &self,
+        workspace_id: &str,
+        filename: &str,
+        data: &[u8],
+    ) -> Result<UploadedFile> {
+        // Load existing workspace metadata
+        let mut workspace = self.load_workspace(workspace_id).await?;
+
+        // Get the workspace directory
+        let workspace_dir = self.get_workspace_dir(workspace_id);
+
+        // Construct the destination directory (resources/uploaded)
+        let uploaded_dir = workspace_dir.join("resources").join("uploaded");
+
+        // Ensure the destination directory exists
+        fs::create_dir_all(&uploaded_dir).await.map_err(|e| {
+            OrcsError::Io(format!(
+                "Failed to create uploaded directory '{}': {}",
+                uploaded_dir.display(),
+                e
+            ))
+        })?;
+
+        // Generate a unique ID for the file
+        let file_id = Uuid::new_v4().to_string();
+
+        // Construct the destination path
+        let dest_path = uploaded_dir.join(filename);
+
+        // Write the byte data to the file
+        fs::write(&dest_path, data).await.map_err(|e| {
+            OrcsError::Io(format!(
+                "Failed to write file to '{}': {}",
+                dest_path.display(),
+                e
+            ))
+        })?;
+
+        // Get file size from data length
+        let file_size = data.len() as u64;
+
+        // Determine MIME type
+        let mime_type = infer_mime_type(filename);
+
+        // Get current timestamp
+        let uploaded_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| OrcsError::Io(format!("Failed to get current timestamp: {}", e)))?
+            .as_secs() as i64;
+
+        // Create the UploadedFile domain model
+        let uploaded_file = UploadedFile {
+            id: file_id,
+            name: filename.to_string(),
+            path: dest_path,
+            mime_type,
+            size: file_size,
+            uploaded_at,
+        };
+
+        // Add to workspace's uploaded_files list
+        workspace.resources.uploaded_files.push(uploaded_file.clone());
+
+        // Save the updated workspace metadata
+        self.save_workspace(&workspace).await?;
+
+        Ok(uploaded_file)
+    }
+
+    async fn delete_file_from_workspace(
+        &self,
+        workspace_id: &str,
+        file_id: &str,
+    ) -> Result<()> {
+        // Load existing workspace metadata
+        let mut workspace = self.load_workspace(workspace_id).await?;
+
+        // Find the file in the uploaded_files list
+        let file_index = workspace
+            .resources
+            .uploaded_files
+            .iter()
+            .position(|f| f.id == file_id)
+            .ok_or_else(|| {
+                OrcsError::Io(format!("File with ID '{}' not found in workspace", file_id))
+            })?;
+
+        // Get the file to delete
+        let file = &workspace.resources.uploaded_files[file_index];
+
+        // Delete the physical file
+        if file.path.exists() {
+            fs::remove_file(&file.path).await.map_err(|e| {
+                OrcsError::Io(format!(
+                    "Failed to delete file '{}': {}",
+                    file.path.display(),
+                    e
+                ))
+            })?;
+        }
+
+        // Remove from workspace's uploaded_files list
+        workspace.resources.uploaded_files.remove(file_index);
+
+        // Save the updated workspace metadata
+        self.save_workspace(&workspace).await?;
+
+        Ok(())
+    }
+
+    async fn rename_file_in_workspace(
+        &self,
+        workspace_id: &str,
+        file_id: &str,
+        new_name: &str,
+    ) -> Result<UploadedFile> {
+        // Load existing workspace metadata
+        let mut workspace = self.load_workspace(workspace_id).await?;
+
+        // Find the file in the uploaded_files list
+        let file_index = workspace
+            .resources
+            .uploaded_files
+            .iter()
+            .position(|f| f.id == file_id)
+            .ok_or_else(|| {
+                OrcsError::Io(format!("File with ID '{}' not found in workspace", file_id))
+            })?;
+
+        // Get the current file
+        let old_file = &workspace.resources.uploaded_files[file_index];
+        let old_path = old_file.path.clone();
+
+        // Construct the new path
+        let new_path = old_path
+            .parent()
+            .ok_or_else(|| OrcsError::Io("Invalid file path".to_string()))?
+            .join(new_name);
+
+        // Check if a file with the new name already exists
+        if new_path.exists() {
+            return Err(OrcsError::Io(format!(
+                "A file with name '{}' already exists",
+                new_name
+            )));
+        }
+
+        // Rename the physical file
+        fs::rename(&old_path, &new_path).await.map_err(|e| {
+            OrcsError::Io(format!(
+                "Failed to rename file from '{}' to '{}': {}",
+                old_path.display(),
+                new_path.display(),
+                e
+            ))
+        })?;
+
+        // Update MIME type based on new extension
+        let mime_type = infer_mime_type(new_name);
+
+        // Update the file metadata
+        workspace.resources.uploaded_files[file_index].name = new_name.to_string();
+        workspace.resources.uploaded_files[file_index].path = new_path;
+        workspace.resources.uploaded_files[file_index].mime_type = mime_type;
+
+        // Clone the updated file for return
+        let updated_file = workspace.resources.uploaded_files[file_index].clone();
+
+        // Save the updated workspace metadata
+        self.save_workspace(&workspace).await?;
+
+        Ok(updated_file)
+    }
+
     async fn create_temp_file(
         &self,
         session_id: &str,
@@ -717,6 +892,56 @@ mod tests {
         assert_eq!(
             updated_workspace.resources.temp_files[0].path,
             temp_file.path
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_file_from_bytes() {
+        let temp_dir = TempDir::new().unwrap();
+        let root_path = temp_dir.path().join("workspaces");
+        let repo_path = temp_dir.path().join("test-repo");
+        fs::create_dir_all(&repo_path).await.unwrap();
+
+        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+            .await
+            .unwrap();
+
+        // Create workspace
+        let workspace = manager
+            .get_or_create_workspace(&repo_path)
+            .await
+            .unwrap();
+
+        // Test data
+        let filename = "test.txt";
+        let test_content = b"Hello, workspace from bytes!";
+
+        // Add file from bytes
+        let uploaded_file = manager
+            .add_file_from_bytes(&workspace.id, filename, test_content)
+            .await
+            .unwrap();
+
+        // Verify the uploaded file metadata
+        assert_eq!(uploaded_file.name, filename);
+        assert_eq!(uploaded_file.mime_type, "text/plain");
+        assert_eq!(uploaded_file.size, test_content.len() as u64);
+
+        // Verify the file was written to the correct location
+        assert!(uploaded_file.path.exists());
+        let file_content = fs::read(&uploaded_file.path).await.unwrap();
+        assert_eq!(file_content, test_content);
+
+        // Verify the workspace metadata was updated
+        let updated_workspace = manager.get_workspace(&workspace.id).await.unwrap().unwrap();
+        assert_eq!(updated_workspace.resources.uploaded_files.len(), 1);
+        assert_eq!(
+            updated_workspace.resources.uploaded_files[0].id,
+            uploaded_file.id
+        );
+        assert_eq!(
+            updated_workspace.resources.uploaded_files[0].name,
+            uploaded_file.name
         );
     }
 

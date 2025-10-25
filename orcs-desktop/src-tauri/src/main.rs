@@ -437,6 +437,66 @@ async fn upload_file_to_workspace(
         .map_err(|e| e.to_string())
 }
 
+/// Uploads a file to a workspace from binary data
+#[tauri::command]
+async fn upload_file_from_bytes(
+    workspace_id: String,
+    filename: String,
+    file_data: Vec<u8>,
+    state: State<'_, AppState>,
+) -> Result<UploadedFile, String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    // Directly add the file from bytes - no temporary file needed
+    state.workspace_manager
+        .add_file_from_bytes(&workspace_id, &filename, &file_data)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Deletes a file from a workspace
+#[tauri::command]
+async fn delete_file_from_workspace(
+    workspace_id: String,
+    file_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    state.workspace_manager
+        .delete_file_from_workspace(&workspace_id, &file_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Renames a file in a workspace
+#[tauri::command]
+async fn rename_file_in_workspace(
+    workspace_id: String,
+    file_id: String,
+    new_name: String,
+    state: State<'_, AppState>,
+) -> Result<UploadedFile, String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    state.workspace_manager
+        .rename_file_in_workspace(&workspace_id, &file_id, &new_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Reads a file from a workspace and returns its content as bytes
+#[tauri::command]
+async fn read_workspace_file(
+    file_path: String,
+) -> Result<Vec<u8>, String> {
+    use tokio::fs;
+
+    fs::read(&file_path)
+        .await
+        .map_err(|e| format!("Failed to read file: {}", e))
+}
+
 /// Gets Git repository information for the current directory
 #[tauri::command]
 fn get_git_info() -> GitInfo {
@@ -624,6 +684,10 @@ fn main() {
                 get_current_workspace,
                 list_workspace_files,
                 upload_file_to_workspace,
+                upload_file_from_bytes,
+                delete_file_from_workspace,
+                rename_file_in_workspace,
+                read_workspace_file,
                 handle_input,
             ])
             .run(tauri::generate_context!())

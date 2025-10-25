@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip } from '@mantine/core';
+import { IconDeviceFloppy } from '@tabler/icons-react';
 import { Message, getMessageStyle } from '../../types/message';
 
 interface MessageItemProps {
   message: Message;
+  onSaveToWorkspace?: (message: Message) => void;
 }
 
 // メンションをハイライト表示するヘルパー
@@ -44,7 +46,7 @@ function renderTextWithMentions(text: string) {
   return parts.length > 0 ? parts : text;
 }
 
-export function MessageItem({ message }: MessageItemProps) {
+export function MessageItem({ message, onSaveToWorkspace }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -93,22 +95,37 @@ export function MessageItem({ message }: MessageItemProps) {
               </Text>
             </Box>
 
-            {/* コピーボタン */}
+            {/* アクションボタン */}
             {isHovered && (
-              <CopyButton value={message.text}>
-                {({ copied, copy }) => (
-                  <Tooltip label={copied ? 'Copied!' : 'Copy'} withArrow>
+              <Group gap={4}>
+                <CopyButton value={message.text}>
+                  {({ copied, copy }) => (
+                    <Tooltip label={copied ? 'Copied!' : 'Copy'} withArrow>
+                      <ActionIcon
+                        color={copied ? 'teal' : 'gray'}
+                        variant="subtle"
+                        onClick={copy}
+                        size="sm"
+                      >
+                        {copied ? '✓' : '📋'}
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </CopyButton>
+
+                {onSaveToWorkspace && (
+                  <Tooltip label="Save to Workspace" withArrow>
                     <ActionIcon
-                      color={copied ? 'teal' : 'gray'}
+                      color="blue"
                       variant="subtle"
-                      onClick={copy}
+                      onClick={() => onSaveToWorkspace(message)}
                       size="sm"
                     >
-                      {copied ? '✓' : '📋'}
+                      <IconDeviceFloppy size={16} />
                     </ActionIcon>
                   </Tooltip>
                 )}
-              </CopyButton>
+              </Group>
             )}
           </Group>
         </Paper>
@@ -152,22 +169,37 @@ export function MessageItem({ message }: MessageItemProps) {
               {message.author}
             </Text>
 
-            {/* コピーボタン */}
+            {/* アクションボタン */}
             {isHovered && (
-              <CopyButton value={message.text}>
-                {({ copied, copy }) => (
-                  <Tooltip label={copied ? 'Copied!' : 'Copy'} withArrow>
+              <Group gap={4}>
+                <CopyButton value={message.text}>
+                  {({ copied, copy }) => (
+                    <Tooltip label={copied ? 'Copied!' : 'Copy'} withArrow>
+                      <ActionIcon
+                        color={copied ? 'teal' : 'gray'}
+                        variant="subtle"
+                        onClick={copy}
+                        size="sm"
+                      >
+                        {copied ? '✓' : '📋'}
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </CopyButton>
+
+                {onSaveToWorkspace && (
+                  <Tooltip label="Save to Workspace" withArrow>
                     <ActionIcon
-                      color={copied ? 'teal' : 'gray'}
+                      color="blue"
                       variant="subtle"
-                      onClick={copy}
+                      onClick={() => onSaveToWorkspace(message)}
                       size="sm"
                     >
-                      {copied ? '✓' : '📋'}
+                      <IconDeviceFloppy size={16} />
                     </ActionIcon>
                   </Tooltip>
                 )}
-              </CopyButton>
+              </Group>
             )}
           </Group>
 

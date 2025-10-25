@@ -21,6 +21,11 @@ interface NavbarProps {
   onTaskToggle: (taskId: string) => void;
   onTaskDelete: (taskId: string) => void;
 
+  // Workspace
+  onAttachFile?: (file: File) => void;
+  includeWorkspaceInPrompt?: boolean;
+  onToggleIncludeWorkspaceInPrompt?: (value: boolean) => void;
+
   // Common
   onMessage: (type: MessageType, author: string, text: string) => void;
 }
@@ -35,6 +40,9 @@ export function Navbar({
   tasks,
   onTaskToggle,
   onTaskDelete,
+  onAttachFile,
+  includeWorkspaceInPrompt,
+  onToggleIncludeWorkspaceInPrompt,
   onMessage,
 }: NavbarProps) {
   return (
@@ -77,7 +85,11 @@ export function Navbar({
               </Group>
             </Accordion.Control>
             <Accordion.Panel>
-              <WorkspacePanel />
+              <WorkspacePanel
+                onAttachFile={onAttachFile}
+                includeInPrompt={includeWorkspaceInPrompt}
+                onToggleIncludeInPrompt={onToggleIncludeWorkspaceInPrompt}
+              />
             </Accordion.Panel>
           </Accordion.Item>
 

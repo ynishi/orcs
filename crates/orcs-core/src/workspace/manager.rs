@@ -75,6 +75,78 @@ pub trait WorkspaceManager: Send + Sync {
         source_path: &Path,
     ) -> Result<UploadedFile>;
 
+    /// Adds a file from byte data to a workspace.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace to add the file to
+    /// * `filename` - The name of the file
+    /// * `data` - The file content as bytes
+    ///
+    /// # Returns
+    ///
+    /// Returns the `UploadedFile` record representing the added file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The file cannot be written to storage
+    /// - The database operation fails
+    async fn add_file_from_bytes(
+        &self,
+        workspace_id: &str,
+        filename: &str,
+        data: &[u8],
+    ) -> Result<UploadedFile>;
+
+    /// Deletes a file from a workspace.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace
+    /// * `file_id` - The ID of the file to delete
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The file does not exist
+    /// - The file cannot be deleted from storage
+    /// - The database operation fails
+    async fn delete_file_from_workspace(
+        &self,
+        workspace_id: &str,
+        file_id: &str,
+    ) -> Result<()>;
+
+    /// Renames a file in a workspace.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace
+    /// * `file_id` - The ID of the file to rename
+    /// * `new_name` - The new name for the file
+    ///
+    /// # Returns
+    ///
+    /// Returns the updated `UploadedFile` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The file does not exist
+    /// - A file with the new name already exists
+    /// - The file cannot be renamed
+    /// - The database operation fails
+    async fn rename_file_in_workspace(
+        &self,
+        workspace_id: &str,
+        file_id: &str,
+        new_name: &str,
+    ) -> Result<UploadedFile>;
+
     /// Creates a temporary file associated with a session and workspace.
     ///
     /// Temporary files are typically used for intermediate data during a session

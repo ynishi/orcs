@@ -29,6 +29,17 @@ pub struct SerializableDialogueMessage {
     pub content: String,
 }
 
+/// Git repository information
+#[derive(Serialize, Clone)]
+pub struct GitInfo {
+    /// Whether the current directory is in a Git repository
+    pub is_repo: bool,
+    /// Current branch name (if in a repo)
+    pub branch: Option<String>,
+    /// Repository name (if in a repo)
+    pub repo_name: Option<String>,
+}
+
 /// Serializable version of InteractionResult for Tauri IPC
 #[derive(Serialize)]
 #[serde(tag = "type", content = "data")]
@@ -365,6 +376,94 @@ async fn handle_input(
     Ok(result.into())
 }
 
+/// Gets Git repository information for the current directory
+#[tauri::command]
+fn get_git_info() -> GitInfo {
+    use std::process::Command;
+
+    // Check if we're in a git repository
+    let is_repo = Command::new("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+
+    if !is_repo {
+        return GitInfo {
+            is_repo: false,
+            branch: None,
+            repo_name: None,
+        };
+    }
+
+    // Get current branch
+    let branch = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+            } else {
+                None
+            }
+        });
+
+    // Get repository name from remote origin URL
+    let repo_name = Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .and_then(|url| {
+                        // Extract repo name from URL
+                        // e.g., "git@github.com:user/repo.git" -> "repo"
+                        // e.g., "https://github.com/user/repo.git" -> "repo"
+                        url.trim()
+                            .split('/')
+                            .last()
+                            .map(|name| {
+                                name.trim_end_matches(".git").to_string()
+                            })
+                    })
+            } else {
+                None
+            }
+        })
+        .or_else(|| {
+            // Fallback: use the root directory name if no remote origin
+            Command::new("git")
+                .args(["rev-parse", "--show-toplevel"])
+                .output()
+                .ok()
+                .and_then(|output| {
+                    if output.status.success() {
+                        String::from_utf8(output.stdout)
+                            .ok()
+                            .and_then(|path| {
+                                std::path::Path::new(path.trim())
+                                    .file_name()
+                                    .and_then(|name| name.to_str())
+                                    .map(|s| s.to_string())
+                            })
+                    } else {
+                        None
+                    }
+                })
+        });
+
+    GitInfo {
+        is_repo: true,
+        branch,
+        repo_name,
+    }
+}
+
 fn main() {
     tauri::async_runtime::block_on(async {
         // Composition Root: Create the concrete repository instances
@@ -447,6 +546,7 @@ fn main() {
                 set_execution_strategy,
                 get_execution_strategy,
                 get_config_path,
+                get_git_info,
                 handle_input,
             ])
             .run(tauri::generate_context!())

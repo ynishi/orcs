@@ -1,14 +1,16 @@
 import { Paper, Group, Badge, Text, Divider, Avatar } from '@mantine/core';
 import { StatusInfo } from '../../types/status';
+import { GitInfo } from '../../types/git';
 
 interface StatusBarProps {
   status: StatusInfo;
   currentDir?: string;
+  gitInfo?: GitInfo;
   participatingAgentsCount?: number;
   autoMode?: boolean;
 }
 
-export function StatusBar({ status, currentDir, participatingAgentsCount = 0, autoMode = false }: StatusBarProps) {
+export function StatusBar({ status, currentDir, gitInfo, participatingAgentsCount = 0, autoMode = false }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -67,7 +69,7 @@ export function StatusBar({ status, currentDir, participatingAgentsCount = 0, au
         {/* エージェント（参加中の人数） */}
         <Group gap={6} wrap="nowrap">
           <Text size="sm" c="dimmed">
-            Agents:
+            Personas:
           </Text>
           <Badge color={participatingAgentsCount > 0 ? 'green' : 'gray'} size="sm" variant="filled">
             {participatingAgentsCount}
@@ -120,6 +122,31 @@ export function StatusBar({ status, currentDir, participatingAgentsCount = 0, au
               <Text size="sm" fw={500} style={{ fontFamily: 'monospace' }}>
                 {currentDir}
               </Text>
+            </Group>
+          </>
+        )}
+
+        {/* Git リポジトリ情報 */}
+        {gitInfo?.is_repo && (
+          <>
+            <Divider orientation="vertical" />
+            <Group gap={6} wrap="nowrap">
+              <Text size="sm" c="dimmed">
+                🌿
+              </Text>
+              <Text size="sm" fw={500} style={{ fontFamily: 'monospace' }}>
+                {gitInfo.repo_name || 'Unknown'}
+              </Text>
+              {gitInfo.branch && (
+                <>
+                  <Text size="sm" c="dimmed">
+                    @
+                  </Text>
+                  <Badge color="blue" size="sm" variant="light">
+                    {gitInfo.branch}
+                  </Badge>
+                </>
+              )}
             </Group>
           </>
         )}

@@ -19,7 +19,6 @@ import {
   Badge,
   CloseButton,
   Paper,
-  Accordion,
   Loader,
 } from "@mantine/core";
 import { useDisclosure } from '@mantine/hooks';
@@ -29,14 +28,12 @@ import { StatusInfo, getDefaultStatus } from "./types/status";
 import { Task } from "./types/task";
 import { Agent } from "./types/agent";
 import { Session, getMessageCount } from "./types/session";
+import { GitInfo } from "./types/git";
 import { MessageItem } from "./components/chat/MessageItem";
 import { StatusBar } from "./components/chat/StatusBar";
 import { CommandSuggestions } from "./components/chat/CommandSuggestions";
 import { AgentSuggestions } from "./components/chat/AgentSuggestions";
-import { FileList } from "./components/files/FileList";
-import { TaskList } from "./components/tasks/TaskList";
-import { PersonasList } from "./components/personas/PersonasList";
-import { SessionList } from "./components/sessions/SessionList";
+import { Navbar } from "./components/navigation/Navbar";
 import { parseCommand, isValidCommand, getCommandHelp } from "./utils/commandParser";
 import { filterCommands, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
@@ -65,6 +62,11 @@ function App() {
   const [currentDir, setCurrentDir] = useState<string>('.');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userNickname, setUserNickname] = useState<string>('You');
+  const [gitInfo, setGitInfo] = useState<GitInfo>({
+    is_repo: false,
+    branch: null,
+    repo_name: null,
+  });
 
   // セッション管理をカスタムフックに切り替え
   const {
@@ -138,6 +140,19 @@ function App() {
       }
     };
     loadNickname();
+  }, []);
+
+  // Load Git repository information on startup
+  useEffect(() => {
+    const loadGitInfo = async () => {
+      try {
+        const info = await invoke<GitInfo>('get_git_info');
+        setGitInfo(info);
+      } catch (error) {
+        console.error('Failed to load Git info:', error);
+      }
+    };
+    loadGitInfo();
   }, []);
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
@@ -550,86 +565,18 @@ function App() {
     >
       {/* 左ペイン */}
       <AppShell.Navbar>
-        <ScrollArea h="100vh" type="auto">
-          <Box p="md">
-            <Accordion
-              defaultValue={['sessions', 'files', 'tasks', 'personas']}
-              multiple
-              variant="separated"
-            >
-              {/* セッション */}
-              <Accordion.Item value="sessions">
-                <Accordion.Control>
-                  <Group gap="xs">
-                    <Text>💬</Text>
-                    <Text fw={600}>Sessions</Text>
-                    <Badge size="sm" color="blue" variant="light">
-                      {sessions.length}
-                    </Badge>
-                  </Group>
-                </Accordion.Control>
-                <Accordion.Panel>
-                  <SessionList
-                    sessions={sessions}
-                    currentSessionId={currentSessionId || undefined}
-                    onSessionSelect={handleSessionSelect}
-                    onSessionDelete={handleSessionDelete}
-                    onSessionRename={handleSessionRename}
-                    onNewSession={handleNewSession}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-
-              {/* ファイル */}
-              <Accordion.Item value="files">
-                <Accordion.Control>
-                  <Group gap="xs">
-                    <Text>📁</Text>
-                    <Text fw={600}>Files</Text>
-                  </Group>
-                </Accordion.Control>
-                <Accordion.Panel>
-                  <FileList onFileSelect={(file) => {
-                    addMessage('system', 'System', `Selected file: ${file.path}`);
-                  }} />
-                </Accordion.Panel>
-              </Accordion.Item>
-
-              {/* タスク */}
-              <Accordion.Item value="tasks">
-                <Accordion.Control>
-                  <Group gap="xs">
-                    <Text>✅</Text>
-                    <Text fw={600}>Tasks</Text>
-                    <Badge size="sm" color="blue" variant="light">
-                      {tasks.filter(t => t.status !== 'completed').length}
-                    </Badge>
-                  </Group>
-                </Accordion.Control>
-                <Accordion.Panel>
-                  <TaskList
-                    tasks={tasks}
-                    onTaskToggle={handleTaskToggle}
-                    onTaskDelete={handleTaskDelete}
-                  />
-                </Accordion.Panel>
-              </Accordion.Item>
-
-              {/* ペルソナ */}
-              <Accordion.Item value="personas">
-                <Accordion.Control>
-                  <Group gap="xs">
-                    <Text>⭐️</Text>
-                    <Text fw={600}>Personas</Text>
-                  </Group>
-                </Accordion.Control>
-                <Accordion.Panel>
-                  <PersonasList onMessage={addMessage} />
-                </Accordion.Panel>
-              </Accordion.Item>
-            </Accordion>
-          </Box>
-        </ScrollArea>
+        <Navbar
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onSessionSelect={handleSessionSelect}
+          onSessionDelete={handleSessionDelete}
+          onSessionRename={handleSessionRename}
+          onNewSession={handleNewSession}
+          tasks={tasks}
+          onTaskToggle={handleTaskToggle}
+          onTaskDelete={handleTaskDelete}
+          onMessage={addMessage}
+        />
       </AppShell.Navbar>
 
       {/* メインコンテンツ */}
@@ -791,6 +738,7 @@ function App() {
             <StatusBar
               status={status}
               currentDir={currentDir}
+              gitInfo={gitInfo}
               participatingAgentsCount={0}
               autoMode={autoMode}
             />

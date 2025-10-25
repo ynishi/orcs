@@ -17,6 +17,7 @@ async-trait = "0.1"
 uuid = { workspace = true, features = ["v5"] }
 tracing = "0.1"
 chrono = "0.4"
+version-migrate = {workspace = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

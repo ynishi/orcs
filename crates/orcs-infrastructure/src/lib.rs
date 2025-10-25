@@ -1,7 +1,8 @@
 pub mod dto;
-pub mod migration;
+// pub mod migration;  // Removed: migrated to version-migrate
 pub mod repository;
 pub mod toml_storage;
+pub mod user_service;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

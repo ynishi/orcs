@@ -1,13 +1,14 @@
 use orcs_core::persona::Persona;
 use orcs_core::repository::{PersonaRepository, SessionRepository};
-use orcs_core::session::Session;
+use orcs_core::session::{Session, ConversationMessage};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use semver::Version;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 use crate::dto::{SessionV0, SessionV1};
-use crate::migration::{SessionV0ToV1Migration, TypedMigration};
+use version_migrate::{MigratesTo, IntoDomain};
 
 /// A repository implementation for storing persona configurations in a TOML file.
 pub struct TomlPersonaRepository;
@@ -97,6 +98,72 @@ impl TomlSessionRepository {
             .join(format!("{}.toml", session_id))
     }
 
+    /// Migrates a persona ID from old format (name) to UUID.
+    fn migrate_persona_id(&self, id: &str) -> Result<String> {
+        // Check if already a UUID
+        if uuid::Uuid::parse_str(id).is_ok() {
+            return Ok(id.to_string());
+        }
+
+        // Try to find persona by name
+        let personas = self.persona_repository.get_all()
+            .map_err(|e| anyhow::anyhow!("Failed to load personas: {}", e))?;
+
+        let id_lower = id.to_lowercase();
+        personas
+            .iter()
+            .find(|p| p.name.to_lowercase() == id_lower || p.name == id)
+            .map(|p| p.id.clone())
+            .ok_or_else(|| anyhow::anyhow!("Could not resolve persona ID '{}' to UUID", id))
+    }
+
+    /// Migrates persona_histories keys from old IDs/names to UUIDs.
+    fn migrate_persona_history_keys(
+        &self,
+        histories: HashMap<String, Vec<ConversationMessage>>,
+    ) -> Result<HashMap<String, Vec<ConversationMessage>>> {
+        let personas = self.persona_repository.get_all()
+            .map_err(|e| anyhow::anyhow!("Failed to load personas: {}", e))?;
+
+        let mut migrated = HashMap::new();
+
+        for (key, messages) in histories {
+            // Check if key is already a valid UUID
+            if uuid::Uuid::parse_str(&key).is_ok() {
+                migrated.insert(key, messages);
+                continue;
+            }
+
+            // Try to find persona by old ID or name (case-insensitive)
+            let key_lower = key.to_lowercase();
+            let matching_persona = personas.iter().find(|p| {
+                let name_matches = p.name.to_lowercase() == key_lower || p.name == key;
+                name_matches
+            });
+
+            let final_key = if let Some(persona) = matching_persona {
+                tracing::debug!(
+                    "Migrated persona_histories key: '{}' -> '{}' ({})",
+                    key,
+                    persona.id,
+                    persona.name
+                );
+                persona.id.clone()
+            } else {
+                // Unknown key - keep as is (might be "user" or other special keys)
+                tracing::debug!(
+                    "Preserved non-persona persona_histories key: '{}'",
+                    key
+                );
+                key
+            };
+
+            migrated.insert(final_key, messages);
+        }
+
+        Ok(migrated)
+    }
+
     /// Loads a session from a specific file path.
     ///
     /// This method handles:
@@ -131,10 +198,14 @@ impl TomlSessionRepository {
             let v0: SessionV0 = toml::from_str(&toml_content)
                 .context("Failed to deserialize SessionV0 from TOML")?;
 
-            // Migrate V0→V1 using the new migration framework
-            let migration = SessionV0ToV1Migration::new(self.persona_repository.clone());
-            migration.migrate(v0)
-                .context("Failed to migrate SessionV0 to SessionV1")?
+            // Migrate V0→V1 using MigratesTo
+            let mut v1 = v0.migrate();
+
+            // Additional migration: migrate persona_histories keys from names to UUIDs
+            v1.persona_histories = self.migrate_persona_history_keys(v1.persona_histories)?;
+            v1.current_persona_id = self.migrate_persona_id(&v1.current_persona_id)?;
+
+            v1
         } else {
             // V1.1.0+ format - load directly
             toml::from_str(&toml_content)
@@ -142,7 +213,7 @@ impl TomlSessionRepository {
         };
 
         // Convert DTO to domain model
-        Ok(Session::from(dto))
+        Ok(dto.into_domain())
     }
 }
 

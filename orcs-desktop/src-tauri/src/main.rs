@@ -6,8 +6,10 @@ use tokio::sync::Mutex;
 use orcs_core::session::{AppMode, Session, SessionManager};
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
-use orcs_core::user::{UserService, DefaultUserService};
+use orcs_core::user::UserService;
 use orcs_infrastructure::repository::{TomlPersonaRepository, TomlSessionRepository};
+use orcs_infrastructure::user_service::ConfigBasedUserService;
+use orcs_infrastructure::toml_storage;
 use orcs_interaction::{InteractionManager, InteractionResult};
 use serde::Serialize;
 use tauri::State;
@@ -188,6 +190,14 @@ async fn save_persona_configs(
     state.persona_repository.save_all(&configs)
 }
 
+/// Gets the user's nickname from the config
+#[tauri::command]
+async fn get_user_nickname(
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    Ok(state.user_service.get_user_name())
+}
+
 /// Adds a participant to the active session
 #[tauri::command]
 async fn add_participant(
@@ -359,7 +369,7 @@ fn main() {
     tauri::async_runtime::block_on(async {
         // Composition Root: Create the concrete repository instances
         let persona_repository = Arc::new(TomlPersonaRepository);
-        let user_service: Arc<dyn UserService> = Arc::new(DefaultUserService::default());
+        let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
 
         // Seed the config file with default personas if it's empty on first run.
         if let Ok(configs) = persona_repository.get_all() {
@@ -376,6 +386,11 @@ fn main() {
                     eprintln!("Warning: Failed to auto-migrate persona config to V2: {}", e);
                 }
             }
+        }
+
+        // Ensure user profile is initialized with default if it doesn't exist
+        if let Err(e) = toml_storage::ensure_user_profile_initialized() {
+            eprintln!("Warning: Failed to initialize user profile: {}", e);
         }
 
         // Create TomlSessionRepository at default location
@@ -425,6 +440,7 @@ fn main() {
                 get_active_session,
                 get_personas,
                 save_persona_configs,
+                get_user_nickname,
                 add_participant,
                 remove_participant,
                 get_active_participants,

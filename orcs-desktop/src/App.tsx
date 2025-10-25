@@ -64,6 +64,7 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [currentDir, setCurrentDir] = useState<string>('.');
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [userNickname, setUserNickname] = useState<string>('You');
 
   // セッション管理をカスタムフックに切り替え
   const {
@@ -124,6 +125,19 @@ function App() {
         unlisten();
       }
     };
+  }, []);
+
+  // Load user nickname from backend on startup
+  useEffect(() => {
+    const loadNickname = async () => {
+      try {
+        const nickname = await invoke<string>('get_user_nickname');
+        setUserNickname(nickname);
+      } catch (error) {
+        console.error('Failed to load user nickname:', error);
+      }
+    };
+    loadNickname();
   }, []);
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
@@ -348,7 +362,7 @@ function App() {
       const fullSession = await switchSession(session.id);
 
       // メッセージ履歴を復元
-      const restoredMessages = convertSessionToMessages(fullSession);
+      const restoredMessages = convertSessionToMessages(fullSession, userNickname);
       setMessages(restoredMessages);
 
       // AppModeを復元
@@ -442,7 +456,7 @@ function App() {
     const parsed = parseCommand(currentInput);
 
     if (parsed.isCommand && parsed.command) {
-      addMessage('command', 'You', currentInput);
+      addMessage('command', userNickname, currentInput);
 
       if (!isValidCommand(parsed.command)) {
         addMessage('error', 'System', `Unknown command: /${parsed.command}\n\nType /help for available commands.`);
@@ -489,7 +503,7 @@ function App() {
       const fileInfo = currentFiles.map(f => `📎 ${f.name} (${(f.size / 1024).toFixed(1)} KB)`).join('\n');
       messageText = currentInput ? `${currentInput}\n\n${fileInfo}` : fileInfo;
     }
-    addMessage('user', 'You', messageText);
+    addMessage('user', userNickname, messageText);
 
     try {
       // Call Tauri backend

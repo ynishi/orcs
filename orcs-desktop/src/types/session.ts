@@ -133,13 +133,13 @@ import type { Message, MessageType } from './message';
 /**
  * ConversationMessageをUI用のMessageに変換
  */
-export function convertToUIMessage(msg: ConversationMessage): Message {
+export function convertToUIMessage(msg: ConversationMessage, userNickname: string = 'You'): Message {
   const messageType: MessageType = msg.role === 'User' ? 'user' : msg.role === 'Assistant' ? 'ai' : 'system';
 
   return {
     id: `${msg.timestamp}-${Math.random()}`,
     type: messageType,
-    author: msg.role === 'User' ? 'You' : msg.role === 'Assistant' ? 'AI' : 'System',
+    author: msg.role === 'User' ? userNickname : msg.role === 'Assistant' ? 'AI' : 'System',
     text: msg.content,
     timestamp: new Date(msg.timestamp),
   };
@@ -148,6 +148,6 @@ export function convertToUIMessage(msg: ConversationMessage): Message {
 /**
  * セッションの会話履歴をUI用Messageの配列に変換
  */
-export function convertSessionToMessages(session: Session): Message[] {
-  return getAllMessages(session).map(convertToUIMessage);
+export function convertSessionToMessages(session: Session, userNickname: string = 'You'): Message[] {
+  return getAllMessages(session).map(msg => convertToUIMessage(msg, userNickname));
 }

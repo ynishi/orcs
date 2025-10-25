@@ -2537,6 +2537,7 @@ dependencies = [
  "toml 0.8.2",
  "tracing",
  "uuid",
+ "version-migrate",
 ]
 
 [[package]]
@@ -4497,6 +4498,32 @@ name = "version-compare"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "852e951cb7832cb45cb1169900d19760cfa39b82bc0ea9c0e5a14ae88411c98b"
+
+[[package]]
+name = "version-migrate"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75f2943e988e26b38c84d0c0b86b1f430bd58a994cfd0591136e5b5a7b614bd6"
+dependencies = [
+ "async-trait",
+ "semver",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "version-migrate-macro",
+]
+
+[[package]]
+name = "version-migrate-macro"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5eecdac9f1208f2baef02c682d4e545868f1f692654e3e132a4e6d4c70e5dd26"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "semver",
+ "syn 2.0.108",
+]
 
 [[package]]
 name = "version_check"

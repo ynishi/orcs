@@ -402,10 +402,20 @@ function App() {
       // ワークスペースのファイルリストを更新
       await refreshWorkspace();
 
-      addMessage('system', 'System', `💾 Saved message to workspace: ${filename}`);
+      // Toast notification instead of system message
+      notifications.show({
+        title: 'File saved',
+        message: `${filename}`,
+        color: 'green',
+        icon: '💾',
+      });
     } catch (err) {
       console.error('Failed to save message to workspace:', err);
-      addMessage('error', 'System', `Failed to save message: ${err}`);
+      notifications.show({
+        title: 'Failed to save message',
+        message: String(err),
+        color: 'red',
+      });
     }
   };
 
@@ -672,6 +682,7 @@ function App() {
           includeWorkspaceInPrompt={includeWorkspaceInPrompt}
           onToggleIncludeWorkspaceInPrompt={setIncludeWorkspaceInPrompt}
           onGoToSession={handleGoToSessionFromFile}
+          onRefreshWorkspace={refreshWorkspace}
           onMessage={addMessage}
         />
       </AppShell.Navbar>

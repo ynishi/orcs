@@ -27,6 +27,7 @@ interface NavbarProps {
   includeWorkspaceInPrompt?: boolean;
   onToggleIncludeWorkspaceInPrompt?: (value: boolean) => void;
   onGoToSession?: (sessionId: string) => void;
+  onRefreshWorkspace?: () => Promise<void>;
 
   // Common
   onMessage: (type: MessageType, author: string, text: string) => void;
@@ -47,6 +48,7 @@ export function Navbar({
   includeWorkspaceInPrompt,
   onToggleIncludeWorkspaceInPrompt,
   onGoToSession,
+  onRefreshWorkspace,
   onMessage,
 }: NavbarProps) {
   return (
@@ -95,6 +97,7 @@ export function Navbar({
                 includeInPrompt={includeWorkspaceInPrompt}
                 onToggleIncludeInPrompt={onToggleIncludeWorkspaceInPrompt}
                 onGoToSession={onGoToSession}
+                onRefresh={onRefreshWorkspace}
               />
             </Accordion.Panel>
           </Accordion.Item>

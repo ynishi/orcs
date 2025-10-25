@@ -1,7 +1,8 @@
-import { Stack, Text, Loader, Center, Alert, ActionIcon, Group, Tooltip, Switch } from '@mantine/core';
+import { Stack, Text, Loader, Center, Alert, ActionIcon, Group, Tooltip, Switch, ScrollArea, Box } from '@mantine/core';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
+import { useCallback } from 'react';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { FileList } from '../files/FileList';
 import { UploadedFile } from '../../types/workspace';
@@ -11,10 +12,19 @@ interface WorkspacePanelProps {
   includeInPrompt?: boolean;
   onToggleIncludeInPrompt?: (value: boolean) => void;
   onGoToSession?: (sessionId: string) => void;
+  onRefresh?: () => Promise<void>;
 }
 
-export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession }: WorkspacePanelProps) {
+export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession, onRefresh }: WorkspacePanelProps) {
   const { workspace, files, isLoading, error, refresh } = useWorkspace();
+
+  // Keep local list in sync and notify parent consumers when provided
+  const refreshWorkspaceState = useCallback(async () => {
+    await refresh();
+    if (onRefresh) {
+      await onRefresh();
+    }
+  }, [refresh, onRefresh]);
 
   // Handle file upload from file input
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,7 +55,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
       }
 
       // Refresh the file list
-      await refresh();
+      await refreshWorkspaceState();
 
       // Clear the input so the same file can be selected again
       e.target.value = '';
@@ -99,7 +109,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
       });
 
       // Refresh the file list
-      await refresh();
+      await refreshWorkspaceState();
     } catch (err) {
       console.error('Failed to rename file:', err);
     }
@@ -116,7 +126,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
       });
 
       // Refresh the file list
-      await refresh();
+      await refreshWorkspaceState();
     } catch (err) {
       console.error('Failed to delete file:', err);
     }
@@ -155,14 +165,17 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
   // No files state
   if (files.length === 0) {
     return (
-      <Stack p="md" gap="md">
-        <Group justify="space-between" wrap="nowrap">
+      <Stack gap="xs" style={{ maxHeight: '400px' }}>
+        {/* ヘッダー */}
+        <Group justify="space-between" wrap="nowrap" px="sm">
           <Text size="sm" fw={500}>
             Workspace Files
           </Text>
           <Group gap={4}>
             <ActionIcon
-              onClick={refresh}
+              onClick={() => {
+                void refreshWorkspaceState();
+              }}
               variant="subtle"
               color="gray"
               aria-label="Refresh"
@@ -182,34 +195,42 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
         </Group>
 
         {/* Include in prompt toggle */}
-        <Tooltip label="Include workspace file list in AI prompts" withArrow>
-          <Switch
-            size="xs"
-            label="Include in prompt"
-            checked={includeInPrompt || false}
-            onChange={(e) => onToggleIncludeInPrompt?.(e.currentTarget.checked)}
-          />
-        </Tooltip>
+        <Box px="sm">
+          <Tooltip label="Include workspace file list in AI prompts" withArrow>
+            <Switch
+              size="xs"
+              label="Include in prompt"
+              checked={includeInPrompt || false}
+              onChange={(e) => onToggleIncludeInPrompt?.(e.currentTarget.checked)}
+            />
+          </Tooltip>
+        </Box>
 
-        <Center p="xl">
-          <Text size="sm" c="dimmed">
-            No files in workspace
-          </Text>
-        </Center>
+        {/* スクロールエリア */}
+        <ScrollArea h={280} px="sm">
+          <Center p="xl">
+            <Text size="sm" c="dimmed">
+              No files in workspace
+            </Text>
+          </Center>
+        </ScrollArea>
       </Stack>
     );
   }
 
   // Render the file list with real data
   return (
-    <Stack p="md" gap="md">
-      <Group justify="space-between" wrap="nowrap">
+    <Stack gap="xs" style={{ maxHeight: '400px' }}>
+      {/* ヘッダー */}
+      <Group justify="space-between" wrap="nowrap" px="sm">
         <Text size="sm" fw={500}>
           Workspace Files
         </Text>
         <Group gap={4}>
           <ActionIcon
-            onClick={refresh}
+            onClick={() => {
+              void refreshWorkspaceState();
+            }}
             variant="subtle"
             color="gray"
             aria-label="Refresh"
@@ -229,23 +250,28 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
       </Group>
 
       {/* Include in prompt toggle */}
-      <Tooltip label="Include workspace file list in AI prompts" withArrow>
-        <Switch
-          size="xs"
-          label="Include in prompt"
-          checked={includeInPrompt || false}
-          onChange={(e) => onToggleIncludeInPrompt?.(e.currentTarget.checked)}
-        />
-      </Tooltip>
+      <Box px="sm">
+        <Tooltip label="Include workspace file list in AI prompts" withArrow>
+          <Switch
+            size="xs"
+            label="Include in prompt"
+            checked={includeInPrompt || false}
+            onChange={(e) => onToggleIncludeInPrompt?.(e.currentTarget.checked)}
+          />
+        </Tooltip>
+      </Box>
 
-      <FileList
-        files={files}
-        onAttachToChat={handleAttachToChat}
-        onOpenFile={handleOpenFile}
-        onRenameFile={handleRenameFile}
-        onDeleteFile={handleDeleteFile}
-        onGoToSession={handleGoToSession}
-      />
+      {/* スクロールエリア */}
+      <ScrollArea h={280} px="sm">
+        <FileList
+          files={files}
+          onAttachToChat={handleAttachToChat}
+          onOpenFile={handleOpenFile}
+          onRenameFile={handleRenameFile}
+          onDeleteFile={handleDeleteFile}
+          onGoToSession={handleGoToSession}
+        />
+      </ScrollArea>
     </Stack>
   );
 }

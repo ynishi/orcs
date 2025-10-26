@@ -22,7 +22,6 @@ use version_migrate::Migrator;
 /// ```
 pub fn create_persona_migrator() -> Migrator {
     let mut migrator = Migrator::builder()
-        .default_version_key("schema_version")
         .build();
 
     // Register migration path: V1.0.0 -> V1.1.0 -> Persona
@@ -51,9 +50,9 @@ mod tests {
     fn test_persona_migration_v1_0_to_domain() {
         let migrator = create_persona_migrator();
 
-        // Simulate TOML structure with schema_version V1.0.0
+        // Simulate TOML structure with version V1.0.0
         let toml_str = r#"
-schema_version = "1.0.0"
+version = "1.0.0"
 id = "test-id"
 name = "Test"
 role = "Tester"
@@ -82,9 +81,9 @@ source = "User"
     fn test_persona_migration_v1_1_to_domain() {
         let migrator = create_persona_migrator();
 
-        // Simulate TOML structure with schema_version V1.1.0
+        // Simulate TOML structure with version V1.1.0
         let toml_str = r#"
-schema_version = "1.1.0"
+version = "1.1.0"
 id = "test-id"
 name = "Test"
 role = "Tester"

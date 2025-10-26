@@ -14,7 +14,11 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+base64 = { workspace = true }
+dirs = { workspace = true }
 
 [dev-dependencies]
 orcs-infrastructure = { path = "../orcs-infrastructure" }
 tokio = { workspace = true, features = ["macros", "rt"] }
+tempfile = "3.8"

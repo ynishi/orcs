@@ -11,7 +11,7 @@ use orcs_core::session::{AppMode, ConversationMessage, Session};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.0.0")]
 pub struct SessionV1_0_0 {
-    /// Unique session identifier
+     /// Unique session identifier
     pub id: String,
     /// Human-readable session name (renamed to 'title' in V1.1.0)
     pub name: String,

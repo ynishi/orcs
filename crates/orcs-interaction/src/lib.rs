@@ -1,5 +1,8 @@
 pub mod persona_agent;
+pub mod gemini_api_agent;
+pub mod config;
 
+use crate::gemini_api_agent::GeminiApiAgent;
 use llm_toolkit::agent::dialogue::{Dialogue, ExecutionModel};
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
@@ -186,64 +189,17 @@ impl InteractionManager {
         persona_repository: Arc<dyn PersonaRepository>,
         user_service: Arc<dyn UserService>,
     ) -> Self {
-        // Migrate persona_histories keys from old IDs to UUIDs
-        let migrated_histories =
-            Self::migrate_persona_history_keys(data.persona_histories, &persona_repository);
-
         Self {
             session_id: data.id,
             title: Arc::new(RwLock::new(data.title)),
             created_at: data.created_at,
             workspace_id: data.workspace_id,
             dialogue: Arc::new(Mutex::new(None)),
-            persona_histories: Arc::new(RwLock::new(migrated_histories)),
+            persona_histories: Arc::new(RwLock::new(data.persona_histories)),
             persona_repository,
             user_service,
             execution_strategy: Arc::new(RwLock::new("broadcast".to_string())),
         }
-    }
-
-    /// Migrates persona_histories keys from non-UUID formats to UUID.
-    ///
-    /// This handles:
-    /// - Old string IDs ("mai", "yui") → UUID
-    /// - Display names ("Mai", "Yui") → UUID
-    /// - Already-UUID keys → pass through
-    fn migrate_persona_history_keys(
-        histories: HashMap<String, Vec<ConversationMessage>>,
-        persona_repository: &Arc<dyn PersonaRepository>,
-    ) -> HashMap<String, Vec<ConversationMessage>> {
-        let personas = persona_repository.get_all().unwrap_or_default();
-        let mut migrated = HashMap::new();
-
-        for (key, messages) in histories {
-            // Check if key is already a valid UUID
-            if uuid::Uuid::parse_str(&key).is_ok() {
-                // Already UUID - keep as is
-                migrated.insert(key, messages);
-                continue;
-            }
-
-            // Try to find persona by old ID or name (case-insensitive)
-            let key_lower = key.to_lowercase();
-            let matching_persona = personas.iter().find(|p| {
-                // Check old ID format (mai, yui, etc.)
-                let old_id_matches = p.name.to_lowercase() == key_lower;
-                // Check display name (Mai, Yui)
-                let name_matches = p.name == key;
-                old_id_matches || name_matches
-            });
-
-            if let Some(persona) = matching_persona {
-                // Use the UUID from the persona
-                migrated.insert(persona.id.clone(), messages);
-            } else {
-                // Unknown key - keep as is (might be user name)
-                migrated.insert(key, messages);
-            }
-        }
-
-        migrated
     }
 
     /// Resolves a persona name to its UUID.
@@ -623,71 +579,3 @@ impl orcs_core::session::InteractionManagerTrait for InteractionManager {
         self.to_session(app_mode, workspace_id).await
     }
 }
-
-// Tests are temporarily commented out to allow compilation after refactoring
-// They will need to be updated to use a PersonaRepository implementation
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_new_session() {
-        let manager = InteractionManager::new_session("test-session".to_string());
-        assert_eq!(manager.session_id(), "test-session");
-        assert_eq!(manager.available_personas().len(), 2);
-    }
-
-    #[tokio::test]
-    async fn test_idle_mode_plan_command() {
-        let manager = InteractionManager::new_session("test".to_string());
-        let mode = AppMode::Idle;
-
-        let result = manager.handle_input(&mode, "/plan").await;
-
-        match result {
-            InteractionResult::ModeChanged(AppMode::AwaitingConfirmation { plan }) => {
-                assert_eq!(plan.steps.len(), 2);
-            }
-            _ => panic!("Expected ModeChanged with AwaitingConfirmation"),
-        }
-    }
-
-    #[tokio::test]
-    async fn test_awaiting_confirmation() {
-        let manager = InteractionManager::new_session("test".to_string());
-        let plan = Plan {
-            steps: vec!["Task 1".to_string(), "Task 2".to_string()],
-        };
-        let mode = AppMode::AwaitingConfirmation { plan: plan.clone() };
-
-        // Test yes
-        let result = manager.handle_input(&mode, "yes").await;
-        match result {
-            InteractionResult::TasksToDispatch { tasks } => {
-                assert_eq!(tasks.len(), 2);
-            }
-            _ => panic!("Expected TasksToDispatch"),
-        }
-
-        // Test no
-        let result = manager.handle_input(&mode, "no").await;
-        assert_eq!(result, InteractionResult::ModeChanged(AppMode::Idle));
-
-        // Test invalid
-        let result = manager.handle_input(&mode, "maybe").await;
-        assert_eq!(result, InteractionResult::NoOp);
-    }
-
-    #[tokio::test]
-    async fn test_to_session() {
-        let manager = InteractionManager::new_session("test-session".to_string());
-
-        let session = manager.to_session(AppMode::Idle, None).await;
-
-        assert_eq!(session.id, "test-session");
-        assert_eq!(session.current_persona_id, "mai");
-        assert_eq!(session.app_mode, AppMode::Idle);
-    }
-}
-*/

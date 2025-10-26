@@ -33,6 +33,7 @@ regex = "1.10"
 log = "0.4"
 minijinja = { version = "2.12.0", features = ["serde_json", "unstable_machinery"] }
 base64 = "0.22"
+reqwest = { version = "0.12", features = ["json"] }
 quick-xml = { version = "0.38.3", features = ["serde"] }
 rand = "0.8"
 futures = "0.3"

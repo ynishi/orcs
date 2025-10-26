@@ -11,7 +11,6 @@ use orcs_core::user::UserService;
 use orcs_core::workspace::{Workspace, UploadedFile};
 use orcs_infrastructure::{TomlPersonaRepository, TomlSessionRepository};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
-use orcs_infrastructure::toml_storage;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_interaction::{InteractionManager, InteractionResult};
 use serde::Serialize;
@@ -596,7 +595,10 @@ fn get_git_info() -> GitInfo {
 fn main() {
     tauri::async_runtime::block_on(async {
         // Composition Root: Create the concrete repository instances
-        let persona_repository = Arc::new(TomlPersonaRepository);
+        let persona_repository = Arc::new(
+            TomlPersonaRepository::new()
+                .expect("Failed to initialize persona repository")
+        );
         let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
 
         // Initialize FileSystemWorkspaceManager
@@ -627,10 +629,11 @@ fn main() {
             }
         }
 
-        // Ensure user profile is initialized with default if it doesn't exist
-        if let Err(e) = toml_storage::ensure_user_profile_initialized() {
-            eprintln!("Warning: Failed to initialize user profile: {}", e);
-        }
+        // TODO: Ensure user profile is initialized with default if it doesn't exist
+        // This will be implemented via UserProfileRepository
+        // if let Err(e) = user_profile_repository.ensure_initialized() {
+        //     eprintln!("Warning: Failed to initialize user profile: {}", e);
+        // }
 
         // Create TomlSessionRepository at default location
         let session_repository = Arc::new(

@@ -4,7 +4,6 @@
 //! from the configuration file (~/.config/orcs/config.toml).
 
 use orcs_core::user::UserService;
-use crate::toml_storage;
 use std::sync::{Arc, RwLock};
 
 /// User service that loads user information from config.toml.
@@ -50,9 +49,9 @@ impl ConfigBasedUserService {
             }
         }
 
-        // Load from config
-        let loaded = toml_storage::load_user_nickname()
-            .unwrap_or_else(|_| "You".to_string());
+        // TODO: Load from ConfigStorage via UserProfileRepository
+        // Temporarily return default value
+        let loaded = "You".to_string();
 
         // Cache it
         {

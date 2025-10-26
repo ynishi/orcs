@@ -27,7 +27,6 @@ mod user_profile;
 mod workspace;
 
 use serde::{Deserialize, Serialize};
-use toml;
 
 // Re-export persona DTOs
 pub use persona::{PersonaBackendDTO, PersonaConfigV1_0_0, PersonaConfigV1_1_0, PersonaSourceDTO};
@@ -54,20 +53,20 @@ pub use workspace::{
 /// Root configuration structure for the application config file.
 ///
 /// This structure doesn't have its own version - each contained entity
-/// (personas, workspaces, etc.) maintains its own schema version.
+/// (personas, workspaces, etc.) maintains its own version field.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigRoot {
-    /// Persona configurations (each has its own schema_version).
-    /// Stored as raw TOML values to allow version-migrate to handle migration.
+    /// Persona configurations (each has its own version field).
+    /// Stored as serde_json::Value (intermediate format) to allow version-migrate to handle migration.
     #[serde(rename = "persona", default)]
-    pub personas: Vec<toml::Value>,
+    pub personas: Vec<serde_json::Value>,
 
     /// User profile configuration.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_profile: Option<UserProfileDTO>,
 
-    /// Workspace configurations (each has its own schema_version).
-    #[serde(default)]
+    /// Workspace configurations (each has its own version field).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub workspaces: Vec<WorkspaceV1>,
 }
 

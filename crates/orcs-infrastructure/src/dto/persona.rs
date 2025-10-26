@@ -36,7 +36,7 @@ impl Default for PersonaBackendDTO {
 
 /// Represents V1 of the persona config schema for serialization.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
-#[versioned(version = "1.0.0", version_key = "schema_version", data_key = "")]
+#[versioned(version = "1.0.0")]
 pub struct PersonaConfigV1_0_0 {
     /// Unique persona identifier.
     pub id: String,
@@ -57,7 +57,7 @@ pub struct PersonaConfigV1_0_0 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
-#[versioned(version = "1.1.0", version_key = "schema_version", data_key = "")]
+#[versioned(version = "1.1.0")]
 pub struct PersonaConfigV1_1_0 {
     /// Unique persona identifier (UUID format).
     pub id: String,
@@ -106,7 +106,7 @@ impl MigratesTo<PersonaConfigV1_1_0> for PersonaConfigV1_0_0 {
             role: self.role,
             background: self.background,
             communication_style: self.communication_style,
-            default_participant: self.default_participant, 
+            default_participant: self.default_participant,
             source: self.source,
             backend: Default::default(),
         }

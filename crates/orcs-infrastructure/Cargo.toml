@@ -11,6 +11,7 @@ orcs-core = { path = "../orcs-core" }
 toml = "0.8"
 dirs = "5.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 semver = { version = "1.0", features = ["serde"] }
 anyhow = "1.0"
 async-trait = "0.1"

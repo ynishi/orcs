@@ -1,6 +1,7 @@
 //! TOML-based PersonaRepository implementation
 
 use crate::dto::create_persona_migrator;
+use crate::paths::OrcsPaths;
 use crate::storage::ConfigStorage;
 use orcs_core::persona::Persona;
 use orcs_core::repository::PersonaRepository;
@@ -39,9 +40,7 @@ impl TomlPersonaRepository {
 
     /// Gets the default config path (~/.config/orcs/config.toml)
     fn get_default_config_path() -> Result<PathBuf, String> {
-        dirs::config_dir()
-            .map(|dir| dir.join("orcs").join("config.toml"))
-            .ok_or_else(|| "Cannot find config directory".to_string())
+        OrcsPaths::config_file().map_err(|e| e.to_string())
     }
 }
 

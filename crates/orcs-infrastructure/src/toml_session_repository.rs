@@ -1,6 +1,7 @@
 //! TOML-based SessionRepository implementation
 
 use crate::dto::{create_session_migrator, SessionV2_0_0};
+use crate::paths::OrcsPaths;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use orcs_core::repository::{PersonaRepository, SessionRepository};
@@ -57,7 +58,7 @@ impl TomlSessionRepository {
         })
     }
 
-    /// Creates a `TomlSessionRepository` instance at the default location (~/.orcs).
+    /// Creates a `TomlSessionRepository` instance at the default location (~/.config/orcs).
     ///
     /// # Arguments
     ///
@@ -65,13 +66,13 @@ impl TomlSessionRepository {
     ///
     /// # Errors
     ///
-    /// Returns an error if the home directory cannot be determined or if
+    /// Returns an error if the configuration directory cannot be determined or if
     /// the directory structure cannot be created.
     pub fn default_location(
         persona_repository: std::sync::Arc<dyn PersonaRepository>,
     ) -> Result<Self> {
-        let home_dir = dirs::home_dir().context("Failed to get home directory")?;
-        let base_dir = home_dir.join(".orcs");
+        let base_dir = OrcsPaths::config_dir()
+            .map_err(|e| anyhow::anyhow!("Failed to get config directory: {}", e))?;
         Self::new(base_dir, persona_repository)
     }
 

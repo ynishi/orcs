@@ -4,6 +4,7 @@
 //! from the configuration file (~/.config/orcs/config.toml).
 
 use crate::dto::create_user_profile_migrator;
+use crate::paths::OrcsPaths;
 use crate::storage::ConfigStorage;
 use orcs_core::user::{UserProfile, UserService};
 use std::path::PathBuf;
@@ -98,9 +99,7 @@ impl ConfigBasedUserService {
 
     /// Gets the default config path (~/.config/orcs/config.toml).
     fn get_config_path() -> Result<PathBuf, String> {
-        dirs::config_dir()
-            .map(|dir| dir.join("orcs").join("config.toml"))
-            .ok_or_else(|| "Cannot find config directory".to_string())
+        OrcsPaths::config_file().map_err(|e| e.to_string())
     }
 }
 

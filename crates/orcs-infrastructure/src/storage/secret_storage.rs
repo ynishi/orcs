@@ -2,6 +2,7 @@
 //!
 //! Provides secure loading of secret configuration from ~/.config/orcs/secret.json.
 
+use crate::paths::OrcsPaths;
 use orcs_core::config::SecretConfig;
 use std::fs;
 use std::path::PathBuf;
@@ -106,8 +107,7 @@ impl SecretStorage {
 
     /// Returns the default path to secret.json: ~/.config/orcs/secret.json
     fn default_path() -> Result<PathBuf, SecretStorageError> {
-        let home = dirs::home_dir().ok_or(SecretStorageError::ConfigDirNotFound)?;
-        Ok(home.join(".config").join("orcs").join("secret.json"))
+        OrcsPaths::secret_file().map_err(|_| SecretStorageError::ConfigDirNotFound)
     }
 
     /// Returns the path to the secret file.

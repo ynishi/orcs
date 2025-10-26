@@ -12,6 +12,7 @@ use orcs_core::session::{AppMode, ConversationMessage, MessageRole, Plan, Sessio
 use orcs_core::user::UserService;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
@@ -43,6 +44,61 @@ impl PersonaBackendAgent {
     fn new(backend: PersonaBackend) -> Self {
         Self { backend }
     }
+
+    /// Executes the agent with optional workspace context.
+    ///
+    /// If `workspace_root` is provided, temporarily changes the current directory
+    /// to the workspace root path before executing the LLM, then restores the
+    /// original directory afterward.
+    ///
+    /// # Arguments
+    ///
+    /// * `payload` - The input payload for the agent
+    /// * `workspace_root` - Optional workspace root path to use as working directory
+    ///
+    /// # Returns
+    ///
+    /// Returns the agent's output string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The directory change fails
+    /// - The agent execution fails
+    async fn execute_with_workspace(
+        &self,
+        payload: Payload,
+        workspace_root: Option<PathBuf>,
+    ) -> Result<String, AgentError> {
+        // Save original directory and change to workspace root if provided
+        let original_dir = if let Some(ref root_path) = workspace_root {
+            let current = std::env::current_dir().ok();
+            std::env::set_current_dir(root_path).map_err(|e| {
+                AgentError::Other(format!(
+                    "Failed to change directory to '{}': {}",
+                    root_path.display(),
+                    e
+                ))
+            })?;
+            current
+        } else {
+            None
+        };
+
+        // Execute LLM
+        let result = match self.backend {
+            PersonaBackend::ClaudeCli => ClaudeCodeAgent::new().execute(payload).await,
+            PersonaBackend::GeminiCli => GeminiAgent::new().execute(payload).await,
+            PersonaBackend::GeminiApi => GeminiApiAgent::try_from_env()?.execute(payload).await,
+        };
+
+        // Restore original directory
+        if let Some(original) = original_dir {
+            let _ = std::env::set_current_dir(original);
+        }
+
+        result
+    }
 }
 
 #[async_trait::async_trait]
@@ -58,11 +114,8 @@ impl Agent for PersonaBackendAgent {
     }
 
     async fn execute(&self, payload: Payload) -> Result<Self::Output, AgentError> {
-        match self.backend {
-            PersonaBackend::ClaudeCli => ClaudeCodeAgent::new().execute(payload).await,
-            PersonaBackend::GeminiCli => GeminiAgent::new().execute(payload).await,
-            PersonaBackend::GeminiApi => GeminiApiAgent::try_from_env()?.execute(payload).await,
-        }
+        // Default implementation without workspace context
+        self.execute_with_workspace(payload, None).await
     }
 }
 

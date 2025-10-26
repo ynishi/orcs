@@ -243,6 +243,35 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
         Ok(())
     }
 
+    /// Updates the workspace ID for a session.
+    ///
+    /// This method allows changing which workspace a session is associated with.
+    /// This is useful when switching workspaces during a session.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The ID of the session to update
+    /// * `workspace_id` - The new workspace ID (None to clear the association)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The session does not exist
+    /// - The storage update fails
+    pub async fn update_workspace_id(&self, session_id: &str, workspace_id: Option<String>) -> Result<()> {
+        // Load existing session from storage
+        let mut session = self.repository.find_by_id(session_id).await?
+            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
+
+        // Update workspace_id
+        session.workspace_id = workspace_id;
+
+        // Save back to storage
+        self.repository.save(&session).await?;
+
+        Ok(())
+    }
+
     /// Returns the ID of the currently active session.
     pub async fn active_session_id(&self) -> Option<String> {
         self.active_session_id.read().await.clone()

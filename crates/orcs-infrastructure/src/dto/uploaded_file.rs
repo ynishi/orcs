@@ -105,3 +105,39 @@ impl From<&UploadedFile> for UploadedFileV1_1_0 {
         }
     }
 }
+
+// ============================================================================
+// Migrator factory
+// ============================================================================
+
+/// Creates and configures a Migrator instance for UploadedFile entities.
+///
+/// The migrator handles automatic schema migration from V1.0.0 to V1.1.0
+/// and conversion to the domain model.
+///
+/// # Migration Path
+///
+/// - V1.0.0 → V1.1.0: Adds `session_id` and `message_timestamp` fields with default value None
+/// - V1.1.0 → UploadedFile: Converts DTO to domain model
+///
+/// # Example
+///
+/// ```ignore
+/// let migrator = create_uploaded_file_migrator();
+/// let file: UploadedFile = migrator.load_flat_from("uploaded_file", toml_value)?;
+/// ```
+pub fn create_uploaded_file_migrator() -> version_migrate::Migrator {
+    let mut migrator = version_migrate::Migrator::builder().build();
+
+    // Register migration path: V1.0.0 -> V1.1.0 -> UploadedFile
+    let uploaded_file_path = version_migrate::Migrator::define("uploaded_file")
+        .from::<UploadedFileV1_0_0>()
+        .step::<UploadedFileV1_1_0>()
+        .into::<UploadedFile>();
+
+    migrator
+        .register(uploaded_file_path)
+        .expect("Failed to register uploaded_file migration path");
+
+    migrator
+}

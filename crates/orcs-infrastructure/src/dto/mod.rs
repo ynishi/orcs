@@ -37,8 +37,8 @@ pub use persona::{
 // Re-export session DTOs and migrator
 pub use session::{create_session_migrator, SessionV1_0_0, SessionV1_1_0, SessionV2_0_0};
 
-// Re-export uploaded_file DTOs
-pub use uploaded_file::{UploadedFileV1_0_0, UploadedFileV1_1_0};
+// Re-export uploaded_file DTOs and migrator
+pub use uploaded_file::{create_uploaded_file_migrator, UploadedFileV1_0_0, UploadedFileV1_1_0};
 
 // Re-export user_profile DTOs
 pub use user_profile::{UserProfileDTO, UserProfileV1_0, UserProfileV1_1};

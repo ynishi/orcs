@@ -1,6 +1,6 @@
 //! TOML-based SessionRepository implementation
 
-use crate::dto::{SessionV1_0_0, SessionV1_1_0, SessionV2_0_0};
+use crate::dto::{create_session_migrator, SessionV2_0_0};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use orcs_core::repository::{PersonaRepository, SessionRepository};
@@ -8,7 +8,6 @@ use orcs_core::session::{ConversationMessage, Session};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use version_migrate::{IntoDomain, MigratesTo};
 
 /// A repository implementation for storing session data in TOML files.
 ///
@@ -154,35 +153,27 @@ impl TomlSessionRepository {
     ///
     /// This method handles:
     /// 1. Reading the TOML file
-    /// 2. Auto-detecting version and migrating if necessary
+    /// 2. Auto-detecting version and migrating if necessary using version-migrate
     /// 3. Converting DTO to domain model
     fn load_session_from_path(&self, path: &Path) -> Result<Session> {
         let toml_content =
             fs::read_to_string(path).context(format!("Failed to read session file: {:?}", path))?;
 
-        // Try to load as SessionV2_0_0 first (latest version)
-        let mut dto: SessionV2_0_0 =
-            if let Ok(v2_0_0) = toml::from_str::<SessionV2_0_0>(&toml_content) {
-                v2_0_0
-            } else if let Ok(v1_1_0) = toml::from_str::<SessionV1_1_0>(&toml_content) {
-                // V1.1.0 format - migrate to V2.0.0
-                tracing::info!("Migrating session from V1.1.0 to V2.0.0: {:?}", path);
-                v1_1_0.migrate()
-            } else if let Ok(v1_0_0) = toml::from_str::<SessionV1_0_0>(&toml_content) {
-                // V1.0.0 format - migrate to V1.1.0 then V2.0.0
-                tracing::info!("Migrating session from V1.0.0 to V2.0.0: {:?}", path);
-                let v1_1_0: SessionV1_1_0 = v1_0_0.migrate();
-                v1_1_0.migrate()
-            } else {
-                return Err(anyhow::anyhow!("Failed to parse session file: {:?}", path));
-            };
+        // Parse TOML content
+        let toml_value: toml::Value = toml::from_str(&toml_content)
+            .context(format!("Failed to parse TOML from session file: {:?}", path))?;
+
+        // Use session migrator to handle automatic migration
+        let migrator = create_session_migrator();
+        let mut session: Session = migrator
+            .load_flat_from("session", toml_value)
+            .context(format!("Failed to migrate session from file: {:?}", path))?;
 
         // Additional migration: migrate persona_histories keys from names to UUIDs if needed
-        dto.persona_histories = self.migrate_persona_history_keys(dto.persona_histories)?;
-        dto.current_persona_id = self.migrate_persona_id(&dto.current_persona_id)?;
+        session.persona_histories = self.migrate_persona_history_keys(session.persona_histories)?;
+        session.current_persona_id = self.migrate_persona_id(&session.current_persona_id)?;
 
-        // Convert DTO to domain model
-        Ok(dto.into_domain())
+        Ok(session)
     }
 }
 
@@ -215,9 +206,19 @@ impl SessionRepository for TomlSessionRepository {
         // Convert domain model to DTO (always use latest version)
         let dto: SessionV2_0_0 = SessionV2_0_0::from(session);
 
-        // Serialize DTO to TOML
-        let toml_content =
-            toml::to_string_pretty(&dto).context("Failed to serialize session data to TOML")?;
+        // Use migrator to serialize with version field
+        let migrator = create_session_migrator();
+        let json_str = migrator
+            .save_flat(dto)
+            .context("Failed to serialize session with version field")?;
+
+        // Convert JSON to TOML
+        let json_value: serde_json::Value = serde_json::from_str(&json_str)
+            .context("Failed to parse session JSON")?;
+        let toml_value: toml::Value = serde_json::from_str(&serde_json::to_string(&json_value)?)
+            .context("Failed to convert session to TOML format")?;
+        let toml_content = toml::to_string_pretty(&toml_value)
+            .context("Failed to serialize session to TOML string")?;
 
         fs::write(&file_path, toml_content)
             .context(format!("Failed to write session file: {:?}", file_path))?;

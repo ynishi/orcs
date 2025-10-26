@@ -68,6 +68,7 @@ pub struct SessionV2_0_0 {
     /// Current application mode
     pub app_mode: AppMode,
     /// Workspace ID if this session is associated with a workspace
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub workspace_id: Option<String>,
 }
 
@@ -142,4 +143,42 @@ impl From<&Session> for SessionV2_0_0 {
             workspace_id: session.workspace_id.clone(),
         }
     }
+}
+
+// ============================================================================
+// Migrator factory
+// ============================================================================
+
+/// Creates and configures a Migrator instance for Session entities.
+///
+/// The migrator handles automatic schema migration from V1.0.0 to V2.0.0
+/// and conversion to the domain model.
+///
+/// # Migration Path
+///
+/// - V1.0.0 → V1.1.0: Renames `name` field to `title`
+/// - V1.1.0 → V2.0.0: Adds `workspace_id` field with default value None
+/// - V2.0.0 → Session: Converts DTO to domain model
+///
+/// # Example
+///
+/// ```ignore
+/// let migrator = create_session_migrator();
+/// let session: Session = migrator.load_flat_from("session", toml_value)?;
+/// ```
+pub fn create_session_migrator() -> version_migrate::Migrator {
+    let mut migrator = version_migrate::Migrator::builder().build();
+
+    // Register migration path: V1.0.0 -> V1.1.0 -> V2.0.0 -> Session
+    let session_path = version_migrate::Migrator::define("session")
+        .from::<SessionV1_0_0>()
+        .step::<SessionV1_1_0>()
+        .step::<SessionV2_0_0>()
+        .into::<Session>();
+
+    migrator
+        .register(session_path)
+        .expect("Failed to register session migration path");
+
+    migrator
 }

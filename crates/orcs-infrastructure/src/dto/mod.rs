@@ -43,8 +43,11 @@ pub use uploaded_file::{create_uploaded_file_migrator, UploadedFileV1_0_0, Uploa
 // Re-export user_profile DTOs and migrator
 pub use user_profile::{create_user_profile_migrator, UserProfileDTO, UserProfileV1_0, UserProfileV1_1};
 
-// Re-export workspace DTOs
+// Re-export workspace DTOs and migrators
 pub use workspace::{
+    create_generated_doc_migrator, create_project_context_migrator,
+    create_session_workspace_migrator, create_temp_file_migrator,
+    create_workspace_migrator, create_workspace_resources_migrator,
     GeneratedDocV1, ProjectContextV1, SessionWorkspaceV1, TempFileV1,
     WorkspaceResourcesV1, WorkspaceV1,
 };

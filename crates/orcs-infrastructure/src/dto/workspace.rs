@@ -283,3 +283,91 @@ impl From<&SessionWorkspace> for SessionWorkspaceV1 {
         }
     }
 }
+
+// ============================================================================
+// Migrator factories
+// ============================================================================
+
+/// Creates a Migrator for TempFile entities.
+///
+/// # Migration Path
+///
+/// - V1.0.0 → TempFile: Converts DTO to domain model (no migration needed yet)
+pub fn create_temp_file_migrator() -> version_migrate::Migrator {
+    let mut migrator = version_migrate::Migrator::builder().build();
+    let path = version_migrate::Migrator::define("temp_file")
+        .from::<TempFileV1>()
+        .into::<TempFile>();
+    migrator.register(path).expect("Failed to register temp_file migration path");
+    migrator
+}
+
+/// Creates a Migrator for GeneratedDoc entities.
+///
+/// # Migration Path
+///
+/// - V1.0.0 → GeneratedDoc: Converts DTO to domain model (no migration needed yet)
+pub fn create_generated_doc_migrator() -> version_migrate::Migrator {
+    let mut migrator = version_migrate::Migrator::builder().build();
+    let path = version_migrate::Migrator::define("generated_doc")
+        .from::<GeneratedDocV1>()
+        .into::<GeneratedDoc>();
+    migrator.register(path).expect("Failed to register generated_doc migration path");
+    migrator
+}
+
+/// Creates a Migrator for ProjectContext entities.
+///
+/// # Migration Path
+///
+/// - V1.0.0 → ProjectContext: Converts DTO to domain model (no migration needed yet)
+pub fn create_project_context_migrator() -> version_migrate::Migrator {
+    let mut migrator = version_migrate::Migrator::builder().build();
+    let path = version_migrate::Migrator::define("project_context")
+        .from::<ProjectContextV1>()
+        .into::<ProjectContext>();
+    migrator.register(path).expect("Failed to register project_context migration path");
+    migrator
+}
+
+/// Creates a Migrator for WorkspaceResources entities.
+///
+/// # Migration Path
+///
+/// - V1.0.0 → WorkspaceResources: Converts DTO to domain model (no migration needed yet)
+pub fn create_workspace_resources_migrator() -> version_migrate::Migrator {
+    let mut migrator = version_migrate::Migrator::builder().build();
+    let path = version_migrate::Migrator::define("workspace_resources")
+        .from::<WorkspaceResourcesV1>()
+        .into::<WorkspaceResources>();
+    migrator.register(path).expect("Failed to register workspace_resources migration path");
+    migrator
+}
+
+/// Creates a Migrator for Workspace entities.
+///
+/// # Migration Path
+///
+/// - V1.0.0 → Workspace: Converts DTO to domain model (no migration needed yet)
+pub fn create_workspace_migrator() -> version_migrate::Migrator {
+    let mut migrator = version_migrate::Migrator::builder().build();
+    let path = version_migrate::Migrator::define("workspace")
+        .from::<WorkspaceV1>()
+        .into::<Workspace>();
+    migrator.register(path).expect("Failed to register workspace migration path");
+    migrator
+}
+
+/// Creates a Migrator for SessionWorkspace entities.
+///
+/// # Migration Path
+///
+/// - V1.0.0 → SessionWorkspace: Converts DTO to domain model (no migration needed yet)
+pub fn create_session_workspace_migrator() -> version_migrate::Migrator {
+    let mut migrator = version_migrate::Migrator::builder().build();
+    let path = version_migrate::Migrator::define("session_workspace")
+        .from::<SessionWorkspaceV1>()
+        .into::<SessionWorkspace>();
+    migrator.register(path).expect("Failed to register session_workspace migration path");
+    migrator
+}

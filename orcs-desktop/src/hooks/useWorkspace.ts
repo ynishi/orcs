@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import type { Workspace, UploadedFile } from '../types/workspace';
 
 /**
@@ -50,6 +51,8 @@ interface RawWorkspace {
     repository_url?: string;
     metadata: Record<string, string>;
   };
+  last_accessed: number;
+  is_favorite: boolean;
 }
 
 /**
@@ -95,6 +98,8 @@ function convertWorkspace(raw: RawWorkspace): Workspace {
       repositoryUrl: raw.project_context.repository_url,
       metadata: raw.project_context.metadata,
     },
+    lastAccessed: raw.last_accessed,
+    isFavorite: raw.is_favorite,
   };
 }
 
@@ -104,6 +109,8 @@ function convertWorkspace(raw: RawWorkspace): Workspace {
 export interface UseWorkspaceResult {
   /** The current workspace, or null if not loaded */
   workspace: Workspace | null;
+  /** List of all registered workspaces */
+  allWorkspaces: Workspace[];
   /** List of uploaded files in the workspace */
   files: UploadedFile[];
   /** Whether the workspace is currently being loaded */
@@ -112,6 +119,12 @@ export interface UseWorkspaceResult {
   error: string | null;
   /** Manually refresh the workspace data */
   refresh: () => Promise<void>;
+  /** Switch to a different workspace */
+  switchWorkspace: (sessionId: string, workspaceId: string) => Promise<void>;
+  /** Toggle the favorite status of a workspace */
+  toggleFavorite: (workspaceId: string) => Promise<void>;
+  /** Refresh the list of all workspaces */
+  refreshWorkspaces: () => Promise<void>;
 }
 
 /**
@@ -146,6 +159,7 @@ export interface UseWorkspaceResult {
  */
 export function useWorkspace(): UseWorkspaceResult {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -198,16 +212,76 @@ export function useWorkspace(): UseWorkspaceResult {
     }
   }, []);
 
+  /**
+   * Fetches the list of all workspaces.
+   */
+  const fetchAllWorkspaces = useCallback(async () => {
+    try {
+      const rawWorkspaces = await invoke<RawWorkspace[]>('list_workspaces');
+      const converted = rawWorkspaces.map(convertWorkspace);
+      setAllWorkspaces(converted);
+    } catch (err) {
+      console.error('Failed to fetch all workspaces:', err);
+    }
+  }, []);
+
+  /**
+   * Switches to a different workspace.
+   */
+  const switchWorkspace = useCallback(async (sessionId: string, workspaceId: string) => {
+    try {
+      await invoke('switch_workspace', { sessionId, workspaceId });
+      // The workspace-switched event will trigger a refresh
+    } catch (err) {
+      console.error('Failed to switch workspace:', err);
+      throw err;
+    }
+  }, []);
+
+  /**
+   * Toggles the favorite status of a workspace.
+   */
+  const toggleFavorite = useCallback(async (workspaceId: string) => {
+    try {
+      await invoke('toggle_favorite_workspace', { workspaceId });
+      // Refresh workspace lists after toggling
+      await fetchAllWorkspaces();
+      if (workspace?.id === workspaceId) {
+        await fetchWorkspace();
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err);
+      throw err;
+    }
+  }, [workspace, fetchWorkspace, fetchAllWorkspaces]);
+
   // Fetch workspace on mount
   useEffect(() => {
     fetchWorkspace();
-  }, [fetchWorkspace]);
+    fetchAllWorkspaces();
+  }, [fetchWorkspace, fetchAllWorkspaces]);
+
+  // Listen for workspace-switched events
+  useEffect(() => {
+    const unlisten = listen<string>('workspace-switched', async () => {
+      await fetchWorkspace();
+      await fetchAllWorkspaces();
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, [fetchWorkspace, fetchAllWorkspaces]);
 
   return {
     workspace,
+    allWorkspaces,
     files,
     isLoading,
     error,
     refresh: fetchWorkspace,
+    switchWorkspace,
+    toggleFavorite,
+    refreshWorkspaces: fetchAllWorkspaces,
   };
 }

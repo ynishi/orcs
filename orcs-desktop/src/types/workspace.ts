@@ -104,6 +104,10 @@ export interface Workspace {
   resources: WorkspaceResources;
   /** Project-specific context and metadata */
   projectContext: ProjectContext;
+  /** Last accessed timestamp (Unix timestamp in seconds) */
+  lastAccessed: number;
+  /** Whether this workspace is marked as favorite */
+  isFavorite: boolean;
 }
 
 /**

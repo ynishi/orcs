@@ -236,4 +236,46 @@ pub trait WorkspaceManager: Send + Sync {
     ///
     /// Returns an error if the database query fails.
     async fn get_session_workspace(&self, session_id: &str) -> Result<Option<SessionWorkspace>>;
+
+    /// Lists all registered workspaces.
+    ///
+    /// Returns a list of all workspaces sorted by last accessed time (most recent first).
+    /// This is useful for UI displays of available workspaces.
+    ///
+    /// # Returns
+    ///
+    /// Returns a vector of all registered workspaces.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workspace listing fails.
+    async fn list_all_workspaces(&self) -> Result<Vec<Workspace>>;
+
+    /// Toggles the favorite status of a workspace.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The update operation fails
+    async fn toggle_favorite(&self, workspace_id: &str) -> Result<()>;
+
+    /// Updates the last accessed timestamp of a workspace.
+    ///
+    /// This should be called when a workspace is accessed or switched to.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The update operation fails
+    async fn touch_workspace(&self, workspace_id: &str) -> Result<()>;
 }

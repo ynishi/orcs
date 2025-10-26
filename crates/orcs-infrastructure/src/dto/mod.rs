@@ -49,7 +49,7 @@ pub use workspace::{
     create_session_workspace_migrator, create_temp_file_migrator,
     create_workspace_migrator, create_workspace_resources_migrator,
     GeneratedDocV1, ProjectContextV1, SessionWorkspaceV1, TempFileV1,
-    WorkspaceResourcesV1, WorkspaceV1,
+    WorkspaceResourcesV1, WorkspaceV1, WorkspaceV1_1_0,
 };
 
 // ============================================================================

@@ -98,6 +98,29 @@ pub struct WorkspaceV1 {
     pub project_context: ProjectContextV1,
 }
 
+/// Represents a project-level workspace (DTO V1.1.0).
+/// Added last_accessed and is_favorite fields.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.1.0")]
+pub struct WorkspaceV1_1_0 {
+    /// Unique identifier for the workspace
+    pub id: String,
+    /// Name of the workspace (typically derived from project name)
+    pub name: String,
+    /// Root directory path of the project
+    pub root_path: PathBuf,
+    /// Collection of all workspace resources
+    pub resources: WorkspaceResourcesV1,
+    /// Project-specific context and metadata
+    pub project_context: ProjectContextV1,
+    /// Last accessed timestamp (UNIX timestamp in seconds)
+    #[serde(default)]
+    pub last_accessed: i64,
+    /// Whether this workspace is marked as favorite
+    #[serde(default)]
+    pub is_favorite: bool,
+}
+
 /// Session-specific workspace view (DTO V1).
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.0.0")]
@@ -229,6 +252,30 @@ impl From<&WorkspaceResources> for WorkspaceResourcesV1 {
     }
 }
 
+// ============================================================================
+// Migration implementations
+// ============================================================================
+
+/// Migration from WorkspaceV1 to WorkspaceV1_1_0.
+/// Added last_accessed and is_favorite fields (default values).
+impl version_migrate::MigratesTo<WorkspaceV1_1_0> for WorkspaceV1 {
+    fn migrate(self) -> WorkspaceV1_1_0 {
+        WorkspaceV1_1_0 {
+            id: self.id,
+            name: self.name,
+            root_path: self.root_path,
+            resources: self.resources,
+            project_context: self.project_context,
+            last_accessed: 0,  // Default: epoch (will be updated on first access)
+            is_favorite: false, // Default: not favorite
+        }
+    }
+}
+
+// ============================================================================
+// Domain model conversions
+// ============================================================================
+
 /// Convert WorkspaceV1 DTO to domain model.
 impl IntoDomain<Workspace> for WorkspaceV1 {
     fn into_domain(self) -> Workspace {
@@ -241,6 +288,26 @@ impl IntoDomain<Workspace> for WorkspaceV1 {
             workspace_dir: PathBuf::new(),
             resources: self.resources.into_domain(),
             project_context: self.project_context.into_domain(),
+            last_accessed: 0,  // Default for V1
+            is_favorite: false, // Default for V1
+        }
+    }
+}
+
+/// Convert WorkspaceV1_1_0 DTO to domain model.
+impl IntoDomain<Workspace> for WorkspaceV1_1_0 {
+    fn into_domain(self) -> Workspace {
+        Workspace {
+            id: self.id,
+            name: self.name,
+            root_path: self.root_path,
+            // workspace_dir is calculated from workspace_id, not stored in DTO
+            // The caller (load_workspace) must set this field after conversion
+            workspace_dir: PathBuf::new(),
+            resources: self.resources.into_domain(),
+            project_context: self.project_context.into_domain(),
+            last_accessed: self.last_accessed,
+            is_favorite: self.is_favorite,
         }
     }
 }
@@ -254,6 +321,21 @@ impl From<&Workspace> for WorkspaceV1 {
             root_path: workspace.root_path.clone(),
             resources: WorkspaceResourcesV1::from(&workspace.resources),
             project_context: ProjectContextV1::from(&workspace.project_context),
+        }
+    }
+}
+
+/// Convert domain model to WorkspaceV1_1_0 DTO for persistence.
+impl From<&Workspace> for WorkspaceV1_1_0 {
+    fn from(workspace: &Workspace) -> Self {
+        WorkspaceV1_1_0 {
+            id: workspace.id.clone(),
+            name: workspace.name.clone(),
+            root_path: workspace.root_path.clone(),
+            resources: WorkspaceResourcesV1::from(&workspace.resources),
+            project_context: ProjectContextV1::from(&workspace.project_context),
+            last_accessed: workspace.last_accessed,
+            is_favorite: workspace.is_favorite,
         }
     }
 }
@@ -348,11 +430,13 @@ pub fn create_workspace_resources_migrator() -> version_migrate::Migrator {
 ///
 /// # Migration Path
 ///
-/// - V1.0.0 → Workspace: Converts DTO to domain model (no migration needed yet)
+/// - V1.0.0 → V1.1.0: Added last_accessed and is_favorite fields
+/// - V1.1.0 → Workspace: Converts DTO to domain model
 pub fn create_workspace_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
     let path = version_migrate::Migrator::define("workspace")
         .from::<WorkspaceV1>()
+        .step::<WorkspaceV1_1_0>()
         .into::<Workspace>();
     migrator.register(path).expect("Failed to register workspace migration path");
     migrator

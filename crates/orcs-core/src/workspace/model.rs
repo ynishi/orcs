@@ -17,6 +17,10 @@ pub struct Workspace {
     pub resources: WorkspaceResources,
     /// Project-specific context and metadata
     pub project_context: ProjectContext,
+    /// Last accessed timestamp (UNIX timestamp in seconds)
+    pub last_accessed: i64,
+    /// Whether this workspace is marked as favorite
+    pub is_favorite: bool,
 }
 
 /// Collection of all resources managed within a workspace.

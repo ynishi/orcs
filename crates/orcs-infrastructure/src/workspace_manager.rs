@@ -13,9 +13,8 @@ use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_core::workspace::{
     ProjectContext, SessionWorkspace, TempFile, UploadedFile, Workspace, WorkspaceResources,
 };
-use version_migrate::IntoDomain;
 
-use crate::dto::WorkspaceV1;
+use crate::dto::WorkspaceV1_1_0;
 
 /// Infers the MIME type from a filename extension.
 ///
@@ -171,7 +170,8 @@ impl FileSystemWorkspaceManager {
             ))
         })?;
 
-        let workspace_dto: WorkspaceV1 = toml::from_str(&content).map_err(|e| {
+        // Parse TOML to toml::Value first
+        let toml_value: toml::Value = toml::from_str(&content).map_err(|e| {
             OrcsError::Serialization(format!(
                 "Failed to parse workspace metadata from '{}': {}",
                 metadata_path.display(),
@@ -179,7 +179,11 @@ impl FileSystemWorkspaceManager {
             ))
         })?;
 
-        let mut workspace = workspace_dto.into_domain();
+        // Use migrator to handle version migration
+        let migrator = crate::dto::create_workspace_migrator();
+        let mut workspace: Workspace = migrator
+            .load_flat_from("workspace", toml_value)
+            .map_err(|e| OrcsError::Serialization(format!("Migration failed: {}", e)))?;
 
         // Set workspace_dir (calculated from workspace_id, not stored in metadata)
         workspace.workspace_dir = self.get_workspace_dir(workspace_id);
@@ -209,8 +213,8 @@ impl FileSystemWorkspaceManager {
             ))
         })?;
 
-        // Convert domain model to DTO
-        let workspace_dto = WorkspaceV1::from(workspace);
+        // Convert domain model to DTO (use latest version V1.1.0)
+        let workspace_dto = WorkspaceV1_1_0::from(workspace);
 
         // Serialize to TOML
         let content = toml::to_string_pretty(&workspace_dto).map_err(|e| {
@@ -269,6 +273,11 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Create new workspace
         let workspace_dir = self.get_workspace_dir(&workspace_id);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| OrcsError::Io(format!("Failed to get current timestamp: {}", e)))?
+            .as_secs() as i64;
+
         let workspace = Workspace {
             id: workspace_id.clone(),
             name: Self::get_workspace_name(repo_path),
@@ -276,6 +285,8 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             workspace_dir,
             resources: WorkspaceResources::default(),
             project_context: ProjectContext::default(),
+            last_accessed: now,
+            is_favorite: false,
         };
 
         // Save to file system
@@ -688,6 +699,53 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
     async fn get_session_workspace(&self, _session_id: &str) -> Result<Option<SessionWorkspace>> {
         unimplemented!("get_session_workspace will be implemented in a subsequent step")
+    }
+
+    async fn list_all_workspaces(&self) -> Result<Vec<Workspace>> {
+        let mut workspaces = Vec::new();
+        let mut entries = fs::read_dir(&self.root_dir).await.map_err(|e| {
+            OrcsError::Io(format!(
+                "Failed to read workspaces directory '{}': {}",
+                self.root_dir.display(),
+                e
+            ))
+        })?;
+
+        while let Some(entry) = entries.next_entry().await.map_err(|e| {
+            OrcsError::Io(format!("Failed to read directory entry: {}", e))
+        })? {
+            let file_type = entry.file_type().await.map_err(|e| {
+                OrcsError::Io(format!("Failed to get file type: {}", e))
+            })?;
+
+            if file_type.is_dir() {
+                let workspace_id = entry.file_name().to_string_lossy().to_string();
+                if let Ok(ws) = self.load_workspace(&workspace_id).await {
+                    workspaces.push(ws);
+                }
+            }
+        }
+
+        // Sort by last_accessed (most recent first)
+        workspaces.sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
+
+        Ok(workspaces)
+    }
+
+    async fn toggle_favorite(&self, workspace_id: &str) -> Result<()> {
+        let mut workspace = self.load_workspace(workspace_id).await?;
+        workspace.is_favorite = !workspace.is_favorite;
+        self.save_workspace(&workspace).await
+    }
+
+    async fn touch_workspace(&self, workspace_id: &str) -> Result<()> {
+        let mut workspace = self.load_workspace(workspace_id).await?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| OrcsError::Io(format!("Failed to get current timestamp: {}", e)))?
+            .as_secs() as i64;
+        workspace.last_accessed = now;
+        self.save_workspace(&workspace).await
     }
 }
 

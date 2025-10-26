@@ -1,7 +1,7 @@
 //! TOML-based PersonaRepository implementation
 
-use crate::dto::{ConfigRoot, PersonaConfigV1_1_0};
-use crate::storage::{create_persona_migrator, ConfigStorage};
+use crate::dto::{create_config_root_migrator, create_persona_migrator, ConfigRoot, PersonaConfigV1_1_0};
+use crate::storage::ConfigStorage;
 use orcs_core::persona::Persona;
 use orcs_core::repository::PersonaRepository;
 use std::path::PathBuf;
@@ -51,19 +51,21 @@ impl PersonaRepository for TomlPersonaRepository {
             .storage
             .load()
             .map_err(|e| e.to_string())?
-            .unwrap_or_else(|| serde_json::json!({}));
+            .unwrap_or_else(|| serde_json::json!({"version": "1.0.0"}));
 
-        // Deserialize to ConfigRoot
-        let config: ConfigRoot = serde_json::from_value(json_value)
-            .map_err(|e| format!("Failed to deserialize config: {}", e))?;
+        // Use ConfigRoot migrator to deserialize
+        let config_migrator = create_config_root_migrator();
+        let config: ConfigRoot = config_migrator
+            .load_flat_from("config_root", json_value)
+            .map_err(|e| format!("Failed to migrate config: {}", e))?;
 
         if config.personas.is_empty() {
             return Ok(Vec::new());
         }
 
-        // Use version-migrate to handle automatic migration (flat format)
-        let migrator = create_persona_migrator();
-        let personas = migrator
+        // Use persona migrator to handle persona migration
+        let persona_migrator = create_persona_migrator();
+        let personas = persona_migrator
             .load_vec_flat_from("persona", config.personas)
             .map_err(|e| format!("Failed to migrate personas: {}", e))?;
 
@@ -75,29 +77,42 @@ impl PersonaRepository for TomlPersonaRepository {
         let persona_dtos: Vec<PersonaConfigV1_1_0> =
             personas.iter().map(|p| p.into()).collect();
 
-        // Use migrator to serialize with version field
-        let migrator = create_persona_migrator();
-        let json_str = migrator
+        // Use persona migrator to serialize with version field
+        let persona_migrator = create_persona_migrator();
+        let json_str = persona_migrator
             .save_vec_flat(persona_dtos)
             .map_err(|e| format!("Failed to serialize personas: {}", e))?;
 
         let persona_values: Vec<serde_json::Value> = serde_json::from_str(&json_str)
             .map_err(|e| format!("Failed to parse persona JSON: {}", e))?;
 
-        // Create ConfigRoot with personas
-        let config = ConfigRoot {
-            personas: persona_values,
-            user_profile: None, // TODO: preserve existing user_profile
-            workspaces: Vec::new(), // TODO: preserve existing workspaces
-        };
+        // Load existing config to preserve other fields
+        let json_value = self
+            .storage
+            .load()
+            .map_err(|e| e.to_string())?
+            .unwrap_or_else(|| serde_json::json!({"version": "1.0.0"}));
 
-        // Serialize to serde_json::Value
-        let json_value = serde_json::to_value(&config)
+        // Use ConfigRoot migrator to deserialize existing config
+        let config_migrator = create_config_root_migrator();
+        let mut config: ConfigRoot = config_migrator
+            .load_flat_from("config_root", json_value)
+            .map_err(|e| format!("Failed to migrate config: {}", e))?;
+
+        // Update only personas field (preserve user_profile and workspaces)
+        config.personas = persona_values;
+
+        // Serialize ConfigRoot with migrator to add version field
+        let config_json_str = config_migrator
+            .save_flat(config)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+        let config_json_value: serde_json::Value = serde_json::from_str(&config_json_str)
+            .map_err(|e| format!("Failed to parse config JSON: {}", e))?;
 
         // Save via ConfigStorage
         self.storage
-            .save(&json_value)
+            .save(&config_json_value)
             .map_err(|e| e.to_string())
     }
 }

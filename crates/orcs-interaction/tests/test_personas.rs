@@ -88,10 +88,6 @@ fn test_persona_fields() {
     repo.save_all(&[test_persona])
         .expect("Should save persona");
 
-    // Debug: Print the saved TOML
-    let toml_content = std::fs::read_to_string(&config_path).expect("Should read file");
-    println!("Saved TOML:\n{}", toml_content);
-
     // Load and verify fields
     let personas = repo.get_all().expect("Should load personas");
     assert_eq!(personas.len(), 1);
@@ -101,4 +97,64 @@ fn test_persona_fields() {
     assert!(!persona.role.is_empty(), "Persona should have a role");
     assert!(!persona.background.is_empty(), "Persona should have a background");
     assert!(!persona.communication_style.is_empty(), "Persona should have a communication style");
+}
+
+#[test]
+fn test_save_preserves_other_config_fields() {
+    use std::fs;
+
+    // Use temporary directory for test
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("config.toml");
+
+    // Manually create a config with user_profile (without workspaces to keep test simple)
+    let initial_config = r#"
+version = "1.0.0"
+
+[[persona]]
+version = "1.1.0"
+id = "initial-id"
+name = "Initial"
+role = "Initial Role"
+background = "Initial background"
+communication_style = "Initial style"
+default_participant = true
+source = "User"
+backend = "claude_cli"
+
+[user_profile]
+nickname = "TestUser"
+background = "Test background"
+"#;
+    fs::write(&config_path, initial_config).expect("Should write initial config");
+
+    // Create repository and save new personas
+    let repo = TomlPersonaRepository::with_path(config_path.clone());
+
+    let new_persona = Persona {
+        id: "new-id".to_string(),
+        name: "New Person".to_string(),
+        role: "New Role".to_string(),
+        background: "New background".to_string(),
+        communication_style: "New style".to_string(),
+        default_participant: false,
+        source: PersonaSource::System,
+        backend: PersonaBackend::GeminiCli,
+    };
+
+    // Save the new persona (should preserve user_profile and workspaces)
+    repo.save_all(&[new_persona])
+        .expect("Should save new persona");
+
+    // Read the saved config
+    let saved_config = fs::read_to_string(&config_path).expect("Should read saved config");
+
+    // Verify that user_profile is preserved
+    assert!(saved_config.contains("user_profile"), "Should preserve user_profile");
+    assert!(saved_config.contains("TestUser"), "Should preserve nickname");
+
+    // Verify that personas were updated
+    let personas = repo.get_all().expect("Should load personas");
+    assert_eq!(personas.len(), 1, "Should have 1 persona");
+    assert_eq!(personas[0].name, "New Person");
 }

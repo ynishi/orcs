@@ -28,8 +28,11 @@ mod workspace;
 
 use serde::{Deserialize, Serialize};
 
-// Re-export persona DTOs
-pub use persona::{PersonaBackendDTO, PersonaConfigV1_0_0, PersonaConfigV1_1_0, PersonaSourceDTO};
+// Re-export persona DTOs and migrator
+pub use persona::{
+    create_persona_migrator, PersonaBackendDTO, PersonaConfigV1_0_0, PersonaConfigV1_1_0,
+    PersonaSourceDTO,
+};
 
 // Re-export session DTOs
 pub use session::{SessionV1_0_0, SessionV1_1_0, SessionV2_0_0};
@@ -50,12 +53,12 @@ pub use workspace::{
 // Root configuration structures
 // ============================================================================
 
-/// Root configuration structure for the application config file.
+/// Root configuration structure V1.0.0 for the application config file.
 ///
-/// This structure doesn't have its own version - each contained entity
-/// (personas, workspaces, etc.) maintains its own version field.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigRoot {
+/// Each contained entity (personas, workspaces, etc.) maintains its own version field.
+#[derive(Debug, Clone, Serialize, Deserialize, version_migrate::Versioned)]
+#[versioned(version = "1.0.0")]
+pub struct ConfigRootV1_0_0 {
     /// Persona configurations (each has its own version field).
     /// Stored as serde_json::Value (intermediate format) to allow version-migrate to handle migration.
     #[serde(rename = "persona", default)]
@@ -70,7 +73,7 @@ pub struct ConfigRoot {
     pub workspaces: Vec<WorkspaceV1>,
 }
 
-impl Default for ConfigRoot {
+impl Default for ConfigRootV1_0_0 {
     fn default() -> Self {
         Self {
             personas: Vec::new(),
@@ -78,4 +81,44 @@ impl Default for ConfigRoot {
             workspaces: Vec::new(),
         }
     }
+}
+
+/// IntoDomain implementation for ConfigRootV1_0_0 (identity conversion since it's the latest version).
+impl version_migrate::IntoDomain<ConfigRootV1_0_0> for ConfigRootV1_0_0 {
+    fn into_domain(self) -> ConfigRootV1_0_0 {
+        self
+    }
+}
+
+/// Type alias for the latest ConfigRoot version.
+pub type ConfigRoot = ConfigRootV1_0_0;
+
+// ============================================================================
+// ConfigRoot Migrator
+// ============================================================================
+
+/// Creates and configures a Migrator instance for ConfigRoot.
+///
+/// Currently only V1.0.0 exists, so no migration steps are needed yet.
+/// Future versions can add migration paths here.
+///
+/// # Example
+///
+/// ```ignore
+/// let migrator = create_config_root_migrator();
+/// let config: ConfigRoot = migrator.load_flat_from("config_root", json_value)?;
+/// ```
+pub fn create_config_root_migrator() -> version_migrate::Migrator {
+    let mut migrator = version_migrate::Migrator::builder().build();
+
+    // Register migration path: V1.0.0 -> ConfigRoot (currently same)
+    let config_path = version_migrate::Migrator::define("config_root")
+        .from::<ConfigRootV1_0_0>()
+        .into::<ConfigRoot>();
+
+    migrator
+        .register(config_path)
+        .expect("Failed to register config_root migration path");
+
+    migrator
 }

@@ -3,8 +3,12 @@
 //! This module provides a UserService implementation that loads user information
 //! from the configuration file (~/.config/orcs/config.toml).
 
-use orcs_core::user::UserService;
+use crate::dto::create_user_profile_migrator;
+use crate::storage::ConfigStorage;
+use orcs_core::user::{UserProfile, UserService};
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
+use version_migrate::ConfigMigrator;
 
 /// User service that loads user information from config.toml.
 ///
@@ -49,9 +53,8 @@ impl ConfigBasedUserService {
             }
         }
 
-        // TODO: Load from ConfigStorage via UserProfileRepository
-        // Temporarily return default value
-        let loaded = "You".to_string();
+        // Load from ConfigStorage
+        let loaded = Self::load_from_config().unwrap_or_else(|_| "You".to_string());
 
         // Cache it
         {
@@ -60,6 +63,44 @@ impl ConfigBasedUserService {
         }
 
         loaded
+    }
+
+    /// Loads UserProfile from config file.
+    fn load_from_config() -> Result<String, String> {
+        // Get config path
+        let config_path = Self::get_config_path()?;
+        let storage = ConfigStorage::new(config_path);
+
+        // Load config as JSON
+        let json_value = storage
+            .load()
+            .map_err(|e| e.to_string())?
+            .unwrap_or_else(|| serde_json::json!({"version": "1.0.0"}));
+
+        // Convert to JSON string for ConfigMigrator
+        let json_str = serde_json::to_string(&json_value)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+        // Use ConfigMigrator to query user_profile
+        let config = ConfigMigrator::from(&json_str, create_user_profile_migrator())
+            .map_err(|e| format!("Failed to create ConfigMigrator: {}", e))?;
+
+        let profiles: Vec<UserProfile> = config
+            .query("user_profile")
+            .map_err(|e| format!("Failed to query user_profile: {}", e))?;
+
+        // user_profile is a single object, but query returns Vec
+        // If empty or error, fall back to default
+        let profile = profiles.into_iter().next().unwrap_or_default();
+
+        Ok(profile.nickname)
+    }
+
+    /// Gets the default config path (~/.config/orcs/config.toml).
+    fn get_config_path() -> Result<PathBuf, String> {
+        dirs::config_dir()
+            .map(|dir| dir.join("orcs").join("config.toml"))
+            .ok_or_else(|| "Cannot find config directory".to_string())
     }
 }
 

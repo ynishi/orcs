@@ -5,13 +5,10 @@ pub mod user;
 pub mod task;
 pub mod repository;
 pub mod workspace;
+pub mod config;
 
 // Re-export common error type
 pub use error::OrcsError;
-
-// Deprecated: Use orcs_core::persona instead
-#[deprecated(since = "0.2.0", note = "Use orcs_core::persona instead")]
-pub mod config;
 
 // Deprecated: Use orcs_core::user instead
 #[deprecated(since = "0.2.0", note = "Use orcs_core::user instead")]

@@ -2689,6 +2689,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "uuid",
+ "version-migrate",
 ]
 
 [[package]]
@@ -4961,9 +4962,9 @@ checksum = "852e951cb7832cb45cb1169900d19760cfa39b82bc0ea9c0e5a14ae88411c98b"
 
 [[package]]
 name = "version-migrate"
-version = "0.2.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac3f2028be128fd006a015cde112799b83aac911e4d54ceb64dcf116e4eb7000"
+checksum = "1105fb60dfd350701fdf5db634b0314a7b6c3f00866bc44dd5d6287a496bf230"
 dependencies = [
  "async-trait",
  "semver",
@@ -4975,9 +4976,9 @@ dependencies = [
 
 [[package]]
 name = "version-migrate-macro"
-version = "0.2.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7990d943cad286113c9770a43958b66dd3218e729524274e9a399ec6133644b1"
+checksum = "95dd373948c9f235fa7608e2cdcb4ba9efa4b8f2066409b1b3ae0ac1127d5e34"
 dependencies = [
  "proc-macro2",
  "quote",

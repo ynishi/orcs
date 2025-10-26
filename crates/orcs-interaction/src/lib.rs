@@ -1,6 +1,5 @@
 pub mod persona_agent;
 pub mod gemini_api_agent;
-pub mod config;
 
 use crate::gemini_api_agent::GeminiApiAgent;
 use llm_toolkit::agent::dialogue::{Dialogue, ExecutionModel};

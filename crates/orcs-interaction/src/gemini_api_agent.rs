@@ -3,7 +3,7 @@
 //! This agent calls the Gemini REST API directly without CLI dependency.
 //! Configuration priority: ~/.config/orcs/secret.json > environment variables
 
-use crate::config;
+use orcs_infrastructure::storage::SecretStorage;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
 use async_trait::async_trait;
@@ -45,13 +45,15 @@ impl GeminiApiAgent {
     ///
     /// Model name defaults to `gemini-2.5-flash` if not specified.
     pub fn try_from_env() -> Result<Self, AgentError> {
-        // Try loading from config file first
-        if let Ok(secret_config) = config::load_secret_config() {
-            if let Some(gemini_config) = secret_config.gemini {
-                let model = gemini_config
-                    .model_name
-                    .unwrap_or_else(|| DEFAULT_GEMINI_MODEL.into());
-                return Ok(Self::new(gemini_config.api_key, model));
+        // Try loading from SecretStorage first
+        if let Ok(storage) = SecretStorage::new() {
+            if let Ok(secret_config) = storage.load() {
+                if let Some(gemini_config) = secret_config.gemini {
+                    let model = gemini_config
+                        .model_name
+                        .unwrap_or_else(|| DEFAULT_GEMINI_MODEL.into());
+                    return Ok(Self::new(gemini_config.api_key, model));
+                }
             }
         }
 

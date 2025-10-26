@@ -313,19 +313,17 @@ async fn get_execution_strategy(
 /// Gets the path to the configuration file, creating it if it doesn't exist
 #[tauri::command]
 async fn get_config_path() -> Result<String, String> {
-    // Get the base config directory
-    let config_dir = dirs::config_dir()
-        .ok_or("Failed to get config directory")?;
+    use orcs_infrastructure::paths::OrcsPaths;
 
-    // Construct the path to the orcs subdirectory
-    let orcs_config_dir = config_dir.join("orcs");
+    // Get the unified config file path
+    let config_file = OrcsPaths::config_file()
+        .map_err(|e| format!("Failed to get config path: {}", e))?;
 
     // Create the directory if it doesn't exist
-    std::fs::create_dir_all(&orcs_config_dir)
-        .map_err(|e| format!("Failed to create config directory: {}", e))?;
-
-    // Construct the final path to config.toml
-    let config_file = orcs_config_dir.join("config.toml");
+    if let Some(parent) = config_file.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
 
     // Create the file if it doesn't exist
     if !config_file.exists() {
@@ -594,6 +592,8 @@ fn get_git_info() -> GitInfo {
 
 fn main() {
     tauri::async_runtime::block_on(async {
+        use orcs_infrastructure::paths::OrcsPaths;
+
         // Composition Root: Create the concrete repository instances
         let persona_repository = Arc::new(
             TomlPersonaRepository::new()
@@ -601,10 +601,9 @@ fn main() {
         );
         let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
 
-        // Initialize FileSystemWorkspaceManager
-        let workspace_root = dirs::home_dir()
-            .expect("Failed to get home directory")
-            .join(".orcs")
+        // Initialize FileSystemWorkspaceManager with unified path
+        let workspace_root = OrcsPaths::config_dir()
+            .expect("Failed to get config directory")
             .join("workspaces");
         let workspace_manager = Arc::new(
             FileSystemWorkspaceManager::new(workspace_root)

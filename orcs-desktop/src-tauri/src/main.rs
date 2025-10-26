@@ -401,6 +401,63 @@ async fn get_current_workspace(
         .map_err(|e| e.to_string())
 }
 
+/// Lists all registered workspaces
+#[tauri::command]
+async fn list_workspaces(
+    state: State<'_, AppState>,
+) -> Result<Vec<Workspace>, String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    state.workspace_manager
+        .list_all_workspaces()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Switches to a different workspace for the active session
+#[tauri::command]
+async fn switch_workspace(
+    session_id: String,
+    workspace_id: String,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+    use tauri::Emitter;
+
+    // Update the session's workspace_id
+    state.session_manager
+        .update_workspace_id(&session_id, Some(workspace_id.clone()))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Update the workspace's last_accessed timestamp
+    state.workspace_manager
+        .touch_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Notify frontend of the workspace switch
+    app.emit("workspace-switched", &workspace_id)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Toggles the favorite status of a workspace
+#[tauri::command]
+async fn toggle_favorite_workspace(
+    workspace_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    state.workspace_manager
+        .toggle_favorite(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Lists all files in a workspace
 #[tauri::command]
 async fn list_workspace_files(
@@ -692,6 +749,9 @@ fn main() {
                 get_config_path,
                 get_git_info,
                 get_current_workspace,
+                list_workspaces,
+                switch_workspace,
+                toggle_favorite_workspace,
                 list_workspace_files,
                 upload_file_to_workspace,
                 upload_file_from_bytes,

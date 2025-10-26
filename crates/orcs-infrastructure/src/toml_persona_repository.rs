@@ -1,10 +1,11 @@
 //! TOML-based PersonaRepository implementation
 
-use crate::dto::{create_config_root_migrator, create_persona_migrator, ConfigRoot, PersonaConfigV1_1_0};
+use crate::dto::create_persona_migrator;
 use crate::storage::ConfigStorage;
 use orcs_core::persona::Persona;
 use orcs_core::repository::PersonaRepository;
 use std::path::PathBuf;
+use version_migrate::ConfigMigrator;
 
 /// A repository implementation for storing persona configurations in a TOML file.
 ///
@@ -53,39 +54,23 @@ impl PersonaRepository for TomlPersonaRepository {
             .map_err(|e| e.to_string())?
             .unwrap_or_else(|| serde_json::json!({"version": "1.0.0"}));
 
-        // Use ConfigRoot migrator to deserialize
-        let config_migrator = create_config_root_migrator();
-        let config: ConfigRoot = config_migrator
-            .load_flat_from("config_root", json_value)
-            .map_err(|e| format!("Failed to migrate config: {}", e))?;
+        // Convert to JSON string for ConfigMigrator
+        let json_str = serde_json::to_string(&json_value)
+            .map_err(|e| format!("Failed to serialize config to JSON: {}", e))?;
 
-        if config.personas.is_empty() {
-            return Ok(Vec::new());
-        }
+        // Use ConfigMigrator to query personas
+        let config = ConfigMigrator::from(&json_str, create_persona_migrator())
+            .map_err(|e| format!("Failed to create ConfigMigrator: {}", e))?;
 
-        // Use persona migrator to handle persona migration
-        let persona_migrator = create_persona_migrator();
-        let personas = persona_migrator
-            .load_vec_flat_from("persona", config.personas)
-            .map_err(|e| format!("Failed to migrate personas: {}", e))?;
+        // Query personas - automatically migrates from any version to Persona domain model
+        let personas: Vec<Persona> = config
+            .query("persona")
+            .map_err(|e| format!("Failed to query personas: {}", e))?;
 
         Ok(personas)
     }
 
     fn save_all(&self, personas: &[Persona]) -> Result<(), String> {
-        // Convert Persona domain models to latest DTO version (V1.1.0)
-        let persona_dtos: Vec<PersonaConfigV1_1_0> =
-            personas.iter().map(|p| p.into()).collect();
-
-        // Use persona migrator to serialize with version field
-        let persona_migrator = create_persona_migrator();
-        let json_str = persona_migrator
-            .save_vec_flat(persona_dtos)
-            .map_err(|e| format!("Failed to serialize personas: {}", e))?;
-
-        let persona_values: Vec<serde_json::Value> = serde_json::from_str(&json_str)
-            .map_err(|e| format!("Failed to parse persona JSON: {}", e))?;
-
         // Load existing config to preserve other fields
         let json_value = self
             .storage
@@ -93,20 +78,23 @@ impl PersonaRepository for TomlPersonaRepository {
             .map_err(|e| e.to_string())?
             .unwrap_or_else(|| serde_json::json!({"version": "1.0.0"}));
 
-        // Use ConfigRoot migrator to deserialize existing config
-        let config_migrator = create_config_root_migrator();
-        let mut config: ConfigRoot = config_migrator
-            .load_flat_from("config_root", json_value)
-            .map_err(|e| format!("Failed to migrate config: {}", e))?;
+        // Convert to JSON string for ConfigMigrator
+        let json_str = serde_json::to_string(&json_value)
+            .map_err(|e| format!("Failed to serialize config to JSON: {}", e))?;
 
-        // Update only personas field (preserve user_profile and workspaces)
-        config.personas = persona_values;
+        // Use ConfigMigrator to update personas
+        let mut config = ConfigMigrator::from(&json_str, create_persona_migrator())
+            .map_err(|e| format!("Failed to create ConfigMigrator: {}", e))?;
 
-        // Serialize ConfigRoot with migrator to add version field
-        let config_json_str = config_migrator
-            .save_flat(config)
+        // Update personas - automatically serializes to latest version
+        config
+            .update("persona", personas.to_vec())
+            .map_err(|e| format!("Failed to update personas: {}", e))?;
+
+        // Convert back to serde_json::Value and save
+        let config_json_str = config
+            .to_string()
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
-
         let config_json_value: serde_json::Value = serde_json::from_str(&config_json_str)
             .map_err(|e| format!("Failed to parse config JSON: {}", e))?;
 

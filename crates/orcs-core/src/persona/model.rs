@@ -4,6 +4,7 @@
 //! Each persona has unique characteristics, roles, and communication styles.
 
 use serde::{Deserialize, Serialize};
+use version_migrate::DeriveQueryable as Queryable;
 
 /// Supported LLM backends for personas.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -42,7 +43,8 @@ impl Default for PersonaSource {
 ///
 /// Personas define the behavior, expertise, and communication style of AI agents
 /// participating in conversations. Each persona has a unique UUID identifier.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Queryable)]
+#[queryable(entity = "persona")]
 pub struct Persona {
     /// Unique identifier (UUID format)
     pub id: String,

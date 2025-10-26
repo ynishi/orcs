@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip, Select } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip, Select, Badge } from '@mantine/core';
 import { IconSettings, IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -11,6 +11,12 @@ const STRATEGIES = [
   { value: 'broadcast', label: 'Broadcast' },
   { value: 'sequential', label: 'Sequential' },
 ];
+
+const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
+  claude_cli: 'Claude CLI',
+  gemini_cli: 'Gemini CLI',
+  gemini_api: 'Gemini API',
+};
 
 interface PersonasListProps {
   onStrategyChange?: (strategy: string) => void;
@@ -165,6 +171,9 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
             <Text size="sm" fw={600} truncate>
               {persona.name}
             </Text>
+            <Badge size="xs" color={persona.backend === 'gemini_cli' ? 'violet' : 'gray'}>
+              {BACKEND_LABELS[persona.backend] || 'Claude CLI'}
+            </Badge>
           </Group>
           <Text size="xs" c="dimmed" truncate>
             {persona.role}

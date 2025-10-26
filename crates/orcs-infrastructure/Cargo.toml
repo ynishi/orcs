@@ -19,6 +19,7 @@ tracing = "0.1"
 chrono = "0.4"
 version-migrate = {workspace = true }
 tokio = { version = "1", features = ["fs", "io-util"] }
+fs2 = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

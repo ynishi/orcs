@@ -25,22 +25,22 @@ use version_migrate::{Versioned, MigratesTo, IntoDomain};
 
 #[derive(Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.0.0")]
-pub struct PersonaConfigV1 {
+pub struct PersonaConfigV1_0_0 {
     pub id: String,
     pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Versioned)]
 #[versioned(version = "2.0.0")]
-pub struct PersonaConfigV2 {
+pub struct PersonaConfigV1_1_0 {
     pub id: String,  // UUID format
     pub name: String,
 }
 
 // Migration: V1 → V2
-impl MigratesTo<PersonaConfigV2> for PersonaConfigV1 {
-    fn migrate(self) -> PersonaConfigV2 {
-        PersonaConfigV2 {
+impl MigratesTo<PersonaConfigV1_1_0> for PersonaConfigV1_0_0 {
+    fn migrate(self) -> PersonaConfigV1_1_0 {
+        PersonaConfigV1_1_0 {
             id: generate_uuid_from_name(&self.name),
             name: self.name,
         }
@@ -48,7 +48,7 @@ impl MigratesTo<PersonaConfigV2> for PersonaConfigV1 {
 }
 
 // Domain conversion: V2 → Domain
-impl IntoDomain<Persona> for PersonaConfigV2 {
+impl IntoDomain<Persona> for PersonaConfigV1_1_0 {
     fn into_domain(self) -> Persona {
         Persona {
             id: self.id,
@@ -116,7 +116,7 @@ pub fn save_personas(personas: &[Persona]) -> Result<(), String> {
     let mut config = load_config()?;
 
     // 2. Update a portion of it
-    let persona_dtos: Vec<PersonaConfigV2> = personas.iter()
+    let persona_dtos: Vec<PersonaConfigV1_1_0> = personas.iter()
         .map(|p| p.into()) // Domain -> DTO
         .collect();
     config.personas = persona_dtos;
@@ -244,7 +244,7 @@ pub fn save_your_entities(entities: &[YourEntity]) -> Result<(), String> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigRootV2 {
     #[serde(rename = "persona")]
-    pub personas: Vec<PersonaConfigV2>,
+    pub personas: Vec<PersonaConfigV1_1_0>,
 
     #[serde(default)]
     pub user_profile: Option<UserProfileDTO>,
@@ -359,7 +359,7 @@ pub const PERSONA_CONFIG_V2_VERSION: &str = "2.0.0";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "2.0.0")]
-pub struct PersonaConfigV2 {
+pub struct PersonaConfigV1_1_0 {
     #[serde(default = "default_persona_v2_version")]
     pub schema_version: String,
 
@@ -374,8 +374,8 @@ pub struct PersonaConfigV2 {
 ```rust
 use version_migrate::MigratesTo;
 
-impl MigratesTo<PersonaConfigV2> for PersonaConfigV1 {
-    fn migrate(self) -> PersonaConfigV2 {
+impl MigratesTo<PersonaConfigV1_1_0> for PersonaConfigV1_0_0 {
+    fn migrate(self) -> PersonaConfigV1_1_0 {
         // Check if ID is already a valid UUID
         let id = if Uuid::parse_str(&self.id).is_ok() {
             self.id
@@ -384,7 +384,7 @@ impl MigratesTo<PersonaConfigV2> for PersonaConfigV1 {
             generate_uuid_from_name(&self.name)
         };
 
-        PersonaConfigV2 {
+        PersonaConfigV1_1_0 {
             schema_version: PERSONA_CONFIG_V2_VERSION.to_string(),
             id,
             name: self.name,
@@ -397,7 +397,7 @@ impl MigratesTo<PersonaConfigV2> for PersonaConfigV1 {
 #### 3. Implement `IntoDomain` for the New Version
 
 ```rust
-impl IntoDomain<Persona> for PersonaConfigV2 {
+impl IntoDomain<Persona> for PersonaConfigV1_1_0 {
     fn into_domain(self) -> Persona {
         Persona {
             id: self.id,

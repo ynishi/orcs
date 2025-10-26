@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, TextInput, Textarea, Switch, Button, Stack, Group } from '@mantine/core';
+import { Modal, TextInput, Textarea, Switch, Button, Stack, Group, Select } from '@mantine/core';
 import { PersonaConfig } from '../../types/agent';
+
+const BACKEND_OPTIONS = [
+  { value: 'claude_cli', label: 'Claude CLI' },
+  { value: 'gemini_cli', label: 'Gemini CLI' },
+  { value: 'gemini_api', label: 'Gemini API' },
+];
 
 interface PersonaEditorModalProps {
   opened: boolean;
@@ -22,6 +28,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
     background: '',
     communication_style: '',
     default_participant: false,
+    backend: 'claude_cli',
   });
 
   // Update form data when persona prop changes
@@ -34,6 +41,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         background: persona.background || '',
         communication_style: persona.communication_style || '',
         default_participant: persona.default_participant || false,
+        backend: persona.backend || 'claude_cli',
       });
     } else {
       setFormData({
@@ -43,6 +51,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         background: '',
         communication_style: '',
         default_participant: false,
+        backend: 'claude_cli',
       });
     }
   }, [persona]);
@@ -62,6 +71,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
       background: formData.background || '',
       communication_style: formData.communication_style || '',
       default_participant: formData.default_participant || false,
+      backend: formData.backend || 'claude_cli',
       source: 'User',
     };
 
@@ -100,6 +110,17 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
           placeholder="e.g., World-Class UX Engineer"
           value={formData.role}
           onChange={(e) => setFormData({ ...formData, role: e.currentTarget.value })}
+        />
+
+        <Select
+          label="Backend"
+          placeholder="Select LLM backend"
+          data={BACKEND_OPTIONS}
+          value={formData.backend || 'claude_cli'}
+          onChange={(value) =>
+            setFormData({ ...formData, backend: (value as PersonaConfig['backend']) || 'claude_cli' })
+          }
+          allowDeselect={false}
         />
 
         <Textarea

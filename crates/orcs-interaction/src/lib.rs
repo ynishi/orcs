@@ -1,17 +1,17 @@
 pub mod persona_agent;
 
+use llm_toolkit::agent::dialogue::{Dialogue, ExecutionModel};
+use llm_toolkit::agent::impls::{ClaudeCodeAgent, GeminiAgent};
+use llm_toolkit::agent::persona::Persona as LlmPersona;
+use llm_toolkit::agent::{Agent, AgentError, Payload};
+use orcs_core::persona::{Persona as PersonaDomain, PersonaBackend};
+use orcs_core::repository::PersonaRepository;
+use orcs_core::session::{AppMode, ConversationMessage, MessageRole, Plan, Session};
+use orcs_core::user::UserService;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{RwLock, Mutex};
-use serde::Serialize;
-use orcs_core::session::{AppMode, ConversationMessage, MessageRole, Plan, Session};
-use orcs_core::repository::PersonaRepository;
-use orcs_core::persona::Persona as PersonaDomain;
-use orcs_core::user::UserService;
-use llm_toolkit::agent::impls::{ClaudeCodeAgent, ClaudeCodeJsonAgent};
-use llm_toolkit::agent::dialogue::{Dialogue, DialogueBlueprint, ExecutionModel};
-use llm_toolkit::agent::persona::{Persona as LlmPersona, PersonaTeam};
-use llm_toolkit::agent::{Agent, AgentError, Payload};
+use tokio::sync::{Mutex, RwLock};
 
 /// Converts a Persona domain model to llm-toolkit Persona.
 fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
@@ -31,40 +31,41 @@ fn string_to_execution_model(s: &str) -> ExecutionModel {
     }
 }
 
-/// Wrapper around ClaudeCodeAgent that implements Clone by creating new instances.
-/// This is needed because Dialogue::from_blueprint requires Clone + 'static.
-#[derive(Debug)]
-struct ClonableAgent {
-    _phantom: std::marker::PhantomData<()>,
+/// Agent wrapper that delegates to the configured backend.
+#[derive(Clone, Debug)]
+struct PersonaBackendAgent {
+    backend: PersonaBackend,
 }
 
-impl ClonableAgent {
-    fn new() -> Self {
-        Self {
-            _phantom: std::marker::PhantomData,
-        }
-    }
-}
-
-impl Clone for ClonableAgent {
-    fn clone(&self) -> Self {
-        Self::new()
+impl PersonaBackendAgent {
+    fn new(backend: PersonaBackend) -> Self {
+        Self { backend }
     }
 }
 
 #[async_trait::async_trait]
-impl Agent for ClonableAgent {
+impl Agent for PersonaBackendAgent {
     type Output = String;
 
     fn expertise(&self) -> &str {
-        "General AI Assistant"
+        match self.backend {
+            PersonaBackend::ClaudeCli => "Claude CLI persona agent",
+            PersonaBackend::GeminiCli => "Gemini CLI persona agent",
+            PersonaBackend::GeminiApi => "Gemini API persona agent",
+        }
     }
 
     async fn execute(&self, payload: Payload) -> Result<Self::Output, AgentError> {
-        // Create a fresh ClaudeCodeAgent for each execution
-        let agent = ClaudeCodeAgent::new();
-        agent.execute(payload).await
+        match self.backend {
+            PersonaBackend::ClaudeCli => ClaudeCodeAgent::new().execute(payload).await,
+            PersonaBackend::GeminiCli => GeminiAgent::new().execute(payload).await,
+            PersonaBackend::GeminiApi => GeminiApiAgent::try_from_env()?.execute(payload).await,
+        }
     }
+}
+
+fn agent_for_persona(persona: &PersonaDomain) -> PersonaBackendAgent {
+    PersonaBackendAgent::new(persona.backend.clone())
 }
 
 /// Represents a single message in a dialogue conversation.
@@ -186,10 +187,8 @@ impl InteractionManager {
         user_service: Arc<dyn UserService>,
     ) -> Self {
         // Migrate persona_histories keys from old IDs to UUIDs
-        let migrated_histories = Self::migrate_persona_history_keys(
-            data.persona_histories,
-            &persona_repository,
-        );
+        let migrated_histories =
+            Self::migrate_persona_history_keys(data.persona_histories, &persona_repository);
 
         Self {
             session_id: data.id,
@@ -252,7 +251,8 @@ impl InteractionManager {
     /// This is used to convert DialogueTurn participant names to persona IDs.
     fn get_persona_id_by_name(&self, name: &str) -> Option<String> {
         let personas = self.persona_repository.get_all().ok()?;
-        personas.iter()
+        personas
+            .iter()
             .find(|p| p.name == name)
             .map(|p| p.id.clone())
     }
@@ -268,34 +268,24 @@ impl InteractionManager {
             return Ok(());
         }
 
-        let all_configs = self.persona_repository.get_all()?;
-        let participants = all_configs
-            .iter()
-            .filter(|p| p.default_participant)
-            .map(domain_to_llm_persona)
-            .collect();
-
         let strategy_str = self.execution_strategy.read().await.clone();
         let strategy_model = string_to_execution_model(&strategy_str);
-
-        let blueprint = DialogueBlueprint {
-            agenda: "Orcs AI Assistant Session".to_string(),
-            context: "A collaborative session between the user and AI assistants Mai and Yui.".to_string(),
-            participants: Some(participants),
-            execution_strategy: Some(strategy_model),
+        let mut dialogue = match strategy_model {
+            ExecutionModel::Sequential => Dialogue::sequential(),
+            ExecutionModel::Broadcast => Dialogue::broadcast(),
         };
 
-        // Create fresh agents for dialogue initialization
-        let generator_agent = ClaudeCodeJsonAgent::<PersonaTeam>::new();
-        let llm_agent = ClonableAgent::new();
+        let default_personas: Vec<PersonaDomain> = self
+            .persona_repository
+            .get_all()?
+            .into_iter()
+            .filter(|p| p.default_participant)
+            .collect();
 
-        let dialogue = Dialogue::from_blueprint(
-            blueprint,
-            generator_agent,
-            llm_agent,
-        )
-        .await
-        .map_err(|e| e.to_string())?;
+        for persona in default_personas {
+            let llm_persona = domain_to_llm_persona(&persona);
+            dialogue.add_participant(llm_persona, agent_for_persona(&persona));
+        }
 
         *dialogue_guard = Some(dialogue);
         Ok(())
@@ -312,11 +302,13 @@ impl InteractionManager {
         let title = self.title.read().await.clone();
 
         // Use the first default participant as current_persona_id
-        let current_persona_id = self.persona_repository
+        let current_persona_id = self
+            .persona_repository
             .get_all()
             .ok()
             .and_then(|personas| {
-                personas.iter()
+                personas
+                    .iter()
                     .find(|p| p.default_participant)
                     .map(|p| p.id.clone())
             })
@@ -366,7 +358,9 @@ impl InteractionManager {
         self.ensure_dialogue_initialized().await?;
 
         // Find the persona
-        let persona_config = self.persona_repository.get_all()?
+        let persona_config = self
+            .persona_repository
+            .get_all()?
             .into_iter()
             .find(|p| p.id == persona_id)
             .ok_or_else(|| format!("Persona with id '{}' not found", persona_id))?;
@@ -375,7 +369,7 @@ impl InteractionManager {
         // Lock the dialogue and add participant
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
-        dialogue.add_participant(persona, ClonableAgent::new());
+        dialogue.add_participant(persona, agent_for_persona(&persona_config));
 
         Ok(())
     }
@@ -395,7 +389,9 @@ impl InteractionManager {
         self.ensure_dialogue_initialized().await?;
 
         // Find the persona to get its full name
-        let persona_config = self.persona_repository.get_all()?
+        let persona_config = self
+            .persona_repository
+            .get_all()?
             .into_iter()
             .find(|p| p.id == persona_id)
             .ok_or_else(|| format!("Persona with id '{}' not found", persona_id))?;
@@ -404,7 +400,9 @@ impl InteractionManager {
         // Lock the dialogue and remove participant
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
-        dialogue.remove_participant(&persona.name).map_err(|e| e.to_string())?;
+        dialogue
+            .remove_participant(&persona.name)
+            .map_err(|e| e.to_string())?;
 
         Ok(())
     }
@@ -421,7 +419,8 @@ impl InteractionManager {
         let dialogue = dialogue_guard.as_ref().expect("Dialogue not initialized");
 
         // Convert participant names to persona UUIDs
-        let participant_ids = dialogue.participants()
+        let participant_ids = dialogue
+            .participants()
             .iter()
             .filter_map(|persona| self.get_persona_id_by_name(&persona.name))
             .collect();
@@ -458,7 +457,10 @@ impl InteractionManager {
     /// * `input` - The user's input string
     pub async fn handle_input(&self, mode: &AppMode, input: &str) -> InteractionResult {
         match mode {
-            AppMode::Idle => self.handle_idle_mode(input, None::<fn(&DialogueMessage)>).await,
+            AppMode::Idle => {
+                self.handle_idle_mode(input, None::<fn(&DialogueMessage)>)
+                    .await
+            }
             AppMode::AwaitingConfirmation { plan } => {
                 self.handle_awaiting_confirmation(input, plan)
             }
@@ -518,7 +520,8 @@ impl InteractionManager {
 
         // Add user input to history BEFORE running dialogue (so timestamp is correct)
         let user_name = self.user_service.get_user_name();
-        self.add_to_history(&user_name, MessageRole::User, input).await;
+        self.add_to_history(&user_name, MessageRole::User, input)
+            .await;
 
         // Run the dialogue with the user's input using partial_session for streaming
         let mut dialogue_guard = self.dialogue.lock().await;
@@ -537,18 +540,22 @@ impl InteractionManager {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap();
                     let preview: String = turn.content.chars().take(50).collect();
-                    eprintln!("[DIALOGUE] [{}.{:03}] Turn received: {} - {}...",
+                    eprintln!(
+                        "[DIALOGUE] [{}.{:03}] Turn received: {} - {}...",
                         now.as_secs(),
                         now.subsec_millis(),
                         turn.participant_name,
-                        preview);
+                        preview
+                    );
 
                     // Convert participant_name (display name) to persona_id (UUID)
-                    let persona_id = self.get_persona_id_by_name(&turn.participant_name)
+                    let persona_id = self
+                        .get_persona_id_by_name(&turn.participant_name)
                         .unwrap_or_else(|| turn.participant_name.clone());
 
                     // Add each response to history using persona_id
-                    self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content).await;
+                    self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content)
+                        .await;
 
                     // Create DialogueMessage (still using name for UI display)
                     let message = DialogueMessage {
@@ -588,7 +595,9 @@ impl InteractionManager {
     /// Adds a message to the conversation history.
     async fn add_to_history(&self, persona_id: &str, role: MessageRole, content: &str) {
         let mut histories = self.persona_histories.write().await;
-        let history = histories.entry(persona_id.to_string()).or_insert_with(Vec::new);
+        let history = histories
+            .entry(persona_id.to_string())
+            .or_insert_with(Vec::new);
 
         history.push(ConversationMessage {
             role,

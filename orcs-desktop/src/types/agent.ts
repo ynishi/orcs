@@ -28,6 +28,8 @@ export interface PersonaInfo {
 /**
  * ペルソナ設定(バックエンドのPersonaConfigに対応)
  */
+export type PersonaBackend = 'claude_cli' | 'gemini_cli' | 'gemini_api';
+
 export interface PersonaConfig {
   id: string;
   name: string;
@@ -36,6 +38,7 @@ export interface PersonaConfig {
   communication_style: string;
   default_participant: boolean;
   source: 'System' | 'User';
+  backend: PersonaBackend;
 }
 
 /**

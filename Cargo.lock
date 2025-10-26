@@ -1026,6 +1026,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "futf"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2568,6 +2578,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dirs 5.0.1",
+ "fs2",
  "orcs-core",
  "semver",
  "serde",
@@ -4650,9 +4661,9 @@ checksum = "852e951cb7832cb45cb1169900d19760cfa39b82bc0ea9c0e5a14ae88411c98b"
 
 [[package]]
 name = "version-migrate"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75f2943e988e26b38c84d0c0b86b1f430bd58a994cfd0591136e5b5a7b614bd6"
+checksum = "ac3f2028be128fd006a015cde112799b83aac911e4d54ceb64dcf116e4eb7000"
 dependencies = [
  "async-trait",
  "semver",
@@ -4664,9 +4675,9 @@ dependencies = [
 
 [[package]]
 name = "version-migrate-macro"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5eecdac9f1208f2baef02c682d4e545868f1f692654e3e132a4e6d4c70e5dd26"
+checksum = "7990d943cad286113c9770a43958b66dd3218e729524274e9a399ec6133644b1"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -1,10 +1,10 @@
 //! PersonaConfig DTOs and migrations
 
 use serde::{Deserialize, Serialize};
-use version_migrate::{IntoDomain, MigratesTo, Versioned};
 use uuid::Uuid;
+use version_migrate::{IntoDomain, MigratesTo, Versioned};
 
-use orcs_core::persona::{Persona, PersonaSource};
+use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
 
 /// Represents the source of a persona.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -19,10 +19,25 @@ impl Default for PersonaSourceDTO {
     }
 }
 
+/// Represents backend options for a persona.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PersonaBackendDTO {
+    ClaudeCli,
+    GeminiCli,
+    GeminiApi,
+}
+
+impl Default for PersonaBackendDTO {
+    fn default() -> Self {
+        PersonaBackendDTO::ClaudeCli
+    }
+}
+
 /// Represents V1 of the persona config schema for serialization.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
-#[versioned(version = "1.0.0")]
-pub struct PersonaConfigV1 {
+#[versioned(version = "1.0.0", version_key = "schema_version", data_key = "")]
+pub struct PersonaConfigV1_0_0 {
     /// Unique persona identifier.
     pub id: String,
     /// Display name of the persona.
@@ -41,12 +56,9 @@ pub struct PersonaConfigV1 {
     pub source: PersonaSourceDTO,
 }
 
-/// Represents V2 of the persona config schema for serialization.
-///
-/// V2 introduces UUID-based IDs for better internationalization and future extensibility.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
-#[versioned(version = "2.0.0")]
-pub struct PersonaConfigV2 {
+#[versioned(version = "1.1.0", version_key = "schema_version", data_key = "")]
+pub struct PersonaConfigV1_1_0 {
     /// Unique persona identifier (UUID format).
     pub id: String,
     /// Display name of the persona.
@@ -63,6 +75,9 @@ pub struct PersonaConfigV2 {
     /// Source of the persona (System or User).
     #[serde(default)]
     pub source: PersonaSourceDTO,
+    /// Backend to execute persona with.
+    #[serde(default)]
+    pub backend: PersonaBackendDTO,
 }
 
 // ============================================================================
@@ -74,9 +89,9 @@ fn generate_uuid_from_name(name: &str) -> String {
     Uuid::new_v5(&Uuid::NAMESPACE_OID, name.as_bytes()).to_string()
 }
 
-/// Migration from PersonaConfigV1 to PersonaConfigV2.
-impl MigratesTo<PersonaConfigV2> for PersonaConfigV1 {
-    fn migrate(self) -> PersonaConfigV2 {
+/// Migration from PersonaConfigV1_0_0 to PersonaConfigV1_1_0.
+impl MigratesTo<PersonaConfigV1_1_0> for PersonaConfigV1_0_0 {
+    fn migrate(self) -> PersonaConfigV1_1_0 {
         // Check if ID is already a valid UUID
         let id = if Uuid::parse_str(&self.id).is_ok() {
             self.id
@@ -85,14 +100,15 @@ impl MigratesTo<PersonaConfigV2> for PersonaConfigV1 {
             generate_uuid_from_name(&self.name)
         };
 
-        PersonaConfigV2 {
+        PersonaConfigV1_1_0 {
             id,
             name: self.name,
             role: self.role,
             background: self.background,
             communication_style: self.communication_style,
-            default_participant: self.default_participant,
+            default_participant: self.default_participant, 
             source: self.source,
+            backend: Default::default(),
         }
     }
 }
@@ -121,8 +137,28 @@ impl From<PersonaSource> for PersonaSourceDTO {
     }
 }
 
-/// Convert PersonaConfigV2 DTO to domain model.
-impl IntoDomain<Persona> for PersonaConfigV2 {
+impl From<PersonaBackendDTO> for PersonaBackend {
+    fn from(dto: PersonaBackendDTO) -> Self {
+        match dto {
+            PersonaBackendDTO::ClaudeCli => PersonaBackend::ClaudeCli,
+            PersonaBackendDTO::GeminiCli => PersonaBackend::GeminiCli,
+            PersonaBackendDTO::GeminiApi => PersonaBackend::GeminiApi,
+        }
+    }
+}
+
+impl From<PersonaBackend> for PersonaBackendDTO {
+    fn from(backend: PersonaBackend) -> Self {
+        match backend {
+            PersonaBackend::ClaudeCli => PersonaBackendDTO::ClaudeCli,
+            PersonaBackend::GeminiCli => PersonaBackendDTO::GeminiCli,
+            PersonaBackend::GeminiApi => PersonaBackendDTO::GeminiApi,
+        }
+    }
+}
+
+/// Convert PersonaConfigV1_1_0 DTO to domain model.
+impl IntoDomain<Persona> for PersonaConfigV1_1_0 {
     fn into_domain(self) -> Persona {
         // Validate and fix ID if needed
         let id = if Uuid::parse_str(&self.id).is_ok() {
@@ -140,14 +176,15 @@ impl IntoDomain<Persona> for PersonaConfigV2 {
             communication_style: self.communication_style,
             default_participant: self.default_participant,
             source: self.source.into(),
+            backend: self.backend.into(),
         }
     }
 }
 
-/// Convert domain model to PersonaConfigV2 DTO for persistence.
-impl From<&Persona> for PersonaConfigV2 {
+/// Convert domain model to PersonaConfigV1_1_0 DTO for persistence.
+impl From<&Persona> for PersonaConfigV1_1_0 {
     fn from(persona: &Persona) -> Self {
-        PersonaConfigV2 {
+        PersonaConfigV1_1_0 {
             id: persona.id.clone(),
             name: persona.name.clone(),
             role: persona.role.clone(),
@@ -155,6 +192,7 @@ impl From<&Persona> for PersonaConfigV2 {
             communication_style: persona.communication_style.clone(),
             default_participant: persona.default_participant,
             source: persona.source.clone().into(),
+            backend: persona.backend.clone().into(),
         }
     }
 }

@@ -27,9 +27,10 @@ mod user_profile;
 mod workspace;
 
 use serde::{Deserialize, Serialize};
+use toml;
 
 // Re-export persona DTOs
-pub use persona::{PersonaConfigV1, PersonaConfigV2, PersonaSourceDTO};
+pub use persona::{PersonaBackendDTO, PersonaConfigV1_0_0, PersonaConfigV1_1_0, PersonaSourceDTO};
 
 // Re-export session DTOs
 pub use session::{SessionV1_0_0, SessionV1_1_0, SessionV2_0_0};
@@ -50,24 +51,32 @@ pub use workspace::{
 // Root configuration structures
 // ============================================================================
 
-/// Root configuration structure for personas (DTO V2).
+/// Root configuration structure for the application config file.
+///
+/// This structure doesn't have its own version - each contained entity
+/// (personas, workspaces, etc.) maintains its own schema version.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigRootV2 {
-    #[serde(rename = "persona")]
-    pub personas: Vec<PersonaConfigV2>,
+pub struct ConfigRoot {
+    /// Persona configurations (each has its own schema_version).
+    /// Stored as raw TOML values to allow version-migrate to handle migration.
+    #[serde(rename = "persona", default)]
+    pub personas: Vec<toml::Value>,
 
-    /// User profile configuration (optional for backward compatibility).
+    /// User profile configuration.
     #[serde(default)]
     pub user_profile: Option<UserProfileDTO>,
-}
 
-/// Root configuration structure for personas (DTO V1).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigRootV1 {
-    #[serde(rename = "persona")]
-    pub personas: Vec<PersonaConfigV1>,
-
-    /// Workspaces managed by the system (added in workspace feature).
+    /// Workspace configurations (each has its own schema_version).
     #[serde(default)]
     pub workspaces: Vec<WorkspaceV1>,
+}
+
+impl Default for ConfigRoot {
+    fn default() -> Self {
+        Self {
+            personas: Vec::new(),
+            user_profile: None,
+            workspaces: Vec::new(),
+        }
+    }
 }

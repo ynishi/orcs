@@ -5,7 +5,7 @@
 //!
 //! # Module Structure
 //!
-//! - `model`: Core persona domain models (`Persona`, `PersonaSource`)
+//! - `model`: Core persona domain models (`Persona`, `PersonaSource`, `PersonaBackend`)
 //! - `repository`: Repository trait for persona persistence
 //! - `preset`: Default system personas
 //!
@@ -20,6 +20,6 @@ mod preset;
 mod repository;
 
 // Re-export public API
-pub use model::{Persona, PersonaSource};
+pub use model::{Persona, PersonaBackend, PersonaSource};
 pub use preset::get_default_presets;
 pub use repository::PersonaRepository;

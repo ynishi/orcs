@@ -5,6 +5,24 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Supported LLM backends for personas.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PersonaBackend {
+    /// Default Anthropic Claude Code CLI backend
+    ClaudeCli,
+    /// Google Gemini CLI backend
+    GeminiCli,
+    /// Google Gemini API backend
+    GeminiApi,
+}
+
+impl Default for PersonaBackend {
+    fn default() -> Self {
+        PersonaBackend::ClaudeCli
+    }
+}
+
 /// Represents the source of a persona (system-provided or user-created).
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub enum PersonaSource {
@@ -42,4 +60,7 @@ pub struct Persona {
     /// Source of the persona (System or User)
     #[serde(default)]
     pub source: PersonaSource,
+    /// Backend used to execute this persona
+    #[serde(default)]
+    pub backend: PersonaBackend,
 }

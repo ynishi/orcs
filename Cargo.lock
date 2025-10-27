@@ -4908,6 +4908,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "urlencoding"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
+
+[[package]]
 name = "urlpattern"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4964,26 +4970,29 @@ checksum = "852e951cb7832cb45cb1169900d19760cfa39b82bc0ea9c0e5a14ae88411c98b"
 
 [[package]]
 name = "version-migrate"
-version = "0.8.0"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e74855cbcf4a1d2d8a88f29bda5cf746e146802a4f0ecd17089dfb93cc53d10"
+checksum = "919e51f48881909cbe09db7f3ad3873dc317feb370a909a9fde4b09c70aef8b6"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "dirs 5.0.1",
  "fs2",
  "semver",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
+ "tokio",
  "toml 0.8.2",
+ "urlencoding",
  "version-migrate-macro",
 ]
 
 [[package]]
 name = "version-migrate-macro"
-version = "0.8.0"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6148b2ad7717196d4524e614f08116a188591d0fcc747bab19ed508d91c95f89"
+checksum = "5fe1e8858253e6008eb2468a0f00e032ab5e6ebe4e1d982ca8f478d7796e1235"
 dependencies = [
  "proc-macro2",
  "quote",

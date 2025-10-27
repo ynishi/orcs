@@ -25,6 +25,7 @@ mod session;
 mod uploaded_file;
 mod user_profile;
 mod workspace;
+mod workspace_metadata;
 
 use serde::{Deserialize, Serialize};
 
@@ -51,6 +52,9 @@ pub use workspace::{
     GeneratedDocV1, ProjectContextV1, SessionWorkspaceV1, TempFileV1,
     WorkspaceResourcesV1, WorkspaceV1, WorkspaceV1_1_0,
 };
+
+// Re-export workspace_metadata DTOs and migrator
+pub use workspace_metadata::{create_workspace_metadata_migrator, WorkspaceMetadataDTO, WorkspaceMetadataV1_0};
 
 // ============================================================================
 // Root configuration structures

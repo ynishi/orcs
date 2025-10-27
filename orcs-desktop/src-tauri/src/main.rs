@@ -10,7 +10,7 @@ use orcs_core::repository::PersonaRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::{Workspace, UploadedFile};
 use orcs_core::workspace::manager::WorkspaceManager;
-use orcs_infrastructure::{TomlPersonaRepository, TomlSessionRepository};
+use orcs_infrastructure::{AsyncDirSessionRepository, TomlPersonaRepository};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_interaction::{InteractionManager, InteractionResult};
@@ -760,9 +760,10 @@ fn main() {
         //     eprintln!("Warning: Failed to initialize user profile: {}", e);
         // }
 
-        // Create TomlSessionRepository at default location
+        // Create AsyncDirSessionRepository at default location
         let session_repository = Arc::new(
-            TomlSessionRepository::default_location(persona_repository.clone())
+            AsyncDirSessionRepository::default_location(persona_repository.clone())
+                .await
                 .expect("Failed to create session repository")
         );
 

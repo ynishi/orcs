@@ -1,0 +1,502 @@
+//! ClaudeCodeAgent - A universal agent implementation that wraps the Claude CLI.
+//!
+//! This agent can handle a wide variety of tasks by spawning the `claude` command
+//! with the `-p` flag to pass prompts directly.
+
+use llm_toolkit::agent::{Agent, AgentError, Payload};
+use async_trait::async_trait;
+use log;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use tokio::process::Command;
+
+/// Supported Claude models
+#[derive(Debug, Clone, Copy, Default)]
+pub enum ClaudeModel {
+    /// Claude Sonnet 4.5 - Balanced performance and speed
+    #[default]
+    Sonnet45,
+    /// Claude Sonnet 4 - Previous generation balanced model
+    Sonnet4,
+    /// Claude Opus 4 - Most capable model
+    Opus4,
+}
+
+impl ClaudeModel {
+    fn as_str(&self) -> &str {
+        match self {
+            ClaudeModel::Sonnet45 => "claude-sonnet-4.5",
+            ClaudeModel::Sonnet4 => "claude-sonnet-4",
+            ClaudeModel::Opus4 => "claude-opus-4",
+        }
+    }
+}
+
+/// A general-purpose agent that executes tasks using the Claude CLI.
+///
+/// This agent wraps the `claude` command-line tool and can handle
+/// coding, research, analysis, and other general tasks.
+///
+/// # Output
+///
+/// Returns the raw string output from Claude. For structured output,
+/// you can parse this string using `serde_json` or other parsers.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use llm_toolkit::agent::{Agent, ClaudeCodeAgent};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let agent = ClaudeCodeAgent::new();
+///
+///     let result = agent.execute(
+///         "Analyze the Rust ownership model and explain it in 3 bullet points".to_string()
+///     ).await?;
+///
+///     println!("{}", result);
+///     Ok(())
+/// }
+/// ```
+pub struct ClaudeCodeAgent {
+    /// Path to the `claude` executable. If None, searches in PATH.
+    claude_path: Option<PathBuf>,
+    /// Model to use for generation
+    model: Option<ClaudeModel>,
+    /// Execution profile (note: Claude CLI doesn't support parameter tuning)
+    execution_profile: llm_toolkit::agent::ExecutionProfile,
+    /// Optional workspace root directory for command execution
+    pub workspace_root: Option<PathBuf>,
+}
+
+impl ClaudeCodeAgent {
+    /// Creates a new ClaudeCodeAgent.
+    ///
+    /// By default, this will search for `claude` in the system PATH
+    /// and use the default model.
+    pub fn new(workspace_root: Option<PathBuf>) -> Self {
+        Self {
+            claude_path: None,
+            model: None,
+            execution_profile: llm_toolkit::agent::ExecutionProfile::default(),
+            workspace_root,
+        }
+    }
+
+    /// Creates a new ClaudeCodeAgent with a custom path to the claude executable.
+    pub fn with_path(path: PathBuf, workspace_root: Option<PathBuf>) -> Self {
+        Self {
+            claude_path: Some(path),
+            model: None,
+            execution_profile: llm_toolkit::agent::ExecutionProfile::default(),
+            workspace_root,
+        }
+    }
+
+    /// Sets the model to use.
+    pub fn with_model(mut self, model: ClaudeModel) -> Self {
+        self.model = Some(model);
+        self
+    }
+
+    /// Sets the model using a string identifier.
+    ///
+    /// Accepts: "sonnet", "sonnet-4.5", "sonnet-4", "opus", "opus-4", etc.
+    pub fn with_model_str(mut self, model: &str) -> Self {
+        self.model = Some(match model {
+            "sonnet" | "sonnet-4.5" | "claude-sonnet-4.5" => ClaudeModel::Sonnet45,
+            "sonnet-4" | "claude-sonnet-4" => ClaudeModel::Sonnet4,
+            "opus" | "opus-4" | "claude-opus-4" => ClaudeModel::Opus4,
+            _ => ClaudeModel::Sonnet45, // Default fallback
+        });
+        self
+    }
+
+    /// Sets the execution profile.
+    ///
+    /// Note: Claude CLI doesn't currently support temperature/top_p parameters,
+    /// so this setting is only used for logging and documentation purposes.
+    pub fn with_execution_profile(mut self, profile: llm_toolkit::agent::ExecutionProfile) -> Self {
+        self.execution_profile = profile;
+        self
+    }
+
+    /// Checks if the `claude` CLI is available in the system (static version).
+    ///
+    /// Returns `true` if the command exists in PATH, `false` otherwise.
+    /// Uses `which` on Unix/macOS or `where` on Windows for a quick check.
+    pub fn is_available() -> bool {
+        #[cfg(unix)]
+        let check_cmd = "which";
+        #[cfg(windows)]
+        let check_cmd = "where";
+
+        std::process::Command::new(check_cmd)
+            .arg("claude")
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+    }
+
+    /// Checks availability using tokio (async version for trait implementation).
+    async fn check_available() -> Result<(), AgentError> {
+        #[cfg(unix)]
+        let check_cmd = "which";
+        #[cfg(windows)]
+        let check_cmd = "where";
+
+        let output = Command::new(check_cmd)
+            .arg("claude")
+            .output()
+            .await
+            .map_err(|e| AgentError::ProcessError {
+                status_code: None,
+                message: format!("Failed to check claude availability: {}", e),
+                is_retryable: true,
+                retry_after: None,
+            })?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(AgentError::ExecutionFailed(
+                "claude CLI not found in PATH. Please install Claude CLI.".to_string(),
+            ))
+        }
+    }
+}
+
+impl Default for ClaudeCodeAgent {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
+#[async_trait]
+impl Agent for ClaudeCodeAgent {
+    type Output = String;
+
+    fn expertise(&self) -> &str {
+        "A general-purpose AI agent capable of coding, research, analysis, \
+         writing, and problem-solving across various domains. Can handle \
+         complex multi-step tasks autonomously."
+    }
+
+    async fn execute(&self, intent: Payload) -> Result<Self::Output, AgentError> {
+        let payload = intent;
+
+        let claude_cmd = self
+            .claude_path
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "claude".to_string());
+
+        // Extract text content for now (images not yet supported by claude CLI -p)
+        let text_intent = payload.to_text();
+
+        log::info!("🤖 ClaudeCodeAgent executing...");
+        log::debug!("Intent length: {} chars", text_intent.len());
+        log::debug!("Execution profile: {:?}", self.execution_profile);
+        log::trace!("Full intent: {}", text_intent);
+
+        if !matches!(
+            self.execution_profile,
+            llm_toolkit::agent::ExecutionProfile::Balanced
+        ) {
+            log::warn!(
+                "ClaudeCodeAgent: Execution profile {:?} is set, but Claude CLI doesn't support \
+                 parameter tuning (temperature, top_p, etc.). Using default behavior.",
+                self.execution_profile
+            );
+        }
+
+        if payload.has_attachments() {
+            log::warn!(
+                "ClaudeCodeAgent: Attachments in payload are not yet supported and will be ignored"
+            );
+        }
+
+        let mut cmd = Command::new(&claude_cmd);
+        cmd.arg("-p").arg(&text_intent);
+
+        // Add model if specified
+        if let Some(model) = &self.model {
+            cmd.arg("--model").arg(model.as_str());
+            log::debug!("Using model: {}", model.as_str());
+        }
+
+        // Set current directory if workspace_root is specified
+        if let Some(root) = &self.workspace_root {
+            cmd.current_dir(root);
+        }
+
+        let output = cmd.output().await.map_err(|e| {
+            log::error!("Failed to spawn claude process: {}", e);
+            AgentError::ProcessError {
+                status_code: None,
+                message: format!(
+                    "Failed to spawn claude process: {}. \
+                     Make sure 'claude' is installed and in PATH.",
+                    e
+                ),
+                is_retryable: true,
+                retry_after: None,
+            }
+        })?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            log::error!("Claude command failed: {}", stderr);
+            return Err(AgentError::ExecutionFailed(format!(
+                "Claude command failed with status {}: {}",
+                output.status,
+                stderr
+            )));
+        }
+
+        let stdout = String::from_utf8(output.stdout).map_err(|e| {
+            log::error!("Failed to parse output: {}", e);
+            AgentError::Other(format!("Failed to parse claude output as UTF-8: {}", e))
+        })?;
+
+        log::info!("✅ ClaudeCodeAgent completed");
+        log::debug!("Output length: {} chars", stdout.len());
+        log::trace!("Full output: {}", stdout);
+
+        Ok(stdout)
+    }
+
+    fn name(&self) -> String {
+        "ClaudeCodeAgent".to_string()
+    }
+
+    async fn is_available(&self) -> Result<(), AgentError> {
+        Self::check_available().await
+    }
+}
+
+/// A typed variant of ClaudeCodeAgent that attempts to parse JSON output.
+///
+/// This agent is useful when you expect structured output from Claude.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use llm_toolkit::agent::{Agent, ClaudeCodeJsonAgent};
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Deserialize, Serialize)]
+/// struct Analysis {
+///     summary: String,
+///     key_points: Vec<String>,
+/// }
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let agent = ClaudeCodeJsonAgent::<Analysis>::new();
+///
+///     let result = agent.execute(
+///         "Analyze Rust's ownership model and return JSON with 'summary' \         and 'key_points' (array of strings)".to_string()
+///     ).await?;
+///
+///     println!("Summary: {}", result.summary);
+///     Ok(())
+/// }
+/// ```
+pub struct ClaudeCodeJsonAgent<T> {
+    inner: ClaudeCodeAgent,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T>
+    ClaudeCodeJsonAgent<T>
+where
+    T: Serialize + for<'de> Deserialize<'de>,
+{
+    /// Creates a new ClaudeCodeJsonAgent.
+    pub fn new(workspace_root: Option<PathBuf>) -> Self {
+        Self {
+            inner: ClaudeCodeAgent::new(workspace_root),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Creates a new ClaudeCodeJsonAgent with a custom path.
+    pub fn with_path(path: PathBuf, workspace_root: Option<PathBuf>) -> Self {
+        Self {
+            inner: ClaudeCodeAgent::with_path(path, workspace_root),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Sets the model to use.
+    pub fn with_model(mut self, model: ClaudeModel) -> Self {
+        self.inner = self.inner.with_model(model);
+        self
+    }
+
+    /// Sets the model using a string identifier.
+    pub fn with_model_str(mut self, model: &str) -> Self {
+        self.inner = self.inner.with_model_str(model);
+        self
+    }
+
+    /// Sets the execution profile.
+    pub fn with_execution_profile(mut self, profile: llm_toolkit::agent::ExecutionProfile) -> Self {
+        self.inner = self.inner.with_execution_profile(profile);
+        self
+    }
+}
+
+impl<T>
+    Default for ClaudeCodeJsonAgent<T>
+where
+    T: Serialize + for<'de> Deserialize<'de>,
+{
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
+#[async_trait]
+impl<T>
+    Agent for ClaudeCodeJsonAgent<T>
+where
+    T: Serialize + for<'de> Deserialize<'de> + Send + Sync,
+{
+    type Output = T;
+
+    fn expertise(&self) -> &str {
+        self.inner.expertise()
+    }
+
+    async fn execute(&self, intent: Payload) -> Result<Self::Output, AgentError> {
+        log::info!(
+            "📊 ClaudeCodeJsonAgent<{}> executing...",
+            std::any::type_name::<T>()
+        );
+
+        let raw_output = self.inner.execute(intent).await?;
+
+        log::debug!("Extracting JSON from raw output...");
+
+        // Try to extract JSON from the output (might be wrapped in markdown, etc.)
+        let json_str = llm_toolkit::extract_json(&raw_output).map_err(|e| {
+            log::error!("Failed to extract JSON: {}", e);
+            AgentError::ParseError {
+                message: format!(
+                    "Failed to extract JSON from claude output: {}. Raw output: {}",
+                    e,
+                    raw_output
+                ),
+                reason: llm_toolkit::agent::error::ParseErrorReason::MarkdownExtractionFailed,
+            }
+        })?;
+
+        log::debug!("Parsing JSON into {}...", std::any::type_name::<T>());
+
+        let result = serde_json::from_str(&json_str).map_err(|e| {
+            log::error!("Failed to parse JSON: {}", e);
+
+            // Determine the parse error reason based on serde_json error type
+            let reason = if e.is_eof() {
+                llm_toolkit::agent::error::ParseErrorReason::UnexpectedEof
+            } else if e.is_syntax() {
+                llm_toolkit::agent::error::ParseErrorReason::InvalidJson
+            } else {
+                llm_toolkit::agent::error::ParseErrorReason::SchemaMismatch
+            };
+
+            AgentError::ParseError {
+                message: format!("Failed to parse JSON: {}. Extracted JSON: {}", e, json_str),
+                reason,
+            }
+        })?;
+
+        log::info!(
+            "✅ ClaudeCodeJsonAgent<{}> completed",
+            std::any::type_name::<T>()
+        );
+
+        Ok(result)
+    }
+
+    fn name(&self) -> String {
+        format!("ClaudeCodeJsonAgent<{}>", std::any::type_name::<T>())
+    }
+
+    async fn is_available(&self) -> Result<(), AgentError> {
+        self.inner.is_available().await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_claude_code_agent_creation() {
+        let agent = ClaudeCodeAgent::new(None);
+        assert_eq!(agent.name(), "ClaudeCodeAgent");
+        assert!(!agent.expertise().is_empty());
+    }
+
+    #[test]
+    fn test_claude_code_agent_with_path() {
+        let path = PathBuf::from("/usr/local/bin/claude");
+        let agent = ClaudeCodeAgent::with_path(path.clone(), None);
+        assert_eq!(agent.claude_path, Some(path));
+    }
+
+    #[test]
+    fn test_claude_code_agent_with_execution_profile() {
+        let agent =
+            ClaudeCodeAgent::new(None).with_execution_profile(llm_toolkit::agent::ExecutionProfile::Creative);
+        assert!(matches!(
+            agent.execution_profile,
+            llm_toolkit::agent::ExecutionProfile::Creative
+        ));
+    }
+
+    #[test]
+    fn test_claude_code_agent_default_profile() {
+        let agent = ClaudeCodeAgent::new(None);
+        assert!(matches!(
+            agent.execution_profile,
+            llm_toolkit::agent::ExecutionProfile::Balanced
+        ));
+    }
+
+    #[test]
+    fn test_claude_code_agent_builder_pattern() {
+        let agent = ClaudeCodeAgent::new(None)
+            .with_model(ClaudeModel::Opus4)
+            .with_execution_profile(llm_toolkit::agent::ExecutionProfile::Deterministic);
+
+        assert!(matches!(agent.model, Some(ClaudeModel::Opus4)));
+        assert!(matches!(
+            agent.execution_profile,
+            llm_toolkit::agent::ExecutionProfile::Deterministic
+        ));
+    }
+
+    #[test]
+    fn test_claude_code_json_agent_with_execution_profile() {
+        use serde::{Deserialize, Serialize};
+
+        #[derive(Serialize, Deserialize)]
+        struct TestOutput {
+            value: String,
+        }
+
+        let agent = ClaudeCodeJsonAgent::<TestOutput>::new(None)
+            .with_execution_profile(llm_toolkit::agent::ExecutionProfile::Creative);
+
+        // Verify the inner agent has the profile set
+        assert!(matches!(
+            agent.inner.execution_profile,
+            llm_toolkit::agent::ExecutionProfile::Creative
+        ));
+    }
+}

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use version_migrate::VersionMigrate;
 use std::path::PathBuf;
 
 /// Represents a project-level workspace containing all resources and context

@@ -15,7 +15,11 @@ import {
   IconStar,
   IconStarFilled,
   IconCheck,
+  IconPlus,
 } from '@tabler/icons-react';
+import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
+import { notifications } from '@mantine/notifications';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import type { Workspace } from '../../types/workspace';
 
@@ -35,19 +39,95 @@ interface WorkspaceSwitcherProps {
  * - Visual indication of current workspace
  */
 export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
-  const { workspace, allWorkspaces, switchWorkspace, toggleFavorite } = useWorkspace();
+  const { workspace, allWorkspaces, switchWorkspace, toggleFavorite, refreshWorkspaces, refresh } = useWorkspace();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSwitch = async (targetWorkspaceId: string) => {
-    if (!sessionId || targetWorkspaceId === workspace?.id) {
+    console.log('[Workspace] handleSwitch called:', {
+      sessionId,
+      targetWorkspaceId,
+      currentWorkspaceId: workspace?.id,
+    });
+
+    if (!sessionId) {
+      console.error('[Workspace] Cannot switch: No session ID');
+      notifications.show({
+        title: 'Cannot Switch Workspace',
+        message: 'Please create or select a session first',
+        color: 'orange',
+      });
+      return;
+    }
+
+    if (targetWorkspaceId === workspace?.id) {
+      console.log('[Workspace] Already on this workspace');
       return;
     }
 
     try {
+      console.log('[Workspace] Switching to workspace:', targetWorkspaceId);
       await switchWorkspace(sessionId, targetWorkspaceId);
       setIsOpen(false);
     } catch (error) {
-      console.error('Failed to switch workspace:', error);
+      console.error('[Workspace] Failed to switch workspace:', error);
+      notifications.show({
+        title: 'Failed to Switch Workspace',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  const handleCreateWorkspace = async () => {
+    try {
+      // Open directory picker dialog
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Select workspace directory',
+      });
+
+      if (!selected) {
+        return; // User cancelled
+      }
+
+      console.log('[Workspace] Creating workspace for:', selected);
+      console.log('[Workspace] Current workspace count before:', allWorkspaces.length);
+
+      // Create workspace for selected directory
+      const newWorkspace = await invoke('create_workspace', { rootPath: selected });
+      console.log('[Workspace] Created workspace:', newWorkspace);
+
+      // Refresh all workspaces list
+      console.log('[Workspace] Refreshing workspace list...');
+      await refreshWorkspaces();
+
+      // Also refresh current workspace if needed
+      await refresh();
+
+      // Wait a bit for React state to update and log the result
+      setTimeout(() => {
+        console.log('[Workspace] After refresh - workspace count:', allWorkspaces.length);
+        console.log('[Workspace] All workspaces:', allWorkspaces.map(w => ({ id: w.id, name: w.name })));
+      }, 100);
+
+      // Show success notification
+      notifications.show({
+        title: 'Workspace Created',
+        message: `New workspace registered for ${selected}`,
+        color: 'green',
+        icon: '✅',
+      });
+
+      // Keep menu open so user can see the new workspace in the list
+      // setIsOpen(false);
+    } catch (error) {
+      console.error('[Workspace] Failed to create workspace:', error);
+      notifications.show({
+        title: 'Failed to create workspace',
+        message: String(error),
+        color: 'red',
+      });
     }
   };
 
@@ -122,7 +202,7 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
     <Menu
       opened={isOpen}
       onChange={setIsOpen}
-      width={400}
+      width={550}
       position="bottom-end"
       shadow="md"
       withArrow
@@ -151,7 +231,20 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
           </Group>
         </Menu.Label>
 
-        <ScrollArea.Autosize mah={400} type="auto">
+        <Menu.Item
+          leftSection={<IconPlus size={16} />}
+          onClick={handleCreateWorkspace}
+          style={{
+            backgroundColor: 'var(--mantine-color-green-light)',
+            fontWeight: 500,
+          }}
+        >
+          Create New Workspace
+        </Menu.Item>
+
+        <Menu.Divider />
+
+        <ScrollArea.Autosize mah={500} type="auto">
           {favorites.length > 0 && (
             <>
               <Menu.Label>

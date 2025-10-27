@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use version_migrate::{IntoDomain, Versioned};
+use version_migrate::{FromDomain, IntoDomain, Versioned};
 
 use orcs_core::workspace::{
     GeneratedDoc, ProjectContext, SessionWorkspace, TempFile,
@@ -54,13 +54,13 @@ pub struct ProjectContextV1 {
     #[serde(default)]
     pub languages: Vec<String>,
     /// Build system or framework (e.g., "cargo", "npm", "maven")
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build_system: Option<String>,
     /// Project description or purpose
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Git repository URL if available
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository_url: Option<String>,
     /// Additional metadata as key-value pairs
     #[serde(default)]
@@ -340,6 +340,21 @@ impl From<&Workspace> for WorkspaceV1_1_0 {
     }
 }
 
+impl FromDomain<Workspace> for WorkspaceV1_1_0 {
+    fn from_domain(domain: Workspace) -> Self {
+        WorkspaceV1_1_0 {
+            id: domain.id,
+            name: domain.name,
+            root_path: domain.root_path,
+            resources: WorkspaceResourcesV1::from(&domain.resources),
+            project_context: ProjectContextV1::from(&domain.project_context),
+            last_accessed: domain.last_accessed,
+            is_favorite: domain.is_favorite,
+        }
+    }
+}
+
+
 /// Convert SessionWorkspaceV1 DTO to domain model.
 impl IntoDomain<SessionWorkspace> for SessionWorkspaceV1 {
     fn into_domain(self) -> SessionWorkspace {
@@ -437,7 +452,8 @@ pub fn create_workspace_migrator() -> version_migrate::Migrator {
     let path = version_migrate::Migrator::define("workspace")
         .from::<WorkspaceV1>()
         .step::<WorkspaceV1_1_0>()
-        .into::<Workspace>();
+        .into_with_save::<Workspace>();
+      // into_with_save() で登録
     migrator.register(path).expect("Failed to register workspace migration path");
     migrator
 }

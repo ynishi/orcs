@@ -213,13 +213,22 @@ impl FileSystemWorkspaceManager {
             ))
         })?;
 
-        // Convert domain model to DTO (use latest version V1.1.0)
-        let workspace_dto = WorkspaceV1_1_0::from(workspace);
+        // Use migrator to serialize with version field (following session repository pattern)
+        let json_str = {
+            let migrator = crate::dto::create_workspace_migrator();
+            migrator
+                .save_domain_flat("workspace", &workspace)
+                .map_err(|e| OrcsError::Serialization(format!("Failed to serialize workspace with version field: {}", e)))?
+        };
 
-        // Serialize to TOML
-        let content = toml::to_string_pretty(&workspace_dto).map_err(|e| {
-            OrcsError::Serialization(format!("Failed to serialize workspace metadata: {}", e))
-        })?;
+        // Convert JSON to TOML (following session repository pattern)
+        let json_value: serde_json::Value = serde_json::from_str(&json_str)
+            .map_err(|e| OrcsError::Serialization(format!("Failed to parse workspace JSON: {}", e)))?;
+        let toml_value: toml::Value = serde_json::from_str(&serde_json::to_string(&json_value)
+            .map_err(|e| OrcsError::Serialization(format!("Failed to stringify JSON: {}", e)))?)
+            .map_err(|e| OrcsError::Serialization(format!("Failed to convert workspace to TOML format: {}", e)))?;
+        let content = toml::to_string_pretty(&toml_value)
+            .map_err(|e| OrcsError::Serialization(format!("Failed to serialize workspace to TOML string: {}", e)))?;
 
         // Write to file
         fs::write(&metadata_path, content).await.map_err(|e| {

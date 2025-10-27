@@ -11,6 +11,7 @@ use super::repository::SessionRepository;
 pub trait InteractionManagerTrait: Send + Sync {
     fn session_id(&self) -> &str;
     fn to_session(&self, app_mode: AppMode, workspace_id: Option<String>) -> impl std::future::Future<Output = Session> + Send;
+    fn set_workspace_id(&self, workspace_id: Option<String>, workspace_root: Option<std::path::PathBuf>) -> impl std::future::Future<Output = ()> + Send;
 }
 
 /// Manages multiple sessions and their lifecycle.
@@ -258,7 +259,14 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     /// Returns an error if:
     /// - The session does not exist
     /// - The storage update fails
-    pub async fn update_workspace_id(&self, session_id: &str, workspace_id: Option<String>) -> Result<()> {
+    pub async fn update_workspace_id(&self, session_id: &str, workspace_id: Option<String>, workspace_root: Option<std::path::PathBuf>) -> Result<()> {
+        // Update the in-memory InteractionManager's workspace_id and workspace_root
+        let sessions = self.sessions.read().await;
+        if let Some(manager) = sessions.get(session_id) {
+            manager.set_workspace_id(workspace_id.clone(), workspace_root).await;
+        }
+        drop(sessions);
+
         // Load existing session from storage
         let mut session = self.repository.find_by_id(session_id).await?
             .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
@@ -344,6 +352,10 @@ mod tests {
                 app_mode,
                 workspace_id,
             }
+        }
+
+        async fn set_workspace_id(&self, _workspace_id: Option<String>, _workspace_root: Option<std::path::PathBuf>) {
+            // Mock implementation - no-op
         }
     }
 

@@ -2752,6 +2752,7 @@ dependencies = [
  "dirs 5.0.1",
  "llm-toolkit",
  "llm-toolkit-macros",
+ "log",
  "orcs-core",
  "orcs-infrastructure",
  "reqwest",
@@ -4962,23 +4963,26 @@ checksum = "852e951cb7832cb45cb1169900d19760cfa39b82bc0ea9c0e5a14ae88411c98b"
 
 [[package]]
 name = "version-migrate"
-version = "0.5.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1105fb60dfd350701fdf5db634b0314a7b6c3f00866bc44dd5d6287a496bf230"
+checksum = "9e74855cbcf4a1d2d8a88f29bda5cf746e146802a4f0ecd17089dfb93cc53d10"
 dependencies = [
  "async-trait",
+ "dirs 5.0.1",
+ "fs2",
  "semver",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
+ "toml 0.8.2",
  "version-migrate-macro",
 ]
 
 [[package]]
 name = "version-migrate-macro"
-version = "0.5.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95dd373948c9f235fa7608e2cdcb4ba9efa4b8f2066409b1b3ae0ac1127d5e34"
+checksum = "6148b2ad7717196d4524e614f08116a188591d0fcc747bab19ed508d91c95f89"
 dependencies = [
  "proc-macro2",
  "quote",

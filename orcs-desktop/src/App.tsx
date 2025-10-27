@@ -35,6 +35,7 @@ import { CommandSuggestions } from "./components/chat/CommandSuggestions";
 import { AgentSuggestions } from "./components/chat/AgentSuggestions";
 import { ThinkingIndicator } from "./components/chat/ThinkingIndicator";
 import { Navbar } from "./components/navigation/Navbar";
+import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
 import { parseCommand, isValidCommand, getCommandHelp } from "./utils/commandParser";
 import { filterCommands, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
@@ -696,17 +697,33 @@ function App() {
                 <Burger opened={navbarOpened} onClick={toggleNavbar} size="sm" />
                 <Text size="xl" fw={700}>ORCS</Text>
               </Group>
-              {currentSessionId && (
+              <Group gap="md">
+                {/* Workspace Switcher */}
                 <Group gap="xs">
-                  <Text size="sm" c="dimmed">Session:</Text>
-                  <Badge size="lg" variant="light">
-                    {sessions.find(s => s.id === currentSessionId)?.title || 'Untitled'}
-                  </Badge>
-                  <Badge size="sm" color="gray" variant="outline">
-                    {getMessageCount(sessions.find(s => s.id === currentSessionId)!) || 0} msgs
-                  </Badge>
+                  <WorkspaceSwitcher sessionId={currentSessionId} />
+                  {workspace && (
+                    <>
+                      <Text size="sm" c="dimmed">Workspace:</Text>
+                      <Badge size="sm" variant="dot" color="green">
+                        {workspace.name}
+                      </Badge>
+                    </>
+                  )}
                 </Group>
-              )}
+
+                {/* Session Info */}
+                {currentSessionId && (
+                  <Group gap="xs">
+                    <Text size="sm" c="dimmed">Session:</Text>
+                    <Badge size="lg" variant="light">
+                      {sessions.find(s => s.id === currentSessionId)?.title || 'Untitled'}
+                    </Badge>
+                    <Badge size="sm" color="gray" variant="outline">
+                      {getMessageCount(sessions.find(s => s.id === currentSessionId)!) || 0} msgs
+                    </Badge>
+                  </Group>
+                )}
+              </Group>
             </Group>
 
             {/* メッセージエリア */}

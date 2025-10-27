@@ -217,11 +217,14 @@ export function useWorkspace(): UseWorkspaceResult {
    */
   const fetchAllWorkspaces = useCallback(async () => {
     try {
+      console.log('[useWorkspace] Fetching all workspaces...');
       const rawWorkspaces = await invoke<RawWorkspace[]>('list_workspaces');
+      console.log('[useWorkspace] Received', rawWorkspaces.length, 'raw workspaces');
       const converted = rawWorkspaces.map(convertWorkspace);
+      console.log('[useWorkspace] Setting allWorkspaces state with', converted.length, 'workspaces');
       setAllWorkspaces(converted);
     } catch (err) {
-      console.error('Failed to fetch all workspaces:', err);
+      console.error('[useWorkspace] Failed to fetch all workspaces:', err);
     }
   }, []);
 

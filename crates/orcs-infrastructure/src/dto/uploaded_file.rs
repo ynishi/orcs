@@ -43,8 +43,10 @@ pub struct UploadedFileV1_1_0 {
     /// Timestamp when the file was uploaded
     pub uploaded_at: i64,
     /// Session ID if this file was saved from a chat message
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     /// Message timestamp if this file was saved from a chat message (ISO 8601)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub message_timestamp: Option<String>,
 }
 

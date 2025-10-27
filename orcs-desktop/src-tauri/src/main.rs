@@ -9,6 +9,7 @@ use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::{Workspace, UploadedFile};
+use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_infrastructure::{TomlPersonaRepository, TomlSessionRepository};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
@@ -387,16 +388,63 @@ async fn handle_input(
     Ok(result.into())
 }
 
-/// Gets the current workspace for the application's working directory
+/// Gets the current workspace based on the active session
 #[tauri::command]
 async fn get_current_workspace(
     state: State<'_, AppState>,
 ) -> Result<Workspace, String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
-    // Delegate to WorkspaceManager - all logic is in the core layer
+    println!("[Backend] get_current_workspace called");
+
+    // Get the active session manager
+    let manager = state.session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    // Get session data (including workspace_id)
+    let app_mode = state.app_mode.lock().await.clone();
+    let session = manager.to_session(app_mode, None).await;
+
+    println!("[Backend] Session workspace_id: {:?}", session.workspace_id);
+
+    // If session has a workspace_id, use it
+    if let Some(workspace_id) = &session.workspace_id {
+        println!("[Backend] Looking up workspace: {}", workspace_id);
+        let workspace = state.workspace_manager
+            .get_workspace(workspace_id)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if let Some(ws) = workspace {
+            println!("[Backend] Found workspace: {} ({})", ws.name, ws.id);
+            return Ok(ws);
+        } else {
+            println!("[Backend] Workspace not found: {}", workspace_id);
+        }
+    }
+
+    // Fallback to current directory workspace
+    println!("[Backend] Falling back to current directory workspace");
     state.workspace_manager
         .get_current_workspace()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Creates a new workspace for the given directory path
+#[tauri::command]
+async fn create_workspace(
+    root_path: String,
+    state: State<'_, AppState>,
+) -> Result<Workspace, String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+    use std::path::PathBuf;
+
+    let path = PathBuf::from(root_path);
+    state.workspace_manager
+        .get_or_create_workspace(&path)
         .await
         .map_err(|e| e.to_string())
 }
@@ -425,11 +473,28 @@ async fn switch_workspace(
     use orcs_core::workspace::manager::WorkspaceManager;
     use tauri::Emitter;
 
-    // Update the session's workspace_id
-    state.session_manager
-        .update_workspace_id(&session_id, Some(workspace_id.clone()))
+    println!("[Backend] switch_workspace called: session_id={}, workspace_id={}", session_id, workspace_id);
+
+    // Resolve workspace root_path from workspace_id
+    let workspace = state.workspace_manager
+        .get_workspace(&workspace_id)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Failed to get workspace: {}", e))?
+        .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
+
+    let workspace_root = Some(std::path::PathBuf::from(workspace.root_path.clone()));
+    println!("[Backend] Resolved workspace root_path: {:?}", workspace_root);
+
+    // Update the session's workspace_id and workspace_root
+    state.session_manager
+        .update_workspace_id(&session_id, Some(workspace_id.clone()), workspace_root)
+        .await
+        .map_err(|e| {
+            println!("[Backend] Failed to update workspace_id: {}", e);
+            e.to_string()
+        })?;
+
+    println!("[Backend] Session workspace_id and root_path updated successfully");
 
     // Update the workspace's last_accessed timestamp
     state.workspace_manager
@@ -437,9 +502,13 @@ async fn switch_workspace(
         .await
         .map_err(|e| e.to_string())?;
 
+    println!("[Backend] Workspace last_accessed updated");
+
     // Notify frontend of the workspace switch
     app.emit("workspace-switched", &workspace_id)
         .map_err(|e| e.to_string())?;
+
+    println!("[Backend] workspace-switched event emitted");
 
     Ok(())
 }
@@ -718,6 +787,23 @@ fn main() {
                 .expect("Failed to create initial session");
         }
 
+        // Resolve and set workspace_root for the active session
+        if let Some(manager) = session_manager.active_session().await {
+            let session = manager.to_session(AppMode::Idle, None).await;
+            if let Some(workspace_id) = session.workspace_id {
+                println!("[Startup] Resolving workspace_root for workspace_id: {}", workspace_id);
+                if let Ok(Some(workspace)) = workspace_manager.get_workspace(&workspace_id).await {
+                    let workspace_root = Some(std::path::PathBuf::from(workspace.root_path.clone()));
+                    println!("[Startup] Setting workspace_root: {:?}", workspace_root);
+                    manager.set_workspace_id(Some(workspace_id), workspace_root).await;
+                } else {
+                    println!("[Startup] Workspace not found: {}", workspace_id);
+                }
+            } else {
+                println!("[Startup] No workspace_id set for session");
+            }
+        }
+
         let app_mode = Mutex::new(AppMode::Idle);
 
         tauri::Builder::default()
@@ -749,6 +835,7 @@ fn main() {
                 get_config_path,
                 get_git_info,
                 get_current_workspace,
+                create_workspace,
                 list_workspaces,
                 switch_workspace,
                 toggle_favorite_workspace,

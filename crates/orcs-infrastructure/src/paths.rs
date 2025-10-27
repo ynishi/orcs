@@ -1,11 +1,12 @@
 //! Unified path management for orcs configuration files.
 //!
-//! All orcs configuration, secrets, and session data are stored under:
-//! `~/.config/orcs/`
+//! All orcs configuration, secrets, and session data are managed via AppPaths
+//! from the version-migrate crate for consistency across all storage.
 //!
 //! This ensures consistency across all platforms (Linux, macOS, Windows).
 
 use std::path::PathBuf;
+use version_migrate::AppPaths;
 
 /// Errors that can occur during path resolution.
 #[derive(Debug)]
@@ -26,38 +27,62 @@ impl std::error::Error for PathError {}
 
 /// Unified path management for orcs.
 ///
-/// All paths are resolved relative to `~/.config/orcs/` for consistency
-/// across platforms.
+/// All paths are resolved via AppPaths from version-migrate crate.
+/// This ensures consistency with AsyncDirStorage and other storage mechanisms.
 ///
 /// # Directory Structure
 ///
 /// ```text
-/// ~/.config/orcs/
-/// ├── config.toml      # Application configuration (persona, user_profile)
-/// ├── secret.json      # API keys and secrets
-/// └── sessions/        # Session files
-///     ├── session-1.toml
-///     └── session-2.toml
+/// ~/.config/orcs/              # Config directory (AppPaths default)
+/// ├── config.toml              # Application configuration
+/// ├── secret.json              # API keys and secrets
+/// ├── sessions/                # Session files (AsyncDirStorage)
+/// ├── workspaces/              # Workspace metadata (AsyncDirStorage)
+/// └── workspace_data/          # Full workspace data (AsyncDirStorage)
+///
+/// ~/.local/share/orcs/         # Data directory (for large files)
+/// └── workspaces/              # Actual workspace files
 /// ```
 pub struct OrcsPaths;
 
 impl OrcsPaths {
-    /// Returns the orcs configuration directory: `~/.config/orcs/`
+    /// Returns a configured AppPaths instance for orcs.
     ///
-    /// This directory is used for all orcs configuration, secrets, and session data.
+    /// This uses the default PathStrategy (XDG on Linux/macOS, appropriate on Windows).
+    fn app_paths() -> AppPaths {
+        AppPaths::new("orcs")
+    }
+
+    /// Returns the orcs configuration directory.
+    ///
+    /// Uses AppPaths to determine the correct config directory for the platform.
     ///
     /// # Returns
     ///
-    /// - `Ok(PathBuf)`: Path to `~/.config/orcs/`
-    /// - `Err(PathError::HomeDirNotFound)`: Could not determine home directory
+    /// - `Ok(PathBuf)`: Path to config directory (e.g., `~/.config/orcs/`)
+    /// - `Err(PathError::HomeDirNotFound)`: Could not determine directory
     pub fn config_dir() -> Result<PathBuf, PathError> {
-        let home = dirs::home_dir().ok_or(PathError::HomeDirNotFound)?;
-        Ok(home.join(".config").join("orcs"))
+        Self::app_paths()
+            .config_dir()
+            .map_err(|_| PathError::HomeDirNotFound)
     }
 
-    /// Returns the path to the main configuration file: `~/.config/orcs/config.toml`
+    /// Returns the orcs data directory.
     ///
-    /// This file contains application configuration such as personas and user profile.
+    /// Uses AppPaths to determine the correct data directory for the platform.
+    /// This is typically used for larger files (workspace files, etc.).
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(PathBuf)`: Path to data directory (e.g., `~/.local/share/orcs/`)
+    /// - `Err(PathError::HomeDirNotFound)`: Could not determine directory
+    pub fn data_dir() -> Result<PathBuf, PathError> {
+        Self::app_paths()
+            .data_dir()
+            .map_err(|_| PathError::HomeDirNotFound)
+    }
+
+    /// Returns the path to the main configuration file.
     ///
     /// # Returns
     ///
@@ -67,9 +92,7 @@ impl OrcsPaths {
         Ok(Self::config_dir()?.join("config.toml"))
     }
 
-    /// Returns the path to the secrets file: `~/.config/orcs/secret.json`
-    ///
-    /// This file contains API keys and other sensitive information.
+    /// Returns the path to the secrets file.
     ///
     /// # Security Note
     ///
@@ -84,9 +107,10 @@ impl OrcsPaths {
         Ok(Self::config_dir()?.join("secret.json"))
     }
 
-    /// Returns the path to the sessions directory: `~/.config/orcs/sessions/`
+    /// Returns the path to the sessions directory.
     ///
-    /// This directory contains session files.
+    /// Note: This is primarily for compatibility. New code should use
+    /// AsyncDirSessionRepository which manages this via AsyncDirStorage.
     ///
     /// # Returns
     ///
@@ -94,6 +118,19 @@ impl OrcsPaths {
     /// - `Err(PathError)`: Could not determine path
     pub fn sessions_dir() -> Result<PathBuf, PathError> {
         Ok(Self::config_dir()?.join("sessions"))
+    }
+
+    /// Returns the path to the workspaces directory (for actual files).
+    ///
+    /// This is where FileSystemWorkspaceManager stores actual workspace files.
+    /// Uses data_dir for larger files.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(PathBuf)`: Path to workspaces directory
+    /// - `Err(PathError)`: Could not determine path
+    pub fn workspaces_dir() -> Result<PathBuf, PathError> {
+        Ok(Self::data_dir()?.join("workspaces"))
     }
 }
 
@@ -104,24 +141,49 @@ mod tests {
     #[test]
     fn test_config_dir() {
         let config_dir = OrcsPaths::config_dir().unwrap();
-        assert!(config_dir.ends_with(".config/orcs"));
+        // AppPaths returns platform-specific config directory with "orcs" appended
+        assert!(config_dir.ends_with("orcs"));
     }
 
     #[test]
     fn test_config_file() {
         let config_file = OrcsPaths::config_file().unwrap();
-        assert!(config_file.ends_with(".config/orcs/config.toml"));
+        assert!(config_file.ends_with("config.toml"));
+        // Verify it's under config_dir
+        let config_dir = OrcsPaths::config_dir().unwrap();
+        assert!(config_file.starts_with(&config_dir));
     }
 
     #[test]
     fn test_secret_file() {
         let secret_file = OrcsPaths::secret_file().unwrap();
-        assert!(secret_file.ends_with(".config/orcs/secret.json"));
+        assert!(secret_file.ends_with("secret.json"));
+        // Verify it's under config_dir
+        let config_dir = OrcsPaths::config_dir().unwrap();
+        assert!(secret_file.starts_with(&config_dir));
     }
 
     #[test]
     fn test_sessions_dir() {
         let sessions_dir = OrcsPaths::sessions_dir().unwrap();
-        assert!(sessions_dir.ends_with(".config/orcs/sessions"));
+        assert!(sessions_dir.ends_with("sessions"));
+        // Verify it's under config_dir
+        let config_dir = OrcsPaths::config_dir().unwrap();
+        assert!(sessions_dir.starts_with(&config_dir));
+    }
+
+    #[test]
+    fn test_data_dir() {
+        let data_dir = OrcsPaths::data_dir().unwrap();
+        assert!(data_dir.ends_with("orcs"));
+    }
+
+    #[test]
+    fn test_workspaces_dir() {
+        let workspaces_dir = OrcsPaths::workspaces_dir().unwrap();
+        assert!(workspaces_dir.ends_with("workspaces"));
+        // Verify it's under data_dir
+        let data_dir = OrcsPaths::data_dir().unwrap();
+        assert!(workspaces_dir.starts_with(&data_dir));
     }
 }

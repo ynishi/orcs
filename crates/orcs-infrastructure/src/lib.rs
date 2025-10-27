@@ -1,5 +1,6 @@
 pub mod async_dir_session_repository;
 pub mod async_dir_workspace_metadata_repository;
+pub mod async_dir_workspace_repository;
 pub mod dto;
 pub mod paths;
 pub mod storage;
@@ -14,6 +15,7 @@ mod test_async_dir_storage;
 
 pub use crate::async_dir_session_repository::AsyncDirSessionRepository;
 pub use crate::async_dir_workspace_metadata_repository::AsyncDirWorkspaceMetadataRepository;
+pub use crate::async_dir_workspace_repository::AsyncDirWorkspaceRepository;
 pub use crate::toml_persona_repository::TomlPersonaRepository;
 pub use crate::toml_session_repository::TomlSessionRepository;
 pub use crate::toml_workspace_metadata_repository::TomlWorkspaceMetadataRepository;

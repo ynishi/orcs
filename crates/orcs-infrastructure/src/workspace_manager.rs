@@ -3,8 +3,10 @@
 //! This module provides a file system-based implementation of the `WorkspaceManager` trait,
 //! storing workspace metadata and files in the `~/.orcs/workspaces` directory.
 
+use crate::async_dir_workspace_repository::AsyncDirWorkspaceRepository;
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio::fs;
 use uuid::Uuid;
 
@@ -27,12 +29,14 @@ fn infer_mime_type(filename: &str) -> String {
 ///
 /// Stores workspace data in the `~/.orcs/workspaces` directory. Each workspace
 /// is stored in a subdirectory named by its workspace ID, containing:
-/// - `metadata.toml` - Workspace metadata and resource listings
+/// - Workspace metadata stored via AsyncDirWorkspaceRepository
 /// - `files/` - Uploaded and generated files
 /// - `temp/` - Temporary session files
 pub struct FileSystemWorkspaceManager {
     /// Root directory for all workspaces (typically `~/.orcs/workspaces`)
     root_dir: PathBuf,
+    /// Repository for workspace data persistence
+    workspace_repository: Arc<AsyncDirWorkspaceRepository>,
 }
 
 impl FileSystemWorkspaceManager {
@@ -61,7 +65,10 @@ impl FileSystemWorkspaceManager {
             ))
         })?;
 
-        Ok(Self { root_dir })
+        // Initialize AsyncDirWorkspaceRepository
+        let workspace_repository = Arc::new(AsyncDirWorkspaceRepository::default_location().await?);
+
+        Ok(Self { root_dir, workspace_repository })
     }
 
     /// Generates a deterministic workspace ID from a repository path.
@@ -104,7 +111,7 @@ impl FileSystemWorkspaceManager {
         self.root_dir.join(workspace_id)
     }
 
-    /// Gets the path to the metadata.toml file for a workspace.
+    /// Loads workspace metadata via AsyncDirWorkspaceRepository.
     ///
     /// # Arguments
     ///
@@ -112,57 +119,27 @@ impl FileSystemWorkspaceManager {
     ///
     /// # Returns
     ///
-    /// Returns the path to the metadata.toml file.
-    fn get_metadata_path(&self, workspace_id: &str) -> PathBuf {
-        self.get_workspace_dir(workspace_id).join("metadata.toml")
-    }
-
-    /// Loads workspace metadata from the metadata.toml file.
-    ///
-    /// # Arguments
-    ///
-    /// * `workspace_id` - The workspace ID
-    ///
-    /// # Returns
-    ///
-    /// Returns the workspace domain model if the metadata file exists and is valid.
+    /// Returns the workspace domain model if it exists and is valid.
     ///
     /// # Errors
     ///
-    /// Returns an error if the file cannot be read or parsed.
+    /// Returns an error if the workspace cannot be read or parsed.
     async fn load_workspace(&self, workspace_id: &str) -> Result<Workspace> {
-        let metadata_path = self.get_metadata_path(workspace_id);
+        let mut workspace = self
+            .workspace_repository
+            .find_by_id(workspace_id)
+            .await?
+            .ok_or_else(|| {
+                OrcsError::Io(format!("Workspace '{}' not found", workspace_id))
+            })?;
 
-        let content = fs::read_to_string(&metadata_path).await.map_err(|e| {
-            OrcsError::Io(format!(
-                "Failed to read workspace metadata from '{}': {}",
-                metadata_path.display(),
-                e
-            ))
-        })?;
-
-        // Parse TOML to toml::Value first
-        let toml_value: toml::Value = toml::from_str(&content).map_err(|e| {
-            OrcsError::Serialization(format!(
-                "Failed to parse workspace metadata from '{}': {}",
-                metadata_path.display(),
-                e
-            ))
-        })?;
-
-        // Use migrator to handle version migration
-        let migrator = crate::dto::create_workspace_migrator();
-        let mut workspace: Workspace = migrator
-            .load_flat_from("workspace", toml_value)
-            .map_err(|e| OrcsError::Serialization(format!("Migration failed: {}", e)))?;
-
-        // Set workspace_dir (calculated from workspace_id, not stored in metadata)
+        // Set workspace_dir (calculated from workspace_id, not stored in repository)
         workspace.workspace_dir = self.get_workspace_dir(workspace_id);
 
         Ok(workspace)
     }
 
-    /// Saves workspace metadata to the metadata.toml file.
+    /// Saves workspace metadata via AsyncDirWorkspaceRepository.
     ///
     /// # Arguments
     ///
@@ -170,12 +147,11 @@ impl FileSystemWorkspaceManager {
     ///
     /// # Errors
     ///
-    /// Returns an error if the file cannot be written.
+    /// Returns an error if the workspace cannot be written.
     async fn save_workspace(&self, workspace: &Workspace) -> Result<()> {
         let workspace_dir = self.get_workspace_dir(&workspace.id);
-        let metadata_path = self.get_metadata_path(&workspace.id);
 
-        // Ensure workspace directory exists
+        // Ensure workspace directory exists (for actual files)
         fs::create_dir_all(&workspace_dir).await.map_err(|e| {
             OrcsError::Io(format!(
                 "Failed to create workspace directory '{}': {}",
@@ -184,31 +160,8 @@ impl FileSystemWorkspaceManager {
             ))
         })?;
 
-        // Use migrator to serialize with version field (following session repository pattern)
-        let json_str = {
-            let migrator = crate::dto::create_workspace_migrator();
-            migrator
-                .save_domain_flat("workspace", &workspace)
-                .map_err(|e| OrcsError::Serialization(format!("Failed to serialize workspace with version field: {}", e)))?
-        };
-
-        // Convert JSON to TOML (following session repository pattern)
-        let json_value: serde_json::Value = serde_json::from_str(&json_str)
-            .map_err(|e| OrcsError::Serialization(format!("Failed to parse workspace JSON: {}", e)))?;
-        let toml_value: toml::Value = serde_json::from_str(&serde_json::to_string(&json_value)
-            .map_err(|e| OrcsError::Serialization(format!("Failed to stringify JSON: {}", e)))?)
-            .map_err(|e| OrcsError::Serialization(format!("Failed to convert workspace to TOML format: {}", e)))?;
-        let content = toml::to_string_pretty(&toml_value)
-            .map_err(|e| OrcsError::Serialization(format!("Failed to serialize workspace to TOML string: {}", e)))?;
-
-        // Write to file
-        fs::write(&metadata_path, content).await.map_err(|e| {
-            OrcsError::Io(format!(
-                "Failed to write workspace metadata to '{}': {}",
-                metadata_path.display(),
-                e
-            ))
-        })?;
+        // Save via repository
+        self.workspace_repository.save(workspace).await?;
 
         Ok(())
     }
@@ -244,11 +197,10 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
     async fn get_or_create_workspace(&self, repo_path: &Path) -> Result<Workspace> {
         let workspace_id = Self::get_workspace_id(repo_path)?;
-        let metadata_path = self.get_metadata_path(&workspace_id);
 
         // Check if workspace already exists
-        if metadata_path.exists() {
-            return self.load_workspace(&workspace_id).await;
+        if let Ok(Some(workspace)) = self.get_workspace(&workspace_id).await {
+            return Ok(workspace);
         }
 
         // Create new workspace
@@ -269,21 +221,18 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             is_favorite: false,
         };
 
-        // Save to file system
+        // Save via repository
         self.save_workspace(&workspace).await?;
 
         Ok(workspace)
     }
 
     async fn get_workspace(&self, workspace_id: &str) -> Result<Option<Workspace>> {
-        let metadata_path = self.get_metadata_path(workspace_id);
-
-        if !metadata_path.exists() {
-            return Ok(None);
+        match self.load_workspace(workspace_id).await {
+            Ok(workspace) => Ok(Some(workspace)),
+            Err(OrcsError::Io(msg)) if msg.contains("not found") => Ok(None),
+            Err(e) => Err(e),
         }
-
-        let workspace = self.load_workspace(workspace_id).await?;
-        Ok(Some(workspace))
     }
 
     async fn add_file_to_workspace(
@@ -682,32 +631,13 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
     }
 
     async fn list_all_workspaces(&self) -> Result<Vec<Workspace>> {
-        let mut workspaces = Vec::new();
-        let mut entries = fs::read_dir(&self.root_dir).await.map_err(|e| {
-            OrcsError::Io(format!(
-                "Failed to read workspaces directory '{}': {}",
-                self.root_dir.display(),
-                e
-            ))
-        })?;
+        // Load all workspaces from repository (already sorted by last_accessed)
+        let mut workspaces = self.workspace_repository.list_all().await?;
 
-        while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            OrcsError::Io(format!("Failed to read directory entry: {}", e))
-        })? {
-            let file_type = entry.file_type().await.map_err(|e| {
-                OrcsError::Io(format!("Failed to get file type: {}", e))
-            })?;
-
-            if file_type.is_dir() {
-                let workspace_id = entry.file_name().to_string_lossy().to_string();
-                if let Ok(ws) = self.load_workspace(&workspace_id).await {
-                    workspaces.push(ws);
-                }
-            }
+        // Set workspace_dir for each workspace
+        for ws in &mut workspaces {
+            ws.workspace_dir = self.get_workspace_dir(&ws.id);
         }
-
-        // Sort by last_accessed (most recent first)
-        workspaces.sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
 
         Ok(workspaces)
     }

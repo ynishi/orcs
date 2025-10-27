@@ -10,7 +10,7 @@ use orcs_core::repository::PersonaRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::{Workspace, UploadedFile};
 use orcs_core::workspace::manager::WorkspaceManager;
-use orcs_infrastructure::{AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirWorkspaceMetadataRepository};
+use orcs_infrastructure::{AsyncDirPersonaRepository, AsyncDirSessionRepository};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_interaction::{InteractionManager, InteractionResult};
@@ -24,7 +24,6 @@ struct AppState {
     persona_repository: Arc<dyn PersonaRepository>,
     user_service: Arc<dyn UserService>,
     workspace_manager: Arc<FileSystemWorkspaceManager>,
-    workspace_metadata_repository: Arc<AsyncDirWorkspaceMetadataRepository>,
 }
 
 /// Serializable version of DialogueMessage for Tauri IPC
@@ -762,13 +761,6 @@ fn main() {
                 .expect("Failed to create session repository")
         );
 
-        // Create AsyncDirWorkspaceMetadataRepository at default location
-        let workspace_metadata_repository = Arc::new(
-            AsyncDirWorkspaceMetadataRepository::default_location()
-                .await
-                .expect("Failed to create workspace metadata repository")
-        );
-
         // Initialize SessionManager with the repository
         let session_manager: Arc<SessionManager<InteractionManager>> = Arc::new(
             SessionManager::new(session_repository)
@@ -812,13 +804,13 @@ fn main() {
         tauri::Builder::default()
             .plugin(tauri_plugin_opener::init())
             .plugin(tauri_plugin_dialog::init())
+            .plugin(tauri_plugin_fs::init())
             .manage(AppState {
                 session_manager,
                 app_mode,
                 persona_repository,
                 user_service,
                 workspace_manager,
-                workspace_metadata_repository,
             })
             .invoke_handler(tauri::generate_handler![
                 create_session,

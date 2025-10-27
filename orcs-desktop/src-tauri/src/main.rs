@@ -10,7 +10,7 @@ use orcs_core::repository::PersonaRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::{Workspace, UploadedFile};
 use orcs_core::workspace::manager::WorkspaceManager;
-use orcs_infrastructure::{AsyncDirSessionRepository, AsyncDirWorkspaceMetadataRepository, TomlPersonaRepository};
+use orcs_infrastructure::{AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirWorkspaceMetadataRepository};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_interaction::{InteractionManager, InteractionResult};
@@ -24,7 +24,6 @@ struct AppState {
     persona_repository: Arc<dyn PersonaRepository>,
     user_service: Arc<dyn UserService>,
     workspace_manager: Arc<FileSystemWorkspaceManager>,
-    #[allow(dead_code)]
     workspace_metadata_repository: Arc<AsyncDirWorkspaceMetadataRepository>,
 }
 
@@ -724,7 +723,8 @@ fn main() {
 
         // Composition Root: Create the concrete repository instances
         let persona_repository = Arc::new(
-            TomlPersonaRepository::new()
+            AsyncDirPersonaRepository::default_location()
+                .await
                 .expect("Failed to initialize persona repository")
         );
         let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
@@ -738,19 +738,13 @@ fn main() {
                 .expect("Failed to initialize workspace manager")
         );
 
-        // Seed the config file with default personas if it's empty on first run.
-        if let Ok(configs) = persona_repository.get_all() {
-            if configs.is_empty() {
+        // Seed the personas directory with default personas if it's empty on first run.
+        if let Ok(personas) = persona_repository.get_all() {
+            if personas.is_empty() {
                 let default_presets = get_default_presets();
                 if let Err(e) = persona_repository.save_all(&default_presets) {
                     // This is a critical failure on startup, so we panic.
-                    panic!("Failed to seed default personas into config file: {}", e);
-                }
-            } else {
-                // Auto-migrate: re-save to ensure V2 format
-                // This converts any V1 configs to V2 on startup
-                if let Err(e) = persona_repository.save_all(&configs) {
-                    eprintln!("Warning: Failed to auto-migrate persona config to V2: {}", e);
+                    panic!("Failed to seed default personas: {}", e);
                 }
             }
         }

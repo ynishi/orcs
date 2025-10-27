@@ -5,11 +5,10 @@
 
 use crate::dto::create_user_profile_migrator;
 use crate::paths::OrcsPaths;
-use crate::storage::ConfigStorage;
 use orcs_core::user::{UserProfile, UserService};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
-use version_migrate::ConfigMigrator;
+use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
 
 /// User service that loads user information from config.toml.
 ///
@@ -54,7 +53,7 @@ impl ConfigBasedUserService {
             }
         }
 
-        // Load from ConfigStorage
+        // Load from FileStorage
         let loaded = Self::load_from_config().unwrap_or_else(|_| "You".to_string());
 
         // Cache it
@@ -66,27 +65,22 @@ impl ConfigBasedUserService {
         loaded
     }
 
-    /// Loads UserProfile from config file.
+    /// Loads UserProfile from config file using FileStorage.
     fn load_from_config() -> Result<String, String> {
         // Get config path
         let config_path = Self::get_config_path()?;
-        let storage = ConfigStorage::new(config_path);
 
-        // Load config as JSON
-        let json_value = storage
-            .load()
-            .map_err(|e| e.to_string())?
-            .unwrap_or_else(|| serde_json::json!({"version": "1.0.0"}));
+        // Create FileStorage with migrator
+        let migrator = create_user_profile_migrator();
+        let strategy = FileStorageStrategy::new()
+            .with_format(FormatStrategy::Toml)
+            .with_load_behavior(LoadBehavior::CreateIfMissing);
 
-        // Convert to JSON string for ConfigMigrator
-        let json_str = serde_json::to_string(&json_value)
-            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        let storage = FileStorage::new(config_path, migrator, strategy)
+            .map_err(|e| format!("Failed to create FileStorage: {}", e))?;
 
-        // Use ConfigMigrator to query user_profile
-        let config = ConfigMigrator::from(&json_str, create_user_profile_migrator())
-            .map_err(|e| format!("Failed to create ConfigMigrator: {}", e))?;
-
-        let profiles: Vec<UserProfile> = config
+        // Query user_profile
+        let profiles: Vec<UserProfile> = storage
             .query("user_profile")
             .map_err(|e| format!("Failed to query user_profile: {}", e))?;
 

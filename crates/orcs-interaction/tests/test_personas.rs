@@ -1,31 +1,33 @@
 use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
 use orcs_core::repository::PersonaRepository;
-use orcs_infrastructure::TomlPersonaRepository;
+use orcs_infrastructure::AsyncDirPersonaRepository;
 use tempfile::TempDir;
 
-#[test]
-fn test_get_all_personas_empty() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_all_personas_empty() {
     // Use temporary directory for test
     let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("config.toml");
-    let repo = TomlPersonaRepository::with_path(config_path);
+    let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+        .await
+        .unwrap();
 
-    // Should return empty vec for non-existent file
+    // Should return empty vec for non-existent personas
     let personas = repo.get_all().expect("Should load personas");
     assert!(personas.is_empty(), "Should have no personas initially");
 }
 
-#[test]
-fn test_save_and_load_personas() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_save_and_load_personas() {
     // Use temporary directory for test
     let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("config.toml");
-    let repo = TomlPersonaRepository::with_path(config_path);
+    let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+        .await
+        .unwrap();
 
     // Create test personas
     let test_personas = vec![
         Persona {
-            id: "test-id-1".to_string(),
+            id: uuid::Uuid::new_v4().to_string(),
             name: "Alice".to_string(),
             role: "Developer".to_string(),
             background: "Expert in Rust".to_string(),
@@ -35,7 +37,7 @@ fn test_save_and_load_personas() {
             backend: PersonaBackend::ClaudeCli,
         },
         Persona {
-            id: "test-id-2".to_string(),
+            id: uuid::Uuid::new_v4().to_string(),
             name: "Bob".to_string(),
             role: "Designer".to_string(),
             background: "UI/UX specialist".to_string(),
@@ -65,16 +67,17 @@ fn test_save_and_load_personas() {
     assert_eq!(bob.backend, PersonaBackend::GeminiCli);
 }
 
-#[test]
-fn test_persona_fields() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_persona_fields() {
     // Use temporary directory for test
     let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("config.toml");
-    let repo = TomlPersonaRepository::with_path(config_path.clone());
+    let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+        .await
+        .unwrap();
 
     // Create a test persona
     let test_persona = Persona {
-        id: "test-id".to_string(),
+        id: uuid::Uuid::new_v4().to_string(),
         name: "Test Person".to_string(),
         role: "Tester".to_string(),
         background: "Testing expert".to_string(),
@@ -99,62 +102,51 @@ fn test_persona_fields() {
     assert!(!persona.communication_style.is_empty(), "Persona should have a communication style");
 }
 
-#[test]
-fn test_save_preserves_other_config_fields() {
-    use std::fs;
-
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiple_personas_stored_separately() {
     // Use temporary directory for test
     let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("config.toml");
+    let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+        .await
+        .unwrap();
 
-    // Manually create a config with user_profile (without workspaces to keep test simple)
-    let initial_config = r#"
-version = "1.0.0"
+    // Create two personas
+    let persona1 = Persona {
+        id: uuid::Uuid::new_v4().to_string(),
+        name: "First".to_string(),
+        role: "First Role".to_string(),
+        background: "First background".to_string(),
+        communication_style: "First style".to_string(),
+        default_participant: true,
+        source: PersonaSource::User,
+        backend: PersonaBackend::ClaudeCli,
+    };
 
-[[persona]]
-version = "1.1.0"
-id = "initial-id"
-name = "Initial"
-role = "Initial Role"
-background = "Initial background"
-communication_style = "Initial style"
-default_participant = true
-source = "User"
-backend = "claude_cli"
-
-[user_profile]
-nickname = "TestUser"
-background = "Test background"
-"#;
-    fs::write(&config_path, initial_config).expect("Should write initial config");
-
-    // Create repository and save new personas
-    let repo = TomlPersonaRepository::with_path(config_path.clone());
-
-    let new_persona = Persona {
-        id: "new-id".to_string(),
-        name: "New Person".to_string(),
-        role: "New Role".to_string(),
-        background: "New background".to_string(),
-        communication_style: "New style".to_string(),
+    let persona2 = Persona {
+        id: uuid::Uuid::new_v4().to_string(),
+        name: "Second".to_string(),
+        role: "Second Role".to_string(),
+        background: "Second background".to_string(),
+        communication_style: "Second style".to_string(),
         default_participant: false,
         source: PersonaSource::System,
         backend: PersonaBackend::GeminiCli,
     };
 
-    // Save the new persona (should preserve user_profile and workspaces)
-    repo.save_all(&[new_persona])
-        .expect("Should save new persona");
+    // Save first persona
+    repo.save_all(&[persona1.clone()])
+        .expect("Should save first persona");
 
-    // Read the saved config
-    let saved_config = fs::read_to_string(&config_path).expect("Should read saved config");
+    // Save second persona
+    repo.save_all(&[persona2.clone()])
+        .expect("Should save second persona");
 
-    // Verify that user_profile is preserved
-    assert!(saved_config.contains("user_profile"), "Should preserve user_profile");
-    assert!(saved_config.contains("TestUser"), "Should preserve nickname");
-
-    // Verify that personas were updated
+    // Load all personas
     let personas = repo.get_all().expect("Should load personas");
-    assert_eq!(personas.len(), 1, "Should have 1 persona");
-    assert_eq!(personas[0].name, "New Person");
+    assert_eq!(personas.len(), 2, "Should have 2 personas");
+
+    // Verify both personas exist
+    let names: Vec<String> = personas.iter().map(|p| p.name.clone()).collect();
+    assert!(names.contains(&"First".to_string()));
+    assert!(names.contains(&"Second".to_string()));
 }

@@ -1,6 +1,6 @@
 //! TOML-based SessionRepository implementation
 
-use crate::dto::{create_session_migrator, SessionV2_0_0};
+use crate::dto::create_session_migrator;
 use crate::paths::OrcsPaths;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -204,13 +204,10 @@ impl SessionRepository for TomlSessionRepository {
     async fn save(&self, session: &Session) -> Result<()> {
         let file_path = self.session_file_path(&session.id);
 
-        // Convert domain model to DTO (always use latest version)
-        let dto: SessionV2_0_0 = SessionV2_0_0::from(session);
-
-        // Use migrator to serialize with version field
+        // Use migrator to serialize domain entity directly with version field
         let migrator = create_session_migrator();
         let json_str = migrator
-            .save_flat(dto)
+            .save_domain_flat("session", session)
             .context("Failed to serialize session with version field")?;
 
         // Convert JSON to TOML

@@ -66,11 +66,11 @@ impl IntoDomain<UserProfile> for UserProfileV1_1 {
 }
 
 /// Convert domain model to UserProfileV1_1 DTO for persistence.
-impl From<&UserProfile> for UserProfileV1_1 {
-    fn from(profile: &UserProfile) -> Self {
+impl version_migrate::FromDomain<UserProfile> for UserProfileV1_1 {
+    fn from_domain(profile: UserProfile) -> Self {
         UserProfileV1_1 {
-            nickname: profile.nickname.clone(),
-            background: profile.background.clone(),
+            nickname: profile.nickname,
+            background: profile.background,
         }
     }
 }
@@ -102,7 +102,7 @@ pub fn create_user_profile_migrator() -> version_migrate::Migrator {
     let user_profile_path = version_migrate::Migrator::define("user_profile")
         .from::<UserProfileV1_0>()
         .step::<UserProfileV1_1>()
-        .into::<UserProfile>();
+        .into_with_save::<UserProfile>();
 
     migrator
         .register(user_profile_path)

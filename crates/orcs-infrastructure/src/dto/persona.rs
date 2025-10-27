@@ -182,17 +182,17 @@ impl IntoDomain<Persona> for PersonaConfigV1_1_0 {
 }
 
 /// Convert domain model to PersonaConfigV1_1_0 DTO for persistence.
-impl From<&Persona> for PersonaConfigV1_1_0 {
-    fn from(persona: &Persona) -> Self {
+impl version_migrate::FromDomain<Persona> for PersonaConfigV1_1_0 {
+    fn from_domain(persona: Persona) -> Self {
         PersonaConfigV1_1_0 {
-            id: persona.id.clone(),
-            name: persona.name.clone(),
-            role: persona.role.clone(),
-            background: persona.background.clone(),
-            communication_style: persona.communication_style.clone(),
+            id: persona.id,
+            name: persona.name,
+            role: persona.role,
+            background: persona.background,
+            communication_style: persona.communication_style,
             default_participant: persona.default_participant,
-            source: persona.source.clone().into(),
-            backend: persona.backend.clone().into(),
+            source: persona.source.into(),
+            backend: persona.backend.into(),
         }
     }
 }
@@ -224,7 +224,7 @@ pub fn create_persona_migrator() -> version_migrate::Migrator {
     let persona_path = version_migrate::Migrator::define("persona")
         .from::<PersonaConfigV1_0_0>()
         .step::<PersonaConfigV1_1_0>()
-        .into::<Persona>();
+        .into_with_save::<Persona>();
 
     migrator
         .register(persona_path)

@@ -130,17 +130,17 @@ impl IntoDomain<Session> for SessionV2_0_0 {
 }
 
 /// Convert domain model to SessionV2_0_0 DTO for persistence.
-impl From<&Session> for SessionV2_0_0 {
-    fn from(session: &Session) -> Self {
+impl version_migrate::FromDomain<Session> for SessionV2_0_0 {
+    fn from_domain(session: Session) -> Self {
         SessionV2_0_0 {
-            id: session.id.clone(),
-            title: session.title.clone(),
-            created_at: session.created_at.clone(),
-            updated_at: session.updated_at.clone(),
-            current_persona_id: session.current_persona_id.clone(),
-            persona_histories: session.persona_histories.clone(),
-            app_mode: session.app_mode.clone(),
-            workspace_id: session.workspace_id.clone(),
+            id: session.id,
+            title: session.title,
+            created_at: session.created_at,
+            updated_at: session.updated_at,
+            current_persona_id: session.current_persona_id,
+            persona_histories: session.persona_histories,
+            app_mode: session.app_mode,
+            workspace_id: session.workspace_id,
         }
     }
 }
@@ -174,7 +174,7 @@ pub fn create_session_migrator() -> version_migrate::Migrator {
         .from::<SessionV1_0_0>()
         .step::<SessionV1_1_0>()
         .step::<SessionV2_0_0>()
-        .into::<Session>();
+        .into_with_save::<Session>();
 
     migrator
         .register(session_path)

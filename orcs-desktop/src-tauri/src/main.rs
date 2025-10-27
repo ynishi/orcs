@@ -24,6 +24,7 @@ struct AppState {
     persona_repository: Arc<dyn PersonaRepository>,
     user_service: Arc<dyn UserService>,
     workspace_manager: Arc<FileSystemWorkspaceManager>,
+    #[allow(dead_code)]
     workspace_metadata_repository: Arc<AsyncDirWorkspaceMetadataRepository>,
 }
 

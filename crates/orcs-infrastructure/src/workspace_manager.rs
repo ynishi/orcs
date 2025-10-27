@@ -14,42 +14,13 @@ use orcs_core::workspace::{
     ProjectContext, SessionWorkspace, TempFile, UploadedFile, Workspace, WorkspaceResources,
 };
 
-use crate::dto::WorkspaceV1_1_0;
-
-/// Infers the MIME type from a filename extension.
+/// Infers the MIME type from a filename extension using the `mime_guess` library.
 ///
-/// This is a simplified implementation. For production use, consider using
-/// a library like `mime_guess` for more comprehensive MIME type detection.
+/// This provides comprehensive MIME type detection based on file extensions.
 fn infer_mime_type(filename: &str) -> String {
-    let extension = std::path::Path::new(filename)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or("");
-
-    match extension.to_lowercase().as_str() {
-        "txt" => "text/plain",
-        "md" => "text/markdown",
-        "html" | "htm" => "text/html",
-        "css" => "text/css",
-        "js" => "application/javascript",
-        "json" => "application/json",
-        "xml" => "application/xml",
-        "pdf" => "application/pdf",
-        "zip" => "application/zip",
-        "tar" => "application/x-tar",
-        "gz" => "application/gzip",
-        "jpg" | "jpeg" => "image/jpeg",
-        "png" => "image/png",
-        "gif" => "image/gif",
-        "svg" => "image/svg+xml",
-        "mp3" => "audio/mpeg",
-        "mp4" => "video/mp4",
-        "rs" => "text/x-rust",
-        "toml" => "application/toml",
-        "yaml" | "yml" => "application/yaml",
-        _ => "application/octet-stream",
-    }
-    .to_string()
+    mime_guess::from_path(filename)
+        .first_or_octet_stream()
+        .to_string()
 }
 
 /// File system-based workspace manager.

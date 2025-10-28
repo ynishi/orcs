@@ -5,6 +5,7 @@ mod slash_commands;
 
 use std::path::Path;
 use std::sync::Arc;
+use tokio::process::Command;
 use tokio::sync::Mutex;
 use orcs_core::session::{AppMode, Session, SessionManager};
 use orcs_core::persona::{Persona, get_default_presets};
@@ -343,6 +344,42 @@ async fn get_workspaces_directory(state: State<'_, AppState>) -> Result<String, 
     Ok(path_str.to_string())
 }
 
+/// Helper function to execute shell commands
+async fn execute_shell_command(command: &str, working_dir: Option<&str>) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    let shell = "cmd";
+    #[cfg(target_os = "windows")]
+    let shell_arg = "/C";
+
+    #[cfg(not(target_os = "windows"))]
+    let shell = "sh";
+    #[cfg(not(target_os = "windows"))]
+    let shell_arg = "-c";
+
+    let mut cmd = Command::new(shell);
+    cmd.arg(shell_arg).arg(command);
+
+    if let Some(dir) = working_dir {
+        cmd.current_dir(dir);
+    }
+
+    let output = cmd.output().await.map_err(|e| format!("Failed to execute command: {}", e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        if stderr.is_empty() {
+            Ok(stdout.to_string())
+        } else {
+            Ok(format!("{}\n\nStderr:\n{}", stdout, stderr))
+        }
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Command failed with exit code {:?}:\n{}", output.status.code(), stderr))
+    }
+}
+
 /// Handles user input
 #[tauri::command]
 async fn handle_input(
@@ -358,9 +395,75 @@ async fn handle_input(
     // Get the current mode
     let current_mode = state.app_mode.lock().await.clone();
 
+    // Check if input is a slash command
+    let processed_input = if input.trim().starts_with('/') {
+        // Extract command name (everything after / until first space or end)
+        let trimmed = input.trim();
+        let cmd_end = trimmed.find(' ').unwrap_or(trimmed.len());
+        let cmd_name = &trimmed[1..cmd_end]; // Skip the '/'
+        let args = if cmd_end < trimmed.len() {
+            trimmed[cmd_end..].trim()
+        } else {
+            ""
+        };
+
+        // Try to get the command from repository
+        match state.slash_command_repository.get_command(cmd_name).await {
+            Ok(Some(cmd)) => {
+                use orcs_core::slash_command::CommandType;
+
+                match cmd.command_type {
+                    CommandType::Prompt => {
+                        // Replace {args} placeholder if it exists
+                        let expanded = if cmd.content.contains("{args}") {
+                            cmd.content.replace("{args}", args)
+                        } else {
+                            // If no placeholder, append args if provided
+                            if !args.is_empty() {
+                                format!("{}\n\n{}", cmd.content, args)
+                            } else {
+                                cmd.content.clone()
+                            }
+                        };
+                        expanded
+                    }
+                    CommandType::Shell => {
+                        // Execute shell command and return output
+                        let cmd_to_run = if cmd.content.contains("{args}") {
+                            cmd.content.replace("{args}", args)
+                        } else {
+                            cmd.content.clone()
+                        };
+
+                        // TODO: Get workspace path for {workspace_path} replacement
+                        let working_dir = cmd.working_dir.as_deref();
+
+                        match execute_shell_command(&cmd_to_run, working_dir).await {
+                            Ok(output) => {
+                                format!("Command output:\n```\n{}\n```", output)
+                            }
+                            Err(e) => {
+                                format!("Error executing command: {}", e)
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(None) => {
+                // Command not found, return error message
+                format!("Unknown command: /{}\n\nAvailable commands can be viewed in Settings.", cmd_name)
+            }
+            Err(e) => {
+                format!("Error loading command: {}", e)
+            }
+        }
+    } else {
+        input.clone()
+    };
+
     // Handle the input with streaming support
     let app_clone = app.clone();
-    let result = manager.handle_input_with_streaming(&current_mode, &input, move |turn| {
+    let result = manager.handle_input_with_streaming(&current_mode, &processed_input, move |turn| {
         use tauri::Emitter;
 
         // Log each dialogue turn as it becomes available with timestamp

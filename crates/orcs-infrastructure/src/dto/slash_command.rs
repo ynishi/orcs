@@ -1,7 +1,7 @@
 //! Slash command DTOs and migrations
 
 use serde::{Deserialize, Serialize};
-use version_migrate::{IntoDomain, Versioned};
+use version_migrate::{FromDomain, IntoDomain, Versioned};
 
 use orcs_core::slash_command::{CommandType, SlashCommand};
 
@@ -53,6 +53,20 @@ impl From<&SlashCommand> for SlashCommandV1 {
     }
 }
 
+/// Convert domain model to SlashCommandV1 DTO (for version-migrate save support)
+impl FromDomain<SlashCommand> for SlashCommandV1 {
+    fn from_domain(cmd: SlashCommand) -> Self {
+        SlashCommandV1 {
+            name: cmd.name,
+            icon: cmd.icon,
+            description: cmd.description,
+            command_type: cmd.command_type,
+            content: cmd.content,
+            working_dir: cmd.working_dir,
+        }
+    }
+}
+
 // ============================================================================
 // Migrator factory
 // ============================================================================
@@ -62,7 +76,7 @@ pub fn create_slash_command_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
     let path = version_migrate::Migrator::define("slash_command")
         .from::<SlashCommandV1>()
-        .into::<SlashCommand>();
+        .into_with_save::<SlashCommand>();
     migrator
         .register(path)
         .expect("Failed to register slash_command migration path");

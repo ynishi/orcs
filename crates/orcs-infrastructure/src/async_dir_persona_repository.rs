@@ -88,6 +88,21 @@ impl AsyncDirPersonaRepository {
 
         Ok(Self { storage, base_dir })
     }
+
+    /// Returns the actual config file path.
+    ///
+    /// This returns the real path where the config.toml is stored.
+    pub fn config_file_path(&self) -> PathBuf {
+        self.base_dir.join("config.toml")
+    }
+
+    /// Returns the actual personas directory path.
+    ///
+    /// This returns the real path where persona files are stored,
+    /// which is determined by the AsyncDirStorage's path resolution strategy.
+    pub fn personas_dir(&self) -> &Path {
+        self.storage.base_path()
+    }
 }
 
 impl PersonaRepository for AsyncDirPersonaRepository {

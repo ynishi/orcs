@@ -4985,9 +4985,9 @@ checksum = "852e951cb7832cb45cb1169900d19760cfa39b82bc0ea9c0e5a14ae88411c98b"
 
 [[package]]
 name = "version-migrate"
-version = "0.10.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "919e51f48881909cbe09db7f3ad3873dc317feb370a909a9fde4b09c70aef8b6"
+checksum = "22d7ea6b206eda2b287a1be247d4cd44f56dfb20d82c9a6657cb58e3fcee5517"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -5005,9 +5005,9 @@ dependencies = [
 
 [[package]]
 name = "version-migrate-macro"
-version = "0.10.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fe1e8858253e6008eb2468a0f00e032ab5e6ebe4e1d982ca8f478d7796e1235"
+checksum = "3ce507b1b4faf592ef1cc83f292713e0d00e012986d99cf333548c1b9cb72fb7"
 dependencies = [
  "proc-macro2",
  "quote",

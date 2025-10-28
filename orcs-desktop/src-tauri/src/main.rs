@@ -24,8 +24,10 @@ use tauri::State;
 struct AppState {
     session_usecase: Arc<SessionUseCase>,
     session_manager: Arc<SessionManager<InteractionManager>>,
+    session_repository: Arc<AsyncDirSessionRepository>,
     app_mode: Mutex<AppMode>,
     persona_repository: Arc<dyn PersonaRepository>,
+    persona_repository_concrete: Arc<AsyncDirPersonaRepository>,
     user_service: Arc<dyn UserService>,
     workspace_manager: Arc<FileSystemWorkspaceManager>,
     slash_command_repository: Arc<dyn SlashCommandRepository>,
@@ -304,24 +306,9 @@ async fn get_execution_strategy(
 
 /// Gets the path to the configuration file, creating it if it doesn't exist
 #[tauri::command]
-async fn get_config_path() -> Result<String, String> {
-    use orcs_infrastructure::paths::OrcsPaths;
-
-    // Get the unified config file path
-    let config_file = OrcsPaths::config_file()
-        .map_err(|e| format!("Failed to get config path: {}", e))?;
-
-    // Create the directory if it doesn't exist
-    if let Some(parent) = config_file.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create config directory: {}", e))?;
-    }
-
-    // Create the file if it doesn't exist
-    if !config_file.exists() {
-        std::fs::File::create(&config_file)
-            .map_err(|e| format!("Failed to create config file: {}", e))?;
-    }
+async fn get_config_path(state: State<'_, AppState>) -> Result<String, String> {
+    // Get the actual config file path from the repository
+    let config_file = state.persona_repository_concrete.config_file_path();
 
     // Convert PathBuf to String
     let path_str = config_file.to_str()
@@ -332,17 +319,11 @@ async fn get_config_path() -> Result<String, String> {
 
 /// Gets the sessions directory path
 #[tauri::command]
-async fn get_sessions_directory() -> Result<String, String> {
-    use orcs_infrastructure::paths::OrcsPaths;
+async fn get_sessions_directory(state: State<'_, AppState>) -> Result<String, String> {
+    // Get the actual sessions directory path from the repository
+    let sessions_dir = state.session_repository.sessions_dir();
 
-    let sessions_dir = OrcsPaths::sessions_dir()
-        .map_err(|e| format!("Failed to get sessions directory: {}", e))?;
-
-    // Create the directory if it doesn't exist
-    std::fs::create_dir_all(&sessions_dir)
-        .map_err(|e| format!("Failed to create sessions directory: {}", e))?;
-
-    // Convert PathBuf to String
+    // Convert Path to String
     let path_str = sessions_dir.to_str()
         .ok_or("Sessions directory path is not valid UTF-8")?;
 
@@ -351,17 +332,11 @@ async fn get_sessions_directory() -> Result<String, String> {
 
 /// Gets the workspaces directory path
 #[tauri::command]
-async fn get_workspaces_directory() -> Result<String, String> {
-    use orcs_infrastructure::paths::OrcsPaths;
+async fn get_workspaces_directory(state: State<'_, AppState>) -> Result<String, String> {
+    // Get the actual workspaces root directory path from the manager
+    let workspaces_dir = state.workspace_manager.workspaces_root_dir();
 
-    let workspaces_dir = OrcsPaths::workspaces_dir()
-        .map_err(|e| format!("Failed to get workspaces directory: {}", e))?;
-
-    // Create the directory if it doesn't exist
-    std::fs::create_dir_all(&workspaces_dir)
-        .map_err(|e| format!("Failed to create workspaces directory: {}", e))?;
-
-    // Convert PathBuf to String
+    // Convert Path to String
     let path_str = workspaces_dir.to_str()
         .ok_or("Workspaces directory path is not valid UTF-8")?;
 
@@ -754,11 +729,12 @@ fn main() {
         use orcs_infrastructure::paths::OrcsPaths;
 
         // Composition Root: Create the concrete repository instances
-        let persona_repository = Arc::new(
+        let persona_repository_concrete = Arc::new(
             AsyncDirPersonaRepository::default_location()
                 .await
                 .expect("Failed to initialize persona repository")
         );
+        let persona_repository: Arc<dyn PersonaRepository> = persona_repository_concrete.clone();
         let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
 
         // Initialize FileSystemWorkspaceManager with unified path
@@ -803,7 +779,7 @@ fn main() {
 
         // Initialize SessionManager with the repository
         let session_manager: Arc<SessionManager<InteractionManager>> = Arc::new(
-            SessionManager::new(session_repository)
+            SessionManager::new(session_repository.clone())
         );
 
         // Create SessionUseCase for coordinated session-workspace management
@@ -838,10 +814,12 @@ fn main() {
             .manage(AppState {
                 session_usecase,
                 session_manager,
+                session_repository: session_repository.clone(),
                 app_mode,
                 persona_repository,
+                persona_repository_concrete: persona_repository_concrete.clone(),
                 user_service,
-                workspace_manager,
+                workspace_manager: workspace_manager.clone(),
                 slash_command_repository,
             })
             .invoke_handler(tauri::generate_handler![

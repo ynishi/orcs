@@ -105,6 +105,14 @@ impl AsyncDirSessionRepository {
         })
     }
 
+    /// Returns the actual sessions directory path.
+    ///
+    /// This returns the real path where session files are stored,
+    /// which is determined by the AsyncDirStorage's path resolution strategy.
+    pub fn sessions_dir(&self) -> &Path {
+        self.storage.base_path()
+    }
+
     /// Migrates a persona ID from old format (name) to UUID.
     fn migrate_persona_id(&self, id: &str) -> Result<String> {
         // Check if already a UUID

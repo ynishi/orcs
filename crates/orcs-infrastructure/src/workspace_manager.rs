@@ -98,6 +98,13 @@ impl FileSystemWorkspaceManager {
         Ok(workspace_id.to_string())
     }
 
+    /// Returns the actual workspaces root directory path.
+    ///
+    /// This returns the real path where workspace directories are stored.
+    pub fn workspaces_root_dir(&self) -> &Path {
+        &self.root_dir
+    }
+
     /// Gets the workspace directory path for a given workspace ID.
     ///
     /// # Arguments

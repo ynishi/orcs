@@ -3,10 +3,10 @@
 //! This module contains the core Session entity that represents
 //! a user session in the application's domain layer.
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use super::app_mode::AppMode;
 use super::message::ConversationMessage;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Represents a user session in the application's domain layer.
 ///

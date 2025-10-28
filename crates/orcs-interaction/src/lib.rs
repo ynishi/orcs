@@ -1,6 +1,6 @@
-pub mod persona_agent;
 pub mod gemini_api_agent;
 pub mod local_agents;
+pub mod persona_agent;
 
 use crate::gemini_api_agent::GeminiApiAgent;
 use crate::local_agents::claude_code::ClaudeCodeAgent;
@@ -45,7 +45,10 @@ struct PersonaBackendAgent {
 
 impl PersonaBackendAgent {
     fn new(backend: PersonaBackend, workspace_root: Arc<RwLock<Option<PathBuf>>>) -> Self {
-        Self { backend, workspace_root }
+        Self {
+            backend,
+            workspace_root,
+        }
     }
 
     /// Executes the agent with optional workspace context.
@@ -68,10 +71,15 @@ impl PersonaBackendAgent {
         workspace_root: Option<PathBuf>,
     ) -> Result<String, AgentError> {
         // Log the intention but do not change the directory
-        eprintln!("[PersonaBackendAgent] Executing with workspace context: {:?} for backend: {:?}", workspace_root, self.backend);
+        eprintln!(
+            "[PersonaBackendAgent] Executing with workspace context: {:?} for backend: {:?}",
+            workspace_root, self.backend
+        );
 
         match self.backend {
-            PersonaBackend::ClaudeCli => ClaudeCodeAgent::new(workspace_root).execute(payload).await,
+            PersonaBackend::ClaudeCli => {
+                ClaudeCodeAgent::new(workspace_root).execute(payload).await
+            }
             PersonaBackend::GeminiCli => GeminiAgent::new(workspace_root).execute(payload).await,
             PersonaBackend::GeminiApi => GeminiApiAgent::try_from_env()?.execute(payload).await,
         }
@@ -93,12 +101,18 @@ impl Agent for PersonaBackendAgent {
     async fn execute(&self, payload: Payload) -> Result<Self::Output, AgentError> {
         // Read workspace_root from shared state
         let workspace_root = self.workspace_root.read().await.clone();
-        eprintln!("[PersonaBackendAgent::execute] Read workspace_root from Arc: {:?}", workspace_root);
+        eprintln!(
+            "[PersonaBackendAgent::execute] Read workspace_root from Arc: {:?}",
+            workspace_root
+        );
         self.execute_with_workspace(payload, workspace_root).await
     }
 }
 
-fn agent_for_persona(persona: &PersonaDomain, workspace_root: Arc<RwLock<Option<PathBuf>>>) -> PersonaBackendAgent {
+fn agent_for_persona(
+    persona: &PersonaDomain,
+    workspace_root: Arc<RwLock<Option<PathBuf>>>,
+) -> PersonaBackendAgent {
     PersonaBackendAgent::new(persona.backend.clone(), workspace_root)
 }
 
@@ -275,7 +289,10 @@ impl InteractionManager {
 
         for persona in default_personas {
             let llm_persona = domain_to_llm_persona(&persona);
-            dialogue.add_participant(llm_persona, agent_for_persona(&persona, self.agent_workspace_root.clone()));
+            dialogue.add_participant(
+                llm_persona,
+                agent_for_persona(&persona, self.agent_workspace_root.clone()),
+            );
         }
 
         *dialogue_guard = Some(dialogue);
@@ -327,8 +344,15 @@ impl InteractionManager {
     }
 
     /// Updates the workspace ID for this session.
-    pub async fn set_workspace_id(&self, workspace_id: Option<String>, workspace_root: Option<PathBuf>) {
-        eprintln!("[InteractionManager::set_workspace_id] Called with workspace_id={:?}, workspace_root={:?}", workspace_id, workspace_root);
+    pub async fn set_workspace_id(
+        &self,
+        workspace_id: Option<String>,
+        workspace_root: Option<PathBuf>,
+    ) {
+        eprintln!(
+            "[InteractionManager::set_workspace_id] Called with workspace_id={:?}, workspace_root={:?}",
+            workspace_id, workspace_root
+        );
 
         let mut ws_id = self.workspace_id.write().await;
         *ws_id = workspace_id.clone();
@@ -336,7 +360,10 @@ impl InteractionManager {
         let mut ws_root = self.agent_workspace_root.write().await;
         *ws_root = workspace_root.clone();
 
-        eprintln!("[InteractionManager::set_workspace_id] Updated agent_workspace_root to: {:?}", workspace_root);
+        eprintln!(
+            "[InteractionManager::set_workspace_id] Updated agent_workspace_root to: {:?}",
+            workspace_root
+        );
     }
 
     /// Returns a list of available persona IDs.
@@ -374,7 +401,10 @@ impl InteractionManager {
         // Lock the dialogue and add participant
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
-        dialogue.add_participant(persona, agent_for_persona(&persona_config, self.agent_workspace_root.clone()));
+        dialogue.add_participant(
+            persona,
+            agent_for_persona(&persona_config, self.agent_workspace_root.clone()),
+        );
 
         Ok(())
     }
@@ -628,7 +658,11 @@ impl orcs_core::session::InteractionManagerTrait for InteractionManager {
         self.to_session(app_mode, workspace_id).await
     }
 
-    async fn set_workspace_id(&self, workspace_id: Option<String>, workspace_root: Option<PathBuf>) {
+    async fn set_workspace_id(
+        &self,
+        workspace_id: Option<String>,
+        workspace_root: Option<PathBuf>,
+    ) {
         self.set_workspace_id(workspace_id, workspace_root).await
     }
 }

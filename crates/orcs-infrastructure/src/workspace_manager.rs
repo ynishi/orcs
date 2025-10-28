@@ -68,7 +68,10 @@ impl FileSystemWorkspaceManager {
         // Initialize AsyncDirWorkspaceRepository
         let workspace_repository = Arc::new(AsyncDirWorkspaceRepository::default_location().await?);
 
-        Ok(Self { root_dir, workspace_repository })
+        Ok(Self {
+            root_dir,
+            workspace_repository,
+        })
     }
 
     /// Generates a deterministic workspace ID from a repository path.
@@ -136,9 +139,7 @@ impl FileSystemWorkspaceManager {
             .workspace_repository
             .find_by_id(workspace_id)
             .await?
-            .ok_or_else(|| {
-                OrcsError::Io(format!("Workspace '{}' not found", workspace_id))
-            })?;
+            .ok_or_else(|| OrcsError::Io(format!("Workspace '{}' not found", workspace_id)))?;
 
         // Set workspace_dir (calculated from workspace_id, not stored in repository)
         workspace.workspace_dir = self.get_workspace_dir(workspace_id);
@@ -196,8 +197,9 @@ impl FileSystemWorkspaceManager {
 #[async_trait]
 impl WorkspaceManager for FileSystemWorkspaceManager {
     async fn get_current_workspace(&self) -> Result<Workspace> {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| orcs_core::error::OrcsError::Io(format!("Failed to get current directory: {}", e)))?;
+        let current_dir = std::env::current_dir().map_err(|e| {
+            orcs_core::error::OrcsError::Io(format!("Failed to get current directory: {}", e))
+        })?;
 
         self.get_or_create_workspace(&current_dir).await
     }
@@ -322,7 +324,10 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         };
 
         // Add to workspace's uploaded_files list
-        workspace.resources.uploaded_files.push(uploaded_file.clone());
+        workspace
+            .resources
+            .uploaded_files
+            .push(uploaded_file.clone());
 
         // Save the updated workspace metadata
         self.save_workspace(&workspace).await?;
@@ -398,7 +403,10 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         };
 
         // Add to workspace's uploaded_files list
-        workspace.resources.uploaded_files.push(uploaded_file.clone());
+        workspace
+            .resources
+            .uploaded_files
+            .push(uploaded_file.clone());
 
         // Save the updated workspace metadata
         self.save_workspace(&workspace).await?;
@@ -406,11 +414,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         Ok(uploaded_file)
     }
 
-    async fn delete_file_from_workspace(
-        &self,
-        workspace_id: &str,
-        file_id: &str,
-    ) -> Result<()> {
+    async fn delete_file_from_workspace(&self, workspace_id: &str, file_id: &str) -> Result<()> {
         // Load existing workspace metadata
         let mut workspace = self.load_workspace(workspace_id).await?;
 
@@ -525,10 +529,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         let workspace_dir = self.get_workspace_dir(workspace_id);
 
         // Construct the path to session's temp directory (sessions/{session_id}/temp)
-        let session_temp_dir = workspace_dir
-            .join("sessions")
-            .join(session_id)
-            .join("temp");
+        let session_temp_dir = workspace_dir.join("sessions").join(session_id).join("temp");
 
         // Ensure the temp directory exists
         fs::create_dir_all(&session_temp_dir).await.map_err(|e| {
@@ -578,11 +579,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         Ok(temp_file)
     }
 
-    async fn read_file_content(
-        &self,
-        workspace_id: &str,
-        relative_path: &str,
-    ) -> Result<String> {
+    async fn read_file_content(&self, workspace_id: &str, relative_path: &str) -> Result<String> {
         // Get the workspace directory
         let workspace_dir = self.get_workspace_dir(workspace_id);
 
@@ -610,8 +607,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         let canonical_target_path = target_path.canonicalize().map_err(|e| {
             OrcsError::Io(format!(
                 "Failed to access file at '{}': {}",
-                relative_path,
-                e
+                relative_path, e
             ))
         })?;
 
@@ -627,11 +623,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         let content = fs::read_to_string(&canonical_target_path)
             .await
             .map_err(|e| {
-                OrcsError::Io(format!(
-                    "Failed to read file at '{}': {}",
-                    relative_path,
-                    e
-                ))
+                OrcsError::Io(format!("Failed to read file at '{}': {}", relative_path, e))
             })?;
 
         Ok(content)
@@ -748,10 +740,7 @@ mod tests {
             .await
             .unwrap();
 
-        let workspace = manager
-            .get_or_create_workspace(&repo_path)
-            .await
-            .unwrap();
+        let workspace = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         assert_eq!(workspace.name, "test-repo");
         assert_eq!(workspace.root_path, repo_path);
@@ -772,16 +761,10 @@ mod tests {
             .unwrap();
 
         // Create workspace first time
-        let workspace1 = manager
-            .get_or_create_workspace(&repo_path)
-            .await
-            .unwrap();
+        let workspace1 = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         // Load workspace second time
-        let workspace2 = manager
-            .get_or_create_workspace(&repo_path)
-            .await
-            .unwrap();
+        let workspace2 = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         assert_eq!(workspace1.id, workspace2.id);
         assert_eq!(workspace1.name, workspace2.name);
@@ -811,10 +794,7 @@ mod tests {
             .await
             .unwrap();
 
-        let workspace = manager
-            .get_or_create_workspace(&repo_path)
-            .await
-            .unwrap();
+        let workspace = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         let retrieved = manager.get_workspace(&workspace.id).await.unwrap();
         assert!(retrieved.is_some());
@@ -838,10 +818,7 @@ mod tests {
             .unwrap();
 
         // Create workspace
-        let workspace = manager
-            .get_or_create_workspace(&repo_path)
-            .await
-            .unwrap();
+        let workspace = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         // Add file to workspace
         let uploaded_file = manager
@@ -884,10 +861,7 @@ mod tests {
             .unwrap();
 
         // Create workspace
-        let workspace = manager
-            .get_or_create_workspace(&repo_path)
-            .await
-            .unwrap();
+        let workspace = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         // Create a temp file
         let session_id = "test-session-123";
@@ -921,10 +895,7 @@ mod tests {
         // Verify the workspace metadata was updated
         let updated_workspace = manager.get_workspace(&workspace.id).await.unwrap().unwrap();
         assert_eq!(updated_workspace.resources.temp_files.len(), 1);
-        assert_eq!(
-            updated_workspace.resources.temp_files[0].id,
-            temp_file.id
-        );
+        assert_eq!(updated_workspace.resources.temp_files[0].id, temp_file.id);
         assert_eq!(
             updated_workspace.resources.temp_files[0].path,
             temp_file.path
@@ -943,10 +914,7 @@ mod tests {
             .unwrap();
 
         // Create workspace
-        let workspace = manager
-            .get_or_create_workspace(&repo_path)
-            .await
-            .unwrap();
+        let workspace = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         // Test data
         let filename = "test.txt";
@@ -993,10 +961,7 @@ mod tests {
             .unwrap();
 
         // Create workspace
-        let workspace = manager
-            .get_or_create_workspace(&repo_path)
-            .await
-            .unwrap();
+        let workspace = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         // Create a test file in the workspace directory
         let workspace_dir = manager.get_workspace_dir(&workspace.id);
@@ -1026,10 +991,7 @@ mod tests {
             .unwrap();
 
         // Create workspace
-        let workspace = manager
-            .get_or_create_workspace(&repo_path)
-            .await
-            .unwrap();
+        let workspace = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         // Create a file outside the workspace directory
         let outside_file = temp_dir.path().join("outside.txt");

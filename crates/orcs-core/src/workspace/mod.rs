@@ -4,6 +4,5 @@ pub mod model;
 
 pub use metadata_repository::{WorkspaceMetadata, WorkspaceMetadataRepository};
 pub use model::{
-    ProjectContext, SessionWorkspace, TempFile, UploadedFile, Workspace,
-    WorkspaceResources,
+    ProjectContext, SessionWorkspace, TempFile, UploadedFile, Workspace, WorkspaceResources,
 };

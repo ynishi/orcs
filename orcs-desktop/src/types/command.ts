@@ -1,3 +1,5 @@
+import { SlashCommand } from './slash_command';
+
 /**
  * コマンド定義
  */
@@ -83,6 +85,49 @@ export function filterCommands(input: string): CommandDefinition[] {
   }
 
   return COMMAND_DEFINITIONS.filter(cmd =>
+    cmd.name.toLowerCase().startsWith(query) ||
+    cmd.description.toLowerCase().includes(query)
+  );
+}
+
+/**
+ * SlashCommand を CommandDefinition に変換
+ */
+export function slashCommandToDefinition(cmd: SlashCommand): CommandDefinition {
+  const usage = cmd.type === 'prompt'
+    ? `/${cmd.name}`
+    : `/${cmd.name} (shell)`;
+
+  return {
+    name: cmd.name,
+    icon: cmd.icon,
+    description: cmd.description,
+    usage,
+    examples: [],
+  };
+}
+
+/**
+ * カスタムコマンドを含めてフィルタリング
+ */
+export function filterCommandsWithCustom(
+  input: string,
+  customCommands: SlashCommand[]
+): CommandDefinition[] {
+  // `/` を除去
+  const query = input.startsWith('/') ? input.slice(1).toLowerCase() : input.toLowerCase();
+
+  // ビルトインコマンドとカスタムコマンドをマージ
+  const allCommands = [
+    ...COMMAND_DEFINITIONS,
+    ...customCommands.map(slashCommandToDefinition),
+  ];
+
+  if (!query) {
+    return allCommands;
+  }
+
+  return allCommands.filter(cmd =>
     cmd.name.toLowerCase().startsWith(query) ||
     cmd.description.toLowerCase().includes(query)
   );

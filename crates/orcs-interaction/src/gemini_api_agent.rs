@@ -3,13 +3,13 @@
 //! This agent calls the Gemini REST API directly without CLI dependency.
 //! Configuration priority: ~/.config/orcs/secret.json > environment variables
 
-use orcs_infrastructure::storage::SecretStorage;
+use async_trait::async_trait;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
-use async_trait::async_trait;
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use base64::Engine;
-use reqwest::{header::HeaderValue, Client, StatusCode};
+use orcs_infrastructure::storage::SecretStorage;
+use reqwest::{Client, StatusCode, header::HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::time::Duration;
@@ -108,15 +108,13 @@ impl GeminiApiAgent {
             Attachment::Remote(_) => {
                 return Err(AgentError::ExecutionFailed(
                     "Remote attachments are not supported for Gemini API".into(),
-                ))
+                ));
             }
             _ => {}
         }
 
         let bytes = attachment.load_bytes().await.map_err(|err| {
-            AgentError::ExecutionFailed(format!(
-                "Failed to load attachment for Gemini API: {err}"
-            ))
+            AgentError::ExecutionFailed(format!("Failed to load attachment for Gemini API: {err}"))
         })?;
 
         let mime_type = attachment
@@ -214,7 +212,9 @@ struct Content {
 #[derive(Serialize)]
 #[serde(untagged)]
 enum Part {
-    Text { text: String },
+    Text {
+        text: String,
+    },
     InlineData {
         #[serde(rename = "inlineData")]
         inline_data: InlineDataPayload,
@@ -274,11 +274,7 @@ fn extract_text_response(response: GenerateContentResponse) -> Result<String, Ag
         })
 }
 
-fn map_http_error(
-    status: StatusCode,
-    body: String,
-    retry_after: Option<Duration>,
-) -> AgentError {
+fn map_http_error(status: StatusCode, body: String, retry_after: Option<Duration>) -> AgentError {
     let message = serde_json::from_str::<ErrorWrapper>(&body)
         .map(|wrapper| {
             let status_text = wrapper.error.status.unwrap_or_default();

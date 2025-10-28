@@ -4,7 +4,7 @@
 //! between `SessionManager` and `WorkspaceManager` to ensure data consistency
 //! and proper state management across workspace-session relationships.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{AppMode, Session, SessionManager};
 use orcs_core::user::UserService;
@@ -312,8 +312,15 @@ impl SessionUseCase {
             .await?
             .ok_or_else(|| anyhow!("Workspace not found: {}", workspace_id))?;
 
-        println!("[SessionUseCase] Target workspace: {} at {}", workspace.name, workspace.root_path.display());
-        println!("[SessionUseCase] Workspace last_active_session_id: {:?}", workspace.last_active_session_id);
+        println!(
+            "[SessionUseCase] Target workspace: {} at {}",
+            workspace.name,
+            workspace.root_path.display()
+        );
+        println!(
+            "[SessionUseCase] Workspace last_active_session_id: {:?}",
+            workspace.last_active_session_id
+        );
         tracing::debug!(
             "[SessionUseCase] Target workspace: {} at {}",
             workspace.name,
@@ -324,31 +331,51 @@ impl SessionUseCase {
         // Priority: last_active_session_id > most recent session > create new session
 
         // Get all sessions for this workspace
-        let all_sessions = self.session_manager.list_sessions().await
+        let all_sessions = self
+            .session_manager
+            .list_sessions()
+            .await
             .map_err(|e| anyhow!("Failed to list sessions: {}", e))?;
 
-        let workspace_sessions: Vec<_> = all_sessions.into_iter()
+        let workspace_sessions: Vec<_> = all_sessions
+            .into_iter()
             .filter(|s| s.workspace_id.as_ref() == Some(&workspace.id))
             .collect();
 
-        println!("[SessionUseCase] Found {} sessions for workspace {}", workspace_sessions.len(), workspace_id);
+        println!(
+            "[SessionUseCase] Found {} sessions for workspace {}",
+            workspace_sessions.len(),
+            workspace_id
+        );
 
         // Try last_active_session_id first
         if let Some(ref last_session_id) = workspace.last_active_session_id {
             if workspace_sessions.iter().any(|s| &s.id == last_session_id) {
-                println!("[SessionUseCase] Using last active session: {}", last_session_id);
+                println!(
+                    "[SessionUseCase] Using last active session: {}",
+                    last_session_id
+                );
                 match self.switch_session(last_session_id).await {
                     Ok(_) => {
-                        println!("[SessionUseCase] Successfully switched to workspace {} with last active session {}", workspace_id, last_session_id);
+                        println!(
+                            "[SessionUseCase] Successfully switched to workspace {} with last active session {}",
+                            workspace_id, last_session_id
+                        );
                         return Ok(());
                     }
                     Err(e) => {
-                        println!("[SessionUseCase] Failed to switch to last active session: {}", e);
+                        println!(
+                            "[SessionUseCase] Failed to switch to last active session: {}",
+                            e
+                        );
                         // Fall through to try other sessions
                     }
                 }
             } else {
-                println!("[SessionUseCase] Last active session {} not found in workspace sessions, ignoring", last_session_id);
+                println!(
+                    "[SessionUseCase] Last active session {} not found in workspace sessions, ignoring",
+                    last_session_id
+                );
             }
         }
 
@@ -358,10 +385,16 @@ impl SessionUseCase {
             sorted_sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
             let most_recent = &sorted_sessions[0];
 
-            println!("[SessionUseCase] Using most recent session: {}", most_recent.id);
+            println!(
+                "[SessionUseCase] Using most recent session: {}",
+                most_recent.id
+            );
             match self.switch_session(&most_recent.id).await {
                 Ok(_) => {
-                    println!("[SessionUseCase] Successfully switched to workspace {} with recent session {}", workspace_id, most_recent.id);
+                    println!(
+                        "[SessionUseCase] Successfully switched to workspace {} with recent session {}",
+                        workspace_id, most_recent.id
+                    );
                     return Ok(());
                 }
                 Err(e) => {
@@ -371,11 +404,17 @@ impl SessionUseCase {
             }
         }
 
-        println!("[SessionUseCase] No valid session found, creating new session for workspace {}", workspace_id);
+        println!(
+            "[SessionUseCase] No valid session found, creating new session for workspace {}",
+            workspace_id
+        );
 
         // 3. Create new session for this workspace
         let session_id = Uuid::new_v4().to_string();
-        println!("[SessionUseCase] Creating new session {} for workspace {}", session_id, workspace_id);
+        println!(
+            "[SessionUseCase] Creating new session {} for workspace {}",
+            session_id, workspace_id
+        );
 
         let manager = self
             .session_manager
@@ -406,7 +445,10 @@ impl SessionUseCase {
         self.workspace_manager.save_workspace(&workspace).await?;
         self.workspace_manager.touch_workspace(workspace_id).await?;
 
-        println!("[SessionUseCase] Successfully created and switched to new session {} for workspace {}", session_id, workspace_id);
+        println!(
+            "[SessionUseCase] Successfully created and switched to new session {} for workspace {}",
+            session_id, workspace_id
+        );
         tracing::info!(
             "[SessionUseCase] Successfully created and switched to new session {} for workspace {}",
             session_id,

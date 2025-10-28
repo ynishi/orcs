@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { notifications } from '@mantine/notifications';
@@ -38,12 +38,12 @@ import { Navbar } from "./components/navigation/Navbar";
 import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
 import { SettingsMenu } from "./components/settings/SettingsMenu";
 import { parseCommand, isValidCommand, getCommandHelp } from "./utils/commandParser";
-import { filterCommands, CommandDefinition } from "./types/command";
+import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages, isIdleMode } from "./types/session";
-import { SlashCommand } from "./types/slash_command";
+import { SlashCommand, ExpandedSlashCommand } from "./types/slash_command";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -74,6 +74,7 @@ function App() {
   });
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [thinkingPersona, setThinkingPersona] = useState<string>('AI');
+  const [customCommands, setCustomCommands] = useState<SlashCommand[]>([]);
 
   // セッション管理をカスタムフックに切り替え
   const {
@@ -166,6 +167,21 @@ function App() {
     loadGitInfo();
   }, []);
 
+  const refreshCustomCommands = useCallback(async () => {
+    try {
+      const commands = await invoke<SlashCommand[]>('list_slash_commands');
+      setCustomCommands(commands);
+      console.log('[App] Loaded custom commands:', commands.length);
+    } catch (error) {
+      console.error('Failed to load custom slash commands:', error);
+    }
+  }, []);
+
+  // Load custom slash commands on startup
+  useEffect(() => {
+    refreshCustomCommands();
+  }, [refreshCustomCommands]);
+
   // Listen for workspace-switched events to refresh workspace data
   useEffect(() => {
     const unlisten = listen<string>('workspace-switched', async () => {
@@ -184,11 +200,13 @@ function App() {
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
   useEffect(() => {
-    const trimmedInput = input.trim();
+    const cursorPosition = textareaRef.current?.selectionStart || input.length;
+    const spaceIndex = input.indexOf(' ');
+    const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
 
-    // コマンドサジェスト
-    if (trimmedInput.startsWith('/')) {
-      const commands = filterCommands(trimmedInput);
+    // コマンドサジェスト（コマンド名入力中のみ表示）
+    if (isCommandPhase) {
+      const commands = filterCommandsWithCustom(input, customCommands);
       setFilteredCommands(commands);
       setShowSuggestions(commands.length > 0);
       setSelectedSuggestionIndex(0);
@@ -198,7 +216,6 @@ function App() {
     }
 
     // エージェントサジェスト（@メンション）
-    const cursorPosition = textareaRef.current?.selectionStart || input.length;
     const mentionFilter = getCurrentMention(input, cursorPosition);
 
     if (mentionFilter !== null) {
@@ -209,7 +226,7 @@ function App() {
     } else {
       setShowAgentSuggestions(false);
     }
-  }, [input]);
+  }, [input, customCommands]);
 
   // メッセージを追加するヘルパー関数
   const addMessage = (type: MessageType, author: string, text: string) => {
@@ -222,6 +239,205 @@ function App() {
     };
     setMessages((prev) => [...prev, newMessage]);
   };
+
+  const processInput = useCallback(
+    async (rawInput: string, attachedFiles: File[] = []) => {
+      if (!rawInput.trim() && attachedFiles.length === 0) {
+        return;
+      }
+
+      const currentFiles = [...attachedFiles];
+
+      const mentions = extractMentions(rawInput);
+      if (mentions.length > 0) {
+        console.log('[MENTION EVENT] Agents mentioned:', mentions.map(m => m.agentName));
+      }
+
+      const parsed = parseCommand(rawInput);
+      let backendInput = rawInput;
+      let promptCommandExecuted = false;
+
+      if (parsed.isCommand && parsed.command) {
+        addMessage('command', userNickname, rawInput);
+
+        const isBuiltinCommand = isValidCommand(parsed.command);
+
+        if (isBuiltinCommand) {
+          switch (parsed.command) {
+            case 'help':
+              addMessage('system', 'System', getCommandHelp());
+              return;
+            case 'status':
+              addMessage('system', 'System', `Status: ${status.connection}\nTasks: ${status.activeTasks}\nAgent: ${status.currentAgent}\nMode: ${status.mode}`);
+              return;
+            case 'task':
+              if (parsed.args && parsed.args.length > 0) {
+                const taskText = parsed.args.join(' ');
+                const newTask: Task = {
+                  id: `${Date.now()}-${Math.random()}`,
+                  description: taskText,
+                  status: 'pending',
+                  createdAt: new Date(),
+                };
+                setTasks((prev) => [...prev, newTask]);
+                setStatus(prev => ({ ...prev, activeTasks: prev.activeTasks + 1 }));
+                addMessage('task', 'System', `✅ Task created: ${taskText}`);
+              } else {
+                addMessage('error', 'System', 'Usage: /task [description]');
+              }
+              return;
+            case 'workspace':
+              if (parsed.args && parsed.args.length > 0) {
+                const workspaceName = parsed.args.join(' ');
+                const targetWorkspace = allWorkspaces.find(ws =>
+                  ws.name.toLowerCase() === workspaceName.toLowerCase()
+                );
+                if (targetWorkspace && currentSessionId) {
+                  switchWorkspace(currentSessionId, targetWorkspace.id)
+                    .then(() => {
+                      addMessage('system', 'System', `✅ Switched to workspace: ${targetWorkspace.name}`);
+                    })
+                    .catch(err => {
+                      addMessage('error', 'System', `Failed to switch workspace: ${err}`);
+                    });
+                } else if (!targetWorkspace) {
+                  addMessage('error', 'System', `Workspace not found: ${workspaceName}\n\nAvailable workspaces:\n${allWorkspaces.map(ws => `- ${ws.name}`).join('\n')}`);
+                } else {
+                  addMessage('error', 'System', 'No active session');
+                }
+              } else {
+                const workspaceList = allWorkspaces.map(ws =>
+                  `${ws.id === workspace?.id ? '📍' : '  '} ${ws.name}${ws.isFavorite ? ' ⭐' : ''}`
+                ).join('\n');
+                addMessage('system', 'System', `Available workspaces:\n${workspaceList}\n\nUsage: /workspace <name>`);
+              }
+              return;
+            case 'files':
+              const fileList = workspaceFiles.length > 0
+                ? workspaceFiles.map(f => `📄 ${f.name} (${(f.size / 1024).toFixed(2)} KB)${f.author ? ` - by ${f.author}` : ''}`).join('\n')
+                : 'No files in current workspace';
+              addMessage('system', 'System', `Files in workspace "${workspace?.name}":\n${fileList}`);
+              return;
+            default:
+              break;
+          }
+        } else {
+          try {
+            const customCommand = await invoke<SlashCommand | null>('get_slash_command', { name: parsed.command });
+
+            if (!customCommand) {
+              addMessage('error', 'System', `Unknown command: /${parsed.command}\n\nType /help for available commands.`);
+              return;
+            }
+
+            const argsText = parsed.args?.join(' ') ?? '';
+            const expanded = await invoke<ExpandedSlashCommand>('expand_command_template', {
+              commandName: customCommand.name,
+              args: argsText,
+            });
+
+            if (customCommand.type === 'prompt') {
+              addMessage('system', 'System', `✨ Executing custom command: /${customCommand.name}`);
+              backendInput = expanded.content;
+              promptCommandExecuted = true;
+            } else {
+              addMessage('system', 'System', `⚡ Executing shell command: /${customCommand.name}`);
+              if (expanded.workingDir) {
+                addMessage('shell_output', 'System', `(cwd: ${expanded.workingDir})`);
+              }
+              addMessage('shell_output', 'System', `$ ${expanded.content}`);
+
+              try {
+                const output = await invoke<string>('execute_shell_command', {
+                  command: expanded.content,
+                  workingDir: expanded.workingDir ?? null,
+                });
+                addMessage('shell_output', 'System', output || '(no output)');
+              } catch (shellError) {
+                addMessage('error', 'System', `Shell command failed: ${shellError}`);
+              }
+              return;
+            }
+          } catch (error) {
+            console.error('Failed to execute custom command:', error);
+            addMessage('error', 'System', `Failed to execute command: ${error}`);
+            return;
+          }
+        }
+      }
+
+      if (promptCommandExecuted && !backendInput.trim()) {
+        addMessage('error', 'System', `Command ${rawInput} produced empty content.`);
+        return;
+      }
+
+      let messageText = backendInput;
+
+      if (currentFiles.length > 0) {
+        const fileInfo = currentFiles.map(f => `📎 ${f.name} (${(f.size / 1024).toFixed(1)} KB)`).join('\n');
+        messageText = backendInput ? `${backendInput}\n\n${fileInfo}` : fileInfo;
+      }
+
+      if (includeWorkspaceInPrompt && workspaceFiles.length > 0) {
+        const uploadedDir = workspace?.workspaceDir
+          ? `${workspace.workspaceDir}/resources/uploaded/`
+          : '~/.orcs/workspaces/{workspace-id}/resources/uploaded/';
+
+        const workspaceInfo = [
+          '',
+          '---',
+          'Available workspace files:',
+          ...workspaceFiles.map(f => `  - ${f.name} (${(f.size / 1024).toFixed(1)} KB)`),
+          '',
+          `Workspace location: ${uploadedDir}`,
+        ].join('\n');
+        messageText = messageText + workspaceInfo;
+      }
+
+      addMessage('user', userNickname, messageText);
+
+      setIsAiThinking(true);
+      setThinkingPersona('AI Assistant');
+
+      try {
+        const result = await invoke<InteractionResult>("handle_input", {
+          input: backendInput,
+        });
+
+        if (result.type === 'NewDialogueMessages') {
+          console.log('[BATCH] Received', result.data.length, 'messages (already streamed)');
+        }
+
+        await saveCurrentSession();
+      } catch (error) {
+        console.error("Error calling backend:", error);
+        addMessage('error', 'System', `Error: ${error}`);
+      } finally {
+        setIsAiThinking(false);
+      }
+    },
+    [
+      addMessage,
+      allWorkspaces,
+      currentSessionId,
+      getCommandHelp,
+      includeWorkspaceInPrompt,
+      invoke,
+      saveCurrentSession,
+      setIsAiThinking,
+      setStatus,
+      setTasks,
+      setThinkingPersona,
+      status.activeTasks,
+      status.connection,
+      status.currentAgent,
+      status.mode,
+      switchWorkspace,
+      userNickname,
+      workspace,
+      workspaceFiles,
+    ]
+  );
 
   // スレッド全体をテキストとして取得
   const getThreadAsText = () => {
@@ -547,7 +763,9 @@ function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!input.trim() && attachedFiles.length === 0) return;
+    if (!input.trim() && attachedFiles.length === 0) {
+      return;
+    }
 
     const currentInput = input;
     const currentFiles = [...attachedFiles];
@@ -555,181 +773,20 @@ function App() {
     setAttachedFiles([]);
     setShowSuggestions(false);
     setShowAgentSuggestions(false);
-
-    // メンションをパース
-    const mentions = extractMentions(currentInput);
-    if (mentions.length > 0) {
-      console.log('[MENTION EVENT] Agents mentioned:', mentions.map(m => m.agentName));
-    }
-
-    // コマンドをパース
-    const parsed = parseCommand(currentInput);
-
-    if (parsed.isCommand && parsed.command) {
-      addMessage('command', userNickname, currentInput);
-
-      if (!isValidCommand(parsed.command)) {
-        addMessage('error', 'System', `Unknown command: /${parsed.command}\n\nType /help for available commands.`);
-        return;
-      }
-
-      // コマンド実行
-      switch (parsed.command) {
-        case 'help':
-          addMessage('system', 'System', getCommandHelp());
-          break;
-        case 'status':
-          addMessage('system', 'System', `Status: ${status.connection}\nTasks: ${status.activeTasks}\nAgent: ${status.currentAgent}\nMode: ${status.mode}`);
-          break;
-        case 'task':
-          if (parsed.args && parsed.args.length > 0) {
-            const taskText = parsed.args.join(' ');
-            const newTask: Task = {
-              id: `${Date.now()}-${Math.random()}`,
-              description: taskText,
-              status: 'pending',
-              createdAt: new Date(),
-            };
-            setTasks((prev) => [...prev, newTask]);
-            setStatus(prev => ({ ...prev, activeTasks: prev.activeTasks + 1 }));
-            addMessage('task', 'System', `✅ Task created: ${taskText}`);
-          } else {
-            addMessage('error', 'System', 'Usage: /task [description]');
-          }
-          break;
-        case 'workspace':
-          if (parsed.args && parsed.args.length > 0) {
-            const workspaceName = parsed.args.join(' ');
-            // Find workspace by name
-            const targetWorkspace = allWorkspaces.find(ws =>
-              ws.name.toLowerCase() === workspaceName.toLowerCase()
-            );
-            if (targetWorkspace && currentSessionId) {
-              switchWorkspace(currentSessionId, targetWorkspace.id)
-                .then(() => {
-                  addMessage('system', 'System', `✅ Switched to workspace: ${targetWorkspace.name}`);
-                })
-                .catch(err => {
-                  addMessage('error', 'System', `Failed to switch workspace: ${err}`);
-                });
-            } else if (!targetWorkspace) {
-              addMessage('error', 'System', `Workspace not found: ${workspaceName}\n\nAvailable workspaces:\n${allWorkspaces.map(ws => `- ${ws.name}`).join('\n')}`);
-            } else {
-              addMessage('error', 'System', 'No active session');
-            }
-          } else {
-            // List all workspaces
-            const workspaceList = allWorkspaces.map(ws =>
-              `${ws.id === workspace?.id ? '📍' : '  '} ${ws.name}${ws.isFavorite ? ' ⭐' : ''}`
-            ).join('\n');
-            addMessage('system', 'System', `Available workspaces:\n${workspaceList}\n\nUsage: /workspace <name>`);
-          }
-          break;
-        case 'files':
-          const fileList = workspaceFiles.length > 0
-            ? workspaceFiles.map(f => `📄 ${f.name} (${(f.size / 1024).toFixed(2)} KB)${f.author ? ` - by ${f.author}` : ''}`).join('\n')
-            : 'No files in current workspace';
-          addMessage('system', 'System', `Files in workspace "${workspace?.name}":\n${fileList}`);
-          break;
-        default:
-          // Try to execute as custom slash command
-          try {
-            const customCommand = await invoke<SlashCommand | null>('get_slash_command', { name: parsed.command });
-
-            if (customCommand) {
-              // Execute custom command
-              if (customCommand.type === 'prompt') {
-                // Expand template variables and display as user message
-                const expandedContent = await invoke<string>('expand_command_template', {
-                  commandName: customCommand.name
-                });
-                addMessage('system', 'System', `✨ Executing custom command: /${customCommand.name}`);
-                addMessage('user', userNickname, expandedContent);
-
-                // Note: The expanded prompt is displayed for transparency but not automatically sent to agents
-                // Users can see what the command expands to and decide whether to send it
-              } else if (customCommand.type === 'shell') {
-                // Execute shell command and show output
-                addMessage('system', 'System', `⚡ Executing shell command: /${customCommand.name}`);
-                addMessage('shell_output', 'System', `$ ${customCommand.content}`);
-
-                try {
-                  const output = await invoke<string>('execute_shell_command', {
-                    command: customCommand.content,
-                    workingDir: customCommand.workingDir
-                  });
-                  addMessage('shell_output', 'System', output || '(no output)');
-                } catch (shellError) {
-                  addMessage('error', 'System', `Shell command failed: ${shellError}`);
-                }
-              }
-            } else {
-              addMessage('error', 'System', `Command not implemented: /${parsed.command}`);
-            }
-          } catch (error) {
-            console.error('Failed to execute custom command:', error);
-            addMessage('error', 'System', `Command not implemented: /${parsed.command}`);
-          }
-      }
-      return;
-    }
-
-    // 通常のメッセージ処理
-    let messageText = currentInput;
-
-    // Add attached files info
-    if (currentFiles.length > 0) {
-      const fileInfo = currentFiles.map(f => `📎 ${f.name} (${(f.size / 1024).toFixed(1)} KB)`).join('\n');
-      messageText = currentInput ? `${currentInput}\n\n${fileInfo}` : fileInfo;
-    }
-
-    // Add workspace files list if enabled
-    if (includeWorkspaceInPrompt && workspaceFiles.length > 0) {
-      const uploadedDir = workspace?.workspaceDir
-        ? `${workspace.workspaceDir}/resources/uploaded/`
-        : '~/.orcs/workspaces/{workspace-id}/resources/uploaded/';
-
-      const workspaceInfo = [
-        '',
-        '---',
-        'Available workspace files:',
-        ...workspaceFiles.map(f => `  - ${f.name} (${(f.size / 1024).toFixed(1)} KB)`),
-        '',
-        `Workspace location: ${uploadedDir}`,
-      ].join('\n');
-      messageText = messageText + workspaceInfo;
-    }
-
-    addMessage('user', userNickname, messageText);
-
-    // Show thinking indicator
-    setIsAiThinking(true);
-    setThinkingPersona('AI Assistant');
-
-    try {
-      // Call Tauri backend
-      const result = await invoke<InteractionResult>("handle_input", {
-        input: currentInput,
-      });
-
-      // Process AI response
-      // Note: NewDialogueMessages are already streamed via 'dialogue-turn' events,
-      // so we skip processing them here to avoid duplicates
-      if (result.type === 'NewDialogueMessages') {
-        // Messages already displayed via streaming events
-        console.log('[BATCH] Received', result.data.length, 'messages (already streamed)');
-      }
-
-      // Auto-save after interaction
-      await saveCurrentSession();
-    } catch (error) {
-      console.error("Error calling backend:", error);
-      addMessage('error', 'System', `Error: ${error}`);
-    } finally {
-      // Hide thinking indicator
-      setIsAiThinking(false);
-    }
+    await processInput(currentInput, currentFiles);
   };
+
+  const handleRunSlashCommand = useCallback(
+    async (command: SlashCommand, args: string) => {
+      setShowSuggestions(false);
+      setShowAgentSuggestions(false);
+      setInput('');
+      const trimmedArgs = args.trim();
+      const commandInput = trimmedArgs ? `/${command.name} ${trimmedArgs}` : `/${command.name}`;
+      await processInput(commandInput);
+    },
+    [processInput]
+  );
 
   // セッションローディング中の表示
   if (sessionsLoading) {
@@ -771,6 +828,8 @@ function App() {
           onGoToSession={handleGoToSessionFromFile}
           onRefreshWorkspace={refreshWorkspace}
           onMessage={addMessage}
+          onSlashCommandsUpdated={refreshCustomCommands}
+          onRunSlashCommand={handleRunSlashCommand}
         />
       </AppShell.Navbar>
 

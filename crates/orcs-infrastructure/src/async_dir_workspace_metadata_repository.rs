@@ -127,9 +127,7 @@ impl WorkspaceMetadataRepository for AsyncDirWorkspaceMetadataRepository {
         let mut metadata = self
             .find_metadata(workspace_id)
             .await?
-            .ok_or_else(|| {
-                OrcsError::Io(format!("Workspace '{}' not found", workspace_id))
-            })?;
+            .ok_or_else(|| OrcsError::Io(format!("Workspace '{}' not found", workspace_id)))?;
 
         f(&mut metadata);
 
@@ -153,8 +151,10 @@ impl WorkspaceMetadataRepository for AsyncDirWorkspaceMetadataRepository {
             .await
             .map_err(|e| OrcsError::Io(format!("Failed to load all metadata: {}", e)))?;
 
-        let mut metadata_list: Vec<WorkspaceMetadata> =
-            all_metadata.into_iter().map(|(_id, metadata)| metadata).collect();
+        let mut metadata_list: Vec<WorkspaceMetadata> = all_metadata
+            .into_iter()
+            .map(|(_id, metadata)| metadata)
+            .collect();
 
         // Sort by last_accessed (descending)
         metadata_list.sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
@@ -231,11 +231,7 @@ mod tests {
         assert_eq!(updated.last_accessed, 2000);
 
         // Verify persistence
-        let found = repo
-            .find_metadata("test-workspace")
-            .await
-            .unwrap()
-            .unwrap();
+        let found = repo.find_metadata("test-workspace").await.unwrap().unwrap();
         assert_eq!(found.is_favorite, true);
         assert_eq!(found.last_accessed, 2000);
     }
@@ -256,18 +252,20 @@ mod tests {
         };
 
         repo.save_metadata(&metadata).await.unwrap();
-        assert!(repo
-            .find_metadata("test-workspace")
-            .await
-            .unwrap()
-            .is_some());
+        assert!(
+            repo.find_metadata("test-workspace")
+                .await
+                .unwrap()
+                .is_some()
+        );
 
         repo.delete_metadata("test-workspace").await.unwrap();
-        assert!(repo
-            .find_metadata("test-workspace")
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            repo.find_metadata("test-workspace")
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]

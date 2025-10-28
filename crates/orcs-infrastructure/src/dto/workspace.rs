@@ -6,8 +6,7 @@ use std::path::PathBuf;
 use version_migrate::{FromDomain, IntoDomain, Versioned};
 
 use orcs_core::workspace::{
-    ProjectContext, SessionWorkspace, TempFile,
-    Workspace, WorkspaceResources,
+    ProjectContext, SessionWorkspace, TempFile, Workspace, WorkspaceResources,
 };
 
 use super::uploaded_file::UploadedFileV1_1_0;
@@ -199,10 +198,14 @@ impl From<&ProjectContext> for ProjectContextV1 {
 impl IntoDomain<WorkspaceResources> for WorkspaceResourcesV1 {
     fn into_domain(self) -> WorkspaceResources {
         WorkspaceResources {
-            uploaded_files: self.uploaded_files.into_iter()
+            uploaded_files: self
+                .uploaded_files
+                .into_iter()
                 .map(|f| f.into_domain())
                 .collect(),
-            temp_files: self.temp_files.into_iter()
+            temp_files: self
+                .temp_files
+                .into_iter()
                 .map(|t| t.into_domain())
                 .collect(),
         }
@@ -213,12 +216,12 @@ impl IntoDomain<WorkspaceResources> for WorkspaceResourcesV1 {
 impl From<&WorkspaceResources> for WorkspaceResourcesV1 {
     fn from(resources: &WorkspaceResources) -> Self {
         WorkspaceResourcesV1 {
-            uploaded_files: resources.uploaded_files.iter()
+            uploaded_files: resources
+                .uploaded_files
+                .iter()
                 .map(UploadedFileV1_1_0::from)
                 .collect(),
-            temp_files: resources.temp_files.iter()
-                .map(TempFileV1::from)
-                .collect(),
+            temp_files: resources.temp_files.iter().map(TempFileV1::from).collect(),
         }
     }
 }
@@ -237,7 +240,7 @@ impl version_migrate::MigratesTo<WorkspaceV1_1_0> for WorkspaceV1 {
             root_path: self.root_path,
             resources: self.resources,
             project_context: self.project_context,
-            last_accessed: 0,  // Default: epoch (will be updated on first access)
+            last_accessed: 0,   // Default: epoch (will be updated on first access)
             is_favorite: false, // Default: not favorite
         }
     }
@@ -255,7 +258,7 @@ impl version_migrate::MigratesTo<WorkspaceV1_2_0> for WorkspaceV1_1_0 {
             project_context: self.project_context,
             last_accessed: self.last_accessed,
             is_favorite: self.is_favorite,
-            last_active_session_id: None,  // Default: no previous active session
+            last_active_session_id: None, // Default: no previous active session
         }
     }
 }
@@ -276,9 +279,9 @@ impl IntoDomain<Workspace> for WorkspaceV1 {
             workspace_dir: PathBuf::new(),
             resources: self.resources.into_domain(),
             project_context: self.project_context.into_domain(),
-            last_accessed: 0,  // Default for V1
-            is_favorite: false, // Default for V1
-            last_active_session_id: None,  // V1 doesn't have this field
+            last_accessed: 0,             // Default for V1
+            is_favorite: false,           // Default for V1
+            last_active_session_id: None, // V1 doesn't have this field
         }
     }
 }
@@ -297,7 +300,7 @@ impl IntoDomain<Workspace> for WorkspaceV1_1_0 {
             project_context: self.project_context.into_domain(),
             last_accessed: self.last_accessed,
             is_favorite: self.is_favorite,
-            last_active_session_id: None,  // V1_1_0 doesn't have this field
+            last_active_session_id: None, // V1_1_0 doesn't have this field
         }
     }
 }
@@ -394,14 +397,15 @@ impl FromDomain<Workspace> for WorkspaceV1_2_0 {
     }
 }
 
-
 /// Convert SessionWorkspaceV1 DTO to domain model.
 impl IntoDomain<SessionWorkspace> for SessionWorkspaceV1 {
     fn into_domain(self) -> SessionWorkspace {
         SessionWorkspace {
             workspace_id: self.workspace_id,
             session_id: self.session_id,
-            session_temp_files: self.session_temp_files.into_iter()
+            session_temp_files: self
+                .session_temp_files
+                .into_iter()
                 .map(|t| t.into_domain())
                 .collect(),
         }
@@ -414,7 +418,9 @@ impl From<&SessionWorkspace> for SessionWorkspaceV1 {
         SessionWorkspaceV1 {
             workspace_id: session_workspace.workspace_id.clone(),
             session_id: session_workspace.session_id.clone(),
-            session_temp_files: session_workspace.session_temp_files.iter()
+            session_temp_files: session_workspace
+                .session_temp_files
+                .iter()
                 .map(TempFileV1::from)
                 .collect(),
         }
@@ -435,7 +441,9 @@ pub fn create_temp_file_migrator() -> version_migrate::Migrator {
     let path = version_migrate::Migrator::define("temp_file")
         .from::<TempFileV1>()
         .into::<TempFile>();
-    migrator.register(path).expect("Failed to register temp_file migration path");
+    migrator
+        .register(path)
+        .expect("Failed to register temp_file migration path");
     migrator
 }
 
@@ -449,7 +457,9 @@ pub fn create_project_context_migrator() -> version_migrate::Migrator {
     let path = version_migrate::Migrator::define("project_context")
         .from::<ProjectContextV1>()
         .into::<ProjectContext>();
-    migrator.register(path).expect("Failed to register project_context migration path");
+    migrator
+        .register(path)
+        .expect("Failed to register project_context migration path");
     migrator
 }
 
@@ -463,7 +473,9 @@ pub fn create_workspace_resources_migrator() -> version_migrate::Migrator {
     let path = version_migrate::Migrator::define("workspace_resources")
         .from::<WorkspaceResourcesV1>()
         .into::<WorkspaceResources>();
-    migrator.register(path).expect("Failed to register workspace_resources migration path");
+    migrator
+        .register(path)
+        .expect("Failed to register workspace_resources migration path");
     migrator
 }
 
@@ -481,8 +493,10 @@ pub fn create_workspace_migrator() -> version_migrate::Migrator {
         .step::<WorkspaceV1_1_0>()
         .step::<WorkspaceV1_2_0>()
         .into_with_save::<Workspace>();
-      // into_with_save() で登録
-    migrator.register(path).expect("Failed to register workspace migration path");
+    // into_with_save() で登録
+    migrator
+        .register(path)
+        .expect("Failed to register workspace migration path");
     migrator
 }
 
@@ -496,6 +510,8 @@ pub fn create_session_workspace_migrator() -> version_migrate::Migrator {
     let path = version_migrate::Migrator::define("session_workspace")
         .from::<SessionWorkspaceV1>()
         .into::<SessionWorkspace>();
-    migrator.register(path).expect("Failed to register session_workspace migration path");
+    migrator
+        .register(path)
+        .expect("Failed to register session_workspace migration path");
     migrator
 }

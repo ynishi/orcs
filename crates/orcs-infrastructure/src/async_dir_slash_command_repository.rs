@@ -10,7 +10,9 @@
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use version_migrate::{AppPaths, AsyncDirStorage, DirStorageStrategy, FilenameEncoding, FormatStrategy, PathStrategy};
+use version_migrate::{
+    AppPaths, AsyncDirStorage, DirStorageStrategy, FilenameEncoding, FormatStrategy, PathStrategy,
+};
 
 use orcs_core::error::{OrcsError, Result};
 use orcs_core::slash_command::{SlashCommand, SlashCommandRepository};
@@ -67,8 +69,7 @@ impl AsyncDirSlashCommandRepository {
             .map_err(|e| OrcsError::Io(format!("Failed to create base directory: {}", e)))?;
 
         // Setup AppPaths with CustomBase strategy to use our base_dir
-        let paths = AppPaths::new("orcs")
-            .data_strategy(PathStrategy::CustomBase(base_dir.clone()));
+        let paths = AppPaths::new("orcs").data_strategy(PathStrategy::CustomBase(base_dir.clone()));
 
         // Setup migrator
         let migrator = create_slash_command_migrator();
@@ -79,14 +80,9 @@ impl AsyncDirSlashCommandRepository {
             .with_filename_encoding(FilenameEncoding::Direct);
 
         // Create AsyncDirStorage
-        let storage = AsyncDirStorage::new(
-            paths,
-            "slash_commands",
-            migrator,
-            strategy
-        )
-        .await
-        .map_err(|e| OrcsError::Io(format!("Failed to create AsyncDirStorage: {}", e)))?;
+        let storage = AsyncDirStorage::new(paths, "slash_commands", migrator, strategy)
+            .await
+            .map_err(|e| OrcsError::Io(format!("Failed to create AsyncDirStorage: {}", e)))?;
 
         Ok(Self { storage, base_dir })
     }
@@ -103,7 +99,8 @@ impl AsyncDirSlashCommandRepository {
 #[async_trait]
 impl SlashCommandRepository for AsyncDirSlashCommandRepository {
     async fn list_commands(&self) -> Result<Vec<SlashCommand>> {
-        let all_commands = self.storage
+        let all_commands = self
+            .storage
             .load_all::<SlashCommand>("slash_command")
             .await
             .map_err(|e| OrcsError::Io(format!("Failed to load all slash commands: {}", e)))?;
@@ -114,15 +111,24 @@ impl SlashCommandRepository for AsyncDirSlashCommandRepository {
     }
 
     async fn get_command(&self, name: &str) -> Result<Option<SlashCommand>> {
-        match self.storage.load::<SlashCommand>("slash_command", name).await {
+        match self
+            .storage
+            .load::<SlashCommand>("slash_command", name)
+            .await
+        {
             Ok(command) => Ok(Some(command)),
             Err(e) => {
                 // Check if it's a "not found" error
                 let error_msg = e.to_string();
-                if error_msg.contains("No such file or directory") || error_msg.contains("not found") {
+                if error_msg.contains("No such file or directory")
+                    || error_msg.contains("not found")
+                {
                     Ok(None)
                 } else {
-                    Err(OrcsError::Io(format!("Failed to load slash command '{}': {}", name, e)))
+                    Err(OrcsError::Io(format!(
+                        "Failed to load slash command '{}': {}",
+                        name, e
+                    )))
                 }
             }
         }
@@ -132,7 +138,12 @@ impl SlashCommandRepository for AsyncDirSlashCommandRepository {
         self.storage
             .save("slash_command", &command.name, &command)
             .await
-            .map_err(|e| OrcsError::Io(format!("Failed to save slash command '{}': {}", command.name, e)))
+            .map_err(|e| {
+                OrcsError::Io(format!(
+                    "Failed to save slash command '{}': {}",
+                    command.name, e
+                ))
+            })
     }
 
     async fn remove_command(&self, name: &str) -> Result<()> {

@@ -3,8 +3,8 @@
 //! This agent can handle a wide variety of tasks by spawning the `gemini` command
 //! with prompts and configuration options.
 
-use llm_toolkit::agent::{Agent, AgentError, Payload};
 use async_trait::async_trait;
+use llm_toolkit::agent::{Agent, AgentError, Payload};
 use log;
 use std::path::PathBuf;
 use tokio::process::Command;
@@ -281,7 +281,10 @@ impl Agent for GeminiAgent {
 
         // Log current directory
         if let Ok(pwd) = std::env::current_dir() {
-            eprintln!("[GeminiAgent] Current directory before execution: {}", pwd.display());
+            eprintln!(
+                "[GeminiAgent] Current directory before execution: {}",
+                pwd.display()
+            );
         }
 
         eprintln!("[GeminiAgent] Executing gemini command: {:?}", cmd);
@@ -291,19 +294,21 @@ impl Agent for GeminiAgent {
             AgentError::ExecutionFailed(format!("Failed to execute gemini command: {}", e))
         })?;
 
-        eprintln!("[GeminiAgent] Command completed with status: {}", output.status);
+        eprintln!(
+            "[GeminiAgent] Command completed with status: {}",
+            output.status
+        );
         eprintln!("[GeminiAgent] stdout length: {} bytes", output.stdout.len());
         eprintln!("[GeminiAgent] stderr length: {} bytes", output.stderr.len());
 
         if output.status.success() {
-            let response =
-                String::from_utf8(output.stdout).map_err(|e| {
-                    eprintln!("[GeminiAgent] Failed to parse stdout as UTF-8: {}", e);
-                    AgentError::ParseError {
-                        message: format!("Failed to parse gemini stdout: {}", e),
-                        reason: llm_toolkit::agent::error::ParseErrorReason::UnexpectedEof,
-                    }
-                })?;
+            let response = String::from_utf8(output.stdout).map_err(|e| {
+                eprintln!("[GeminiAgent] Failed to parse stdout as UTF-8: {}", e);
+                AgentError::ParseError {
+                    message: format!("Failed to parse gemini stdout: {}", e),
+                    reason: llm_toolkit::agent::error::ParseErrorReason::UnexpectedEof,
+                }
+            })?;
 
             eprintln!("[GeminiAgent] Response: {} chars", response.len());
             Ok(response.trim().to_string())
@@ -360,8 +365,8 @@ mod tests {
 
     #[test]
     fn test_gemini_agent_with_execution_profile() {
-        let agent =
-            GeminiAgent::new(None).with_execution_profile(llm_toolkit::agent::ExecutionProfile::Creative);
+        let agent = GeminiAgent::new(None)
+            .with_execution_profile(llm_toolkit::agent::ExecutionProfile::Creative);
 
         assert!(matches!(
             agent.execution_profile,
@@ -381,10 +386,10 @@ mod tests {
     #[test]
     fn test_gemini_agent_execution_profile_parameters() {
         // Test that different profiles result in different parameter conversions
-        let creative =
-            GeminiAgent::new(None).with_execution_profile(llm_toolkit::agent::ExecutionProfile::Creative);
-        let balanced =
-            GeminiAgent::new(None).with_execution_profile(llm_toolkit::agent::ExecutionProfile::Balanced);
+        let creative = GeminiAgent::new(None)
+            .with_execution_profile(llm_toolkit::agent::ExecutionProfile::Creative);
+        let balanced = GeminiAgent::new(None)
+            .with_execution_profile(llm_toolkit::agent::ExecutionProfile::Balanced);
         let deterministic = GeminiAgent::new(None)
             .with_execution_profile(llm_toolkit::agent::ExecutionProfile::Deterministic);
 

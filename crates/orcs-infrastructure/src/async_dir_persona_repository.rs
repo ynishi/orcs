@@ -13,7 +13,9 @@ use orcs_core::persona::Persona;
 use orcs_core::repository::PersonaRepository;
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use version_migrate::{AppPaths, AsyncDirStorage, DirStorageStrategy, FilenameEncoding, FormatStrategy, PathStrategy};
+use version_migrate::{
+    AppPaths, AsyncDirStorage, DirStorageStrategy, FilenameEncoding, FormatStrategy, PathStrategy,
+};
 
 /// AsyncDirStorage-based persona repository.
 ///
@@ -65,8 +67,7 @@ impl AsyncDirPersonaRepository {
             .context("Failed to create base directory")?;
 
         // Setup AppPaths with CustomBase strategy to use our base_dir
-        let paths = AppPaths::new("orcs")
-            .data_strategy(PathStrategy::CustomBase(base_dir.clone()));
+        let paths = AppPaths::new("orcs").data_strategy(PathStrategy::CustomBase(base_dir.clone()));
 
         // Setup migrator
         let migrator = create_persona_migrator();
@@ -77,14 +78,9 @@ impl AsyncDirPersonaRepository {
             .with_filename_encoding(FilenameEncoding::Direct);
 
         // Create AsyncDirStorage
-        let storage = AsyncDirStorage::new(
-            paths,
-            "personas",
-            migrator,
-            strategy
-        )
-        .await
-        .context("Failed to create AsyncDirStorage")?;
+        let storage = AsyncDirStorage::new(paths, "personas", migrator, strategy)
+            .await
+            .context("Failed to create AsyncDirStorage")?;
 
         Ok(Self { storage, base_dir })
     }
@@ -110,7 +106,8 @@ impl PersonaRepository for AsyncDirPersonaRepository {
         // Block on async operation (since trait is sync)
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                let all_personas = self.storage
+                let all_personas = self
+                    .storage
                     .load_all::<Persona>("persona")
                     .await
                     .map_err(|e| format!("Failed to load all personas: {}", e))?;
@@ -203,7 +200,8 @@ mod tests {
         };
 
         // Save multiple
-        repo.save_all(&[persona1.clone(), persona2.clone()]).unwrap();
+        repo.save_all(&[persona1.clone(), persona2.clone()])
+            .unwrap();
 
         // Load all
         let personas = repo.get_all().unwrap();

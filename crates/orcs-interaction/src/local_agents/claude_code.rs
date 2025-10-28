@@ -3,8 +3,8 @@
 //! This agent can handle a wide variety of tasks by spawning the `claude` command
 //! with the `-p` flag to pass prompts directly.
 
-use llm_toolkit::agent::{Agent, AgentError, Payload};
 use async_trait::async_trait;
+use llm_toolkit::agent::{Agent, AgentError, Payload};
 use log;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -250,8 +250,7 @@ impl Agent for ClaudeCodeAgent {
             log::error!("Claude command failed: {}", stderr);
             return Err(AgentError::ExecutionFailed(format!(
                 "Claude command failed with status {}: {}",
-                output.status,
-                stderr
+                output.status, stderr
             )));
         }
 
@@ -309,8 +308,7 @@ pub struct ClaudeCodeJsonAgent<T> {
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T>
-    ClaudeCodeJsonAgent<T>
+impl<T> ClaudeCodeJsonAgent<T>
 where
     T: Serialize + for<'de> Deserialize<'de>,
 {
@@ -349,8 +347,7 @@ where
     }
 }
 
-impl<T>
-    Default for ClaudeCodeJsonAgent<T>
+impl<T> Default for ClaudeCodeJsonAgent<T>
 where
     T: Serialize + for<'de> Deserialize<'de>,
 {
@@ -360,8 +357,7 @@ where
 }
 
 #[async_trait]
-impl<T>
-    Agent for ClaudeCodeJsonAgent<T>
+impl<T> Agent for ClaudeCodeJsonAgent<T>
 where
     T: Serialize + for<'de> Deserialize<'de> + Send + Sync,
 {
@@ -387,8 +383,7 @@ where
             AgentError::ParseError {
                 message: format!(
                     "Failed to extract JSON from claude output: {}. Raw output: {}",
-                    e,
-                    raw_output
+                    e, raw_output
                 ),
                 reason: llm_toolkit::agent::error::ParseErrorReason::MarkdownExtractionFailed,
             }
@@ -451,8 +446,8 @@ mod tests {
 
     #[test]
     fn test_claude_code_agent_with_execution_profile() {
-        let agent =
-            ClaudeCodeAgent::new(None).with_execution_profile(llm_toolkit::agent::ExecutionProfile::Creative);
+        let agent = ClaudeCodeAgent::new(None)
+            .with_execution_profile(llm_toolkit::agent::ExecutionProfile::Creative);
         assert!(matches!(
             agent.execution_profile,
             llm_toolkit::agent::ExecutionProfile::Creative

@@ -32,33 +32,35 @@ use serde::{Deserialize, Serialize};
 
 // Re-export persona DTOs and migrator
 pub use persona::{
-    create_persona_migrator, PersonaBackendDTO, PersonaConfigV1_0_0, PersonaConfigV1_1_0,
-    PersonaSourceDTO,
+    PersonaBackendDTO, PersonaConfigV1_0_0, PersonaConfigV1_1_0, PersonaSourceDTO,
+    create_persona_migrator,
 };
 
 // Re-export session DTOs and migrator
-pub use session::{create_session_migrator, SessionV1_0_0, SessionV1_1_0, SessionV2_0_0};
+pub use session::{SessionV1_0_0, SessionV1_1_0, SessionV2_0_0, create_session_migrator};
 
 // Re-export slash_command DTOs and migrator
-pub use slash_command::{create_slash_command_migrator, SlashCommandV1};
+pub use slash_command::{SlashCommandV1, SlashCommandV1_1, create_slash_command_migrator};
 
 // Re-export uploaded_file DTOs and migrator
-pub use uploaded_file::{create_uploaded_file_migrator, UploadedFileV1_0_0, UploadedFileV1_1_0};
+pub use uploaded_file::{UploadedFileV1_0_0, UploadedFileV1_1_0, create_uploaded_file_migrator};
 
 // Re-export user_profile DTOs and migrator
-pub use user_profile::{create_user_profile_migrator, UserProfileDTO, UserProfileV1_0, UserProfileV1_1};
+pub use user_profile::{
+    UserProfileDTO, UserProfileV1_0, UserProfileV1_1, create_user_profile_migrator,
+};
 
 // Re-export workspace DTOs and migrators
 pub use workspace::{
-    create_project_context_migrator,
-    create_session_workspace_migrator, create_temp_file_migrator,
-    create_workspace_migrator, create_workspace_resources_migrator,
-    ProjectContextV1, SessionWorkspaceV1, TempFileV1,
-    WorkspaceResourcesV1, WorkspaceV1, WorkspaceV1_1_0,
+    ProjectContextV1, SessionWorkspaceV1, TempFileV1, WorkspaceResourcesV1, WorkspaceV1,
+    WorkspaceV1_1_0, create_project_context_migrator, create_session_workspace_migrator,
+    create_temp_file_migrator, create_workspace_migrator, create_workspace_resources_migrator,
 };
 
 // Re-export workspace_metadata DTOs and migrator
-pub use workspace_metadata::{create_workspace_metadata_migrator, WorkspaceMetadataDTO, WorkspaceMetadataV1_0};
+pub use workspace_metadata::{
+    WorkspaceMetadataDTO, WorkspaceMetadataV1_0, create_workspace_metadata_migrator,
+};
 
 // ============================================================================
 // Root configuration structures

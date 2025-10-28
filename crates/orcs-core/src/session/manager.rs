@@ -1,17 +1,25 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use anyhow::Result;
 use super::app_mode::AppMode;
 use super::model::Session;
 use super::repository::SessionRepository;
+use anyhow::Result;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 // Forward declaration - orcs-interaction will provide this
 // We use dynamic dispatch to avoid circular dependencies
 pub trait InteractionManagerTrait: Send + Sync {
     fn session_id(&self) -> &str;
-    fn to_session(&self, app_mode: AppMode, workspace_id: Option<String>) -> impl std::future::Future<Output = Session> + Send;
-    fn set_workspace_id(&self, workspace_id: Option<String>, workspace_root: Option<std::path::PathBuf>) -> impl std::future::Future<Output = ()> + Send;
+    fn to_session(
+        &self,
+        app_mode: AppMode,
+        workspace_id: Option<String>,
+    ) -> impl std::future::Future<Output = Session> + Send;
+    fn set_workspace_id(
+        &self,
+        workspace_id: Option<String>,
+        workspace_root: Option<std::path::PathBuf>,
+    ) -> impl std::future::Future<Output = ()> + Send;
 }
 
 /// Manages multiple sessions and their lifecycle.
@@ -159,13 +167,17 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     ///
     /// Returns an error if there is no active session or if storage fails.
     pub async fn save_active_session(&self, app_mode: AppMode) -> Result<()> {
-        let manager = self.active_session()
+        let manager = self
+            .active_session()
             .await
             .ok_or_else(|| anyhow::anyhow!("No active session"))?;
 
         // Load existing session to preserve workspace_id
         let session_id = manager.session_id();
-        let existing_workspace_id = self.repository.find_by_id(session_id).await?
+        let existing_workspace_id = self
+            .repository
+            .find_by_id(session_id)
+            .await?
             .and_then(|s| s.workspace_id);
 
         let session = manager.to_session(app_mode, existing_workspace_id).await;
@@ -204,7 +216,10 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
         drop(sessions);
 
         // Load from storage
-        let session = self.repository.find_by_id(session_id).await?
+        let session = self
+            .repository
+            .find_by_id(session_id)
+            .await?
             .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
         self.load_session(session, factory).await
     }
@@ -259,16 +274,26 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     /// Returns an error if:
     /// - The session does not exist
     /// - The storage update fails
-    pub async fn update_workspace_id(&self, session_id: &str, workspace_id: Option<String>, workspace_root: Option<std::path::PathBuf>) -> Result<()> {
+    pub async fn update_workspace_id(
+        &self,
+        session_id: &str,
+        workspace_id: Option<String>,
+        workspace_root: Option<std::path::PathBuf>,
+    ) -> Result<()> {
         // Update the in-memory InteractionManager's workspace_id and workspace_root
         let sessions = self.sessions.read().await;
         if let Some(manager) = sessions.get(session_id) {
-            manager.set_workspace_id(workspace_id.clone(), workspace_root).await;
+            manager
+                .set_workspace_id(workspace_id.clone(), workspace_root)
+                .await;
         }
         drop(sessions);
 
         // Load existing session from storage
-        let mut session = self.repository.find_by_id(session_id).await?
+        let mut session = self
+            .repository
+            .find_by_id(session_id)
+            .await?
             .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
 
         // Update workspace_id
@@ -297,7 +322,10 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     /// Returns an error if the session doesn't exist or cannot be saved.
     pub async fn rename_session(&self, session_id: &str, new_title: String) -> Result<()> {
         // Load the session from storage
-        let mut session = self.repository.find_by_id(session_id).await?
+        let mut session = self
+            .repository
+            .find_by_id(session_id)
+            .await?
             .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
 
         // Update the title
@@ -354,7 +382,11 @@ mod tests {
             }
         }
 
-        async fn set_workspace_id(&self, _workspace_id: Option<String>, _workspace_root: Option<std::path::PathBuf>) {
+        async fn set_workspace_id(
+            &self,
+            _workspace_id: Option<String>,
+            _workspace_root: Option<std::path::PathBuf>,
+        ) {
             // Mock implementation - no-op
         }
     }
@@ -420,13 +452,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(manager.active_session_id().await, Some("test-1".to_string()));
+        assert_eq!(
+            manager.active_session_id().await,
+            Some("test-1".to_string())
+        );
     }
 
     #[tokio::test]
     async fn test_save_and_load_session() {
         let repository = Arc::new(MockSessionRepository::new());
-        let manager: SessionManager<MockInteractionManager> = SessionManager::new(repository.clone());
+        let manager: SessionManager<MockInteractionManager> =
+            SessionManager::new(repository.clone());
 
         // Create and save
         let _session = manager
@@ -467,7 +503,10 @@ mod tests {
             .unwrap();
 
         // Active should be session-2
-        assert_eq!(manager.active_session_id().await, Some("session-2".to_string()));
+        assert_eq!(
+            manager.active_session_id().await,
+            Some("session-2".to_string())
+        );
 
         // Switch back to session-1
         manager
@@ -475,7 +514,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(manager.active_session_id().await, Some("session-1".to_string()));
+        assert_eq!(
+            manager.active_session_id().await,
+            Some("session-1".to_string())
+        );
     }
 
     #[tokio::test]

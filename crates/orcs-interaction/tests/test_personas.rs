@@ -49,8 +49,7 @@ async fn test_save_and_load_personas() {
     ];
 
     // Save personas
-    repo.save_all(&test_personas)
-        .expect("Should save personas");
+    repo.save_all(&test_personas).expect("Should save personas");
 
     // Load personas
     let loaded_personas = repo.get_all().expect("Should load personas");
@@ -88,8 +87,7 @@ async fn test_persona_fields() {
     };
 
     // Save
-    repo.save_all(&[test_persona])
-        .expect("Should save persona");
+    repo.save_all(&[test_persona]).expect("Should save persona");
 
     // Load and verify fields
     let personas = repo.get_all().expect("Should load personas");
@@ -98,8 +96,14 @@ async fn test_persona_fields() {
     let persona = &personas[0];
     assert!(!persona.name.is_empty(), "Persona should have a name");
     assert!(!persona.role.is_empty(), "Persona should have a role");
-    assert!(!persona.background.is_empty(), "Persona should have a background");
-    assert!(!persona.communication_style.is_empty(), "Persona should have a communication style");
+    assert!(
+        !persona.background.is_empty(),
+        "Persona should have a background"
+    );
+    assert!(
+        !persona.communication_style.is_empty(),
+        "Persona should have a communication style"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

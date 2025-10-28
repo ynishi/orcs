@@ -19,6 +19,13 @@ export interface SlashCommand {
   content: string;
   /** Working directory for shell commands (supports variables like {workspace_path}) */
   workingDir?: string;
+  /** Optional description of expected arguments */
+  argsDescription?: string;
+}
+
+export interface ExpandedSlashCommand {
+  content: string;
+  workingDir?: string;
 }
 
 /**

@@ -27,6 +27,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
     type: 'prompt',
     content: '',
     workingDir: undefined,
+    argsDescription: undefined,
   });
 
   // Update form data when command prop changes
@@ -39,6 +40,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
         type: command.type || 'prompt',
         content: command.content || '',
         workingDir: command.workingDir || undefined,
+        argsDescription: command.argsDescription || undefined,
       });
     } else {
       setFormData({
@@ -48,6 +50,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
         type: 'prompt',
         content: '',
         workingDir: undefined,
+        argsDescription: undefined,
       });
     }
   }, [command]);
@@ -67,6 +70,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
       type: formData.type as CommandType,
       content: formData.content,
       workingDir: formData.workingDir || undefined,
+      argsDescription: formData.argsDescription || undefined,
     };
 
     onSave(validatedCommand);
@@ -148,6 +152,16 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
             onChange={(e) => setFormData({ ...formData, workingDir: e.currentTarget.value || undefined })}
           />
         )}
+
+        <Textarea
+          label="Argument Description (Optional)"
+          placeholder="Describe how to provide arguments (e.g., 'Pass file path')"
+          description="Shown when running the command to remind you what {args} should contain."
+          value={formData.argsDescription || ''}
+          onChange={(e) => setFormData({ ...formData, argsDescription: e.currentTarget.value || undefined })}
+          minRows={2}
+          autosize
+        />
 
         <Group justify="flex-end" gap="sm">
           <Button variant="subtle" onClick={onClose}>

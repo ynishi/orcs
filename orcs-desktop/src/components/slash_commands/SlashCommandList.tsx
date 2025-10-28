@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, Badge } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, Badge, Modal, Textarea, Button } from '@mantine/core';
 import { IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { SlashCommand } from '../../types/slash_command';
@@ -17,18 +17,24 @@ const COMMAND_TYPE_COLORS: Record<SlashCommand['type'], string> = {
 
 interface SlashCommandListProps {
   onMessage?: (type: 'system' | 'error', author: string, text: string) => void;
+  onCommandsUpdated?: (commands: SlashCommand[]) => void;
+  onRunCommand?: (command: SlashCommand, args: string) => void | Promise<void>;
 }
 
-export function SlashCommandList({ onMessage }: SlashCommandListProps) {
+export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }: SlashCommandListProps) {
   const [commands, setCommands] = useState<SlashCommand[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCommand, setEditingCommand] = useState<Partial<SlashCommand> | null>(null);
+  const [runningCommand, setRunningCommand] = useState<SlashCommand | null>(null);
+  const [runArgs, setRunArgs] = useState('');
+  const [isRunning, setIsRunning] = useState(false);
 
   // Fetch slash commands from backend
   const fetchCommands = async () => {
     try {
       const loadedCommands = await invoke<SlashCommand[]>('list_slash_commands');
       setCommands(loadedCommands);
+      onCommandsUpdated?.(loadedCommands);
     } catch (error) {
       console.error('Failed to fetch slash commands:', error);
       onMessage?.('error', 'SYSTEM', `Failed to load slash commands: ${error}`);
@@ -37,7 +43,9 @@ export function SlashCommandList({ onMessage }: SlashCommandListProps) {
 
   useEffect(() => {
     fetchCommands();
-  }, []);
+    // We intentionally ignore exhaustive-deps to avoid recreating fetchCommands
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCommandsUpdated]);
 
   // Handler to open modal for creating or editing
   const handleOpenModal = (command?: SlashCommand) => {
@@ -82,6 +90,44 @@ export function SlashCommandList({ onMessage }: SlashCommandListProps) {
     }
   };
 
+  const handleRunCommand = (command: SlashCommand) => {
+    setRunningCommand(command);
+    setRunArgs('');
+    setIsRunning(false);
+  };
+
+  const handleCloseRunModal = () => {
+    if (isRunning) {
+      return;
+    }
+    setRunningCommand(null);
+    setRunArgs('');
+  };
+
+  const handleConfirmRun = async () => {
+    if (!runningCommand) {
+      return;
+    }
+
+    if (!onRunCommand) {
+      setRunningCommand(null);
+      setRunArgs('');
+      return;
+    }
+
+    setIsRunning(true);
+    try {
+      await onRunCommand(runningCommand, runArgs);
+      setRunningCommand(null);
+      setRunArgs('');
+    } catch (error) {
+      console.error('Failed to run slash command:', error);
+      onMessage?.('error', 'SYSTEM', `Failed to run command: ${error}`);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   const renderCommand = (command: SlashCommand) => {
     return (
       <Group
@@ -95,7 +141,7 @@ export function SlashCommandList({ onMessage }: SlashCommandListProps) {
           transition: 'background-color 0.15s ease',
           cursor: 'pointer',
         }}
-        onClick={() => handleOpenModal(command)}
+        onClick={() => handleRunCommand(command)}
       >
         {/* Command icon */}
         <Text size="lg">{command.icon}</Text>
@@ -147,6 +193,10 @@ export function SlashCommandList({ onMessage }: SlashCommandListProps) {
       </Group>
     );
   };
+
+  const requiresArgs = runningCommand
+    ? runningCommand.content.includes('{args}') || runningCommand.workingDir?.includes('{args}')
+    : false;
 
   return (
     <Stack gap="md" h="100%">
@@ -208,6 +258,57 @@ export function SlashCommandList({ onMessage }: SlashCommandListProps) {
         command={editingCommand}
         onSave={handleSaveCommand}
       />
+
+      <Modal
+        opened={!!runningCommand}
+        onClose={handleCloseRunModal}
+        title={runningCommand ? `Run /${runningCommand.name}` : 'Run Command'}
+        centered
+      >
+        <Stack gap="md">
+          {runningCommand && (
+            <>
+              <Text size="sm" c="dimmed">
+                {runningCommand.description}
+              </Text>
+              {runningCommand.argsDescription && (
+                <Text size="sm" c="dimmed">
+                  Args: {runningCommand.argsDescription}
+                </Text>
+              )}
+              <Textarea
+                label="Arguments"
+                placeholder="Optional arguments (leave blank if not needed)"
+                description={
+                  requiresArgs
+                    ? 'This command uses {args}. Provide the replacement text below.'
+                    : 'Arguments will be appended and available as {args} if used.'
+                }
+                value={runArgs}
+                onChange={(e) => setRunArgs(e.currentTarget.value)}
+                minRows={3}
+                autosize
+                disabled={isRunning}
+              />
+            </>
+          )}
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={handleCloseRunModal} disabled={isRunning}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmRun}
+              loading={isRunning}
+              disabled={
+                isRunning ||
+                (requiresArgs && runArgs.trim().length === 0)
+              }
+            >
+              Run Command
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }

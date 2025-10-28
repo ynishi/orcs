@@ -3,23 +3,25 @@
 
 mod slash_commands;
 
-use std::path::Path;
-use std::sync::Arc;
-use tokio::process::Command;
-use tokio::sync::Mutex;
-use orcs_core::session::{AppMode, Session, SessionManager};
+use orcs_application::SessionUseCase;
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
+use orcs_core::session::{AppMode, Session, SessionManager};
 use orcs_core::slash_command::SlashCommandRepository;
 use orcs_core::user::UserService;
-use orcs_core::workspace::{Workspace, UploadedFile};
-use orcs_infrastructure::{AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirSlashCommandRepository};
+use orcs_core::workspace::{UploadedFile, Workspace};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
+use orcs_infrastructure::{
+    AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirSlashCommandRepository,
+};
 use orcs_interaction::{InteractionManager, InteractionResult};
-use orcs_application::SessionUseCase;
 use serde::Serialize;
+use std::path::Path;
+use std::sync::Arc;
 use tauri::State;
+use tokio::process::Command;
+use tokio::sync::Mutex;
 
 /// Application state shared across Tauri commands
 struct AppState {
@@ -72,9 +74,7 @@ enum SerializableInteractionResult {
 impl From<InteractionResult> for SerializableInteractionResult {
     fn from(result: InteractionResult) -> Self {
         match result {
-            InteractionResult::NewMessage(msg) => {
-                SerializableInteractionResult::NewMessage(msg)
-            }
+            InteractionResult::NewMessage(msg) => SerializableInteractionResult::NewMessage(msg),
             InteractionResult::ModeChanged(mode) => {
                 SerializableInteractionResult::ModeChanged(mode)
             }
@@ -98,11 +98,10 @@ impl From<InteractionResult> for SerializableInteractionResult {
 
 /// Creates a new session
 #[tauri::command]
-async fn create_session(
-    state: State<'_, AppState>,
-) -> Result<Session, String> {
+async fn create_session(state: State<'_, AppState>) -> Result<Session, String> {
     // Use SessionUseCase for proper workspace association
-    let session = state.session_usecase
+    let session = state
+        .session_usecase
         .create_session()
         .await
         .map_err(|e| e.to_string())?;
@@ -115,10 +114,9 @@ async fn create_session(
 
 /// Lists all saved sessions
 #[tauri::command]
-async fn list_sessions(
-    state: State<'_, AppState>,
-) -> Result<Vec<Session>, String> {
-    state.session_manager
+async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, String> {
+    state
+        .session_manager
         .list_sessions()
         .await
         .map_err(|e| e.to_string())
@@ -126,12 +124,10 @@ async fn list_sessions(
 
 /// Switches to a different session
 #[tauri::command]
-async fn switch_session(
-    session_id: String,
-    state: State<'_, AppState>,
-) -> Result<Session, String> {
+async fn switch_session(session_id: String, state: State<'_, AppState>) -> Result<Session, String> {
     // Use SessionUseCase for proper workspace context restoration
-    let session = state.session_usecase
+    let session = state
+        .session_usecase
         .switch_session(&session_id)
         .await
         .map_err(|e| e.to_string())?;
@@ -144,11 +140,9 @@ async fn switch_session(
 
 /// Deletes a session
 #[tauri::command]
-async fn delete_session(
-    session_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state.session_manager
+async fn delete_session(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .session_manager
         .delete_session(&session_id)
         .await
         .map_err(|e| e.to_string())
@@ -161,7 +155,8 @@ async fn rename_session(
     new_title: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.session_manager
+    state
+        .session_manager
         .rename_session(&session_id, new_title)
         .await
         .map_err(|e| e.to_string())
@@ -169,11 +164,10 @@ async fn rename_session(
 
 /// Saves the current session
 #[tauri::command]
-async fn save_current_session(
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+async fn save_current_session(state: State<'_, AppState>) -> Result<(), String> {
     let app_mode = state.app_mode.lock().await.clone();
-    state.session_manager
+    state
+        .session_manager
         .save_active_session(app_mode)
         .await
         .map_err(|e| e.to_string())
@@ -181,9 +175,7 @@ async fn save_current_session(
 
 /// Gets the currently active session
 #[tauri::command]
-async fn get_active_session(
-    state: State<'_, AppState>,
-) -> Result<Option<Session>, String> {
+async fn get_active_session(state: State<'_, AppState>) -> Result<Option<Session>, String> {
     if let Some(manager) = state.session_manager.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();
         let session = manager.to_session(app_mode, None).await;
@@ -195,9 +187,7 @@ async fn get_active_session(
 
 /// Gets all personas from the single source of truth
 #[tauri::command]
-async fn get_personas(
-    state: State<'_, AppState>,
-) -> Result<Vec<Persona>, String> {
+async fn get_personas(state: State<'_, AppState>) -> Result<Vec<Persona>, String> {
     state.persona_repository.get_all()
 }
 
@@ -212,24 +202,22 @@ async fn save_persona_configs(
 
 /// Gets the user's nickname from the config
 #[tauri::command]
-async fn get_user_nickname(
-    state: State<'_, AppState>,
-) -> Result<String, String> {
+async fn get_user_nickname(state: State<'_, AppState>) -> Result<String, String> {
     Ok(state.user_service.get_user_name())
 }
 
 /// Adds a participant to the active session
 #[tauri::command]
-async fn add_participant(
-    persona_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    let manager = state.session_manager
+async fn add_participant(persona_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    let manager = state
+        .session_manager
         .active_session()
         .await
         .ok_or("No active session")?;
 
-    manager.add_participant(&persona_id).await
+    manager
+        .add_participant(&persona_id)
+        .await
         .map_err(|e| e.to_string())?;
 
     // Auto-save after adding participant
@@ -241,16 +229,16 @@ async fn add_participant(
 
 /// Removes a participant from the active session
 #[tauri::command]
-async fn remove_participant(
-    persona_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    let manager = state.session_manager
+async fn remove_participant(persona_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    let manager = state
+        .session_manager
         .active_session()
         .await
         .ok_or("No active session")?;
 
-    manager.remove_participant(&persona_id).await
+    manager
+        .remove_participant(&persona_id)
+        .await
         .map_err(|e| e.to_string())?;
 
     // Auto-save after removing participant
@@ -262,10 +250,9 @@ async fn remove_participant(
 
 /// Gets the list of active participants in the current session
 #[tauri::command]
-async fn get_active_participants(
-    state: State<'_, AppState>,
-) -> Result<Vec<String>, String> {
-    let manager = state.session_manager
+async fn get_active_participants(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let manager = state
+        .session_manager
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -279,7 +266,8 @@ async fn set_execution_strategy(
     strategy: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let manager = state.session_manager
+    let manager = state
+        .session_manager
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -295,10 +283,9 @@ async fn set_execution_strategy(
 
 /// Gets the current execution strategy for the active session
 #[tauri::command]
-async fn get_execution_strategy(
-    state: State<'_, AppState>,
-) -> Result<String, String> {
-    let manager = state.session_manager
+async fn get_execution_strategy(state: State<'_, AppState>) -> Result<String, String> {
+    let manager = state
+        .session_manager
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -313,7 +300,8 @@ async fn get_config_path(state: State<'_, AppState>) -> Result<String, String> {
     let config_file = state.persona_repository_concrete.config_file_path();
 
     // Convert PathBuf to String
-    let path_str = config_file.to_str()
+    let path_str = config_file
+        .to_str()
         .ok_or("Config path is not valid UTF-8")?;
 
     Ok(path_str.to_string())
@@ -326,7 +314,8 @@ async fn get_sessions_directory(state: State<'_, AppState>) -> Result<String, St
     let sessions_dir = state.session_repository.sessions_dir();
 
     // Convert Path to String
-    let path_str = sessions_dir.to_str()
+    let path_str = sessions_dir
+        .to_str()
         .ok_or("Sessions directory path is not valid UTF-8")?;
 
     Ok(path_str.to_string())
@@ -339,7 +328,8 @@ async fn get_workspaces_directory(state: State<'_, AppState>) -> Result<String, 
     let workspaces_dir = state.workspace_manager.workspaces_root_dir();
 
     // Convert Path to String
-    let path_str = workspaces_dir.to_str()
+    let path_str = workspaces_dir
+        .to_str()
         .ok_or("Workspaces directory path is not valid UTF-8")?;
 
     Ok(path_str.to_string())
@@ -352,7 +342,8 @@ async fn get_personas_directory(state: State<'_, AppState>) -> Result<String, St
     let personas_dir = state.persona_repository_concrete.personas_dir();
 
     // Convert Path to String
-    let path_str = personas_dir.to_str()
+    let path_str = personas_dir
+        .to_str()
         .ok_or("Personas directory path is not valid UTF-8")?;
 
     Ok(path_str.to_string())
@@ -365,7 +356,8 @@ async fn get_slash_commands_directory(state: State<'_, AppState>) -> Result<Stri
     let slash_commands_dir = state.slash_command_repository_concrete.slash_commands_dir();
 
     // Convert Path to String
-    let path_str = slash_commands_dir.to_str()
+    let path_str = slash_commands_dir
+        .to_str()
         .ok_or("Slash commands directory path is not valid UTF-8")?;
 
     Ok(path_str.to_string())
@@ -390,7 +382,10 @@ async fn execute_shell_command(command: &str, working_dir: Option<&str>) -> Resu
         cmd.current_dir(dir);
     }
 
-    let output = cmd.output().await.map_err(|e| format!("Failed to execute command: {}", e))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("Failed to execute command: {}", e))?;
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -403,7 +398,11 @@ async fn execute_shell_command(command: &str, working_dir: Option<&str>) -> Resu
         }
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Command failed with exit code {:?}:\n{}", output.status.code(), stderr))
+        Err(format!(
+            "Command failed with exit code {:?}:\n{}",
+            output.status.code(),
+            stderr
+        ))
     }
 }
 
@@ -414,7 +413,8 @@ async fn handle_input(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SerializableInteractionResult, String> {
-    let manager = state.session_manager
+    let manager = state
+        .session_manager
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -434,7 +434,24 @@ async fn handle_input(
             ""
         };
 
+        eprintln!(
+            "[SLASH_COMMAND] Detected command: '{}', args: '{}'",
+            cmd_name, args
+        );
+
+        // Debug: List all available commands
+        if let Ok(all_commands) = state.slash_command_repository.list_commands().await {
+            eprintln!(
+                "[SLASH_COMMAND] Available commands: {:?}",
+                all_commands.iter().map(|c| &c.name).collect::<Vec<_>>()
+            );
+        }
+
         // Try to get the command from repository
+        eprintln!(
+            "[SLASH_COMMAND] Getting command '{}' from repository...",
+            cmd_name
+        );
         match state.slash_command_repository.get_command(cmd_name).await {
             Ok(Some(cmd)) => {
                 use orcs_core::slash_command::CommandType;
@@ -478,7 +495,10 @@ async fn handle_input(
             }
             Ok(None) => {
                 // Command not found, return error message
-                format!("Unknown command: /{}\n\nAvailable commands can be viewed in Settings.", cmd_name)
+                format!(
+                    "Unknown command: /{}\n\nAvailable commands can be viewed in Settings.",
+                    cmd_name
+                )
             }
             Err(e) => {
                 format!("Error loading command: {}", e)
@@ -490,25 +510,29 @@ async fn handle_input(
 
     // Handle the input with streaming support
     let app_clone = app.clone();
-    let result = manager.handle_input_with_streaming(&current_mode, &processed_input, move |turn| {
-        use tauri::Emitter;
+    let result = manager
+        .handle_input_with_streaming(&current_mode, &processed_input, move |turn| {
+            use tauri::Emitter;
 
-        // Log each dialogue turn as it becomes available with timestamp
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap();
-        let preview: String = turn.content.chars().take(50).collect();
-        eprintln!("[TAURI] [{}.{:03}] Streaming turn: {} - {}...",
-            now.as_secs(),
-            now.subsec_millis(),
-            turn.author,
-            preview);
+            // Log each dialogue turn as it becomes available with timestamp
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap();
+            let preview: String = turn.content.chars().take(50).collect();
+            eprintln!(
+                "[TAURI] [{}.{:03}] Streaming turn: {} - {}...",
+                now.as_secs(),
+                now.subsec_millis(),
+                turn.author,
+                preview
+            );
 
-        // Emit event to frontend for real-time streaming
-        if let Err(e) = app_clone.emit("dialogue-turn", turn) {
-            eprintln!("[TAURI] Failed to emit dialogue-turn event: {}", e);
-        }
-    }).await;
+            // Emit event to frontend for real-time streaming
+            if let Err(e) = app_clone.emit("dialogue-turn", turn) {
+                eprintln!("[TAURI] Failed to emit dialogue-turn event: {}", e);
+            }
+        })
+        .await;
 
     // Update the mode if it changed
     if let InteractionResult::ModeChanged(ref new_mode) = result {
@@ -524,15 +548,14 @@ async fn handle_input(
 
 /// Gets the current workspace based on the active session
 #[tauri::command]
-async fn get_current_workspace(
-    state: State<'_, AppState>,
-) -> Result<Workspace, String> {
+async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspace, String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
     println!("[Backend] get_current_workspace called");
 
     // Get the active session manager
-    let manager = state.session_manager
+    let manager = state
+        .session_manager
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -546,7 +569,8 @@ async fn get_current_workspace(
     // If session has a workspace_id, use it
     if let Some(workspace_id) = &session.workspace_id {
         println!("[Backend] Looking up workspace: {}", workspace_id);
-        let workspace = state.workspace_manager
+        let workspace = state
+            .workspace_manager
             .get_workspace(workspace_id)
             .await
             .map_err(|e| e.to_string())?;
@@ -561,7 +585,8 @@ async fn get_current_workspace(
 
     // Fallback to current directory workspace
     println!("[Backend] Falling back to current directory workspace");
-    state.workspace_manager
+    state
+        .workspace_manager
         .get_current_workspace()
         .await
         .map_err(|e| e.to_string())
@@ -577,7 +602,8 @@ async fn create_workspace(
     use std::path::PathBuf;
 
     let path = PathBuf::from(root_path);
-    state.workspace_manager
+    state
+        .workspace_manager
         .get_or_create_workspace(&path)
         .await
         .map_err(|e| e.to_string())
@@ -585,12 +611,11 @@ async fn create_workspace(
 
 /// Lists all registered workspaces
 #[tauri::command]
-async fn list_workspaces(
-    state: State<'_, AppState>,
-) -> Result<Vec<Workspace>, String> {
+async fn list_workspaces(state: State<'_, AppState>) -> Result<Vec<Workspace>, String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
-    state.workspace_manager
+    state
+        .workspace_manager
         .list_all_workspaces()
         .await
         .map_err(|e| e.to_string())
@@ -599,17 +624,21 @@ async fn list_workspaces(
 /// Switches to a different workspace for the active session
 #[tauri::command]
 async fn switch_workspace(
-    _session_id: String,  // Kept for API compatibility but unused
+    _session_id: String, // Kept for API compatibility but unused
     workspace_id: String,
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     use tauri::Emitter;
 
-    println!("[Backend] switch_workspace called: workspace_id={}", workspace_id);
+    println!(
+        "[Backend] switch_workspace called: workspace_id={}",
+        workspace_id
+    );
 
     // Use SessionUseCase for coordinated workspace switching
-    state.session_usecase
+    state
+        .session_usecase
         .switch_workspace(&workspace_id)
         .await
         .map_err(|e| {
@@ -617,7 +646,10 @@ async fn switch_workspace(
             e.to_string()
         })?;
 
-    println!("[Backend] Successfully switched to workspace {}", workspace_id);
+    println!(
+        "[Backend] Successfully switched to workspace {}",
+        workspace_id
+    );
 
     // Notify frontend of the workspace switch
     app.emit("workspace-switched", &workspace_id)
@@ -636,7 +668,8 @@ async fn toggle_favorite_workspace(
 ) -> Result<(), String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
-    state.workspace_manager
+    state
+        .workspace_manager
         .toggle_favorite(&workspace_id)
         .await
         .map_err(|e| e.to_string())
@@ -644,15 +677,16 @@ async fn toggle_favorite_workspace(
 
 /// Deletes a workspace
 #[tauri::command]
-async fn delete_workspace(
-    workspace_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+async fn delete_workspace(workspace_id: String, state: State<'_, AppState>) -> Result<(), String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
-    println!("[Backend] delete_workspace called: workspace_id={}", workspace_id);
+    println!(
+        "[Backend] delete_workspace called: workspace_id={}",
+        workspace_id
+    );
 
-    state.workspace_manager
+    state
+        .workspace_manager
         .delete_workspace(&workspace_id)
         .await
         .map_err(|e| {
@@ -673,7 +707,8 @@ async fn list_workspace_files(
     use orcs_core::workspace::manager::WorkspaceManager;
 
     // Get the workspace
-    let workspace = state.workspace_manager
+    let workspace = state
+        .workspace_manager
         .get_workspace(&workspace_id)
         .await
         .map_err(|e| e.to_string())?;
@@ -697,7 +732,8 @@ async fn upload_file_to_workspace(
     let file_path = Path::new(&local_file_path);
 
     // Add the file to the workspace
-    state.workspace_manager
+    state
+        .workspace_manager
         .add_file_to_workspace(&workspace_id, file_path)
         .await
         .map_err(|e| e.to_string())
@@ -717,8 +753,16 @@ async fn upload_file_from_bytes(
     use orcs_core::workspace::manager::WorkspaceManager;
 
     // Directly add the file from bytes - no temporary file needed
-    state.workspace_manager
-        .add_file_from_bytes(&workspace_id, &filename, &file_data, session_id, message_timestamp, author)
+    state
+        .workspace_manager
+        .add_file_from_bytes(
+            &workspace_id,
+            &filename,
+            &file_data,
+            session_id,
+            message_timestamp,
+            author,
+        )
         .await
         .map_err(|e| e.to_string())
 }
@@ -732,7 +776,8 @@ async fn delete_file_from_workspace(
 ) -> Result<(), String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
-    state.workspace_manager
+    state
+        .workspace_manager
         .delete_file_from_workspace(&workspace_id, &file_id)
         .await
         .map_err(|e| e.to_string())
@@ -748,7 +793,8 @@ async fn rename_file_in_workspace(
 ) -> Result<UploadedFile, String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
-    state.workspace_manager
+    state
+        .workspace_manager
         .rename_file_in_workspace(&workspace_id, &file_id, &new_name)
         .await
         .map_err(|e| e.to_string())
@@ -756,9 +802,7 @@ async fn rename_file_in_workspace(
 
 /// Reads a file from a workspace and returns its content as bytes
 #[tauri::command]
-async fn read_workspace_file(
-    file_path: String,
-) -> Result<Vec<u8>, String> {
+async fn read_workspace_file(file_path: String) -> Result<Vec<u8>, String> {
     use tokio::fs;
 
     fs::read(&file_path)
@@ -808,19 +852,15 @@ fn get_git_info() -> GitInfo {
         .ok()
         .and_then(|output| {
             if output.status.success() {
-                String::from_utf8(output.stdout)
-                    .ok()
-                    .and_then(|url| {
-                        // Extract repo name from URL
-                        // e.g., "git@github.com:user/repo.git" -> "repo"
-                        // e.g., "https://github.com/user/repo.git" -> "repo"
-                        url.trim()
-                            .split('/')
-                            .last()
-                            .map(|name| {
-                                name.trim_end_matches(".git").to_string()
-                            })
-                    })
+                String::from_utf8(output.stdout).ok().and_then(|url| {
+                    // Extract repo name from URL
+                    // e.g., "git@github.com:user/repo.git" -> "repo"
+                    // e.g., "https://github.com/user/repo.git" -> "repo"
+                    url.trim()
+                        .split('/')
+                        .last()
+                        .map(|name| name.trim_end_matches(".git").to_string())
+                })
             } else {
                 None
             }
@@ -833,14 +873,12 @@ fn get_git_info() -> GitInfo {
                 .ok()
                 .and_then(|output| {
                     if output.status.success() {
-                        String::from_utf8(output.stdout)
-                            .ok()
-                            .and_then(|path| {
-                                std::path::Path::new(path.trim())
-                                    .file_name()
-                                    .and_then(|name| name.to_str())
-                                    .map(|s| s.to_string())
-                            })
+                        String::from_utf8(output.stdout).ok().and_then(|path| {
+                            std::path::Path::new(path.trim())
+                                .file_name()
+                                .and_then(|name| name.to_str())
+                                .map(|s| s.to_string())
+                        })
                     } else {
                         None
                     }
@@ -862,27 +900,28 @@ fn main() {
         let persona_repository_concrete = Arc::new(
             AsyncDirPersonaRepository::default_location()
                 .await
-                .expect("Failed to initialize persona repository")
+                .expect("Failed to initialize persona repository"),
         );
         let persona_repository: Arc<dyn PersonaRepository> = persona_repository_concrete.clone();
         let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
 
         // Initialize FileSystemWorkspaceManager with unified path
-        let workspace_root = OrcsPaths::workspaces_dir()
-            .expect("Failed to get workspaces directory");
+        let workspace_root =
+            OrcsPaths::workspaces_dir().expect("Failed to get workspaces directory");
         let workspace_manager = Arc::new(
             FileSystemWorkspaceManager::new(workspace_root)
                 .await
-                .expect("Failed to initialize workspace manager")
+                .expect("Failed to initialize workspace manager"),
         );
 
         // Initialize AsyncDirSlashCommandRepository
         let slash_command_repository_concrete = Arc::new(
             AsyncDirSlashCommandRepository::new()
                 .await
-                .expect("Failed to initialize slash command repository")
+                .expect("Failed to initialize slash command repository"),
         );
-        let slash_command_repository: Arc<dyn SlashCommandRepository> = slash_command_repository_concrete.clone();
+        let slash_command_repository: Arc<dyn SlashCommandRepository> =
+            slash_command_repository_concrete.clone();
 
         // Seed the personas directory with default personas if it's empty on first run.
         if let Ok(personas) = persona_repository.get_all() {
@@ -905,13 +944,12 @@ fn main() {
         let session_repository = Arc::new(
             AsyncDirSessionRepository::default_location(persona_repository.clone())
                 .await
-                .expect("Failed to create session repository")
+                .expect("Failed to create session repository"),
         );
 
         // Initialize SessionManager with the repository
-        let session_manager: Arc<SessionManager<InteractionManager>> = Arc::new(
-            SessionManager::new(session_repository.clone())
-        );
+        let session_manager: Arc<SessionManager<InteractionManager>> =
+            Arc::new(SessionManager::new(session_repository.clone()));
 
         // Create SessionUseCase for coordinated session-workspace management
         let session_usecase = Arc::new(SessionUseCase::new(
@@ -922,11 +960,7 @@ fn main() {
         ));
 
         // Try to restore last session using SessionUseCase
-        let restored = session_usecase
-            .restore_last_session()
-            .await
-            .ok()
-            .flatten();
+        let restored = session_usecase.restore_last_session().await.ok().flatten();
 
         if restored.is_none() {
             // Create initial session using SessionUseCase (properly associates workspace)

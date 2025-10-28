@@ -29,6 +29,10 @@ pub struct SlashCommand {
     /// Working directory for shell commands (supports variables like {workspace_path})
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_dir: Option<String>,
+    /// Optional description of expected arguments (displayed in UI)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "argsDescription")]
+    pub args_description: Option<String>,
 }
 
 impl SlashCommand {
@@ -41,7 +45,21 @@ impl SlashCommand {
             command_type: CommandType::Prompt,
             content,
             working_dir: None,
+            args_description: None,
         }
+    }
+
+    /// Creates a new prompt-type slash command with an argument description.
+    pub fn new_prompt_with_args(
+        name: String,
+        icon: String,
+        description: String,
+        content: String,
+        args_description: Option<String>,
+    ) -> Self {
+        let mut cmd = Self::new_prompt(name, icon, description, content);
+        cmd.args_description = args_description;
+        cmd
     }
 
     /// Creates a new shell-type slash command.
@@ -59,6 +77,21 @@ impl SlashCommand {
             command_type: CommandType::Shell,
             content,
             working_dir,
+            args_description: None,
         }
+    }
+
+    /// Creates a new shell-type slash command with an argument description.
+    pub fn new_shell_with_args(
+        name: String,
+        icon: String,
+        description: String,
+        content: String,
+        working_dir: Option<String>,
+        args_description: Option<String>,
+    ) -> Self {
+        let mut cmd = Self::new_shell(name, icon, description, content, working_dir);
+        cmd.args_description = args_description;
+        cmd
     }
 }

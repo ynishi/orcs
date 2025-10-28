@@ -7,6 +7,7 @@ import { WorkspacePanel } from '../workspace/WorkspacePanel';
 import { TaskList } from '../tasks/TaskList';
 import { PersonasList } from '../personas/PersonasList';
 import { SlashCommandList } from '../slash_commands/SlashCommandList';
+import { SlashCommand } from '../../types/slash_command';
 
 interface NavbarProps {
   // Sessions
@@ -32,6 +33,8 @@ interface NavbarProps {
 
   // Common
   onMessage: (type: MessageType, author: string, text: string) => void;
+  onSlashCommandsUpdated?: (commands: SlashCommand[]) => void;
+  onRunSlashCommand?: (command: SlashCommand, args: string) => void | Promise<void>;
 }
 
 export function Navbar({
@@ -51,6 +54,8 @@ export function Navbar({
   onGoToSession,
   onRefreshWorkspace,
   onMessage,
+  onSlashCommandsUpdated,
+  onRunSlashCommand,
 }: NavbarProps) {
   return (
     <ScrollArea h="100vh" type="auto">
@@ -145,7 +150,11 @@ export function Navbar({
               </Group>
             </Accordion.Control>
             <Accordion.Panel>
-              <SlashCommandList onMessage={onMessage} />
+              <SlashCommandList
+                onMessage={onMessage}
+                onCommandsUpdated={onSlashCommandsUpdated}
+                onRunCommand={onRunSlashCommand}
+              />
             </Accordion.Panel>
           </Accordion.Item>
         </Accordion>

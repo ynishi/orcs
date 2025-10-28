@@ -1,12 +1,12 @@
-pub mod error;
-pub mod session;
-pub mod persona;
-pub mod user;
-pub mod task;
-pub mod repository;
-pub mod workspace;
 pub mod config;
+pub mod error;
+pub mod persona;
+pub mod repository;
+pub mod session;
 pub mod slash_command;
+pub mod task;
+pub mod user;
+pub mod workspace;
 
 // Re-export common error type
 pub use error::OrcsError;

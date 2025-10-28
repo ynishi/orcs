@@ -136,11 +136,7 @@ pub trait WorkspaceManager: Send + Sync {
     /// - The file does not exist
     /// - The file cannot be deleted from storage
     /// - The database operation fails
-    async fn delete_file_from_workspace(
-        &self,
-        workspace_id: &str,
-        file_id: &str,
-    ) -> Result<()>;
+    async fn delete_file_from_workspace(&self, workspace_id: &str, file_id: &str) -> Result<()>;
 
     /// Renames a file in a workspace.
     ///
@@ -217,11 +213,7 @@ pub trait WorkspaceManager: Send + Sync {
     /// - The file does not exist
     /// - The file cannot be read
     /// - The file content is not valid UTF-8
-    async fn read_file_content(
-        &self,
-        workspace_id: &str,
-        relative_path: &str,
-    ) -> Result<String>;
+    async fn read_file_content(&self, workspace_id: &str, relative_path: &str) -> Result<String>;
 
     /// Retrieves the workspace association for a session.
     ///

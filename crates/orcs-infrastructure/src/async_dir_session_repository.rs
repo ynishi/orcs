@@ -15,7 +15,9 @@ use orcs_core::session::{ConversationMessage, Session};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use version_migrate::{AppPaths, AsyncDirStorage, DirStorageStrategy, FilenameEncoding, FormatStrategy, PathStrategy};
+use version_migrate::{
+    AppPaths, AsyncDirStorage, DirStorageStrategy, FilenameEncoding, FormatStrategy, PathStrategy,
+};
 
 /// AsyncDirStorage-based session repository.
 ///
@@ -77,8 +79,7 @@ impl AsyncDirSessionRepository {
             .context("Failed to create base directory")?;
 
         // Setup AppPaths with CustomBase strategy to use our base_dir
-        let paths = AppPaths::new("orcs")
-            .data_strategy(PathStrategy::CustomBase(base_dir.clone()));
+        let paths = AppPaths::new("orcs").data_strategy(PathStrategy::CustomBase(base_dir.clone()));
 
         // Setup migrator
         let migrator = create_session_migrator();
@@ -89,14 +90,9 @@ impl AsyncDirSessionRepository {
             .with_filename_encoding(FilenameEncoding::Direct);
 
         // Create AsyncDirStorage
-        let storage = AsyncDirStorage::new(
-            paths,
-            "sessions",
-            migrator,
-            strategy
-        )
-        .await
-        .context("Failed to create AsyncDirStorage")?;
+        let storage = AsyncDirStorage::new(paths, "sessions", migrator, strategy)
+            .await
+            .context("Failed to create AsyncDirStorage")?;
 
         Ok(Self {
             storage,

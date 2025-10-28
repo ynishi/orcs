@@ -1,6 +1,6 @@
 // PASTE THE USER-PROVIDED CODE HERE
-use llm_toolkit::{agent::{Agent, AgentError, Payload, PayloadContent, persona::Persona}};
 use async_trait::async_trait;
+use llm_toolkit::agent::{Agent, AgentError, Payload, PayloadContent, persona::Persona};
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -36,7 +36,10 @@ where
     async fn execute(&self, intent: Payload) -> Result<Self::Output, AgentError> {
         let system_prompt = format!(
             "# Persona Profile\n**Name**: {}\n**Role**: {}\n\n## Background\n{}\n\n## Communication Style\n{}",
-            self.persona.name, self.persona.role, self.persona.background, self.persona.communication_style
+            self.persona.name,
+            self.persona.role,
+            self.persona.background,
+            self.persona.communication_style
         );
         let user_request = intent.to_text();
 
@@ -86,9 +89,9 @@ fn format_response_for_history<T: Serialize>(response: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use llm_toolkit::agent::{Agent, AgentError, Payload};
     use llm_toolkit::attachment::Attachment;
-    use async_trait::async_trait;
     use serde::Deserialize;
     use serde::de::DeserializeOwned;
     use std::sync::Arc;

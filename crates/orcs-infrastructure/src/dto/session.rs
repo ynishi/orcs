@@ -11,7 +11,7 @@ use orcs_core::session::{AppMode, ConversationMessage, Session};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.0.0")]
 pub struct SessionV1_0_0 {
-     /// Unique session identifier
+    /// Unique session identifier
     pub id: String,
     /// Human-readable session name (renamed to 'title' in V1.1.0)
     pub name: String,
@@ -82,7 +82,7 @@ impl MigratesTo<SessionV1_1_0> for SessionV1_0_0 {
     fn migrate(self) -> SessionV1_1_0 {
         SessionV1_1_0 {
             id: self.id,
-            title: self.name,  // name → title
+            title: self.name, // name → title
             created_at: self.created_at,
             updated_at: self.updated_at,
             current_persona_id: self.current_persona_id,
@@ -104,7 +104,7 @@ impl MigratesTo<SessionV2_0_0> for SessionV1_1_0 {
             current_persona_id: self.current_persona_id,
             persona_histories: self.persona_histories,
             app_mode: self.app_mode,
-            workspace_id: None,  // Existing sessions have no workspace association
+            workspace_id: None, // Existing sessions have no workspace association
         }
     }
 }

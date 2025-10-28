@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import type { Workspace, UploadedFile } from '../types/workspace';
 
 // Global fetch coordination to prevent duplicate fetches across multiple hook instances
@@ -19,6 +18,7 @@ interface RawUploadedFile {
   uploaded_at: number;
   session_id?: string;
   message_timestamp?: string;
+  author?: string;
 }
 
 /**
@@ -32,14 +32,6 @@ interface RawWorkspace {
   workspace_dir: string;
   resources: {
     uploaded_files: RawUploadedFile[];
-    generated_docs: Array<{
-      id: string;
-      title: string;
-      path: string;
-      doc_type: string;
-      session_id: string;
-      generated_at: number;
-    }>;
     temp_files: Array<{
       id: string;
       path: string;
@@ -78,14 +70,7 @@ function convertWorkspace(raw: RawWorkspace): Workspace {
         uploadedAt: file.uploaded_at,
         sessionId: file.session_id,
         messageTimestamp: file.message_timestamp,
-      })),
-      generatedDocs: raw.resources.generated_docs.map(doc => ({
-        id: doc.id,
-        title: doc.title,
-        path: doc.path,
-        docType: doc.doc_type,
-        sessionId: doc.session_id,
-        generatedAt: doc.generated_at,
+        author: file.author,
       })),
       tempFiles: raw.resources.temp_files.map(file => ({
         id: file.id,
@@ -201,6 +186,7 @@ export function useWorkspace(): UseWorkspaceResult {
           uploadedAt: file.uploaded_at,
           sessionId: file.session_id,
           messageTimestamp: file.message_timestamp,
+          author: file.author,
         }));
 
         setFiles(convertedFiles);

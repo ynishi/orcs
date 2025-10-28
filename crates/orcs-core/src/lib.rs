@@ -6,6 +6,7 @@ pub mod task;
 pub mod repository;
 pub mod workspace;
 pub mod config;
+pub mod slash_command;
 
 // Re-export common error type
 pub use error::OrcsError;

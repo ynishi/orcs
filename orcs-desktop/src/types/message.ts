@@ -1,7 +1,7 @@
 /**
  * メッセージタイプの定義
  */
-export type MessageType = 'user' | 'ai' | 'system' | 'error' | 'command' | 'task' | 'thinking';
+export type MessageType = 'user' | 'ai' | 'system' | 'error' | 'command' | 'task' | 'thinking' | 'shell_output';
 
 /**
  * メッセージインターフェース
@@ -103,6 +103,16 @@ export const getMessageStyle = (type: MessageType): MessageStyle => {
         textColor: '#7048e8',
         borderColor: '#9775fa',
         iconColor: '#9775fa',
+        align: 'left',
+        showAvatar: false,
+        showBadge: true,
+      };
+    case 'shell_output':
+      return {
+        backgroundColor: '#2e2e2e',
+        textColor: '#00ff00',
+        borderColor: '#4a4a4a',
+        iconColor: '#00ff00',
         align: 'left',
         showAvatar: false,
         showBadge: true,

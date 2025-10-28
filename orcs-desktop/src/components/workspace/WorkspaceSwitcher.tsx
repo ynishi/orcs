@@ -16,6 +16,7 @@ import {
   IconStarFilled,
   IconCheck,
   IconPlus,
+  IconTrash,
 } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -140,6 +141,39 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
     }
   };
 
+  const handleDeleteWorkspace = async (workspaceId: string, workspaceName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!confirm(`Are you sure you want to delete workspace "${workspaceName}"?\n\nThis will remove the workspace metadata and uploaded files. Your project files will not be affected.`)) {
+      return;
+    }
+
+    try {
+      await invoke('delete_workspace', { workspaceId });
+
+      notifications.show({
+        title: 'Workspace Deleted',
+        message: `${workspaceName} has been removed`,
+        color: 'green',
+      });
+
+      // Refresh workspace list
+      await refreshWorkspaces();
+
+      // If deleted current workspace, refresh to switch to another
+      if (workspaceId === workspace?.id) {
+        await refresh();
+      }
+    } catch (error) {
+      console.error('Failed to delete workspace:', error);
+      notifications.show({
+        title: 'Failed to Delete Workspace',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
   const formatLastAccessed = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
     const now = new Date();
@@ -164,14 +198,24 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
         onClick={() => handleSwitch(ws.id)}
         leftSection={isCurrent ? <IconCheck size={16} /> : <IconFolder size={16} />}
         rightSection={
-          <ActionIcon
-            size="xs"
-            variant="subtle"
-            color={ws.isFavorite ? 'yellow' : 'gray'}
-            onClick={(e) => handleToggleFavorite(ws.id, e)}
-          >
-            {ws.isFavorite ? <IconStarFilled size={14} /> : <IconStar size={14} />}
-          </ActionIcon>
+          <Group gap={4}>
+            <ActionIcon
+              size="xs"
+              variant="subtle"
+              color={ws.isFavorite ? 'yellow' : 'gray'}
+              onClick={(e) => handleToggleFavorite(ws.id, e)}
+            >
+              {ws.isFavorite ? <IconStarFilled size={14} /> : <IconStar size={14} />}
+            </ActionIcon>
+            <ActionIcon
+              size="xs"
+              variant="subtle"
+              color="red"
+              onClick={(e) => handleDeleteWorkspace(ws.id, ws.name, e)}
+            >
+              <IconTrash size={14} />
+            </ActionIcon>
+          </Group>
         }
         style={{
           backgroundColor: isCurrent ? 'var(--mantine-color-blue-light)' : undefined,

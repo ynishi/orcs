@@ -36,12 +36,14 @@ import { AgentSuggestions } from "./components/chat/AgentSuggestions";
 import { ThinkingIndicator } from "./components/chat/ThinkingIndicator";
 import { Navbar } from "./components/navigation/Navbar";
 import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
+import { SettingsMenu } from "./components/settings/SettingsMenu";
 import { parseCommand, isValidCommand, getCommandHelp } from "./utils/commandParser";
 import { filterCommands, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages, isIdleMode } from "./types/session";
+import { SlashCommand } from "./types/slash_command";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -86,7 +88,7 @@ function App() {
   } = useSessions();
 
   // ワークスペース管理
-  const { workspace, files: workspaceFiles, refresh: refreshWorkspace, refreshWorkspaces } = useWorkspace();
+  const { workspace, allWorkspaces, files: workspaceFiles, refresh: refreshWorkspace, refreshWorkspaces, switchWorkspace } = useWorkspace();
   const [includeWorkspaceInPrompt, setIncludeWorkspaceInPrompt] = useState<boolean>(false);
 
   const [autoMode, setAutoMode] = useState<boolean>(false);
@@ -407,13 +409,14 @@ function App() {
       // ワークスペースIDを取得
       const workspace = await invoke<{ id: string }>('get_current_workspace');
 
-      // ワークスペースに保存（セッションIDとメッセージタイムスタンプを含める）
+      // ワークスペースに保存（セッションID、メッセージタイムスタンプ、作者を含める）
       await invoke('upload_file_from_bytes', {
         workspaceId: workspace.id,
         filename: filename,
         fileData: fileData,
         sessionId: currentSessionId || null,
         messageTimestamp: message.timestamp.toISOString(),
+        author: message.author,
       });
 
       // ワークスペースのファイルリストを更新
@@ -578,10 +581,6 @@ function App() {
         case 'status':
           addMessage('system', 'System', `Status: ${status.connection}\nTasks: ${status.activeTasks}\nAgent: ${status.currentAgent}\nMode: ${status.mode}`);
           break;
-        case 'clear':
-          setMessages([]);
-          addMessage('system', 'System', 'Chat history cleared.');
-          break;
         case 'task':
           if (parsed.args && parsed.args.length > 0) {
             const taskText = parsed.args.join(' ');
@@ -598,8 +597,79 @@ function App() {
             addMessage('error', 'System', 'Usage: /task [description]');
           }
           break;
+        case 'workspace':
+          if (parsed.args && parsed.args.length > 0) {
+            const workspaceName = parsed.args.join(' ');
+            // Find workspace by name
+            const targetWorkspace = allWorkspaces.find(ws =>
+              ws.name.toLowerCase() === workspaceName.toLowerCase()
+            );
+            if (targetWorkspace && currentSessionId) {
+              switchWorkspace(currentSessionId, targetWorkspace.id)
+                .then(() => {
+                  addMessage('system', 'System', `✅ Switched to workspace: ${targetWorkspace.name}`);
+                })
+                .catch(err => {
+                  addMessage('error', 'System', `Failed to switch workspace: ${err}`);
+                });
+            } else if (!targetWorkspace) {
+              addMessage('error', 'System', `Workspace not found: ${workspaceName}\n\nAvailable workspaces:\n${allWorkspaces.map(ws => `- ${ws.name}`).join('\n')}`);
+            } else {
+              addMessage('error', 'System', 'No active session');
+            }
+          } else {
+            // List all workspaces
+            const workspaceList = allWorkspaces.map(ws =>
+              `${ws.id === workspace?.id ? '📍' : '  '} ${ws.name}${ws.isFavorite ? ' ⭐' : ''}`
+            ).join('\n');
+            addMessage('system', 'System', `Available workspaces:\n${workspaceList}\n\nUsage: /workspace <name>`);
+          }
+          break;
+        case 'files':
+          const fileList = workspaceFiles.length > 0
+            ? workspaceFiles.map(f => `📄 ${f.name} (${(f.size / 1024).toFixed(2)} KB)${f.author ? ` - by ${f.author}` : ''}`).join('\n')
+            : 'No files in current workspace';
+          addMessage('system', 'System', `Files in workspace "${workspace?.name}":\n${fileList}`);
+          break;
         default:
-          addMessage('error', 'System', `Command not implemented: /${parsed.command}`);
+          // Try to execute as custom slash command
+          try {
+            const customCommand = await invoke<SlashCommand | null>('get_slash_command', { name: parsed.command });
+
+            if (customCommand) {
+              // Execute custom command
+              if (customCommand.type === 'prompt') {
+                // Expand template variables and display as user message
+                const expandedContent = await invoke<string>('expand_command_template', {
+                  commandName: customCommand.name
+                });
+                addMessage('system', 'System', `✨ Executing custom command: /${customCommand.name}`);
+                addMessage('user', userNickname, expandedContent);
+
+                // Note: The expanded prompt is displayed for transparency but not automatically sent to agents
+                // Users can see what the command expands to and decide whether to send it
+              } else if (customCommand.type === 'shell') {
+                // Execute shell command and show output
+                addMessage('system', 'System', `⚡ Executing shell command: /${customCommand.name}`);
+                addMessage('shell_output', 'System', `$ ${customCommand.content}`);
+
+                try {
+                  const output = await invoke<string>('execute_shell_command', {
+                    command: customCommand.content,
+                    workingDir: customCommand.workingDir
+                  });
+                  addMessage('shell_output', 'System', output || '(no output)');
+                } catch (shellError) {
+                  addMessage('error', 'System', `Shell command failed: ${shellError}`);
+                }
+              }
+            } else {
+              addMessage('error', 'System', `Command not implemented: /${parsed.command}`);
+            }
+          } catch (error) {
+            console.error('Failed to execute custom command:', error);
+            addMessage('error', 'System', `Command not implemented: /${parsed.command}`);
+          }
       }
       return;
     }
@@ -739,6 +809,9 @@ function App() {
                     </Badge>
                   </Group>
                 )}
+
+                {/* Settings Menu */}
+                <SettingsMenu />
               </Group>
             </Group>
 

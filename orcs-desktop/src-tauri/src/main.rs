@@ -1,15 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod slash_commands;
+
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use orcs_core::session::{AppMode, Session, SessionManager};
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
+use orcs_core::slash_command::SlashCommandRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::{Workspace, UploadedFile};
-use orcs_infrastructure::{AsyncDirPersonaRepository, AsyncDirSessionRepository};
+use orcs_infrastructure::{AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirSlashCommandRepository};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_interaction::{InteractionManager, InteractionResult};
@@ -25,6 +28,7 @@ struct AppState {
     persona_repository: Arc<dyn PersonaRepository>,
     user_service: Arc<dyn UserService>,
     workspace_manager: Arc<FileSystemWorkspaceManager>,
+    slash_command_repository: Arc<dyn SlashCommandRepository>,
 }
 
 /// Serializable version of DialogueMessage for Tauri IPC
@@ -326,6 +330,44 @@ async fn get_config_path() -> Result<String, String> {
     Ok(path_str.to_string())
 }
 
+/// Gets the sessions directory path
+#[tauri::command]
+async fn get_sessions_directory() -> Result<String, String> {
+    use orcs_infrastructure::paths::OrcsPaths;
+
+    let sessions_dir = OrcsPaths::sessions_dir()
+        .map_err(|e| format!("Failed to get sessions directory: {}", e))?;
+
+    // Create the directory if it doesn't exist
+    std::fs::create_dir_all(&sessions_dir)
+        .map_err(|e| format!("Failed to create sessions directory: {}", e))?;
+
+    // Convert PathBuf to String
+    let path_str = sessions_dir.to_str()
+        .ok_or("Sessions directory path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+
+/// Gets the workspaces directory path
+#[tauri::command]
+async fn get_workspaces_directory() -> Result<String, String> {
+    use orcs_infrastructure::paths::OrcsPaths;
+
+    let workspaces_dir = OrcsPaths::workspaces_dir()
+        .map_err(|e| format!("Failed to get workspaces directory: {}", e))?;
+
+    // Create the directory if it doesn't exist
+    std::fs::create_dir_all(&workspaces_dir)
+        .map_err(|e| format!("Failed to create workspaces directory: {}", e))?;
+
+    // Convert PathBuf to String
+    let path_str = workspaces_dir.to_str()
+        .ok_or("Workspaces directory path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+
 /// Handles user input
 #[tauri::command]
 async fn handle_input(
@@ -495,6 +537,28 @@ async fn toggle_favorite_workspace(
         .map_err(|e| e.to_string())
 }
 
+/// Deletes a workspace
+#[tauri::command]
+async fn delete_workspace(
+    workspace_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    println!("[Backend] delete_workspace called: workspace_id={}", workspace_id);
+
+    state.workspace_manager
+        .delete_workspace(&workspace_id)
+        .await
+        .map_err(|e| {
+            println!("[Backend] Failed to delete workspace: {}", e);
+            e.to_string()
+        })?;
+
+    println!("[Backend] Successfully deleted workspace {}", workspace_id);
+    Ok(())
+}
+
 /// Lists all files in a workspace
 #[tauri::command]
 async fn list_workspace_files(
@@ -542,13 +606,14 @@ async fn upload_file_from_bytes(
     file_data: Vec<u8>,
     session_id: Option<String>,
     message_timestamp: Option<String>,
+    author: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<UploadedFile, String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
     // Directly add the file from bytes - no temporary file needed
     state.workspace_manager
-        .add_file_from_bytes(&workspace_id, &filename, &file_data, session_id, message_timestamp)
+        .add_file_from_bytes(&workspace_id, &filename, &file_data, session_id, message_timestamp, author)
         .await
         .map_err(|e| e.to_string())
 }
@@ -705,6 +770,13 @@ fn main() {
                 .expect("Failed to initialize workspace manager")
         );
 
+        // Initialize AsyncDirSlashCommandRepository
+        let slash_command_repository: Arc<dyn SlashCommandRepository> = Arc::new(
+            AsyncDirSlashCommandRepository::new()
+                .await
+                .expect("Failed to initialize slash command repository")
+        );
+
         // Seed the personas directory with default personas if it's empty on first run.
         if let Ok(personas) = persona_repository.get_all() {
             if personas.is_empty() {
@@ -770,6 +842,7 @@ fn main() {
                 persona_repository,
                 user_service,
                 workspace_manager,
+                slash_command_repository,
             })
             .invoke_handler(tauri::generate_handler![
                 create_session,
@@ -788,12 +861,15 @@ fn main() {
                 set_execution_strategy,
                 get_execution_strategy,
                 get_config_path,
+                get_sessions_directory,
+                get_workspaces_directory,
                 get_git_info,
                 get_current_workspace,
                 create_workspace,
                 list_workspaces,
                 switch_workspace,
                 toggle_favorite_workspace,
+                delete_workspace,
                 list_workspace_files,
                 upload_file_to_workspace,
                 upload_file_from_bytes,
@@ -801,6 +877,12 @@ fn main() {
                 rename_file_in_workspace,
                 read_workspace_file,
                 handle_input,
+                slash_commands::list_slash_commands,
+                slash_commands::get_slash_command,
+                slash_commands::save_slash_command,
+                slash_commands::remove_slash_command,
+                slash_commands::expand_command_template,
+                slash_commands::execute_shell_command,
             ])
             .run(tauri::generate_context!())
             .expect("error while running tauri application");

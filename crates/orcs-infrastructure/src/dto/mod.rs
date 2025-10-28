@@ -22,6 +22,7 @@
 
 mod persona;
 mod session;
+mod slash_command;
 mod uploaded_file;
 mod user_profile;
 mod workspace;
@@ -38,6 +39,9 @@ pub use persona::{
 // Re-export session DTOs and migrator
 pub use session::{create_session_migrator, SessionV1_0_0, SessionV1_1_0, SessionV2_0_0};
 
+// Re-export slash_command DTOs and migrator
+pub use slash_command::{create_slash_command_migrator, SlashCommandV1};
+
 // Re-export uploaded_file DTOs and migrator
 pub use uploaded_file::{create_uploaded_file_migrator, UploadedFileV1_0_0, UploadedFileV1_1_0};
 
@@ -46,10 +50,10 @@ pub use user_profile::{create_user_profile_migrator, UserProfileDTO, UserProfile
 
 // Re-export workspace DTOs and migrators
 pub use workspace::{
-    create_generated_doc_migrator, create_project_context_migrator,
+    create_project_context_migrator,
     create_session_workspace_migrator, create_temp_file_migrator,
     create_workspace_migrator, create_workspace_resources_migrator,
-    GeneratedDocV1, ProjectContextV1, SessionWorkspaceV1, TempFileV1,
+    ProjectContextV1, SessionWorkspaceV1, TempFileV1,
     WorkspaceResourcesV1, WorkspaceV1, WorkspaceV1_1_0,
 };
 

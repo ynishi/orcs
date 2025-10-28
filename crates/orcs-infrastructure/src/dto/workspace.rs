@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use version_migrate::{FromDomain, IntoDomain, Versioned};
 
 use orcs_core::workspace::{
-    GeneratedDoc, ProjectContext, SessionWorkspace, TempFile,
+    ProjectContext, SessionWorkspace, TempFile,
     Workspace, WorkspaceResources,
 };
 
@@ -26,24 +26,6 @@ pub struct TempFileV1 {
     pub created_at: i64,
     /// Whether the file should be deleted after session ends
     pub auto_delete: bool,
-}
-
-/// Represents an AI-generated document or artifact (DTO V1).
-#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
-#[versioned(version = "1.0.0")]
-pub struct GeneratedDocV1 {
-    /// Unique identifier for the generated document
-    pub id: String,
-    /// Title or name of the document
-    pub title: String,
-    /// Path to the stored document
-    pub path: PathBuf,
-    /// Type of document (e.g., "summary", "analysis", "diagram")
-    pub doc_type: String,
-    /// ID of the session that generated this document
-    pub session_id: String,
-    /// Timestamp when the document was generated
-    pub generated_at: i64,
 }
 
 /// Project-specific context and metadata (DTO V1).
@@ -74,9 +56,6 @@ pub struct WorkspaceResourcesV1 {
     /// Files uploaded by the user or system
     #[serde(default)]
     pub uploaded_files: Vec<UploadedFileV1_1_0>,
-    /// AI-generated documentation and artifacts
-    #[serde(default)]
-    pub generated_docs: Vec<GeneratedDocV1>,
     /// Temporary files created during session operations
     #[serde(default)]
     pub temp_files: Vec<TempFileV1>,
@@ -190,34 +169,6 @@ impl From<&TempFile> for TempFileV1 {
     }
 }
 
-/// Convert GeneratedDocV1 DTO to domain model.
-impl IntoDomain<GeneratedDoc> for GeneratedDocV1 {
-    fn into_domain(self) -> GeneratedDoc {
-        GeneratedDoc {
-            id: self.id,
-            title: self.title,
-            path: self.path,
-            doc_type: self.doc_type,
-            session_id: self.session_id,
-            generated_at: self.generated_at,
-        }
-    }
-}
-
-/// Convert domain model to GeneratedDocV1 DTO for persistence.
-impl From<&GeneratedDoc> for GeneratedDocV1 {
-    fn from(generated_doc: &GeneratedDoc) -> Self {
-        GeneratedDocV1 {
-            id: generated_doc.id.clone(),
-            title: generated_doc.title.clone(),
-            path: generated_doc.path.clone(),
-            doc_type: generated_doc.doc_type.clone(),
-            session_id: generated_doc.session_id.clone(),
-            generated_at: generated_doc.generated_at,
-        }
-    }
-}
-
 /// Convert ProjectContextV1 DTO to domain model.
 impl IntoDomain<ProjectContext> for ProjectContextV1 {
     fn into_domain(self) -> ProjectContext {
@@ -251,9 +202,6 @@ impl IntoDomain<WorkspaceResources> for WorkspaceResourcesV1 {
             uploaded_files: self.uploaded_files.into_iter()
                 .map(|f| f.into_domain())
                 .collect(),
-            generated_docs: self.generated_docs.into_iter()
-                .map(|d| d.into_domain())
-                .collect(),
             temp_files: self.temp_files.into_iter()
                 .map(|t| t.into_domain())
                 .collect(),
@@ -267,9 +215,6 @@ impl From<&WorkspaceResources> for WorkspaceResourcesV1 {
         WorkspaceResourcesV1 {
             uploaded_files: resources.uploaded_files.iter()
                 .map(UploadedFileV1_1_0::from)
-                .collect(),
-            generated_docs: resources.generated_docs.iter()
-                .map(GeneratedDocV1::from)
                 .collect(),
             temp_files: resources.temp_files.iter()
                 .map(TempFileV1::from)
@@ -491,20 +436,6 @@ pub fn create_temp_file_migrator() -> version_migrate::Migrator {
         .from::<TempFileV1>()
         .into::<TempFile>();
     migrator.register(path).expect("Failed to register temp_file migration path");
-    migrator
-}
-
-/// Creates a Migrator for GeneratedDoc entities.
-///
-/// # Migration Path
-///
-/// - V1.0.0 → GeneratedDoc: Converts DTO to domain model (no migration needed yet)
-pub fn create_generated_doc_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-    let path = version_migrate::Migrator::define("generated_doc")
-        .from::<GeneratedDocV1>()
-        .into::<GeneratedDoc>();
-    migrator.register(path).expect("Failed to register generated_doc migration path");
     migrator
 }
 

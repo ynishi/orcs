@@ -311,6 +311,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             uploaded_at,
             session_id: None,
             message_timestamp: None,
+            author: None,
         };
 
         // Add to workspace's uploaded_files list
@@ -329,6 +330,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         data: &[u8],
         session_id: Option<String>,
         message_timestamp: Option<String>,
+        author: Option<String>,
     ) -> Result<UploadedFile> {
         // Load existing workspace metadata
         let mut workspace = self.load_workspace(workspace_id).await?;
@@ -385,6 +387,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             uploaded_at,
             session_id,
             message_timestamp,
+            author,
         };
 
         // Add to workspace's uploaded_files list
@@ -676,6 +679,25 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         Ok(())
     }
+
+    async fn delete_workspace(&self, workspace_id: &str) -> Result<()> {
+        // Delete metadata via repository
+        self.workspace_repository.delete(workspace_id).await?;
+
+        // Delete workspace files directory
+        let workspace_dir = self.get_workspace_dir(workspace_id);
+        if workspace_dir.exists() {
+            fs::remove_dir_all(&workspace_dir).await.map_err(|e| {
+                OrcsError::Io(format!(
+                    "Failed to delete workspace directory '{}': {}",
+                    workspace_dir.display(),
+                    e
+                ))
+            })?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -925,7 +947,7 @@ mod tests {
 
         // Add file from bytes
         let uploaded_file = manager
-            .add_file_from_bytes(&workspace.id, filename, test_content, None, None)
+            .add_file_from_bytes(&workspace.id, filename, test_content, None, None, None)
             .await
             .unwrap();
 

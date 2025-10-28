@@ -30,8 +30,6 @@ pub struct Workspace {
 pub struct WorkspaceResources {
     /// Files uploaded by the user or system
     pub uploaded_files: Vec<UploadedFile>,
-    /// AI-generated documentation and artifacts
-    pub generated_docs: Vec<GeneratedDoc>,
     /// Temporary files created during session operations
     pub temp_files: Vec<TempFile>,
 }
@@ -55,23 +53,8 @@ pub struct UploadedFile {
     pub session_id: Option<String>,
     /// Message timestamp if this file was saved from a chat message (ISO 8601)
     pub message_timestamp: Option<String>,
-}
-
-/// Represents an AI-generated document or artifact.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GeneratedDoc {
-    /// Unique identifier for the generated document
-    pub id: String,
-    /// Title or name of the document
-    pub title: String,
-    /// Path to the stored document
-    pub path: PathBuf,
-    /// Type of document (e.g., "summary", "analysis", "diagram")
-    pub doc_type: String,
-    /// ID of the session that generated this document
-    pub session_id: String,
-    /// Timestamp when the document was generated
-    pub generated_at: i64,
+    /// Author of the file (user ID, persona ID, or "system")
+    pub author: Option<String>,
 }
 
 /// Project-specific context and metadata.

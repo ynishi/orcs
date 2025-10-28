@@ -42,13 +42,6 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     examples: ['/status'],
   },
   {
-    name: 'clear',
-    icon: '🗑️',
-    description: 'Clear all chat messages from the screen',
-    usage: '/clear',
-    examples: ['/clear'],
-  },
-  {
     name: 'agents',
     icon: '🤖',
     description: 'List all available agents and their current status',
@@ -56,32 +49,18 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     examples: ['/agents'],
   },
   {
+    name: 'workspace',
+    icon: '🗂️',
+    description: 'Switch to a different workspace or list all workspaces',
+    usage: '/workspace [name]',
+    examples: ['/workspace', '/workspace my-project', '/workspace orcs'],
+  },
+  {
     name: 'files',
     icon: '📁',
-    description: 'List files in the current directory',
+    description: 'List files in the current workspace',
     usage: '/files',
     examples: ['/files'],
-  },
-  {
-    name: 'ls',
-    icon: '📂',
-    description: 'List contents of a directory (like ls command)',
-    usage: '/ls [path]',
-    examples: ['/ls', '/ls src', '/ls ../'],
-  },
-  {
-    name: 'cd',
-    icon: '📍',
-    description: 'Change current working directory',
-    usage: '/cd <path>',
-    examples: ['/cd src', '/cd ..', '/cd ~/projects'],
-  },
-  {
-    name: 'pwd',
-    icon: '🗂️',
-    description: 'Print current working directory',
-    usage: '/pwd',
-    examples: ['/pwd'],
   },
 ];
 

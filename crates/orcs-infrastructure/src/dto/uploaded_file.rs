@@ -48,6 +48,9 @@ pub struct UploadedFileV1_1_0 {
     /// Message timestamp if this file was saved from a chat message (ISO 8601)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message_timestamp: Option<String>,
+    /// Author of the file (user ID, persona ID, or "system")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
 }
 
 // ============================================================================
@@ -68,6 +71,7 @@ impl MigratesTo<UploadedFileV1_1_0> for UploadedFileV1_0_0 {
             uploaded_at: self.uploaded_at,
             session_id: None,
             message_timestamp: None,
+            author: None,
         }
     }
 }
@@ -88,6 +92,7 @@ impl IntoDomain<UploadedFile> for UploadedFileV1_1_0 {
             uploaded_at: self.uploaded_at,
             session_id: self.session_id,
             message_timestamp: self.message_timestamp,
+            author: self.author,
         }
     }
 }
@@ -104,6 +109,7 @@ impl From<&UploadedFile> for UploadedFileV1_1_0 {
             uploaded_at: uploaded_file.uploaded_at,
             session_id: uploaded_file.session_id.clone(),
             message_timestamp: uploaded_file.message_timestamp.clone(),
+            author: uploaded_file.author.clone(),
         }
     }
 }

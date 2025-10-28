@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip, Select, Badge } from '@mantine/core';
-import { IconSettings, IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
-import { openPath } from '@tauri-apps/plugin-opener';
 import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
 
@@ -78,15 +77,6 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
       setActiveParticipantIds(updatedIds);
     } catch (error) {
       console.error(error);
-    }
-  };
-
-  const handleOpenConfigFile = async () => {
-    try {
-      const path = await invoke<string>('get_config_path');
-      await openPath(path);
-    } catch (error) {
-      console.error('Failed to open config file:', error);
     }
   };
 
@@ -222,11 +212,6 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
             <Tooltip label="Add persona" withArrow>
               <ActionIcon variant="subtle" color="blue" onClick={() => handleOpenModal()}>
                 <IconPlus size={16} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Open config file" withArrow>
-              <ActionIcon variant="subtle" color="gray" onClick={handleOpenConfigFile}>
-                <IconSettings size={16} />
               </ActionIcon>
             </Tooltip>
           </Group>

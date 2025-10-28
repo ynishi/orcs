@@ -16,12 +16,9 @@ export const AVAILABLE_COMMANDS = [
   'task',
   'mode',
   'status',
-  'clear',
   'agents',
+  'workspace',
   'files',
-  'ls',
-  'cd',
-  'pwd',
 ] as const;
 
 export type AvailableCommand = typeof AVAILABLE_COMMANDS[number];
@@ -73,8 +70,9 @@ export function getCommandHelp(command?: string): string {
 /task [text]   - Create a new task
 /mode [name]   - Switch mode
 /status        - Show current status
-/clear         - Clear chat history
-/agents        - List available agents`;
+/agents        - List available agents
+/workspace [name] - Switch workspace or list workspaces
+/files         - List files in current workspace`;
   }
 
   const helpTexts: Record<string, string> = {
@@ -82,8 +80,9 @@ export function getCommandHelp(command?: string): string {
     task: '/task [text] - Create a new task with the given text',
     mode: '/mode [name] - Switch to the specified mode (e.g., chat, analysis, debug)',
     status: '/status - Display current system status',
-    clear: '/clear - Clear all chat messages',
     agents: '/agents - List all available agents and their status',
+    workspace: '/workspace [name] - Switch to a workspace or list all workspaces',
+    files: '/files - List files in the current workspace',
   };
 
   return helpTexts[command] || `Unknown command: /${command}`;

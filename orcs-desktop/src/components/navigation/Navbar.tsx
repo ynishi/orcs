@@ -6,6 +6,7 @@ import { SessionList } from '../sessions/SessionList';
 import { WorkspacePanel } from '../workspace/WorkspacePanel';
 import { TaskList } from '../tasks/TaskList';
 import { PersonasList } from '../personas/PersonasList';
+import { SlashCommandList } from '../slash_commands/SlashCommandList';
 
 interface NavbarProps {
   // Sessions
@@ -55,7 +56,7 @@ export function Navbar({
     <ScrollArea h="100vh" type="auto">
       <Box p="md">
         <Accordion
-          defaultValue={['sessions', 'files', 'tasks', 'personas']}
+          defaultValue={['sessions', 'files', 'tasks', 'personas', 'commands']}
           multiple
           variant="separated"
         >
@@ -132,6 +133,19 @@ export function Navbar({
             </Accordion.Control>
             <Accordion.Panel>
               <PersonasList onMessage={onMessage} />
+            </Accordion.Panel>
+          </Accordion.Item>
+
+          {/* スラッシュコマンド */}
+          <Accordion.Item value="commands">
+            <Accordion.Control>
+              <Group gap="xs">
+                <Text>⚡</Text>
+                <Text fw={600}>Slash Commands</Text>
+              </Group>
+            </Accordion.Control>
+            <Accordion.Panel>
+              <SlashCommandList onMessage={onMessage} />
             </Accordion.Panel>
           </Accordion.Item>
         </Accordion>

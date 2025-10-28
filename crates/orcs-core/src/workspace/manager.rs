@@ -100,6 +100,7 @@ pub trait WorkspaceManager: Send + Sync {
     /// * `data` - The file content as bytes
     /// * `session_id` - Optional session ID if file was saved from a chat message
     /// * `message_timestamp` - Optional message timestamp if file was saved from a chat message
+    /// * `author` - Optional author identifier (user ID, persona ID, or "system")
     ///
     /// # Returns
     ///
@@ -118,6 +119,7 @@ pub trait WorkspaceManager: Send + Sync {
         data: &[u8],
         session_id: Option<String>,
         message_timestamp: Option<String>,
+        author: Option<String>,
     ) -> Result<UploadedFile>;
 
     /// Deletes a file from a workspace.
@@ -292,4 +294,19 @@ pub trait WorkspaceManager: Send + Sync {
     ///
     /// Returns an error if the save operation fails.
     async fn save_workspace(&self, workspace: &Workspace) -> Result<()>;
+
+    /// Deletes a workspace from persistent storage.
+    ///
+    /// This method removes the workspace metadata and all associated files.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace to delete
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The deletion operation fails
+    async fn delete_workspace(&self, workspace_id: &str) -> Result<()>;
 }

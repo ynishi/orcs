@@ -23,24 +23,8 @@ export interface UploadedFile {
   sessionId?: string;
   /** Message timestamp if this file was saved from a chat message (ISO 8601) */
   messageTimestamp?: string;
-}
-
-/**
- * Represents an AI-generated document or artifact.
- */
-export interface GeneratedDoc {
-  /** Unique identifier for the generated document */
-  id: string;
-  /** Title or name of the document */
-  title: string;
-  /** Path to the stored document */
-  path: string;
-  /** Type of document (e.g., "summary", "analysis", "diagram") */
-  docType: string;
-  /** ID of the session that generated this document */
-  sessionId: string;
-  /** Timestamp when the document was generated (Unix timestamp in seconds) */
-  generatedAt: number;
+  /** Author of the file (user ID, persona ID, or "system") */
+  author?: string;
 }
 
 /**
@@ -65,8 +49,6 @@ export interface TempFile {
 export interface WorkspaceResources {
   /** Files uploaded by the user or system */
   uploadedFiles: UploadedFile[];
-  /** AI-generated documentation and artifacts */
-  generatedDocs: GeneratedDoc[];
   /** Temporary files created during session operations */
   tempFiles: TempFile[];
 }

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { Session } from '../types/session';
 
 export function useSessions() {
@@ -8,23 +9,21 @@ export function useSessions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 初回ロード: セッション一覧と現在のセッションを取得
-  useEffect(() => {
-    loadSessions();
-  }, []);
-
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
+      console.log('[useSessions] Loading sessions from backend...');
       // セッション一覧を取得
       const sessionList = await invoke<Session[]>('list_sessions');
+      console.log('[useSessions] Loaded sessions:', sessionList.map(s => ({ id: s.id, workspace_id: s.workspace_id })));
       setSessions(sessionList);
 
       // 現在アクティブなセッションを取得
       const activeSession = await invoke<Session | null>('get_active_session');
       if (activeSession) {
+        console.log('[useSessions] Active session:', activeSession.id, 'workspace_id:', activeSession.workspace_id);
         setCurrentSessionId(activeSession.id);
       }
     } catch (err) {
@@ -33,14 +32,31 @@ export function useSessions() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // 初回ロード: セッション一覧と現在のセッションを取得
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  // Listen for workspace-switched events to refresh session list
+  useEffect(() => {
+    const unlisten = listen<string>('workspace-switched', async () => {
+      console.log('[useSessions] workspace-switched event received, refreshing sessions');
+      await loadSessions();
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, [loadSessions]);
 
   const createSession = async (): Promise<string> => {
     try {
       const newSession = await invoke<Session>('create_session');
-      // Update local state directly instead of reloading
-      setSessions(prev => [...prev, newSession]);
       setCurrentSessionId(newSession.id);
+      // Reload sessions to ensure workspace_id and other fields are properly set
+      await loadSessions();
       return newSession.id;
     } catch (err) {
       console.error('Failed to create session:', err);

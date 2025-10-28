@@ -278,4 +278,18 @@ pub trait WorkspaceManager: Send + Sync {
     /// - The workspace does not exist
     /// - The update operation fails
     async fn touch_workspace(&self, workspace_id: &str) -> Result<()>;
+
+    /// Saves a workspace to persistent storage.
+    ///
+    /// This method updates the workspace data in storage, including all fields
+    /// such as last_accessed, is_favorite, last_active_session_id, etc.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace` - The workspace to save
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the save operation fails.
+    async fn save_workspace(&self, workspace: &Workspace) -> Result<()>;
 }

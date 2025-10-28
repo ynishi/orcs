@@ -21,6 +21,8 @@ pub struct Workspace {
     pub last_accessed: i64,
     /// Whether this workspace is marked as favorite
     pub is_favorite: bool,
+    /// ID of the last active session in this workspace
+    pub last_active_session_id: Option<String>,
 }
 
 /// Collection of all resources managed within a workspace.

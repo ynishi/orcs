@@ -5,7 +5,7 @@ members = [
     "crates/orcs-core",
     "crates/orcs-execution",
     "orcs-desktop/src-tauri",
-    "crates/orcs-infrastructure",
+    "crates/orcs-infrastructure", "crates/orcs-application",
 ]
 
 [workspace.package]

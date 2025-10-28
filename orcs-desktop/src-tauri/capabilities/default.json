@@ -14,7 +14,9 @@
         { "path": "$APPCONFIG/**" },
         { "path": "$APPDATA/**" },
         { "path": "$APPLOCALDATA/**" },
-        { "path": "$HOME/Library/Application Support/orcs/**" }
+        { "path": "$HOME/Library/Application Support/orcs/**" },
+        { "path": "$HOME/.config/orcs/**" },
+        { "path": "$HOME/.local/share/orcs/**" }
       ]
     },
     {
@@ -23,7 +25,9 @@
         { "path": "$APPCONFIG/**" },
         { "path": "$APPDATA/**" },
         { "path": "$APPLOCALDATA/**" },
-        { "path": "$HOME/Library/Application Support/orcs/**" }
+        { "path": "$HOME/Library/Application Support/orcs/**" },
+        { "path": "$HOME/.config/orcs/**" },
+        { "path": "$HOME/.local/share/orcs/**" }
       ]
     },
     {
@@ -32,7 +36,9 @@
         { "path": "$APPCONFIG/**" },
         { "path": "$APPDATA/**" },
         { "path": "$APPLOCALDATA/**" },
-        { "path": "$HOME/Library/Application Support/orcs/**" }
+        { "path": "$HOME/Library/Application Support/orcs/**" },
+        { "path": "$HOME/.config/orcs/**" },
+        { "path": "$HOME/.local/share/orcs/**" }
       ]
     },
     {
@@ -41,7 +47,9 @@
         { "path": "$APPCONFIG/**" },
         { "path": "$APPDATA/**" },
         { "path": "$APPLOCALDATA/**" },
-        { "path": "$HOME/Library/Application Support/orcs/**" }
+        { "path": "$HOME/Library/Application Support/orcs/**" },
+        { "path": "$HOME/.config/orcs/**" },
+        { "path": "$HOME/.local/share/orcs/**" }
       ]
     },
     {
@@ -50,7 +58,9 @@
         { "path": "$APPCONFIG/**" },
         { "path": "$APPDATA/**" },
         { "path": "$APPLOCALDATA/**" },
-        { "path": "$HOME/Library/Application Support/orcs/**" }
+        { "path": "$HOME/Library/Application Support/orcs/**" },
+        { "path": "$HOME/.config/orcs/**" },
+        { "path": "$HOME/.local/share/orcs/**" }
       ]
     },
     {
@@ -59,7 +69,9 @@
         { "path": "$APPCONFIG/**" },
         { "path": "$APPDATA/**" },
         { "path": "$APPLOCALDATA/**" },
-        { "path": "$HOME/Library/Application Support/orcs/**" }
+        { "path": "$HOME/Library/Application Support/orcs/**" },
+        { "path": "$HOME/.config/orcs/**" },
+        { "path": "$HOME/.local/share/orcs/**" }
       ]
     },
     {
@@ -68,7 +80,9 @@
         { "path": "$APPCONFIG/**" },
         { "path": "$APPDATA/**" },
         { "path": "$APPLOCALDATA/**" },
-        { "path": "$HOME/Library/Application Support/orcs/**" }
+        { "path": "$HOME/Library/Application Support/orcs/**" },
+        { "path": "$HOME/.config/orcs/**" },
+        { "path": "$HOME/.local/share/orcs/**" }
       ]
     }
   ]

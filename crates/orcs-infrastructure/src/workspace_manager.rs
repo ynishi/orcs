@@ -219,6 +219,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             project_context: ProjectContext::default(),
             last_accessed: now,
             is_favorite: false,
+            last_active_session_id: None,
         };
 
         // Save via repository
@@ -656,6 +657,24 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             .as_secs() as i64;
         workspace.last_accessed = now;
         self.save_workspace(&workspace).await
+    }
+
+    async fn save_workspace(&self, workspace: &Workspace) -> Result<()> {
+        let workspace_dir = self.get_workspace_dir(&workspace.id);
+
+        // Ensure workspace directory exists (for actual files)
+        fs::create_dir_all(&workspace_dir).await.map_err(|e| {
+            OrcsError::Io(format!(
+                "Failed to create workspace directory '{}': {}",
+                workspace_dir.display(),
+                e
+            ))
+        })?;
+
+        // Save via repository
+        self.workspace_repository.save(workspace).await?;
+
+        Ok(())
     }
 }
 

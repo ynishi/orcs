@@ -1,0 +1,24 @@
+[package]
+name = "orcs-application"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+# Internal dependencies
+orcs-core = { path = "../orcs-core" }
+orcs-interaction = { path = "../orcs-interaction" }
+
+# External dependencies
+anyhow = "1.0"
+async-trait = "0.1"
+tokio = { version = "1.40", features = ["sync"] }
+tracing = "0.1"
+uuid = { version = "1.11", features = ["v4"] }

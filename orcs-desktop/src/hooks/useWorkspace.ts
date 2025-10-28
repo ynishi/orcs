@@ -3,6 +3,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { Workspace, UploadedFile } from '../types/workspace';
 
+// Global fetch coordination to prevent duplicate fetches across multiple hook instances
+let isFetchingAllWorkspaces = false;
+let pendingFetchPromise: Promise<RawWorkspace[]> | null = null;
+
 /**
  * Raw uploaded file structure as returned from Rust/Tauri with snake_case fields.
  */
@@ -168,12 +172,14 @@ export function useWorkspace(): UseWorkspaceResult {
    * Fetches the current workspace and its files from the backend.
    */
   const fetchWorkspace = useCallback(async () => {
+    console.log('[useWorkspace] Fetching current workspace...');
     setIsLoading(true);
     setError(null);
 
     try {
       // Call the Tauri command to get the current workspace
       const rawWorkspace = await invoke<RawWorkspace>('get_current_workspace');
+      console.log('[useWorkspace] Current workspace:', rawWorkspace.id, rawWorkspace.name);
 
       // Convert from snake_case to camelCase
       const convertedWorkspace = convertWorkspace(rawWorkspace);
@@ -214,17 +220,40 @@ export function useWorkspace(): UseWorkspaceResult {
 
   /**
    * Fetches the list of all workspaces.
+   * Uses global coordination to prevent duplicate fetches when multiple components mount simultaneously.
    */
   const fetchAllWorkspaces = useCallback(async () => {
     try {
       console.log('[useWorkspace] Fetching all workspaces...');
-      const rawWorkspaces = await invoke<RawWorkspace[]>('list_workspaces');
+
+      // If already fetching, wait for the existing promise
+      if (isFetchingAllWorkspaces && pendingFetchPromise) {
+        console.log('[useWorkspace] Fetch already in progress, waiting...');
+        const rawWorkspaces = await pendingFetchPromise;
+        const converted = rawWorkspaces.map(convertWorkspace);
+        setAllWorkspaces(converted);
+        return;
+      }
+
+      // Start new fetch
+      isFetchingAllWorkspaces = true;
+      pendingFetchPromise = invoke<RawWorkspace[]>('list_workspaces');
+
+      const rawWorkspaces = await pendingFetchPromise;
       console.log('[useWorkspace] Received', rawWorkspaces.length, 'raw workspaces');
       const converted = rawWorkspaces.map(convertWorkspace);
       console.log('[useWorkspace] Setting allWorkspaces state with', converted.length, 'workspaces');
       setAllWorkspaces(converted);
+
+      // Clear the fetch state after a short delay to allow other hooks to use the result
+      setTimeout(() => {
+        isFetchingAllWorkspaces = false;
+        pendingFetchPromise = null;
+      }, 100);
     } catch (err) {
       console.error('[useWorkspace] Failed to fetch all workspaces:', err);
+      isFetchingAllWorkspaces = false;
+      pendingFetchPromise = null;
     }
   }, []);
 
@@ -262,18 +291,6 @@ export function useWorkspace(): UseWorkspaceResult {
   useEffect(() => {
     fetchWorkspace();
     fetchAllWorkspaces();
-  }, [fetchWorkspace, fetchAllWorkspaces]);
-
-  // Listen for workspace-switched events
-  useEffect(() => {
-    const unlisten = listen<string>('workspace-switched', async () => {
-      await fetchWorkspace();
-      await fetchAllWorkspaces();
-    });
-
-    return () => {
-      unlisten.then(fn => fn());
-    };
   }, [fetchWorkspace, fetchAllWorkspaces]);
 
   return {

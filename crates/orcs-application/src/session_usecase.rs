@@ -1,0 +1,555 @@
+//! Session use case implementation.
+//!
+//! This module provides the `SessionUseCase` which orchestrates interactions
+//! between `SessionManager` and `WorkspaceManager` to ensure data consistency
+//! and proper state management across workspace-session relationships.
+
+use anyhow::{anyhow, Result};
+use orcs_core::repository::PersonaRepository;
+use orcs_core::session::{AppMode, Session, SessionManager};
+use orcs_core::user::UserService;
+use orcs_core::workspace::manager::WorkspaceManager;
+use orcs_interaction::InteractionManager;
+use std::sync::Arc;
+use uuid::Uuid;
+
+/// Use case for managing sessions with workspace context.
+///
+/// `SessionUseCase` coordinates between `SessionManager` and `WorkspaceManager`
+/// to handle all session-related operations while maintaining consistency between
+/// sessions and their associated workspaces.
+///
+/// # Responsibilities
+///
+/// - Creating new sessions with proper workspace association
+/// - Switching between sessions and restoring workspace context
+/// - Managing workspace changes within sessions
+/// - Validating and cleaning up orphaned workspace references
+///
+/// # Thread Safety
+///
+/// All internal managers are wrapped in `Arc` and use interior mutability
+/// (`RwLock`, `Mutex`) for thread-safe concurrent access.
+pub struct SessionUseCase {
+    /// Manager for session lifecycle and state
+    session_manager: Arc<SessionManager<InteractionManager>>,
+    /// Manager for workspace operations
+    workspace_manager: Arc<dyn WorkspaceManager>,
+    /// Repository for persona configurations
+    persona_repository: Arc<dyn PersonaRepository>,
+    /// Service for user information
+    user_service: Arc<dyn UserService>,
+}
+
+impl SessionUseCase {
+    /// Creates a new `SessionUseCase` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_manager` - Manager for session operations
+    /// * `workspace_manager` - Manager for workspace operations
+    /// * `persona_repository` - Repository for accessing persona configurations
+    /// * `user_service` - Service for retrieving user information
+    pub fn new(
+        session_manager: Arc<SessionManager<InteractionManager>>,
+        workspace_manager: Arc<dyn WorkspaceManager>,
+        persona_repository: Arc<dyn PersonaRepository>,
+        user_service: Arc<dyn UserService>,
+    ) -> Self {
+        Self {
+            session_manager,
+            workspace_manager,
+            persona_repository,
+            user_service,
+        }
+    }
+
+    /// Creates a new session associated with the current workspace.
+    ///
+    /// This method implements UC1 (Session Creation with Workspace Association):
+    /// 1. Gets the current workspace
+    /// 2. Creates a new session
+    /// 3. Associates the session with the workspace
+    /// 4. Persists the session with workspace_id
+    ///
+    /// # Returns
+    ///
+    /// Returns the newly created session with workspace association.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The current workspace cannot be determined
+    /// - The session creation fails
+    /// - The session persistence fails
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let session = usecase.create_session().await?;
+    /// println!("Created session {} in workspace {:?}", session.id, session.workspace_id);
+    /// ```
+    pub async fn create_session(&self) -> Result<Session> {
+        tracing::info!("[SessionUseCase] Creating new session");
+
+        // 1. Get current workspace
+        let workspace = self.workspace_manager.get_current_workspace().await?;
+        tracing::info!(
+            "[SessionUseCase] Current workspace: {} ({})",
+            workspace.name,
+            workspace.id
+        );
+
+        // 2. Create session
+        let session_id = Uuid::new_v4().to_string();
+        tracing::debug!("[SessionUseCase] Generated session ID: {}", session_id);
+
+        let manager = self
+            .session_manager
+            .create_session(session_id.clone(), |sid| {
+                InteractionManager::new_session(
+                    sid,
+                    self.persona_repository.clone(),
+                    self.user_service.clone(),
+                )
+            })
+            .await?;
+
+        // 3. Associate with workspace
+        tracing::debug!(
+            "[SessionUseCase] Associating session with workspace {} at path: {}",
+            workspace.id,
+            workspace.root_path.display()
+        );
+
+        manager
+            .set_workspace_id(
+                Some(workspace.id.clone()),
+                Some(workspace.root_path.clone()),
+            )
+            .await;
+
+        // 4. Persist session (now includes workspace_id)
+        self.session_manager
+            .save_active_session(AppMode::Idle)
+            .await?;
+
+        tracing::info!(
+            "[SessionUseCase] Session {} created and persisted with workspace {}",
+            session_id,
+            workspace.id
+        );
+
+        // 5. Return session
+        let session = manager.to_session(AppMode::Idle, None).await;
+        Ok(session)
+    }
+
+    /// Switches to an existing session and restores its workspace context.
+    ///
+    /// This method implements UC2 (Session Switching):
+    /// 1. Loads the session from storage
+    /// 2. Validates the workspace association
+    /// 3. Resolves and sets the workspace context
+    /// 4. Updates workspace access timestamp and last active session
+    /// 5. Handles orphaned workspace references
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The ID of the session to switch to
+    ///
+    /// # Returns
+    ///
+    /// Returns the switched session with workspace context restored.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The session does not exist
+    /// - The session cannot be loaded
+    ///
+    /// # Note
+    ///
+    /// If the session references a non-existent workspace (orphaned reference),
+    /// the workspace_id will be automatically cleared and a warning will be logged.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let session = usecase.switch_session("abc-123").await?;
+    /// if session.workspace_id.is_none() {
+    ///     println!("Warning: Session was orphaned, workspace cleared");
+    /// }
+    /// ```
+    pub async fn switch_session(&self, session_id: &str) -> Result<Session> {
+        tracing::info!("[SessionUseCase] Switching to session: {}", session_id);
+
+        // 1. Load session from storage
+        let manager = self
+            .session_manager
+            .switch_session(session_id, |data| {
+                InteractionManager::from_session(
+                    data,
+                    self.persona_repository.clone(),
+                    self.user_service.clone(),
+                )
+            })
+            .await?;
+
+        // 2. Get session data to check workspace_id
+        let session = manager.to_session(AppMode::Idle, None).await;
+
+        // 3. Validate and restore workspace context if workspace_id exists
+        if let Some(ref workspace_id) = session.workspace_id {
+            tracing::debug!(
+                "[SessionUseCase] Session references workspace: {}",
+                workspace_id
+            );
+
+            match self.workspace_manager.get_workspace(workspace_id).await {
+                Ok(Some(mut workspace)) => {
+                    // Valid workspace - restore context
+                    tracing::info!(
+                        "[SessionUseCase] Restoring workspace context: {} at {}",
+                        workspace.name,
+                        workspace.root_path.display()
+                    );
+
+                    manager
+                        .set_workspace_id(
+                            Some(workspace_id.clone()),
+                            Some(workspace.root_path.clone()),
+                        )
+                        .await;
+
+                    // Update workspace last active session
+                    workspace.last_active_session_id = Some(session_id.to_string());
+                    if let Err(e) = self.workspace_manager.save_workspace(&workspace).await {
+                        tracing::warn!(
+                            "[SessionUseCase] Failed to save workspace last active session: {}",
+                            e
+                        );
+                    }
+
+                    // Update workspace access timestamp
+                    if let Err(e) = self.workspace_manager.touch_workspace(workspace_id).await {
+                        tracing::warn!(
+                            "[SessionUseCase] Failed to update workspace access time: {}",
+                            e
+                        );
+                    }
+                }
+                Ok(None) => {
+                    // Orphaned session - workspace was deleted
+                    tracing::warn!(
+                        "[SessionUseCase] Session {} references non-existent workspace {}",
+                        session_id,
+                        workspace_id
+                    );
+
+                    // Clear the invalid workspace_id
+                    self.session_manager
+                        .update_workspace_id(session_id, None, None)
+                        .await?;
+
+                    tracing::info!(
+                        "[SessionUseCase] Cleared orphaned workspace reference from session {}",
+                        session_id
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "[SessionUseCase] Error checking workspace {}: {}",
+                        workspace_id,
+                        e
+                    );
+                    // Continue without workspace context
+                }
+            }
+        } else {
+            tracing::debug!("[SessionUseCase] Session has no workspace association");
+        }
+
+        // Return the session (potentially with cleared workspace_id)
+        let final_session = manager.to_session(AppMode::Idle, None).await;
+        tracing::info!("[SessionUseCase] Switched to session: {}", session_id);
+
+        Ok(final_session)
+    }
+
+    /// Switches the current session to a different workspace.
+    ///
+    /// This method implements UC5 (Workspace Switching):
+    /// 1. Validates the target workspace exists
+    /// 2. Checks if workspace has a last active session
+    /// 3. If yes, switches to that session; if no, updates current session
+    /// 4. Updates workspace access timestamp and last active session
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace to switch to
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The update operation fails
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// usecase.switch_workspace("ws-456").await?;
+    /// println!("Switched to workspace ws-456");
+    /// ```
+    pub async fn switch_workspace(&self, workspace_id: &str) -> Result<()> {
+        println!("[SessionUseCase] Switching to workspace: {}", workspace_id);
+        tracing::info!("[SessionUseCase] Switching to workspace: {}", workspace_id);
+
+        // 1. Validate workspace exists
+        let mut workspace = self
+            .workspace_manager
+            .get_workspace(workspace_id)
+            .await?
+            .ok_or_else(|| anyhow!("Workspace not found: {}", workspace_id))?;
+
+        println!("[SessionUseCase] Target workspace: {} at {}", workspace.name, workspace.root_path.display());
+        println!("[SessionUseCase] Workspace last_active_session_id: {:?}", workspace.last_active_session_id);
+        tracing::debug!(
+            "[SessionUseCase] Target workspace: {} at {}",
+            workspace.name,
+            workspace.root_path.display()
+        );
+
+        // 2. Find a session for this workspace
+        // Priority: last_active_session_id > most recent session > create new session
+
+        // Get all sessions for this workspace
+        let all_sessions = self.session_manager.list_sessions().await
+            .map_err(|e| anyhow!("Failed to list sessions: {}", e))?;
+
+        let workspace_sessions: Vec<_> = all_sessions.into_iter()
+            .filter(|s| s.workspace_id.as_ref() == Some(&workspace.id))
+            .collect();
+
+        println!("[SessionUseCase] Found {} sessions for workspace {}", workspace_sessions.len(), workspace_id);
+
+        // Try last_active_session_id first
+        if let Some(ref last_session_id) = workspace.last_active_session_id {
+            if workspace_sessions.iter().any(|s| &s.id == last_session_id) {
+                println!("[SessionUseCase] Using last active session: {}", last_session_id);
+                match self.switch_session(last_session_id).await {
+                    Ok(_) => {
+                        println!("[SessionUseCase] Successfully switched to workspace {} with last active session {}", workspace_id, last_session_id);
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        println!("[SessionUseCase] Failed to switch to last active session: {}", e);
+                        // Fall through to try other sessions
+                    }
+                }
+            } else {
+                println!("[SessionUseCase] Last active session {} not found in workspace sessions, ignoring", last_session_id);
+            }
+        }
+
+        // Try most recent session
+        if !workspace_sessions.is_empty() {
+            let mut sorted_sessions = workspace_sessions;
+            sorted_sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+            let most_recent = &sorted_sessions[0];
+
+            println!("[SessionUseCase] Using most recent session: {}", most_recent.id);
+            match self.switch_session(&most_recent.id).await {
+                Ok(_) => {
+                    println!("[SessionUseCase] Successfully switched to workspace {} with recent session {}", workspace_id, most_recent.id);
+                    return Ok(());
+                }
+                Err(e) => {
+                    println!("[SessionUseCase] Failed to switch to recent session: {}", e);
+                    // Fall through to create new session
+                }
+            }
+        }
+
+        println!("[SessionUseCase] No valid session found, creating new session for workspace {}", workspace_id);
+
+        // 3. Create new session for this workspace
+        let session_id = Uuid::new_v4().to_string();
+        println!("[SessionUseCase] Creating new session {} for workspace {}", session_id, workspace_id);
+
+        let manager = self
+            .session_manager
+            .create_session(session_id.clone(), |sid| {
+                InteractionManager::new_session(
+                    sid,
+                    self.persona_repository.clone(),
+                    self.user_service.clone(),
+                )
+            })
+            .await?;
+
+        // Associate with workspace
+        manager
+            .set_workspace_id(
+                Some(workspace.id.clone()),
+                Some(workspace.root_path.clone()),
+            )
+            .await;
+
+        // Persist session
+        self.session_manager
+            .save_active_session(orcs_core::session::AppMode::Idle)
+            .await?;
+
+        // Update workspace last active session
+        workspace.last_active_session_id = Some(session_id.clone());
+        self.workspace_manager.save_workspace(&workspace).await?;
+        self.workspace_manager.touch_workspace(workspace_id).await?;
+
+        println!("[SessionUseCase] Successfully created and switched to new session {} for workspace {}", session_id, workspace_id);
+        tracing::info!(
+            "[SessionUseCase] Successfully created and switched to new session {} for workspace {}",
+            session_id,
+            workspace_id
+        );
+
+        Ok(())
+    }
+
+    /// Restores the last active session on application startup.
+    ///
+    /// This method implements UC6 (Session Restoration):
+    /// 1. Attempts to restore the last active session
+    /// 2. Validates the workspace reference
+    /// 3. Restores workspace context if valid
+    /// 4. Clears orphaned workspace references
+    /// 5. Updates workspace access timestamp
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some(Session)` if a session was restored, `None` if no active
+    /// session was found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the restoration process fails.
+    ///
+    /// # Note
+    ///
+    /// This method automatically handles orphaned workspace references by
+    /// clearing them and logging warnings.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// match usecase.restore_last_session().await? {
+    ///     Some(session) => println!("Restored session: {}", session.title),
+    ///     None => println!("No previous session found"),
+    /// }
+    /// ```
+    pub async fn restore_last_session(&self) -> Result<Option<Session>> {
+        tracing::info!("[SessionUseCase] Attempting to restore last session");
+
+        // 1. Attempt to restore session
+        let manager = self
+            .session_manager
+            .restore_last_session(|data| {
+                InteractionManager::from_session(
+                    data,
+                    self.persona_repository.clone(),
+                    self.user_service.clone(),
+                )
+            })
+            .await?;
+
+        let Some(manager) = manager else {
+            tracing::info!("[SessionUseCase] No previous session found");
+            return Ok(None);
+        };
+
+        // 2. Get session data
+        let session = manager.to_session(AppMode::Idle, None).await;
+        tracing::info!("[SessionUseCase] Restored session: {}", session.id);
+
+        // 3. Validate and restore workspace context
+        if let Some(ref workspace_id) = session.workspace_id {
+            tracing::debug!(
+                "[SessionUseCase] Session references workspace: {}",
+                workspace_id
+            );
+
+            match self.workspace_manager.get_workspace(workspace_id).await {
+                Ok(Some(workspace)) => {
+                    // Valid workspace - restore context
+                    tracing::info!(
+                        "[SessionUseCase] Restoring workspace context: {} at {}",
+                        workspace.name,
+                        workspace.root_path.display()
+                    );
+
+                    manager
+                        .set_workspace_id(
+                            Some(workspace_id.clone()),
+                            Some(workspace.root_path.clone()),
+                        )
+                        .await;
+
+                    // Update workspace access timestamp
+                    if let Err(e) = self.workspace_manager.touch_workspace(workspace_id).await {
+                        tracing::warn!(
+                            "[SessionUseCase] Failed to update workspace access time: {}",
+                            e
+                        );
+                    }
+                }
+                Ok(None) => {
+                    // Orphaned session - workspace was deleted
+                    tracing::warn!(
+                        "[SessionUseCase] Restored session {} references non-existent workspace {}",
+                        session.id,
+                        workspace_id
+                    );
+
+                    // Clear the invalid workspace_id
+                    self.session_manager
+                        .update_workspace_id(&session.id, None, None)
+                        .await?;
+
+                    tracing::info!(
+                        "[SessionUseCase] Cleared orphaned workspace reference from restored session"
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "[SessionUseCase] Error checking workspace {}: {}",
+                        workspace_id,
+                        e
+                    );
+                    // Continue without workspace context
+                }
+            }
+        } else {
+            tracing::debug!("[SessionUseCase] Restored session has no workspace association");
+        }
+
+        // Return the final session state
+        let final_session = manager.to_session(AppMode::Idle, None).await;
+        Ok(Some(final_session))
+    }
+
+    /// Returns a reference to the session manager.
+    ///
+    /// This provides direct access to the underlying session manager for
+    /// operations that don't require workspace coordination.
+    pub fn session_manager(&self) -> &Arc<SessionManager<InteractionManager>> {
+        &self.session_manager
+    }
+
+    /// Returns a reference to the workspace manager.
+    ///
+    /// This provides direct access to the underlying workspace manager for
+    /// workspace-only operations.
+    pub fn workspace_manager(&self) -> &Arc<dyn WorkspaceManager> {
+        &self.workspace_manager
+    }
+}

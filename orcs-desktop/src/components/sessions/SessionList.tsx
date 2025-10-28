@@ -27,8 +27,19 @@ export function SessionList({
 
   // フィルタリングされたセッション
   const filteredSessions = filterByWorkspace && currentWorkspaceId
-    ? sessions.filter(s => s.workspace_id === currentWorkspaceId)
+    ? sessions.filter(s => {
+        // workspace_idがnullまたはundefinedのSessionは除外
+        if (!s.workspace_id) {
+          console.log('[SessionList] Filtering out session with no workspace_id:', s.id, s.title);
+          return false;
+        }
+        const matches = s.workspace_id === currentWorkspaceId;
+        console.log('[SessionList] Filter check:', s.id.substring(0, 8), 'workspace_id:', s.workspace_id?.substring(0, 8), 'current:', currentWorkspaceId?.substring(0, 8), 'matches:', matches);
+        return matches;
+      })
     : sessions;
+
+  console.log('[SessionList] Filter active:', filterByWorkspace, 'currentWorkspaceId:', currentWorkspaceId?.substring(0, 8), 'total sessions:', sessions.length, 'filtered:', filteredSessions.length);
 
   const sortedSessions = [...filteredSessions].sort(
     (a, b) => getLastActive(b).getTime() - getLastActive(a).getTime()

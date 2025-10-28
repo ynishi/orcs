@@ -9,16 +9,17 @@ use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::{Workspace, UploadedFile};
-use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_infrastructure::{AsyncDirPersonaRepository, AsyncDirSessionRepository};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_interaction::{InteractionManager, InteractionResult};
+use orcs_application::SessionUseCase;
 use serde::Serialize;
 use tauri::State;
 
 /// Application state shared across Tauri commands
 struct AppState {
+    session_usecase: Arc<SessionUseCase>,
     session_manager: Arc<SessionManager<InteractionManager>>,
     app_mode: Mutex<AppMode>,
     persona_repository: Arc<dyn PersonaRepository>,
@@ -92,26 +93,14 @@ impl From<InteractionResult> for SerializableInteractionResult {
 async fn create_session(
     state: State<'_, AppState>,
 ) -> Result<Session, String> {
-    use orcs_core::workspace::manager::WorkspaceManager;
-
-    let session_id = uuid::Uuid::new_v4().to_string();
-    let manager = state.session_manager
-        .create_session(session_id.clone(), |sid| InteractionManager::new_session(sid, state.persona_repository.clone(), state.user_service.clone()))
+    // Use SessionUseCase for proper workspace association
+    let session = state.session_usecase
+        .create_session()
         .await
         .map_err(|e| e.to_string())?;
 
     // Reset app mode
     *state.app_mode.lock().await = AppMode::Idle;
-
-    // Get current workspace ID to associate with this session
-    let workspace_id = state.workspace_manager
-        .get_current_workspace()
-        .await
-        .ok()
-        .map(|ws| ws.id);
-
-    // Get the full session data to return
-    let session = manager.to_session(AppMode::Idle, workspace_id).await;
 
     Ok(session)
 }
@@ -133,13 +122,11 @@ async fn switch_session(
     session_id: String,
     state: State<'_, AppState>,
 ) -> Result<Session, String> {
-    let manager = state.session_manager
-        .switch_session(&session_id, |data| InteractionManager::from_session(data, state.persona_repository.clone(), state.user_service.clone()))
+    // Use SessionUseCase for proper workspace context restoration
+    let session = state.session_usecase
+        .switch_session(&session_id)
         .await
         .map_err(|e| e.to_string())?;
-
-    // InteractionManager preserves workspace_id from the loaded session
-    let session = manager.to_session(AppMode::Idle, None).await;
 
     // Update app mode
     *state.app_mode.lock().await = session.app_mode.clone();
@@ -465,44 +452,25 @@ async fn list_workspaces(
 /// Switches to a different workspace for the active session
 #[tauri::command]
 async fn switch_workspace(
-    session_id: String,
+    _session_id: String,  // Kept for API compatibility but unused
     workspace_id: String,
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    use orcs_core::workspace::manager::WorkspaceManager;
     use tauri::Emitter;
 
-    println!("[Backend] switch_workspace called: session_id={}, workspace_id={}", session_id, workspace_id);
+    println!("[Backend] switch_workspace called: workspace_id={}", workspace_id);
 
-    // Resolve workspace root_path from workspace_id
-    let workspace = state.workspace_manager
-        .get_workspace(&workspace_id)
-        .await
-        .map_err(|e| format!("Failed to get workspace: {}", e))?
-        .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
-
-    let workspace_root = Some(std::path::PathBuf::from(workspace.root_path.clone()));
-    println!("[Backend] Resolved workspace root_path: {:?}", workspace_root);
-
-    // Update the session's workspace_id and workspace_root
-    state.session_manager
-        .update_workspace_id(&session_id, Some(workspace_id.clone()), workspace_root)
+    // Use SessionUseCase for coordinated workspace switching
+    state.session_usecase
+        .switch_workspace(&workspace_id)
         .await
         .map_err(|e| {
-            println!("[Backend] Failed to update workspace_id: {}", e);
+            println!("[Backend] Failed to switch workspace: {}", e);
             e.to_string()
         })?;
 
-    println!("[Backend] Session workspace_id and root_path updated successfully");
-
-    // Update the workspace's last_accessed timestamp
-    state.workspace_manager
-        .touch_workspace(&workspace_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    println!("[Backend] Workspace last_accessed updated");
+    println!("[Backend] Successfully switched to workspace {}", workspace_id);
 
     // Notify frontend of the workspace switch
     app.emit("workspace-switched", &workspace_id)
@@ -766,37 +734,27 @@ fn main() {
             SessionManager::new(session_repository)
         );
 
-        // Try to restore last session, otherwise create a new one
-        let restored = session_manager
-            .restore_last_session(|data| InteractionManager::from_session(data, persona_repository.clone(), user_service.clone()))
+        // Create SessionUseCase for coordinated session-workspace management
+        let session_usecase = Arc::new(SessionUseCase::new(
+            session_manager.clone(),
+            workspace_manager.clone(),
+            persona_repository.clone(),
+            user_service.clone(),
+        ));
+
+        // Try to restore last session using SessionUseCase
+        let restored = session_usecase
+            .restore_last_session()
             .await
             .ok()
             .flatten();
 
         if restored.is_none() {
-            // Create initial session
-            let initial_session_id = uuid::Uuid::new_v4().to_string();
-            session_manager
-                .create_session(initial_session_id, |sid| InteractionManager::new_session(sid, persona_repository.clone(), user_service.clone()))
+            // Create initial session using SessionUseCase (properly associates workspace)
+            session_usecase
+                .create_session()
                 .await
                 .expect("Failed to create initial session");
-        }
-
-        // Resolve and set workspace_root for the active session
-        if let Some(manager) = session_manager.active_session().await {
-            let session = manager.to_session(AppMode::Idle, None).await;
-            if let Some(workspace_id) = session.workspace_id {
-                println!("[Startup] Resolving workspace_root for workspace_id: {}", workspace_id);
-                if let Ok(Some(workspace)) = workspace_manager.get_workspace(&workspace_id).await {
-                    let workspace_root = Some(std::path::PathBuf::from(workspace.root_path.clone()));
-                    println!("[Startup] Setting workspace_root: {:?}", workspace_root);
-                    manager.set_workspace_id(Some(workspace_id), workspace_root).await;
-                } else {
-                    println!("[Startup] Workspace not found: {}", workspace_id);
-                }
-            } else {
-                println!("[Startup] No workspace_id set for session");
-            }
         }
 
         let app_mode = Mutex::new(AppMode::Idle);
@@ -806,6 +764,7 @@ fn main() {
             .plugin(tauri_plugin_dialog::init())
             .plugin(tauri_plugin_fs::init())
             .manage(AppState {
+                session_usecase,
                 session_manager,
                 app_mode,
                 persona_repository,

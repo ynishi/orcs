@@ -86,7 +86,7 @@ function App() {
   } = useSessions();
 
   // ワークスペース管理
-  const { workspace, files: workspaceFiles, refresh: refreshWorkspace } = useWorkspace();
+  const { workspace, files: workspaceFiles, refresh: refreshWorkspace, refreshWorkspaces } = useWorkspace();
   const [includeWorkspaceInPrompt, setIncludeWorkspaceInPrompt] = useState<boolean>(false);
 
   const [autoMode, setAutoMode] = useState<boolean>(false);
@@ -163,6 +163,22 @@ function App() {
     };
     loadGitInfo();
   }, []);
+
+  // Listen for workspace-switched events to refresh workspace data
+  useEffect(() => {
+    const unlisten = listen<string>('workspace-switched', async () => {
+      console.log('[App] workspace-switched event received, refreshing workspace');
+      console.log('[App] Calling refreshWorkspace...');
+      await refreshWorkspace();
+      console.log('[App] Calling refreshWorkspaces...');
+      await refreshWorkspaces();
+      console.log('[App] Workspace refresh complete');
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, [refreshWorkspace, refreshWorkspaces]);
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
   useEffect(() => {

@@ -16,6 +16,8 @@ import { notifications } from '@mantine/notifications';
  * - Open config file (config.toml)
  * - Open sessions directory
  * - Open workspaces directory
+ * - Open personas directory
+ * - Open slash commands directory
  */
 export function SettingsMenu() {
   const handleOpenConfigFile = async () => {
@@ -63,6 +65,36 @@ export function SettingsMenu() {
     }
   };
 
+  const handleOpenPersonasDir = async () => {
+    try {
+      const personasDir = await invoke<string>('get_personas_directory');
+      console.log('[Settings] Opening personas directory:', personasDir);
+      await openPath(personasDir);
+    } catch (error) {
+      console.error('[Settings] Failed to open personas directory:', error);
+      notifications.show({
+        title: 'Failed to Open Directory',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  const handleOpenSlashCommandsDir = async () => {
+    try {
+      const slashCommandsDir = await invoke<string>('get_slash_commands_directory');
+      console.log('[Settings] Opening slash commands directory:', slashCommandsDir);
+      await openPath(slashCommandsDir);
+    } catch (error) {
+      console.error('[Settings] Failed to open slash commands directory:', error);
+      notifications.show({
+        title: 'Failed to Open Directory',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
   return (
     <Menu shadow="md" width={250}>
       <Menu.Target>
@@ -94,6 +126,18 @@ export function SettingsMenu() {
           onClick={handleOpenWorkspacesDir}
         >
           <Text size="sm">Workspaces Directory</Text>
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<IconFolder size={16} />}
+          onClick={handleOpenPersonasDir}
+        >
+          <Text size="sm">Personas Directory</Text>
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<IconFolder size={16} />}
+          onClick={handleOpenSlashCommandsDir}
+        >
+          <Text size="sm">Slash Commands Directory</Text>
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>

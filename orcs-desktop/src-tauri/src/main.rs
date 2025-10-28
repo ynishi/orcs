@@ -32,6 +32,7 @@ struct AppState {
     user_service: Arc<dyn UserService>,
     workspace_manager: Arc<FileSystemWorkspaceManager>,
     slash_command_repository: Arc<dyn SlashCommandRepository>,
+    slash_command_repository_concrete: Arc<AsyncDirSlashCommandRepository>,
 }
 
 /// Serializable version of DialogueMessage for Tauri IPC
@@ -340,6 +341,32 @@ async fn get_workspaces_directory(state: State<'_, AppState>) -> Result<String, 
     // Convert Path to String
     let path_str = workspaces_dir.to_str()
         .ok_or("Workspaces directory path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+
+/// Gets the personas directory path
+#[tauri::command]
+async fn get_personas_directory(state: State<'_, AppState>) -> Result<String, String> {
+    // Get the actual personas directory path from the repository
+    let personas_dir = state.persona_repository_concrete.personas_dir();
+
+    // Convert Path to String
+    let path_str = personas_dir.to_str()
+        .ok_or("Personas directory path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+
+/// Gets the slash commands directory path
+#[tauri::command]
+async fn get_slash_commands_directory(state: State<'_, AppState>) -> Result<String, String> {
+    // Get the actual slash commands directory path from the repository
+    let slash_commands_dir = state.slash_command_repository_concrete.slash_commands_dir();
+
+    // Convert Path to String
+    let path_str = slash_commands_dir.to_str()
+        .ok_or("Slash commands directory path is not valid UTF-8")?;
 
     Ok(path_str.to_string())
 }
@@ -850,11 +877,12 @@ fn main() {
         );
 
         // Initialize AsyncDirSlashCommandRepository
-        let slash_command_repository: Arc<dyn SlashCommandRepository> = Arc::new(
+        let slash_command_repository_concrete = Arc::new(
             AsyncDirSlashCommandRepository::new()
                 .await
                 .expect("Failed to initialize slash command repository")
         );
+        let slash_command_repository: Arc<dyn SlashCommandRepository> = slash_command_repository_concrete.clone();
 
         // Seed the personas directory with default personas if it's empty on first run.
         if let Ok(personas) = persona_repository.get_all() {
@@ -924,6 +952,7 @@ fn main() {
                 user_service,
                 workspace_manager: workspace_manager.clone(),
                 slash_command_repository,
+                slash_command_repository_concrete: slash_command_repository_concrete.clone(),
             })
             .invoke_handler(tauri::generate_handler![
                 create_session,
@@ -944,6 +973,8 @@ fn main() {
                 get_config_path,
                 get_sessions_directory,
                 get_workspaces_directory,
+                get_personas_directory,
+                get_slash_commands_directory,
                 get_git_info,
                 get_current_workspace,
                 create_workspace,

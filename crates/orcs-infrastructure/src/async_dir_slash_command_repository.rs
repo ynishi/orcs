@@ -90,6 +90,14 @@ impl AsyncDirSlashCommandRepository {
 
         Ok(Self { storage, base_dir })
     }
+
+    /// Returns the actual slash commands directory path.
+    ///
+    /// This returns the real path where slash command files are stored,
+    /// which is determined by the AsyncDirStorage's path resolution strategy.
+    pub fn slash_commands_dir(&self) -> &Path {
+        self.storage.base_path()
+    }
 }
 
 #[async_trait]

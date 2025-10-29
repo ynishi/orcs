@@ -20,6 +20,10 @@ async fn expand_slash_command(
     args: &str,
     state: &State<'_, AppState>,
 ) -> Result<ExpandedSlashCommand, String> {
+    tracing::info!("expand_slash_command: Command name: {}", command.name);
+    tracing::info!("expand_slash_command: Command type: {:?}", command.command_type);
+    tracing::info!("expand_slash_command: Working dir (raw): {:?}", command.working_dir);
+
     let trimmed_args = args.trim();
 
     let mut content = match command.command_type {
@@ -41,12 +45,27 @@ async fn expand_slash_command(
         }
     };
 
-    // Get workspace info and files
-    let workspace = state
-        .workspace_manager
-        .get_current_workspace()
-        .await
-        .map_err(|e| e.to_string())?;
+    // Get workspace info from active session
+    let workspace = if let Some(session_mgr) = state.session_manager.active_session().await {
+        let app_mode = state.app_mode.lock().await.clone();
+        let session = session_mgr.to_session(app_mode, None).await;
+        if let Some(workspace_id) = session.workspace_id {
+            tracing::info!("expand_slash_command: Active session workspace_id: {}", workspace_id);
+            let ws = state
+                .workspace_manager
+                .get_workspace(&workspace_id)
+                .await
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
+            tracing::info!("expand_slash_command: Workspace name: {}, root_path: {}", ws.name, ws.root_path.display());
+            ws
+        } else {
+            return Err("No workspace associated with current session".to_string());
+        }
+    } else {
+        return Err("No active session".to_string());
+    };
+
     let files = workspace.resources.uploaded_files.clone();
 
     let file_list = files
@@ -55,9 +74,9 @@ async fn expand_slash_command(
         .collect::<Vec<_>>()
         .join("\n");
 
-    // Get git info
-    let git_branch = get_git_branch().unwrap_or_else(|| "unknown".to_string());
-    let git_status = get_git_status().unwrap_or_else(|| "unavailable".to_string());
+    // Get git info from workspace directory
+    let git_branch = get_git_branch(Some(&workspace.root_path)).unwrap_or_else(|| "unknown".to_string());
+    let git_status = get_git_status(Some(&workspace.root_path)).unwrap_or_else(|| "unavailable".to_string());
 
     // Replace common placeholders in content
     content = content.replace("{workspace}", &workspace.name);
@@ -75,6 +94,7 @@ async fn expand_slash_command(
     // Expand working directory if provided
     let working_dir = command.working_dir.as_ref().map(|dir| {
         let mut expanded = dir.clone();
+        tracing::info!("expand_slash_command: Expanding working_dir from: {}", dir);
         expanded = expanded.replace("{workspace}", &workspace.name);
         expanded = expanded.replace(
             "{workspace_path}",
@@ -85,8 +105,11 @@ async fn expand_slash_command(
         if expanded.contains("{args}") {
             expanded = expanded.replace("{args}", trimmed_args);
         }
+        tracing::info!("expand_slash_command: Expanded working_dir to: {}", expanded);
         expanded
     });
+
+    tracing::info!("expand_slash_command: Final working_dir: {:?}", working_dir);
 
     Ok(ExpandedSlashCommand {
         content,
@@ -166,7 +189,11 @@ pub async fn expand_command_template(
 pub async fn execute_shell_command(
     command: String,
     working_dir: Option<String>,
+    state: State<'_, AppState>,
 ) -> Result<String, String> {
+    tracing::info!("execute_shell_command: Command: {}", command);
+    tracing::info!("execute_shell_command: Working dir provided: {:?}", working_dir);
+
     let mut cmd = if cfg!(target_os = "windows") {
         let mut c = Command::new("cmd");
         c.args(["/C", &command]);
@@ -177,9 +204,37 @@ pub async fn execute_shell_command(
         c
     };
 
-    if let Some(dir) = working_dir {
-        cmd.current_dir(dir);
-    }
+    // If working_dir is provided, use it. Otherwise, use workspace directory from active session
+    let actual_dir = if let Some(dir) = working_dir {
+        tracing::info!("execute_shell_command: Using provided dir: {}", dir);
+        cmd.current_dir(&dir);
+        dir
+    } else {
+        // Default to workspace directory from active session
+        let workspace = if let Some(session_mgr) = state.session_manager.active_session().await {
+            let app_mode = state.app_mode.lock().await.clone();
+            let session = session_mgr.to_session(app_mode, None).await;
+            if let Some(workspace_id) = session.workspace_id {
+                state
+                    .workspace_manager
+                    .get_workspace(&workspace_id)
+                    .await
+                    .map_err(|e| format!("Failed to get workspace: {}", e))?
+                    .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?
+            } else {
+                return Err("No workspace associated with current session".to_string());
+            }
+        } else {
+            return Err("No active session".to_string());
+        };
+
+        let dir = workspace.root_path.to_string_lossy().to_string();
+        tracing::info!("execute_shell_command: Using workspace dir: {}", dir);
+        cmd.current_dir(&workspace.root_path);
+        dir
+    };
+
+    tracing::info!("execute_shell_command: Executing in: {}", actual_dir);
 
     let output = cmd
         .output()
@@ -195,10 +250,15 @@ pub async fn execute_shell_command(
 
 // Helper functions
 
-fn get_git_branch() -> Option<String> {
-    Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .output()
+fn get_git_branch(working_dir: Option<&std::path::Path>) -> Option<String> {
+    let mut cmd = Command::new("git");
+    cmd.args(["rev-parse", "--abbrev-ref", "HEAD"]);
+
+    if let Some(dir) = working_dir {
+        cmd.current_dir(dir);
+    }
+
+    cmd.output()
         .ok()
         .and_then(|output| {
             if output.status.success() {
@@ -211,10 +271,15 @@ fn get_git_branch() -> Option<String> {
         })
 }
 
-fn get_git_status() -> Option<String> {
-    Command::new("git")
-        .args(["status", "--short"])
-        .output()
+fn get_git_status(working_dir: Option<&std::path::Path>) -> Option<String> {
+    let mut cmd = Command::new("git");
+    cmd.args(["status", "--short"]);
+
+    if let Some(dir) = working_dir {
+        cmd.current_dir(dir);
+    }
+
+    cmd.output()
         .ok()
         .and_then(|output| {
             if output.status.success() {

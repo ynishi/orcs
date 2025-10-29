@@ -1,3 +1,4 @@
+pub mod app_state_service;
 pub mod async_dir_persona_repository;
 pub mod async_dir_session_repository;
 pub mod async_dir_slash_command_repository;
@@ -9,6 +10,7 @@ pub mod storage;
 pub mod user_service;
 pub mod workspace_manager;
 
+pub use crate::app_state_service::AppStateService;
 pub use crate::async_dir_persona_repository::AsyncDirPersonaRepository;
 pub use crate::async_dir_session_repository::AsyncDirSessionRepository;
 pub use crate::async_dir_slash_command_repository::AsyncDirSlashCommandRepository;

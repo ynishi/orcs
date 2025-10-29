@@ -71,7 +71,7 @@ impl PersonaBackendAgent {
         workspace_root: Option<PathBuf>,
     ) -> Result<String, AgentError> {
         // Log the intention but do not change the directory
-        eprintln!(
+        tracing::info!(
             "[PersonaBackendAgent] Executing with workspace context: {:?} for backend: {:?}",
             workspace_root, self.backend
         );
@@ -101,7 +101,7 @@ impl Agent for PersonaBackendAgent {
     async fn execute(&self, payload: Payload) -> Result<Self::Output, AgentError> {
         // Read workspace_root from shared state
         let workspace_root = self.workspace_root.read().await.clone();
-        eprintln!(
+        tracing::info!(
             "[PersonaBackendAgent::execute] Read workspace_root from Arc: {:?}",
             workspace_root
         );
@@ -349,7 +349,7 @@ impl InteractionManager {
         workspace_id: Option<String>,
         workspace_root: Option<PathBuf>,
     ) {
-        eprintln!(
+        tracing::info!(
             "[InteractionManager::set_workspace_id] Called with workspace_id={:?}, workspace_root={:?}",
             workspace_id, workspace_root
         );
@@ -360,7 +360,7 @@ impl InteractionManager {
         let mut ws_root = self.agent_workspace_root.write().await;
         *ws_root = workspace_root.clone();
 
-        eprintln!(
+        tracing::info!(
             "[InteractionManager::set_workspace_id] Updated agent_workspace_root to: {:?}",
             workspace_root
         );
@@ -571,14 +571,9 @@ impl InteractionManager {
             match result {
                 Ok(turn) => {
                     // Log the turn for debugging sequential execution with timestamp
-                    let now = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap();
                     let preview: String = turn.content.chars().take(50).collect();
-                    eprintln!(
-                        "[DIALOGUE] [{}.{:03}] Turn received: {} - {}...",
-                        now.as_secs(),
-                        now.subsec_millis(),
+                    tracing::debug!(
+                        "[DIALOGUE] Turn received: {} - {}...",
                         turn.participant_name,
                         preview
                     );

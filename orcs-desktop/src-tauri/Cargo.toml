@@ -28,6 +28,10 @@ anyhow = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 uuid = { workspace = true }
 dirs = "5.0"
+chrono = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
 orcs-core = { path = "../../crates/orcs-core" }
 orcs-execution = { path = "../../crates/orcs-execution" }
 orcs-infrastructure = { path = "../../crates/orcs-infrastructure" }

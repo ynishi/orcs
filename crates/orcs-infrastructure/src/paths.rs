@@ -38,7 +38,9 @@ impl std::error::Error for PathError {}
 /// ├── secret.json              # API keys and secrets
 /// ├── sessions/                # Session files (AsyncDirStorage)
 /// ├── workspaces/              # Workspace metadata (AsyncDirStorage)
-/// └── workspace_data/          # Full workspace data (AsyncDirStorage)
+/// ├── workspace_data/          # Full workspace data (AsyncDirStorage)
+/// └── logs/                    # Application logs
+///     └── orcs-desktop.log.YYYY-MM-DD
 ///
 /// ~/.local/share/orcs/         # Data directory (for large files)
 /// └── workspaces/              # Actual workspace files
@@ -132,6 +134,16 @@ impl OrcsPaths {
     pub fn workspaces_dir() -> Result<PathBuf, PathError> {
         Ok(Self::data_dir()?.join("workspaces"))
     }
+
+    /// Returns the path to the logs directory.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(PathBuf)`: Path to logs directory (e.g., `~/.config/orcs/logs/`)
+    /// - `Err(PathError)`: Could not determine path
+    pub fn logs_dir() -> Result<PathBuf, PathError> {
+        Ok(Self::config_dir()?.join("logs"))
+    }
 }
 
 #[cfg(test)]
@@ -185,5 +197,14 @@ mod tests {
         // Verify it's under data_dir
         let data_dir = OrcsPaths::data_dir().unwrap();
         assert!(workspaces_dir.starts_with(&data_dir));
+    }
+
+    #[test]
+    fn test_logs_dir() {
+        let logs_dir = OrcsPaths::logs_dir().unwrap();
+        assert!(logs_dir.ends_with("logs"));
+        // Verify it's under config_dir
+        let config_dir = OrcsPaths::config_dir().unwrap();
+        assert!(logs_dir.starts_with(&config_dir));
     }
 }

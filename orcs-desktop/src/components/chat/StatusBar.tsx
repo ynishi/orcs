@@ -4,13 +4,12 @@ import { GitInfo } from '../../types/git';
 
 interface StatusBarProps {
   status: StatusInfo;
-  currentDir?: string;
   gitInfo?: GitInfo;
   participatingAgentsCount?: number;
   autoMode?: boolean;
 }
 
-export function StatusBar({ status, currentDir, gitInfo, participatingAgentsCount = 0, autoMode = false }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoMode = false }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -110,21 +109,6 @@ export function StatusBar({ status, currentDir, gitInfo, participatingAgentsCoun
             {autoMode ? 'ON' : 'OFF'}
           </Badge>
         </Group>
-
-        {/* カレントディレクトリ */}
-        {currentDir && (
-          <>
-            <Divider orientation="vertical" />
-            <Group gap={6} wrap="nowrap">
-              <Text size="sm" c="dimmed">
-                📁
-              </Text>
-              <Text size="sm" fw={500} style={{ fontFamily: 'monospace' }}>
-                {currentDir}
-              </Text>
-            </Group>
-          </>
-        )}
 
         {/* Git リポジトリ情報 */}
         {gitInfo?.is_repo && (

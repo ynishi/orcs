@@ -79,13 +79,29 @@ export function useSessions() {
   const deleteSession = async (sessionId: string): Promise<void> => {
     try {
       await invoke('delete_session', { sessionId });
-      await loadSessions(); // リロード
 
       // 削除されたセッションが現在のセッションだった場合
       if (currentSessionId === sessionId) {
-        // 新しいセッションを作成
-        await createSession();
+        // 削除前のセッションリストから次のセッションを選択
+        const currentIndex = sessions.findIndex(s => s.id === sessionId);
+        const remainingSessions = sessions.filter(s => s.id !== sessionId);
+
+        if (remainingSessions.length > 0) {
+          // 次のセッションを選択（現在のインデックスか、それより前）
+          const nextIndex = Math.min(currentIndex, remainingSessions.length - 1);
+          const nextSession = remainingSessions[nextIndex];
+          console.log(`[useSessions] Switching to next session: ${nextSession.id}`);
+          await invoke('switch_session', { sessionId: nextSession.id });
+          setCurrentSessionId(nextSession.id);
+        } else {
+          // 最後の1つだった場合は新しいセッションを作成
+          console.log('[useSessions] No remaining sessions, creating new one');
+          await createSession();
+        }
       }
+
+      // セッションリストをリロード
+      await loadSessions();
     } catch (err) {
       console.error('Failed to delete session:', err);
       throw new Error(`Failed to delete session: ${err}`);

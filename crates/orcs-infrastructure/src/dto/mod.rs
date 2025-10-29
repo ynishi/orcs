@@ -20,6 +20,7 @@
 //! - **1.0.0**: Initial V1 schema (string-based ID)
 //! - **2.0.0**: V2 schema (UUID-based ID)
 
+mod app_state;
 mod persona;
 mod session;
 mod slash_command;
@@ -29,6 +30,9 @@ mod workspace;
 mod workspace_metadata;
 
 use serde::{Deserialize, Serialize};
+
+// Re-export app_state DTOs and migrator
+pub use app_state::{AppStateDTO, AppStateV1_0, create_app_state_migrator};
 
 // Re-export persona DTOs and migrator
 pub use persona::{
@@ -86,6 +90,30 @@ pub struct ConfigRootV1_0_0 {
     pub workspaces: Vec<WorkspaceV1>,
 }
 
+/// Root configuration structure V1.1.0 for the application config file.
+///
+/// Added app_state field to persist application-level state.
+#[derive(Debug, Clone, Serialize, Deserialize, version_migrate::Versioned)]
+#[versioned(version = "1.1.0")]
+pub struct ConfigRootV1_1_0 {
+    /// Persona configurations (each has its own version field).
+    /// Stored as serde_json::Value (intermediate format) to allow version-migrate to handle migration.
+    #[serde(rename = "persona", default)]
+    pub personas: Vec<serde_json::Value>,
+
+    /// User profile configuration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_profile: Option<UserProfileDTO>,
+
+    /// Application state configuration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_state: Option<AppStateDTO>,
+
+    /// Workspace configurations (each has its own version field).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub workspaces: Vec<WorkspaceV1>,
+}
+
 impl Default for ConfigRootV1_0_0 {
     fn default() -> Self {
         Self {
@@ -96,15 +124,39 @@ impl Default for ConfigRootV1_0_0 {
     }
 }
 
-/// IntoDomain implementation for ConfigRootV1_0_0 (identity conversion since it's the latest version).
-impl version_migrate::IntoDomain<ConfigRootV1_0_0> for ConfigRootV1_0_0 {
-    fn into_domain(self) -> ConfigRootV1_0_0 {
+impl Default for ConfigRootV1_1_0 {
+    fn default() -> Self {
+        Self {
+            personas: Vec::new(),
+            user_profile: None,
+            app_state: None,
+            workspaces: Vec::new(),
+        }
+    }
+}
+
+/// Migration from ConfigRootV1_0_0 to ConfigRootV1_1_0.
+/// Adds app_state field with default value.
+impl version_migrate::MigratesTo<ConfigRootV1_1_0> for ConfigRootV1_0_0 {
+    fn migrate(self) -> ConfigRootV1_1_0 {
+        ConfigRootV1_1_0 {
+            personas: self.personas,
+            user_profile: self.user_profile,
+            app_state: None, // Default: no app_state
+            workspaces: self.workspaces,
+        }
+    }
+}
+
+/// IntoDomain implementation for ConfigRootV1_1_0 (identity conversion since it's the latest version).
+impl version_migrate::IntoDomain<ConfigRootV1_1_0> for ConfigRootV1_1_0 {
+    fn into_domain(self) -> ConfigRootV1_1_0 {
         self
     }
 }
 
 /// Type alias for the latest ConfigRoot version.
-pub type ConfigRoot = ConfigRootV1_0_0;
+pub type ConfigRoot = ConfigRootV1_1_0;
 
 // ============================================================================
 // ConfigRoot Migrator
@@ -112,8 +164,11 @@ pub type ConfigRoot = ConfigRootV1_0_0;
 
 /// Creates and configures a Migrator instance for ConfigRoot.
 ///
-/// Currently only V1.0.0 exists, so no migration steps are needed yet.
-/// Future versions can add migration paths here.
+/// Handles automatic schema migration from V1.0.0 to V1.1.0.
+///
+/// # Migration Path
+///
+/// - V1.0.0 → V1.1.0: Adds `app_state` field with default value (None)
 ///
 /// # Example
 ///
@@ -124,9 +179,10 @@ pub type ConfigRoot = ConfigRootV1_0_0;
 pub fn create_config_root_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> ConfigRoot (currently same)
+    // Register migration path: V1.0.0 -> V1.1.0 -> ConfigRoot
     let config_path = version_migrate::Migrator::define("config_root")
         .from::<ConfigRootV1_0_0>()
+        .step::<ConfigRootV1_1_0>()
         .into::<ConfigRoot>();
 
     migrator

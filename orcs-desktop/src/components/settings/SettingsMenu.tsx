@@ -1,13 +1,15 @@
-import { Menu, ActionIcon, Text } from '@mantine/core';
+import { Menu, ActionIcon, Text, Stack } from '@mantine/core';
 import {
   IconSettings,
   IconFile,
   IconFolder,
   IconFolderOpen,
+  IconInfoCircle,
 } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { notifications } from '@mantine/notifications';
+import { useState, useEffect } from 'react';
 
 /**
  * Settings menu component that provides access to configuration files and directories.
@@ -18,8 +20,23 @@ import { notifications } from '@mantine/notifications';
  * - Open workspaces directory
  * - Open personas directory
  * - Open slash commands directory
+ * - Display app root directory
  */
 export function SettingsMenu() {
+  const [rootDir, setRootDir] = useState<string>('');
+
+  useEffect(() => {
+    const loadRootDir = async () => {
+      try {
+        const dir = await invoke<string>('get_root_directory');
+        setRootDir(dir);
+      } catch (error) {
+        console.error('[Settings] Failed to load root directory:', error);
+      }
+    };
+    loadRootDir();
+  }, []);
+
   const handleOpenConfigFile = async () => {
     try {
       const configPath = await invoke<string>('get_config_path');
@@ -95,6 +112,44 @@ export function SettingsMenu() {
     }
   };
 
+  const handleOpenRootDir = async () => {
+    if (!rootDir) {
+      notifications.show({
+        title: 'Root Directory Not Loaded',
+        message: 'Please wait for the root directory to load',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    try {
+      console.log('[Settings] Opening root directory:', rootDir);
+      await openPath(rootDir);
+    } catch (error) {
+      console.error('[Settings] Failed to open root directory:', error);
+      notifications.show({
+        title: 'Failed to Open Directory',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  const handleOpenLogsDirectory = async () => {
+    try {
+      const logsDir = await invoke<string>('get_logs_directory');
+      console.log('[Settings] Opening logs directory:', logsDir);
+      await openPath(logsDir);
+    } catch (error) {
+      console.error('[Settings] Failed to open logs directory:', error);
+      notifications.show({
+        title: 'Failed to Open Logs Directory',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
   return (
     <Menu shadow="md" width={250}>
       <Menu.Target>
@@ -104,12 +159,33 @@ export function SettingsMenu() {
       </Menu.Target>
 
       <Menu.Dropdown>
+        <Menu.Label>Application Info</Menu.Label>
+        <Menu.Item
+          leftSection={<IconInfoCircle size={16} />}
+          onClick={handleOpenRootDir}
+        >
+          <Stack gap={4}>
+            <Text size="xs" c="dimmed">Root Directory:</Text>
+            <Text size="xs" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              {rootDir || 'Loading...'}
+            </Text>
+          </Stack>
+        </Menu.Item>
+
+        <Menu.Divider />
+
         <Menu.Label>Configuration</Menu.Label>
         <Menu.Item
           leftSection={<IconFile size={16} />}
           onClick={handleOpenConfigFile}
         >
           <Text size="sm">Open Config File</Text>
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<IconFolder size={16} />}
+          onClick={handleOpenLogsDirectory}
+        >
+          <Text size="sm">Open Logs Directory</Text>
         </Menu.Item>
 
         <Menu.Divider />

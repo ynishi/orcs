@@ -28,6 +28,7 @@ pub struct SlashCommand {
     pub content: String,
     /// Working directory for shell commands (supports variables like {workspace_path})
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "workingDir")]
     pub working_dir: Option<String>,
     /// Optional description of expected arguments (displayed in UI)
     #[serde(skip_serializing_if = "Option::is_none")]

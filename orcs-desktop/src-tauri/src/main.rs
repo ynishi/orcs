@@ -13,13 +13,14 @@ use orcs_core::workspace::{UploadedFile, Workspace};
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_infrastructure::{
-    AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirSlashCommandRepository,
+    AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
+    AsyncDirSlashCommandRepository,
 };
 use orcs_interaction::{InteractionManager, InteractionResult};
 use serde::Serialize;
 use std::path::Path;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Emitter, State};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
@@ -35,6 +36,7 @@ struct AppState {
     workspace_manager: Arc<FileSystemWorkspaceManager>,
     slash_command_repository: Arc<dyn SlashCommandRepository>,
     slash_command_repository_concrete: Arc<AsyncDirSlashCommandRepository>,
+    app_state_service: Arc<AppStateService>,
 }
 
 /// Serializable version of DialogueMessage for Tauri IPC
@@ -363,6 +365,33 @@ async fn get_slash_commands_directory(state: State<'_, AppState>) -> Result<Stri
     Ok(path_str.to_string())
 }
 
+/// Gets the root directory where the application is running from
+#[tauri::command]
+async fn get_root_directory() -> Result<String, String> {
+    let current_dir = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+
+    let path_str = current_dir
+        .to_str()
+        .ok_or("Root directory path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+
+/// Gets the logs directory path
+#[tauri::command]
+async fn get_logs_directory() -> Result<String, String> {
+    use orcs_infrastructure::paths::OrcsPaths;
+
+    let logs_dir = OrcsPaths::logs_dir().map_err(|e| e.to_string())?;
+
+    let path_str = logs_dir
+        .to_str()
+        .ok_or("Logs directory path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+
 /// Helper function to execute shell commands
 async fn execute_shell_command(command: &str, working_dir: Option<&str>) -> Result<String, String> {
     #[cfg(target_os = "windows")]
@@ -651,6 +680,24 @@ async fn switch_workspace(
         workspace_id
     );
 
+    // Save as last selected workspace
+    if let Err(e) = state
+        .app_state_service
+        .set_last_selected_workspace(workspace_id.clone())
+        .await
+    {
+        println!(
+            "[Backend] Warning: Failed to save last selected workspace: {}",
+            e
+        );
+        // Non-fatal error - continue
+    } else {
+        println!(
+            "[Backend] Saved last selected workspace: {}",
+            workspace_id
+        );
+    }
+
     // Notify frontend of the workspace switch
     app.emit("workspace-switched", &workspace_id)
         .map_err(|e| e.to_string())?;
@@ -749,11 +796,12 @@ async fn upload_file_from_bytes(
     message_timestamp: Option<String>,
     author: Option<String>,
     state: State<'_, AppState>,
+    app: tauri::AppHandle,
 ) -> Result<UploadedFile, String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
     // Directly add the file from bytes - no temporary file needed
-    state
+    let result = state
         .workspace_manager
         .add_file_from_bytes(
             &workspace_id,
@@ -764,7 +812,15 @@ async fn upload_file_from_bytes(
             author,
         )
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // Emit workspace-files-changed event
+    app.emit("workspace-files-changed", &workspace_id)
+        .map_err(|e| e.to_string())?;
+
+    tracing::info!("upload_file_from_bytes: Emitted workspace-files-changed event for workspace: {}", workspace_id);
+
+    Ok(result)
 }
 
 /// Deletes a file from a workspace
@@ -810,28 +866,56 @@ async fn read_workspace_file(file_path: String) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed to read file: {}", e))
 }
 
-/// Gets Git repository information for the current directory
+/// Gets Git repository information for the current workspace
 #[tauri::command]
-fn get_git_info() -> GitInfo {
+async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String> {
     use std::process::Command;
+    use orcs_core::workspace::manager::WorkspaceManager;
+
+    // Get the current workspace
+    let workspace = match state.session_manager.active_session().await {
+        Some(manager) => {
+            let app_mode = state.app_mode.lock().await.clone();
+            let session = manager.to_session(app_mode, None).await;
+
+            if let Some(workspace_id) = &session.workspace_id {
+                state
+                    .workspace_manager
+                    .get_workspace(workspace_id)
+                    .await
+                    .map_err(|e| e.to_string())?
+            } else {
+                None
+            }
+        }
+        None => None,
+    };
+
+    // Use workspace root_path, or fall back to current directory
+    let working_dir = workspace
+        .as_ref()
+        .map(|ws| ws.root_path.as_path())
+        .unwrap_or_else(|| std::path::Path::new("."));
 
     // Check if we're in a git repository
     let is_repo = Command::new("git")
+        .current_dir(working_dir)
         .args(["rev-parse", "--is-inside-work-tree"])
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false);
 
     if !is_repo {
-        return GitInfo {
+        return Ok(GitInfo {
             is_repo: false,
             branch: None,
             repo_name: None,
-        };
+        });
     }
 
     // Get current branch
     let branch = Command::new("git")
+        .current_dir(working_dir)
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
         .ok()
@@ -847,6 +931,7 @@ fn get_git_info() -> GitInfo {
 
     // Get repository name from remote origin URL
     let repo_name = Command::new("git")
+        .current_dir(working_dir)
         .args(["remote", "get-url", "origin"])
         .output()
         .ok()
@@ -866,33 +951,68 @@ fn get_git_info() -> GitInfo {
             }
         })
         .or_else(|| {
-            // Fallback: use the root directory name if no remote origin
-            Command::new("git")
-                .args(["rev-parse", "--show-toplevel"])
-                .output()
-                .ok()
-                .and_then(|output| {
-                    if output.status.success() {
-                        String::from_utf8(output.stdout).ok().and_then(|path| {
-                            std::path::Path::new(path.trim())
-                                .file_name()
-                                .and_then(|name| name.to_str())
-                                .map(|s| s.to_string())
-                        })
-                    } else {
-                        None
-                    }
-                })
+            // Fallback: use the workspace name or root directory name
+            workspace.as_ref().map(|ws| ws.name.clone()).or_else(|| {
+                Command::new("git")
+                    .current_dir(working_dir)
+                    .args(["rev-parse", "--show-toplevel"])
+                    .output()
+                    .ok()
+                    .and_then(|output| {
+                        if output.status.success() {
+                            String::from_utf8(output.stdout).ok().and_then(|path| {
+                                std::path::Path::new(path.trim())
+                                    .file_name()
+                                    .and_then(|name| name.to_str())
+                                    .map(|s| s.to_string())
+                            })
+                        } else {
+                            None
+                        }
+                    })
+            })
         });
 
-    GitInfo {
+    Ok(GitInfo {
         is_repo: true,
         branch,
         repo_name,
-    }
+    })
 }
 
 fn main() {
+    // Initialize logging to file
+    use orcs_infrastructure::paths::OrcsPaths;
+
+    let log_dir = OrcsPaths::logs_dir().expect("Failed to get logs directory");
+
+    std::fs::create_dir_all(&log_dir).expect("Failed to create logs directory");
+
+    // Custom log file naming: orcs-desktop-YYYY-MM-DD.log
+    use chrono::Local;
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    let log_file_name = format!("orcs-desktop-{}.log", today);
+    let log_file_path = log_dir.join(&log_file_name);
+
+    // Use non-rotating file appender (we handle rotation manually with date in filename)
+    let log_file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file_path)
+        .expect("Failed to open log file");
+
+    let (non_blocking, _guard) = tracing_appender::non_blocking(log_file);
+
+    tracing_subscriber::fmt()
+        .with_writer(non_blocking)
+        .with_ansi(false)
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_line_number(true)
+        .init();
+
+    tracing::info!("ORCS Desktop starting...");
+
     tauri::async_runtime::block_on(async {
         use orcs_infrastructure::paths::OrcsPaths;
 
@@ -959,18 +1079,89 @@ fn main() {
             user_service.clone(),
         ));
 
+        // Initialize AppStateService
+        let app_state_service = Arc::new(
+            AppStateService::new()
+                .await
+                .expect("Failed to initialize AppStateService")
+        );
+
         // Try to restore last session using SessionUseCase
         let restored = session_usecase.restore_last_session().await.ok().flatten();
 
         if restored.is_none() {
-            // Create initial session using SessionUseCase (properly associates workspace)
-            session_usecase
-                .create_session()
-                .await
-                .expect("Failed to create initial session");
+            // Try to restore workspace from last selected workspace ID
+            let workspace_selected = if let Some(last_workspace_id) =
+                app_state_service.get_last_selected_workspace().await
+            {
+                tracing::info!(
+                    "[Startup] Found last selected workspace: {}",
+                    last_workspace_id
+                );
+
+                // Try to switch to that workspace
+                match session_usecase.switch_workspace(&last_workspace_id).await {
+                    Ok(_) => {
+                        tracing::info!(
+                            "[Startup] Successfully restored workspace: {}",
+                            last_workspace_id
+                        );
+                        true
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "[Startup] Failed to restore last workspace {}: {}",
+                            last_workspace_id,
+                            e
+                        );
+                        false
+                    }
+                }
+            } else {
+                false
+            };
+
+            if !workspace_selected {
+                // No last workspace or failed to restore - try to find any workspace
+                use orcs_core::workspace::manager::WorkspaceManager;
+                match workspace_manager.list_all_workspaces().await {
+                    Ok(workspaces) if !workspaces.is_empty() => {
+                        // Use most recently accessed workspace
+                        let most_recent = &workspaces[0];
+                        tracing::info!(
+                            "[Startup] Using most recent workspace: {} ({})",
+                            most_recent.name,
+                            most_recent.id
+                        );
+
+                        if let Err(e) =
+                            session_usecase.switch_workspace(&most_recent.id).await
+                        {
+                            tracing::warn!(
+                                "[Startup] Failed to switch to most recent workspace: {}",
+                                e
+                            );
+                            // Fall back to creating a new session without workspace validation
+                            tracing::info!("[Startup] Creating new session without workspace");
+                        }
+                    }
+                    Ok(_) => {
+                        // No workspaces exist - just start with empty session
+                        tracing::info!(
+                            "[Startup] No workspaces found, starting with empty session"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("[Startup] Failed to list workspaces: {}", e);
+                    }
+                }
+            }
         }
 
         let app_mode = Mutex::new(AppMode::Idle);
+
+        // Clone session_manager for setup closure
+        let session_manager_for_setup = session_manager.clone();
 
         tauri::Builder::default()
             .plugin(tauri_plugin_opener::init())
@@ -987,6 +1178,7 @@ fn main() {
                 workspace_manager: workspace_manager.clone(),
                 slash_command_repository,
                 slash_command_repository_concrete: slash_command_repository_concrete.clone(),
+                app_state_service: app_state_service.clone(),
             })
             .invoke_handler(tauri::generate_handler![
                 create_session,
@@ -1009,6 +1201,8 @@ fn main() {
                 get_workspaces_directory,
                 get_personas_directory,
                 get_slash_commands_directory,
+                get_root_directory,
+                get_logs_directory,
                 get_git_info,
                 get_current_workspace,
                 create_workspace,
@@ -1030,6 +1224,25 @@ fn main() {
                 slash_commands::expand_command_template,
                 slash_commands::execute_shell_command,
             ])
+            .setup(move |app| {
+                // Emit workspace-switched event after startup to trigger frontend session load
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Wait a bit to ensure frontend is ready
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+                    // Get current workspace from session manager
+                    if let Some(session_mgr) = session_manager_for_setup.active_session().await {
+                        let app_mode_locked = AppMode::Idle;
+                        let session = session_mgr.to_session(app_mode_locked, None).await;
+                        if let Some(workspace_id) = session.workspace_id {
+                            tracing::info!("[Startup] Emitting workspace-switched event for: {}", workspace_id);
+                            let _ = handle.emit("workspace-switched", &workspace_id);
+                        }
+                    }
+                });
+                Ok(())
+            })
             .run(tauri::generate_context!())
             .expect("error while running tauri application");
     });

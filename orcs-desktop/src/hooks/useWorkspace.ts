@@ -279,6 +279,29 @@ export function useWorkspace(): UseWorkspaceResult {
     fetchAllWorkspaces();
   }, [fetchWorkspace, fetchAllWorkspaces]);
 
+  // Listen for workspace files changed events
+  useEffect(() => {
+    const setupListener = async () => {
+      const { listen } = await import('@tauri-apps/api/event');
+      const unlisten = await listen<string>('workspace-files-changed', async () => {
+        console.log('[useWorkspace] workspace-files-changed event received, refreshing files');
+        await fetchWorkspace();
+      });
+      return unlisten;
+    };
+
+    let unlistenPromise: Promise<() => void> | null = null;
+    setupListener().then((unlisten) => {
+      unlistenPromise = Promise.resolve(unlisten);
+    });
+
+    return () => {
+      if (unlistenPromise) {
+        unlistenPromise.then((unlisten) => unlisten());
+      }
+    };
+  }, [fetchWorkspace]);
+
   return {
     workspace,
     allWorkspaces,

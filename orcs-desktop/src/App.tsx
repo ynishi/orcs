@@ -64,7 +64,6 @@ function App() {
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [currentDir] = useState<string>('.');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userNickname, setUserNickname] = useState<string>('You');
   const [gitInfo, setGitInfo] = useState<GitInfo>({
@@ -86,6 +85,7 @@ function App() {
     deleteSession,
     renameSession,
     saveCurrentSession,
+    refreshSessions,
   } = useSessions();
 
   // ワークスペース管理
@@ -182,21 +182,53 @@ function App() {
     refreshCustomCommands();
   }, [refreshCustomCommands]);
 
-  // Listen for workspace-switched events to refresh workspace data
+  // Listen for workspace-switched events to refresh workspace data and Git info
   useEffect(() => {
     const unlisten = listen<string>('workspace-switched', async () => {
-      console.log('[App] workspace-switched event received, refreshing workspace');
+      console.log('[App] workspace-switched event received, refreshing workspace and Git info');
       console.log('[App] Calling refreshWorkspace...');
       await refreshWorkspace();
       console.log('[App] Calling refreshWorkspaces...');
       await refreshWorkspaces();
+
+      // Refresh session list (workspace-specific sessions)
+      console.log('[App] Refreshing sessions...');
+      await refreshSessions();
+
+      // Load active session (which should have been switched by the backend)
+      try {
+        console.log('[App] Loading active session...');
+        const activeSession = await invoke<Session | null>('get_active_session');
+        if (activeSession) {
+          console.log('[App] Active session loaded:', activeSession.id);
+          // Switch to this session (this will update currentSessionId and messages)
+          await switchSession(activeSession.id);
+        } else {
+          console.log('[App] No active session, clearing messages');
+          setMessages([]);
+          setTasks([]);
+        }
+      } catch (error) {
+        console.error('[App] Failed to load active session:', error);
+      }
+
+      // Reload Git info for the new workspace
+      try {
+        console.log('[App] Reloading Git info...');
+        const info = await invoke<GitInfo>('get_git_info');
+        setGitInfo(info);
+        console.log('[App] Git info reloaded:', info);
+      } catch (error) {
+        console.error('[App] Failed to reload Git info:', error);
+      }
+
       console.log('[App] Workspace refresh complete');
     });
 
     return () => {
       unlisten.then(fn => fn());
     };
-  }, [refreshWorkspace, refreshWorkspaces]);
+  }, [refreshWorkspace, refreshWorkspaces, refreshSessions]);
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
   useEffect(() => {
@@ -1016,7 +1048,6 @@ function App() {
 
             <StatusBar
               status={status}
-              currentDir={currentDir}
               gitInfo={gitInfo}
               participatingAgentsCount={0}
               autoMode={autoMode}

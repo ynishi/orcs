@@ -1,4 +1,4 @@
-import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput, Switch } from '@mantine/core';
 import { Session, getMessageCount, getLastActive } from '../../types/session';
 import { useState } from 'react';
 
@@ -23,7 +23,7 @@ export function SessionList({
 }: SessionListProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
-  const [filterByWorkspace, setFilterByWorkspace] = useState<boolean>(false);
+  const [filterByWorkspace, setFilterByWorkspace] = useState<boolean>(true); // デフォルトON
 
   // フィルタリングされたセッション
   const filteredSessions = filterByWorkspace && currentWorkspaceId
@@ -66,24 +66,11 @@ export function SessionList({
   return (
     <Stack gap="xs" style={{ maxHeight: '400px' }}>
       {/* ヘッダー */}
-      <Group justify="space-between" px="sm">
-        <Text size="sm" fw={600}>
-          Sessions
-        </Text>
-        <Group gap="xs">
-          {/* ワークスペースフィルタートグル */}
-          {currentWorkspaceId && (
-            <Tooltip label={filterByWorkspace ? "Show all sessions" : "Filter by current workspace"} withArrow>
-              <ActionIcon
-                color={filterByWorkspace ? "blue" : "gray"}
-                variant={filterByWorkspace ? "filled" : "light"}
-                onClick={() => setFilterByWorkspace(!filterByWorkspace)}
-                size="xs"
-              >
-                🗂️
-              </ActionIcon>
-            </Tooltip>
-          )}
+      <Stack gap="xs" px="sm">
+        <Group justify="space-between">
+          <Text size="sm" fw={600}>
+            Sessions
+          </Text>
           <Tooltip label="New session" withArrow>
             <ActionIcon
               color="blue"
@@ -95,7 +82,17 @@ export function SessionList({
             </ActionIcon>
           </Tooltip>
         </Group>
-      </Group>
+
+        {/* ワークスペースフィルタートグル */}
+        {currentWorkspaceId && (
+          <Switch
+            size="xs"
+            label="Filter by Workspace"
+            checked={filterByWorkspace}
+            onChange={(e) => setFilterByWorkspace(e.currentTarget.checked)}
+          />
+        )}
+      </Stack>
 
       {/* セッションリスト */}
       <ScrollArea h={340} px="sm">

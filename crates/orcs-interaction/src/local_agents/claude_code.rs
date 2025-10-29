@@ -231,16 +231,52 @@ impl Agent for ClaudeCodeAgent {
             cmd.current_dir(root);
         }
 
+        // Fix PATH for macOS .app bundles (they don't inherit shell PATH)
+        // Add common binary locations to PATH
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(current_path) = std::env::var("PATH") {
+                let home_dir = std::env::var("HOME").unwrap_or_default();
+
+                // Build paths as owned Strings
+                let local_bin = format!("{}/.local/bin", home_dir);
+                let home_bin = format!("{}/bin", home_dir);
+                let cargo_bin = format!("{}/.cargo/bin", home_dir);
+                let volta_bin = format!("{}/.volta/bin", home_dir);
+
+                let additional_paths = vec![
+                    "/usr/local/bin",
+                    "/opt/homebrew/bin",
+                    local_bin.as_str(),
+                    home_bin.as_str(),
+                    cargo_bin.as_str(),
+                    volta_bin.as_str(),
+                ];
+
+                let mut new_path = current_path.clone();
+                for path in additional_paths {
+                    if !new_path.contains(path) {
+                        new_path = format!("{}:{}", new_path, path);
+                    }
+                }
+
+                cmd.env("PATH", new_path);
+                log::debug!("Enhanced PATH for macOS app");
+            }
+        }
+
         let output = cmd.output().await.map_err(|e| {
             log::error!("Failed to spawn claude process: {}", e);
             AgentError::ProcessError {
                 status_code: None,
                 message: format!(
                     "Failed to spawn claude process: {}. \
-                     Make sure 'claude' is installed and in PATH.",
+                     Make sure 'claude' CLI is installed and in PATH. \
+                     Install it with: npm install -g @anthropic-ai/claude-code-cli \
+                     Or set 'claude_path' in persona config to point to the claude executable.",
                     e
                 ),
-                is_retryable: true,
+                is_retryable: false, // Changed to false - this is a configuration error
                 retry_after: None,
             }
         })?;

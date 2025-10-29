@@ -201,49 +201,46 @@ impl GeminiAgent {
         // Add model
         cmd.arg("--model").arg(self.model.as_str());
 
-        // Add execution profile parameters
-        let (temperature, top_p) = match self.execution_profile {
-            llm_toolkit::agent::ExecutionProfile::Creative => (0.9, 0.95),
-            llm_toolkit::agent::ExecutionProfile::Balanced => (0.7, 0.9),
-            llm_toolkit::agent::ExecutionProfile::Deterministic => (0.1, 0.8),
-        };
-        cmd.arg("--temperature")
-            .arg(temperature.to_string())
-            .arg("--top-p")
-            .arg(top_p.to_string());
+        // Note: Gemini CLI does not support temperature, top-p, or skip-memory flags
+        // These settings are handled by the Gemini API internally
 
-        log::debug!(
-            "GeminiAgent: Using execution profile {:?} (temperature={}, top_p={})",
-            self.execution_profile,
-            temperature,
-            top_p
-        );
-
-        // Add skip-memory flag if enabled
-        if self.skip_memory {
-            cmd.arg("--skip-memory");
-        }
-
-        // Add system prompt if provided
-        if let Some(sys_prompt) = &self.system_prompt {
-            // Write system prompt to temp file
-            let temp_dir = std::env::temp_dir();
-            let temp_file =
-                temp_dir.join(format!("gemini_system_prompt_{}.md", std::process::id()));
-
-            std::fs::write(&temp_file, sys_prompt).map_err(|e| {
-                AgentError::ExecutionFailed(format!("Failed to write system prompt file: {}", e))
-            })?;
-
-            cmd.arg("--system-prompt-file").arg(&temp_file);
-        }
-
-        // Add the prompt
-        cmd.arg("--prompt").arg(prompt);
+        // Add the prompt as positional argument
+        cmd.arg(prompt);
 
         // Set current directory if workspace_root is specified
         if let Some(root) = &self.workspace_root {
             cmd.current_dir(root);
+        }
+
+        // Add PATH enhancement for macOS .app bundles to ensure CLI tools can be found
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(current_path) = std::env::var("PATH") {
+                let home_dir = std::env::var("HOME").unwrap_or_default();
+                let local_bin = format!("{}/.local/bin", home_dir);
+                let home_bin = format!("{}/bin", home_dir);
+                let cargo_bin = format!("{}/.cargo/bin", home_dir);
+                let volta_bin = format!("{}/.volta/bin", home_dir);
+                let mise_bin = format!("{}/.local/share/mise/shims", home_dir);
+
+                let additional_paths = vec![
+                    "/usr/local/bin",
+                    "/opt/homebrew/bin",
+                    local_bin.as_str(),
+                    home_bin.as_str(),
+                    cargo_bin.as_str(),
+                    volta_bin.as_str(),
+                    mise_bin.as_str(),
+                ];
+
+                let mut new_path = current_path.clone();
+                for path in additional_paths {
+                    if !new_path.contains(path) {
+                        new_path = format!("{}:{}", new_path, path);
+                    }
+                }
+                cmd.env("PATH", new_path);
+            }
         }
 
         Ok(cmd)

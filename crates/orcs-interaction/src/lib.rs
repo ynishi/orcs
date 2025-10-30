@@ -242,6 +242,8 @@ pub struct InteractionManager {
     user_service: Arc<dyn UserService>,
     /// Execution strategy for dialogue (e.g., "broadcast", "sequential")
     execution_strategy: Arc<RwLock<String>>,
+    /// Active participant persona IDs (restored from session or populated dynamically)
+    restored_participant_ids: Arc<RwLock<Option<Vec<String>>>>,
 }
 
 impl InteractionManager {
@@ -285,6 +287,7 @@ impl InteractionManager {
             persona_repository,
             user_service,
             execution_strategy: Arc::new(RwLock::new("broadcast".to_string())),
+            restored_participant_ids: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -305,6 +308,12 @@ impl InteractionManager {
         persona_repository: Arc<dyn PersonaRepository>,
         user_service: Arc<dyn UserService>,
     ) -> Self {
+        let restored_ids = if data.active_participant_ids.is_empty() {
+            None
+        } else {
+            Some(data.active_participant_ids)
+        };
+
         Self {
             session_id: data.id,
             title: Arc::new(RwLock::new(data.title)),
@@ -315,7 +324,8 @@ impl InteractionManager {
             persona_histories: Arc::new(RwLock::new(data.persona_histories)),
             persona_repository,
             user_service,
-            execution_strategy: Arc::new(RwLock::new("broadcast".to_string())),
+            execution_strategy: Arc::new(RwLock::new(data.execution_strategy)),
+            restored_participant_ids: Arc::new(RwLock::new(restored_ids)),
         }
     }
 
@@ -348,20 +358,35 @@ impl InteractionManager {
             ExecutionModel::Broadcast => Dialogue::broadcast(),
         };
 
-        let default_personas: Vec<PersonaDomain> = self
-            .persona_repository
-            .get_all()?
-            .into_iter()
-            .filter(|p| p.default_participant)
-            .collect();
+        // Check if we have restored participant IDs from session
+        let restored_ids_opt = self.restored_participant_ids.read().await.clone();
 
-        for persona in default_personas {
+        let personas_to_add: Vec<PersonaDomain> = if let Some(restored_ids) = restored_ids_opt {
+            // Restore specific participants from session
+            let all_personas = self.persona_repository.get_all()?;
+            all_personas
+                .into_iter()
+                .filter(|p| restored_ids.contains(&p.id))
+                .collect()
+        } else {
+            // Use default participants
+            self.persona_repository
+                .get_all()?
+                .into_iter()
+                .filter(|p| p.default_participant)
+                .collect()
+        };
+
+        for persona in personas_to_add {
             let llm_persona = domain_to_llm_persona(&persona);
             dialogue.add_participant(
                 llm_persona,
                 agent_for_persona(&persona, self.agent_workspace_root.clone()),
             );
         }
+
+        // Clear restored IDs after using them once
+        *self.restored_participant_ids.write().await = None;
 
         *dialogue_guard = Some(dialogue);
         Ok(())
@@ -377,6 +402,7 @@ impl InteractionManager {
         let persona_histories = self.persona_histories.read().await.clone();
         let title = self.title.read().await.clone();
         let instance_workspace_id = self.workspace_id.read().await.clone();
+        let execution_strategy = self.execution_strategy.read().await.clone();
 
         // Use the first default participant as current_persona_id
         let current_persona_id = self
@@ -394,6 +420,9 @@ impl InteractionManager {
         // Use provided workspace_id, fallback to instance workspace_id
         let final_workspace_id = workspace_id.or(instance_workspace_id);
 
+        // Get active participants if dialogue is initialized
+        let active_participant_ids = self.get_active_participants().await.unwrap_or_default();
+
         Session {
             id: self.session_id.clone(),
             title,
@@ -403,6 +432,8 @@ impl InteractionManager {
             persona_histories,
             app_mode,
             workspace_id: final_workspace_id,
+            active_participant_ids,
+            execution_strategy,
         }
     }
 

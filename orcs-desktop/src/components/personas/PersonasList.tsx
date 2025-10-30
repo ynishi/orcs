@@ -14,8 +14,11 @@ const STRATEGIES = [
 
 const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
   claude_cli: 'Claude CLI',
+  claude_api: 'Claude API',
   gemini_cli: 'Gemini CLI',
   gemini_api: 'Gemini API',
+  openai_api: 'OpenAI API',
+  codex_cli: 'Codex CLI',
 };
 
 interface PersonasListProps {

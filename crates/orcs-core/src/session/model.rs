@@ -13,6 +13,8 @@ use std::collections::HashMap;
 /// A session contains:
 /// - Conversation history for each participating persona
 /// - The currently active persona
+/// - Active participants (personas participating in the conversation)
+/// - Execution strategy (broadcast or sequential)
 /// - Application mode (Idle, Planning, etc.)
 /// - Timestamps for creation and last update
 /// - Optional workspace association for filtering
@@ -37,4 +39,14 @@ pub struct Session {
     pub app_mode: AppMode,
     /// Workspace ID if this session is associated with a workspace
     pub workspace_id: Option<String>,
+    /// Active participant persona IDs
+    #[serde(default)]
+    pub active_participant_ids: Vec<String>,
+    /// Execution strategy ("broadcast" or "sequential")
+    #[serde(default = "default_execution_strategy")]
+    pub execution_strategy: String,
+}
+
+fn default_execution_strategy() -> String {
+    "broadcast".to_string()
 }

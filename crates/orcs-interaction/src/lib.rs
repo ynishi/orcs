@@ -3,9 +3,8 @@ pub mod local_agents;
 pub mod persona_agent;
 
 use crate::gemini_api_agent::GeminiApiAgent;
-use crate::local_agents::claude_code::ClaudeCodeAgent;
-use crate::local_agents::gemini::GeminiAgent;
 use llm_toolkit::agent::dialogue::{Dialogue, ExecutionModel};
+use llm_toolkit::agent::impls::{ClaudeCodeAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
@@ -85,7 +84,11 @@ impl PersonaBackendAgent {
 
         match self.backend {
             PersonaBackend::ClaudeCli => {
-                let mut agent = ClaudeCodeAgent::new(workspace_root);
+                let mut agent = ClaudeCodeAgent::new();
+                // Set workspace root if provided
+                if let Some(workspace) = workspace_root {
+                    agent = agent.with_cwd(workspace);
+                }
                 // Apply model if specified
                 if let Some(ref model_str) = self.model_name {
                     tracing::info!("[PersonaBackendAgent] Using Claude model: {}", model_str);
@@ -94,8 +97,17 @@ impl PersonaBackendAgent {
                 agent.execute(payload).await
             }
             PersonaBackend::GeminiCli => {
-                // TODO: Add model support for Gemini CLI when available
-                GeminiAgent::new(workspace_root).execute(payload).await
+                let mut agent = GeminiAgent::new();
+                // Set workspace root if provided
+                if let Some(workspace) = workspace_root {
+                    agent = agent.with_cwd(workspace);
+                }
+                // Apply model if specified
+                if let Some(ref model_str) = self.model_name {
+                    tracing::info!("[PersonaBackendAgent] Using Gemini model: {}", model_str);
+                    agent = agent.with_model_str(model_str);
+                }
+                agent.execute(payload).await
             }
             PersonaBackend::GeminiApi => {
                 let mut agent = GeminiApiAgent::try_from_env()?;

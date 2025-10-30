@@ -27,8 +27,12 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 semver = "1.0"
 thiserror = "1.0"
-llm-toolkit = { version = "0.38.0", features = ["agent"] }
-llm-toolkit-macros = { version = "0.38.0" }
+# IMPORTANT: NEVER use path dependencies for llm-toolkit. Always use version from crates.io.
+# DO NOT change to: path = "llm-toolkit/..."
+llm-toolkit = { version = "0.39.0", features = ["agent"] }
+llm-toolkit-macros = { version = "0.39.0" }
+# IMPORTANT: NEVER use path dependencies for version-migrate. Always use version from crates.io.
+# DO NOT change to: path = "version-migrate/..."
 version-migrate = { version = "0.11.0", features = ["async"] }
 tokio = { version = "1", features = ["full"] }
 ratatui = "0.27.0"

@@ -109,6 +109,61 @@ impl OrcsPaths {
         Ok(Self::config_dir()?.join("secret.json"))
     }
 
+    /// Ensures the secret file exists, creating it with a template if it doesn't.
+    ///
+    /// Creates a secret.json file with a properly typed template structure if the file doesn't exist.
+    /// The template includes placeholders for common API keys using the SecretConfig type.
+    ///
+    /// # Security Note
+    ///
+    /// This function sets file permissions to 600 (user read/write only) on Unix systems.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(PathBuf)`: Path to the secret file (existing or newly created)
+    /// - `Err(std::io::Error)`: If file creation or permission setting fails
+    pub fn ensure_secret_file() -> Result<PathBuf, std::io::Error> {
+        let secret_path = Self::secret_file()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::NotFound, e.to_string()))?;
+
+        // If file already exists, return the path
+        if secret_path.exists() {
+            return Ok(secret_path);
+        }
+
+        // Ensure parent directory exists
+        if let Some(parent) = secret_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        // Create typed template using SecretConfig
+        use orcs_core::config::{SecretConfig, GeminiConfig};
+
+        let template_config = SecretConfig {
+            gemini: Some(GeminiConfig {
+                api_key: String::new(),
+                model_name: Some("gemini-2.5-flash".to_string()),
+            }),
+        };
+
+        // Serialize to pretty JSON
+        let template_json = serde_json::to_string_pretty(&template_config)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+        // Write template to file
+        std::fs::write(&secret_path, template_json)?;
+
+        // Set file permissions to 600 (user read/write only) on Unix
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let permissions = std::fs::Permissions::from_mode(0o600);
+            std::fs::set_permissions(&secret_path, permissions)?;
+        }
+
+        Ok(secret_path)
+    }
+
     /// Returns the path to the sessions directory.
     ///
     /// Note: This is primarily for compatibility. New code should use
@@ -139,7 +194,7 @@ impl OrcsPaths {
     ///
     /// # Returns
     ///
-    /// - `Ok(PathBuf)`: Path to logs directory (e.g., `~/.config/orcs/logs/`)
+    /// - `Ok(PathBuf)`: Path to logs directory
     /// - `Err(PathError)`: Could not determine path
     pub fn logs_dir() -> Result<PathBuf, PathError> {
         Ok(Self::config_dir()?.join("logs"))

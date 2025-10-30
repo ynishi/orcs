@@ -392,6 +392,22 @@ async fn get_logs_directory() -> Result<String, String> {
     Ok(path_str.to_string())
 }
 
+/// Gets the secret file path (~/.config/orcs/secret.json)
+/// Creates the file with a template if it doesn't exist
+#[tauri::command]
+async fn get_secret_path() -> Result<String, String> {
+    use orcs_infrastructure::paths::OrcsPaths;
+
+    // Ensure the secret file exists (creates template if missing)
+    let secret_file = OrcsPaths::ensure_secret_file().map_err(|e| e.to_string())?;
+
+    let path_str = secret_file
+        .to_str()
+        .ok_or("Secret file path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+
 /// Helper function to execute shell commands
 async fn execute_shell_command(command: &str, working_dir: Option<&str>) -> Result<String, String> {
     #[cfg(target_os = "windows")]
@@ -439,6 +455,7 @@ async fn execute_shell_command(command: &str, working_dir: Option<&str>) -> Resu
 #[tauri::command]
 async fn handle_input(
     input: String,
+    file_paths: Option<Vec<String>>,
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SerializableInteractionResult, String> {
@@ -540,7 +557,7 @@ async fn handle_input(
     // Handle the input with streaming support
     let app_clone = app.clone();
     let result = manager
-        .handle_input_with_streaming(&current_mode, &processed_input, move |turn| {
+        .handle_input_with_streaming(&current_mode, &processed_input, file_paths, move |turn| {
             use tauri::Emitter;
 
             // Log each dialogue turn as it becomes available with timestamp
@@ -582,20 +599,36 @@ async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspace, 
 
     println!("[Backend] get_current_workspace called");
 
-    // Get the active session manager
+    // Priority 1: Use last selected workspace from AppStateService (user's explicit selection)
+    if let Some(workspace_id) = state.app_state_service.get_last_selected_workspace().await {
+        println!("[Backend] AppStateService last selected workspace: {}", workspace_id);
+        let workspace = state
+            .workspace_manager
+            .get_workspace(&workspace_id)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if let Some(ws) = workspace {
+            println!("[Backend] Found workspace: {} ({})", ws.name, ws.id);
+            return Ok(ws);
+        } else {
+            println!("[Backend] AppStateService workspace not found: {}", workspace_id);
+        }
+    }
+
+    // Priority 2: Fallback to session's workspace_id
+    println!("[Backend] No AppStateService workspace, checking session");
     let manager = state
         .session_manager
         .active_session()
         .await
         .ok_or("No active session")?;
 
-    // Get session data (including workspace_id)
     let app_mode = state.app_mode.lock().await.clone();
     let session = manager.to_session(app_mode, None).await;
 
     println!("[Backend] Session workspace_id: {:?}", session.workspace_id);
 
-    // If session has a workspace_id, use it
     if let Some(workspace_id) = &session.workspace_id {
         println!("[Backend] Looking up workspace: {}", workspace_id);
         let workspace = state
@@ -608,17 +641,12 @@ async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspace, 
             println!("[Backend] Found workspace: {} ({})", ws.name, ws.id);
             return Ok(ws);
         } else {
-            println!("[Backend] Workspace not found: {}", workspace_id);
+            println!("[Backend] Session workspace not found: {}", workspace_id);
         }
     }
 
-    // Fallback to current directory workspace
-    println!("[Backend] Falling back to current directory workspace");
-    state
-        .workspace_manager
-        .get_current_workspace()
-        .await
-        .map_err(|e| e.to_string())
+    // No workspace found
+    Err("No workspace selected or associated with session".to_string())
 }
 
 /// Creates a new workspace for the given directory path
@@ -666,6 +694,7 @@ async fn switch_workspace(
     );
 
     // Use SessionUseCase for coordinated workspace switching
+    // (SessionUseCase will handle AppStateService update)
     state
         .session_usecase
         .switch_workspace(&workspace_id)
@@ -679,24 +708,6 @@ async fn switch_workspace(
         "[Backend] Successfully switched to workspace {}",
         workspace_id
     );
-
-    // Save as last selected workspace
-    if let Err(e) = state
-        .app_state_service
-        .set_last_selected_workspace(workspace_id.clone())
-        .await
-    {
-        println!(
-            "[Backend] Warning: Failed to save last selected workspace: {}",
-            e
-        );
-        // Non-fatal error - continue
-    } else {
-        println!(
-            "[Backend] Saved last selected workspace: {}",
-            workspace_id
-        );
-    }
 
     // Notify frontend of the workspace switch
     app.emit("workspace-switched", &workspace_id)
@@ -1071,20 +1082,21 @@ fn main() {
         let session_manager: Arc<SessionManager<InteractionManager>> =
             Arc::new(SessionManager::new(session_repository.clone()));
 
-        // Create SessionUseCase for coordinated session-workspace management
-        let session_usecase = Arc::new(SessionUseCase::new(
-            session_manager.clone(),
-            workspace_manager.clone(),
-            persona_repository.clone(),
-            user_service.clone(),
-        ));
-
         // Initialize AppStateService
         let app_state_service = Arc::new(
             AppStateService::new()
                 .await
                 .expect("Failed to initialize AppStateService")
         );
+
+        // Create SessionUseCase for coordinated session-workspace management
+        let session_usecase = Arc::new(SessionUseCase::new(
+            session_manager.clone(),
+            workspace_manager.clone(),
+            app_state_service.clone(),
+            persona_repository.clone(),
+            user_service.clone(),
+        ));
 
         // Try to restore last session using SessionUseCase
         let restored = session_usecase.restore_last_session().await.ok().flatten();
@@ -1203,6 +1215,7 @@ fn main() {
                 get_slash_commands_directory,
                 get_root_directory,
                 get_logs_directory,
+                get_secret_path,
                 get_git_info,
                 get_current_workspace,
                 create_workspace,

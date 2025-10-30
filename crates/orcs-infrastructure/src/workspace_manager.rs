@@ -196,13 +196,6 @@ impl FileSystemWorkspaceManager {
 
 #[async_trait]
 impl WorkspaceManager for FileSystemWorkspaceManager {
-    async fn get_current_workspace(&self) -> Result<Workspace> {
-        let current_dir = std::env::current_dir().map_err(|e| {
-            orcs_core::error::OrcsError::Io(format!("Failed to get current directory: {}", e))
-        })?;
-
-        self.get_or_create_workspace(&current_dir).await
-    }
 
     async fn get_or_create_workspace(&self, repo_path: &Path) -> Result<Workspace> {
         let workspace_id = Self::get_workspace_id(repo_path)?;

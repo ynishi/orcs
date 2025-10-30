@@ -21,6 +21,7 @@ pub fn get_default_presets() -> Vec<Persona> {
             default_participant: true,
             source: PersonaSource::System,
             backend: Default::default(),
+            model_name: None,
         },
         Persona {
             id: Uuid::new_v4().to_string(),
@@ -31,6 +32,7 @@ pub fn get_default_presets() -> Vec<Persona> {
             default_participant: true,
             source: PersonaSource::System,
             backend: Default::default(),
+            model_name: None,
         },
     ]
 }

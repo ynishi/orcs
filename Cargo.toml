@@ -27,8 +27,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 semver = "1.0"
 thiserror = "1.0"
-llm-toolkit = { version = "0.37.0", features = ["agent"] }
-llm-toolkit-macros = { version = "0.37.0" }
+llm-toolkit = { version = "0.38.0", features = ["agent"] }
+llm-toolkit-macros = { version = "0.38.0" }
 version-migrate = { version = "0.11.0", features = ["async"] }
 tokio = { version = "1", features = ["full"] }
 ratatui = "0.27.0"

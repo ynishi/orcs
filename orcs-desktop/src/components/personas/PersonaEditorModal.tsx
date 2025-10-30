@@ -8,6 +8,21 @@ const BACKEND_OPTIONS = [
   { value: 'gemini_api', label: 'Gemini API' },
 ];
 
+const CLAUDE_MODEL_OPTIONS = [
+  { value: '', label: 'Default (Sonnet 4.5)' },
+  { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1 (2025-08-05)' },
+  { value: 'claude-opus-4-20250514', label: 'Claude Opus 4.0 (2025-05-14)' },
+  { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5 (2025-09-29)' },
+  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4.0 (2025-05-14)' },
+  { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (2024-10-22)' },
+];
+
+const GEMINI_MODEL_OPTIONS = [
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+];
+
 interface PersonaEditorModalProps {
   opened: boolean;
   onClose: () => void;
@@ -29,6 +44,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
     communication_style: '',
     default_participant: false,
     backend: 'claude_cli',
+    model_name: undefined,
   });
 
   // Update form data when persona prop changes
@@ -42,6 +58,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         communication_style: persona.communication_style || '',
         default_participant: persona.default_participant || false,
         backend: persona.backend || 'claude_cli',
+        model_name: persona.model_name,
       });
     } else {
       setFormData({
@@ -52,6 +69,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         communication_style: '',
         default_participant: false,
         backend: 'claude_cli',
+        model_name: undefined,
       });
     }
   }, [persona]);
@@ -73,6 +91,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
       default_participant: formData.default_participant || false,
       backend: formData.backend || 'claude_cli',
       source: 'User',
+      model_name: formData.model_name || undefined,
     };
 
     onSave(validatedPersona);
@@ -122,6 +141,30 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
           }
           allowDeselect={false}
         />
+
+        {formData.backend === 'claude_cli' && (
+          <Select
+            label="Model"
+            placeholder="Select Claude model"
+            description="Choose which Claude model to use for this persona"
+            data={CLAUDE_MODEL_OPTIONS}
+            value={formData.model_name || ''}
+            onChange={(value) => setFormData({ ...formData, model_name: value || undefined })}
+            clearable
+          />
+        )}
+
+        {formData.backend === 'gemini_api' && (
+          <Select
+            label="Model"
+            placeholder="Select Gemini model"
+            description="Choose which Gemini model to use for this persona"
+            data={GEMINI_MODEL_OPTIONS}
+            value={formData.model_name || 'gemini-2.5-flash'}
+            onChange={(value) => setFormData({ ...formData, model_name: value || undefined })}
+            clearable
+          />
+        )}
 
         <Textarea
           label="Background"

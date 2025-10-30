@@ -65,4 +65,8 @@ pub struct Persona {
     /// Backend used to execute this persona
     #[serde(default)]
     pub backend: PersonaBackend,
+    /// Model name for the backend (e.g., "claude-sonnet-4.5", "gemini-2.5-flash")
+    /// If None, uses the backend's default model
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_name: Option<String>,
 }

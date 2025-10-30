@@ -150,6 +150,21 @@ export function SettingsMenu() {
     }
   };
 
+  const handleOpenSecretFile = async () => {
+    try {
+      const secretPath = await invoke<string>('get_secret_path');
+      console.log('[Settings] Opening secret file:', secretPath);
+      await openPath(secretPath);
+    } catch (error) {
+      console.error('[Settings] Failed to open secret file:', error);
+      notifications.show({
+        title: 'Failed to Open Secret File',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
   return (
     <Menu shadow="md" width={250}>
       <Menu.Target>
@@ -180,6 +195,12 @@ export function SettingsMenu() {
           onClick={handleOpenConfigFile}
         >
           <Text size="sm">Open Config File</Text>
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<IconFile size={16} />}
+          onClick={handleOpenSecretFile}
+        >
+          <Text size="sm">Open Secret File</Text>
         </Menu.Item>
         <Menu.Item
           leftSection={<IconFolder size={16} />}

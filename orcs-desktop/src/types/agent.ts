@@ -39,6 +39,7 @@ export interface PersonaConfig {
   default_participant: boolean;
   source: 'System' | 'User';
   backend: PersonaBackend;
+  model_name?: string;
 }
 
 /**

@@ -80,6 +80,34 @@ pub struct PersonaConfigV1_1_0 {
     pub backend: PersonaBackendDTO,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.2.0")]
+pub struct PersonaConfigV1_2_0 {
+    /// Unique persona identifier (UUID format).
+    pub id: String,
+    /// Display name of the persona.
+    pub name: String,
+    /// Role or title of the persona.
+    pub role: String,
+    /// Background description of the persona.
+    pub background: String,
+    /// Communication style of the persona.
+    pub communication_style: String,
+    /// Whether this persona is a default participant in new sessions.
+    #[serde(default)]
+    pub default_participant: bool,
+    /// Source of the persona (System or User).
+    #[serde(default)]
+    pub source: PersonaSourceDTO,
+    /// Backend to execute persona with.
+    #[serde(default)]
+    pub backend: PersonaBackendDTO,
+    /// Model name for the backend (e.g., "claude-sonnet-4-5-20250929", "gemini-2.5-flash")
+    /// If None, uses the backend's default model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_name: Option<String>,
+}
+
 // ============================================================================
 // Migration implementations
 // ============================================================================
@@ -109,6 +137,23 @@ impl MigratesTo<PersonaConfigV1_1_0> for PersonaConfigV1_0_0 {
             default_participant: self.default_participant,
             source: self.source,
             backend: Default::default(),
+        }
+    }
+}
+
+/// Migration from PersonaConfigV1_1_0 to PersonaConfigV1_2_0.
+impl MigratesTo<PersonaConfigV1_2_0> for PersonaConfigV1_1_0 {
+    fn migrate(self) -> PersonaConfigV1_2_0 {
+        PersonaConfigV1_2_0 {
+            id: self.id,
+            name: self.name,
+            role: self.role,
+            background: self.background,
+            communication_style: self.communication_style,
+            default_participant: self.default_participant,
+            source: self.source,
+            backend: self.backend,
+            model_name: None, // V1_1_0 doesn't have model_name field
         }
     }
 }
@@ -157,14 +202,14 @@ impl From<PersonaBackend> for PersonaBackendDTO {
     }
 }
 
-/// Convert PersonaConfigV1_1_0 DTO to domain model.
-impl IntoDomain<Persona> for PersonaConfigV1_1_0 {
+/// Convert PersonaConfigV1_2_0 DTO to domain model.
+impl IntoDomain<Persona> for PersonaConfigV1_2_0 {
     fn into_domain(self) -> Persona {
         // Validate and fix ID if needed
         let id = if Uuid::parse_str(&self.id).is_ok() {
             self.id
         } else {
-            // Legacy data: V2 schema but non-UUID ID
+            // Legacy data: V1.2.0 schema but non-UUID ID
             generate_uuid_from_name(&self.name)
         };
 
@@ -177,14 +222,15 @@ impl IntoDomain<Persona> for PersonaConfigV1_1_0 {
             default_participant: self.default_participant,
             source: self.source.into(),
             backend: self.backend.into(),
+            model_name: self.model_name,
         }
     }
 }
 
-/// Convert domain model to PersonaConfigV1_1_0 DTO for persistence.
-impl version_migrate::FromDomain<Persona> for PersonaConfigV1_1_0 {
+/// Convert domain model to PersonaConfigV1_2_0 DTO for persistence.
+impl version_migrate::FromDomain<Persona> for PersonaConfigV1_2_0 {
     fn from_domain(persona: Persona) -> Self {
-        PersonaConfigV1_1_0 {
+        PersonaConfigV1_2_0 {
             id: persona.id,
             name: persona.name,
             role: persona.role,
@@ -193,6 +239,7 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_1_0 {
             default_participant: persona.default_participant,
             source: persona.source.into(),
             backend: persona.backend.into(),
+            model_name: persona.model_name,
         }
     }
 }
@@ -203,13 +250,14 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_1_0 {
 
 /// Creates and configures a Migrator instance for Persona entities.
 ///
-/// The migrator handles automatic schema migration from V1.0.0 to V1.1.0
+/// The migrator handles automatic schema migration from V1.0.0 to V1.2.0
 /// and conversion to the domain model.
 ///
 /// # Migration Path
 ///
 /// - V1.0.0 → V1.1.0: Adds `backend` field with default value
-/// - V1.1.0 → Persona: Converts DTO to domain model
+/// - V1.1.0 → V1.2.0: Adds `model_name` field (optional)
+/// - V1.2.0 → Persona: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -220,10 +268,11 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_1_0 {
 pub fn create_persona_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> V1.1.0 -> Persona
+    // Register migration path: V1.0.0 -> V1.1.0 -> V1.2.0 -> Persona
     let persona_path = version_migrate::Migrator::define("persona")
         .from::<PersonaConfigV1_0_0>()
         .step::<PersonaConfigV1_1_0>()
+        .step::<PersonaConfigV1_2_0>()
         .into_with_save::<Persona>();
 
     migrator

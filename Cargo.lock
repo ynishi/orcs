@@ -2058,9 +2058,9 @@ checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
 
 [[package]]
 name = "llm-toolkit"
-version = "0.37.0"
+version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64e80321ab81a7f194a2a14a783d1d1813ea87199f3674d25ee5968bbed24e09"
+checksum = "f78517ec531500b90794d554cfb23e19087a0eb8087cf3dca2f686059a27ef4a"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2085,9 +2085,9 @@ dependencies = [
 
 [[package]]
 name = "llm-toolkit-macros"
-version = "0.37.0"
+version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7444df360eff912294a4e02824e3d05cf7a41adefb02cbb1712b7b88acff4e9"
+checksum = "e58a195a8049203c35724349e7848cf7214d55c969bba37cc5bee91dd558e507"
 dependencies = [
  "minijinja",
  "proc-macro-crate 3.4.0",
@@ -2699,6 +2699,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "orcs-core",
+ "orcs-infrastructure",
  "orcs-interaction",
  "tokio",
  "tracing",

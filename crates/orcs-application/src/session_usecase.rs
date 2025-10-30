@@ -15,9 +15,9 @@ use uuid::Uuid;
 
 /// Use case for managing sessions with workspace context.
 ///
-/// `SessionUseCase` coordinates between `SessionManager` and `WorkspaceManager`
-/// to handle all session-related operations while maintaining consistency between
-/// sessions and their associated workspaces.
+/// `SessionUseCase` coordinates between `SessionManager`, `WorkspaceManager`,
+/// and `AppStateService` to handle all session-related operations while maintaining
+/// consistency between sessions and their associated workspaces.
 ///
 /// # Responsibilities
 ///
@@ -25,6 +25,7 @@ use uuid::Uuid;
 /// - Switching between sessions and restoring workspace context
 /// - Managing workspace changes within sessions
 /// - Validating and cleaning up orphaned workspace references
+/// - Coordinating application state (selected workspace) with session state
 ///
 /// # Thread Safety
 ///
@@ -35,6 +36,8 @@ pub struct SessionUseCase {
     session_manager: Arc<SessionManager<InteractionManager>>,
     /// Manager for workspace operations
     workspace_manager: Arc<dyn WorkspaceManager>,
+    /// Service for application-level state (e.g., last selected workspace)
+    app_state_service: Arc<orcs_infrastructure::AppStateService>,
     /// Repository for persona configurations
     persona_repository: Arc<dyn PersonaRepository>,
     /// Service for user information
@@ -48,29 +51,33 @@ impl SessionUseCase {
     ///
     /// * `session_manager` - Manager for session operations
     /// * `workspace_manager` - Manager for workspace operations
+    /// * `app_state_service` - Service for application-level state
     /// * `persona_repository` - Repository for accessing persona configurations
     /// * `user_service` - Service for retrieving user information
     pub fn new(
         session_manager: Arc<SessionManager<InteractionManager>>,
         workspace_manager: Arc<dyn WorkspaceManager>,
+        app_state_service: Arc<orcs_infrastructure::AppStateService>,
         persona_repository: Arc<dyn PersonaRepository>,
         user_service: Arc<dyn UserService>,
     ) -> Self {
         Self {
             session_manager,
             workspace_manager,
+            app_state_service,
             persona_repository,
             user_service,
         }
     }
 
-    /// Creates a new session associated with the current workspace.
+    /// Creates a new session associated with the selected workspace.
     ///
     /// This method implements UC1 (Session Creation with Workspace Association):
-    /// 1. Gets the current workspace
-    /// 2. Creates a new session
-    /// 3. Associates the session with the workspace
-    /// 4. Persists the session with workspace_id
+    /// 1. Gets the last selected workspace from AppStateService
+    /// 2. Retrieves workspace details from WorkspaceManager
+    /// 3. Creates a new session
+    /// 4. Associates the session with the workspace
+    /// 5. Persists the session with workspace_id
     ///
     /// # Returns
     ///
@@ -79,7 +86,8 @@ impl SessionUseCase {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The current workspace cannot be determined
+    /// - No workspace is currently selected
+    /// - The selected workspace cannot be found
     /// - The session creation fails
     /// - The session persistence fails
     ///
@@ -92,15 +100,29 @@ impl SessionUseCase {
     pub async fn create_session(&self) -> Result<Session> {
         tracing::info!("[SessionUseCase] Creating new session");
 
-        // 1. Get current workspace
-        let workspace = self.workspace_manager.get_current_workspace().await?;
+        // 1. Get selected workspace ID from AppStateService
+        let workspace_id = self
+            .app_state_service
+            .get_last_selected_workspace()
+            .await
+            .ok_or_else(|| anyhow!("No workspace selected"))?;
+
+        tracing::info!("[SessionUseCase] Selected workspace ID: {}", workspace_id);
+
+        // 2. Get workspace details from WorkspaceManager
+        let workspace = self
+            .workspace_manager
+            .get_workspace(&workspace_id)
+            .await?
+            .ok_or_else(|| anyhow!("Selected workspace not found: {}", workspace_id))?;
+
         tracing::info!(
-            "[SessionUseCase] Current workspace: {} ({})",
+            "[SessionUseCase] Found workspace: {} ({})",
             workspace.name,
             workspace.id
         );
 
-        // 2. Create session
+        // 3. Create session
         let session_id = Uuid::new_v4().to_string();
         tracing::debug!("[SessionUseCase] Generated session ID: {}", session_id);
 
@@ -115,7 +137,7 @@ impl SessionUseCase {
             })
             .await?;
 
-        // 3. Associate with workspace
+        // 4. Associate with workspace
         tracing::debug!(
             "[SessionUseCase] Associating session with workspace {} at path: {}",
             workspace.id,
@@ -129,7 +151,7 @@ impl SessionUseCase {
             )
             .await;
 
-        // 4. Persist session (now includes workspace_id)
+        // 5. Persist session (now includes workspace_id)
         self.session_manager
             .save_active_session(AppMode::Idle)
             .await?;
@@ -140,7 +162,7 @@ impl SessionUseCase {
             workspace.id
         );
 
-        // 5. Return session
+        // 6. Return session
         let session = manager.to_session(AppMode::Idle, None).await;
         Ok(session)
     }
@@ -304,6 +326,13 @@ impl SessionUseCase {
     pub async fn switch_workspace(&self, workspace_id: &str) -> Result<()> {
         println!("[SessionUseCase] Switching to workspace: {}", workspace_id);
         tracing::info!("[SessionUseCase] Switching to workspace: {}", workspace_id);
+
+        // 0. Save to AppStateService (user's explicit selection)
+        self.app_state_service
+            .set_last_selected_workspace(workspace_id.to_string())
+            .await
+            .map_err(|e| anyhow!("Failed to save last selected workspace: {}", e))?;
+        println!("[SessionUseCase] Saved to AppStateService: {}", workspace_id);
 
         // 1. Validate workspace exists
         let mut workspace = self

@@ -432,8 +432,30 @@ function App() {
       setThinkingPersona('AI Assistant');
 
       try {
+        // Upload files to workspace and get paths
+        const filePaths: string[] = [];
+        if (currentFiles.length > 0 && workspace) {
+          for (const file of currentFiles) {
+            try {
+              const arrayBuffer = await file.arrayBuffer();
+              const bytes = Array.from(new Uint8Array(arrayBuffer));
+              const path = await invoke<string>("upload_file_from_bytes", {
+                workspaceId: workspace.id,
+                fileName: file.name,
+                bytes: bytes,
+              });
+              filePaths.push(path);
+              console.log('[FILE] Uploaded file:', file.name, 'to', path);
+            } catch (uploadError) {
+              console.error('[FILE] Failed to upload file:', file.name, uploadError);
+              addMessage('error', 'System', `Failed to upload file ${file.name}: ${uploadError}`);
+            }
+          }
+        }
+
         const result = await invoke<InteractionResult>("handle_input", {
           input: backendInput,
+          filePaths: filePaths.length > 0 ? filePaths : null,
         });
 
         if (result.type === 'NewDialogueMessages') {

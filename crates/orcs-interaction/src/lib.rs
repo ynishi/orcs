@@ -8,6 +8,7 @@ use crate::local_agents::gemini::GeminiAgent;
 use llm_toolkit::agent::dialogue::{Dialogue, ExecutionModel};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
+use llm_toolkit::attachment::Attachment;
 use orcs_core::persona::{Persona as PersonaDomain, PersonaBackend};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{AppMode, ConversationMessage, MessageRole, Plan, Session};
@@ -40,13 +41,19 @@ fn string_to_execution_model(s: &str) -> ExecutionModel {
 #[derive(Clone, Debug)]
 struct PersonaBackendAgent {
     backend: PersonaBackend,
+    model_name: Option<String>,
     workspace_root: Arc<RwLock<Option<PathBuf>>>,
 }
 
 impl PersonaBackendAgent {
-    fn new(backend: PersonaBackend, workspace_root: Arc<RwLock<Option<PathBuf>>>) -> Self {
+    fn new(
+        backend: PersonaBackend,
+        model_name: Option<String>,
+        workspace_root: Arc<RwLock<Option<PathBuf>>>,
+    ) -> Self {
         Self {
             backend,
+            model_name,
             workspace_root,
         }
     }
@@ -78,10 +85,27 @@ impl PersonaBackendAgent {
 
         match self.backend {
             PersonaBackend::ClaudeCli => {
-                ClaudeCodeAgent::new(workspace_root).execute(payload).await
+                let mut agent = ClaudeCodeAgent::new(workspace_root);
+                // Apply model if specified
+                if let Some(ref model_str) = self.model_name {
+                    tracing::info!("[PersonaBackendAgent] Using Claude model: {}", model_str);
+                    agent = agent.with_model_str(model_str);
+                }
+                agent.execute(payload).await
             }
-            PersonaBackend::GeminiCli => GeminiAgent::new(workspace_root).execute(payload).await,
-            PersonaBackend::GeminiApi => GeminiApiAgent::try_from_env()?.execute(payload).await,
+            PersonaBackend::GeminiCli => {
+                // TODO: Add model support for Gemini CLI when available
+                GeminiAgent::new(workspace_root).execute(payload).await
+            }
+            PersonaBackend::GeminiApi => {
+                let mut agent = GeminiApiAgent::try_from_env()?;
+                // Override model if specified
+                if let Some(ref model_str) = self.model_name {
+                    tracing::info!("[PersonaBackendAgent] Using Gemini model: {}", model_str);
+                    agent = agent.with_model(model_str);
+                }
+                agent.execute(payload).await
+            }
         }
     }
 }
@@ -113,7 +137,11 @@ fn agent_for_persona(
     persona: &PersonaDomain,
     workspace_root: Arc<RwLock<Option<PathBuf>>>,
 ) -> PersonaBackendAgent {
-    PersonaBackendAgent::new(persona.backend.clone(), workspace_root)
+    PersonaBackendAgent::new(
+        persona.backend.clone(),
+        persona.model_name.clone(),
+        workspace_root,
+    )
 }
 
 /// Represents a single message in a dialogue conversation.
@@ -493,7 +521,7 @@ impl InteractionManager {
     pub async fn handle_input(&self, mode: &AppMode, input: &str) -> InteractionResult {
         match mode {
             AppMode::Idle => {
-                self.handle_idle_mode(input, None::<fn(&DialogueMessage)>)
+                self.handle_idle_mode(input, None, None::<fn(&DialogueMessage)>)
                     .await
             }
             AppMode::AwaitingConfirmation { plan } => {
@@ -508,6 +536,7 @@ impl InteractionManager {
     ///
     /// * `mode` - The current application mode
     /// * `input` - The user's input string
+    /// * `file_paths` - Optional list of file paths to attach
     /// * `on_turn` - Callback function called for each dialogue turn as it becomes available
     ///
     /// # Returns
@@ -517,13 +546,14 @@ impl InteractionManager {
         &self,
         mode: &AppMode,
         input: &str,
+        file_paths: Option<Vec<String>>,
         on_turn: F,
     ) -> InteractionResult
     where
         F: Fn(&DialogueMessage),
     {
         match mode {
-            AppMode::Idle => self.handle_idle_mode(input, Some(on_turn)).await,
+            AppMode::Idle => self.handle_idle_mode(input, file_paths, Some(on_turn)).await,
             AppMode::AwaitingConfirmation { plan } => {
                 self.handle_awaiting_confirmation(input, plan)
             }
@@ -531,7 +561,12 @@ impl InteractionManager {
     }
 
     /// Handles input when in Idle mode.
-    async fn handle_idle_mode<F>(&self, input: &str, on_turn: Option<F>) -> InteractionResult
+    async fn handle_idle_mode<F>(
+        &self,
+        input: &str,
+        file_paths: Option<Vec<String>>,
+        on_turn: Option<F>,
+    ) -> InteractionResult
     where
         F: Fn(&DialogueMessage),
     {
@@ -562,8 +597,18 @@ impl InteractionManager {
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
 
+        // Create a payload with text and optional file attachments
+        let mut payload = Payload::text(input.to_string());
+        if let Some(paths) = file_paths {
+            for path in paths {
+                tracing::info!("[InteractionManager] Attaching file: {}", path);
+                payload = payload.with_attachment(Attachment::local(path));
+            }
+        }
+
         // Create a partial session for incremental turn processing
-        let mut session = dialogue.partial_session(input.to_string());
+        // partial_session now accepts impl Into<Payload>, so both String and Payload work
+        let mut session = dialogue.partial_session(payload);
         let mut messages = Vec::new();
 
         // Process each turn as it becomes available

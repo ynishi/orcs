@@ -4,6 +4,7 @@ import { IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
+import { handleSystemMessage, conversationMessage } from '../../utils/systemMessage';
 
 // Available execution strategies
 const STRATEGIES = [
@@ -41,10 +42,22 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
       // Show system message
       const strategyLabel = STRATEGIES.find(s => s.value === strategy)?.label || strategy;
       const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-      onMessage?.('system', 'SYSTEM', `Execution strategy changed to: ${strategyLabel} [${timestamp}]`);
+      handleSystemMessage(
+        conversationMessage(
+          `Execution strategy changed to: ${strategyLabel} [${timestamp}]`,
+          'info'
+        ),
+        onMessage
+      );
     } catch (error) {
       console.error('Failed to set execution strategy:', error);
-      onMessage?.('error', 'SYSTEM', `Failed to set execution strategy: ${error}`);
+      handleSystemMessage(
+        conversationMessage(
+          `Failed to set execution strategy: ${error}`,
+          'error'
+        ),
+        onMessage
+      );
     }
   };
 
@@ -68,15 +81,31 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
 
   const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
     try {
+      const persona = personaConfigs.find(p => p.id === personaId);
+      if (!persona) return;
+
       if (isChecked) {
         await invoke('add_participant', { personaId });
+        handleSystemMessage(
+          conversationMessage(`${persona.name} が会話に参加しました`, 'success'),
+          onMessage
+        );
       } else {
         await invoke('remove_participant', { personaId });
+        handleSystemMessage(
+          conversationMessage(`${persona.name} が会話から退出しました`, 'info'),
+          onMessage
+        );
       }
+
       const updatedIds = await invoke<string[]>('get_active_participants');
       setActiveParticipantIds(updatedIds);
     } catch (error) {
       console.error(error);
+      handleSystemMessage(
+        conversationMessage(`Failed to update participant: ${error}`, 'error'),
+        onMessage
+      );
     }
   };
 
@@ -97,10 +126,16 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
     try {
       await invoke('save_persona_configs', { configs: updatedConfigs });
       await fetchPersonas();
-      window.alert('Configuration saved. Please restart the application for all changes to take effect.');
+      handleSystemMessage(
+        conversationMessage('Persona configuration saved successfully.', 'success', '✅'),
+        onMessage
+      );
     } catch (error) {
       console.error('Failed to save persona configs:', error);
-      window.alert('Failed to save configuration. Please check the console for details.');
+      handleSystemMessage(
+        conversationMessage(`Failed to save configuration: ${error}`, 'error', '❌'),
+        onMessage
+      );
     }
   };
 
@@ -164,6 +199,11 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
             <Badge size="xs" color={persona.backend === 'gemini_cli' ? 'violet' : 'gray'}>
               {BACKEND_LABELS[persona.backend] || 'Claude CLI'}
             </Badge>
+            {persona.model_name && (
+              <Badge size="xs" variant="outline" color="blue">
+                {persona.model_name}
+              </Badge>
+            )}
           </Group>
           <Text size="xs" c="dimmed" truncate>
             {persona.role}

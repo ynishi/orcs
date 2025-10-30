@@ -13,21 +13,27 @@ use tokio::process::Command;
 /// Supported Claude models
 #[derive(Debug, Clone, Copy, Default)]
 pub enum ClaudeModel {
-    /// Claude Sonnet 4.5 - Balanced performance and speed
+    /// Claude Opus 4.1 (2025-08-05) - Most capable model
+    Opus41,
+    /// Claude Opus 4.0 (2025-05-14)
+    Opus40,
+    /// Claude Sonnet 4.5 (2025-09-29) - Balanced performance and speed
     #[default]
     Sonnet45,
-    /// Claude Sonnet 4 - Previous generation balanced model
-    Sonnet4,
-    /// Claude Opus 4 - Most capable model
-    Opus4,
+    /// Claude Sonnet 4.0 (2025-05-14)
+    Sonnet40,
+    /// Claude 3.5 Haiku (2024-10-22) - Fast and efficient
+    Haiku35,
 }
 
 impl ClaudeModel {
     fn as_str(&self) -> &str {
         match self {
-            ClaudeModel::Sonnet45 => "claude-sonnet-4.5",
-            ClaudeModel::Sonnet4 => "claude-sonnet-4",
-            ClaudeModel::Opus4 => "claude-opus-4",
+            ClaudeModel::Opus41 => "claude-opus-4-1-20250805",
+            ClaudeModel::Opus40 => "claude-opus-4-20250514",
+            ClaudeModel::Sonnet45 => "claude-sonnet-4-5-20250929",
+            ClaudeModel::Sonnet40 => "claude-sonnet-4-20250514",
+            ClaudeModel::Haiku35 => "claude-3-5-haiku-20241022",
         }
     }
 }
@@ -102,12 +108,20 @@ impl ClaudeCodeAgent {
 
     /// Sets the model using a string identifier.
     ///
-    /// Accepts: "sonnet", "sonnet-4.5", "sonnet-4", "opus", "opus-4", etc.
+    /// Accepts full model IDs (e.g., "claude-opus-4-1-20250805") or shortcuts
     pub fn with_model_str(mut self, model: &str) -> Self {
         self.model = Some(match model {
-            "sonnet" | "sonnet-4.5" | "claude-sonnet-4.5" => ClaudeModel::Sonnet45,
-            "sonnet-4" | "claude-sonnet-4" => ClaudeModel::Sonnet4,
-            "opus" | "opus-4" | "claude-opus-4" => ClaudeModel::Opus4,
+            "claude-opus-4-1-20250805" => ClaudeModel::Opus41,
+            "claude-opus-4-20250514" => ClaudeModel::Opus40,
+            "claude-sonnet-4-5-20250929" => ClaudeModel::Sonnet45,
+            "claude-sonnet-4-20250514" => ClaudeModel::Sonnet40,
+            "claude-3-5-haiku-20241022" => ClaudeModel::Haiku35,
+            // Legacy shortcuts
+            "opus-4.1" | "opus41" => ClaudeModel::Opus41,
+            "opus-4" | "opus" => ClaudeModel::Opus40,
+            "sonnet-4.5" | "sonnet" => ClaudeModel::Sonnet45,
+            "sonnet-4" => ClaudeModel::Sonnet40,
+            "haiku-3.5" | "haiku" => ClaudeModel::Haiku35,
             _ => ClaudeModel::Sonnet45, // Default fallback
         });
         self
@@ -502,10 +516,10 @@ mod tests {
     #[test]
     fn test_claude_code_agent_builder_pattern() {
         let agent = ClaudeCodeAgent::new(None)
-            .with_model(ClaudeModel::Opus4)
+            .with_model(ClaudeModel::Opus41)
             .with_execution_profile(llm_toolkit::agent::ExecutionProfile::Deterministic);
 
-        assert!(matches!(agent.model, Some(ClaudeModel::Opus4)));
+        assert!(matches!(agent.model, Some(ClaudeModel::Opus41)));
         assert!(matches!(
             agent.execution_profile,
             llm_toolkit::agent::ExecutionProfile::Deterministic

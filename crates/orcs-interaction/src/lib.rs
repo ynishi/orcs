@@ -4,7 +4,7 @@ pub mod persona_agent;
 
 use crate::gemini_api_agent::GeminiApiAgent;
 use llm_toolkit::agent::dialogue::{Dialogue, ExecutionModel};
-use llm_toolkit::agent::impls::{ClaudeCodeAgent, GeminiAgent};
+use llm_toolkit::agent::impls::{ClaudeCodeAgent, CodexAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
@@ -96,6 +96,12 @@ impl PersonaBackendAgent {
                 }
                 agent.execute(payload).await
             }
+            PersonaBackend::ClaudeApi => {
+                // TODO: Implement Claude API agent
+                Err(AgentError::ExecutionFailed(
+                    "Claude API backend not yet implemented".to_string(),
+                ))
+            }
             PersonaBackend::GeminiCli => {
                 let mut agent = GeminiAgent::new();
                 // Set workspace root if provided
@@ -118,6 +124,25 @@ impl PersonaBackendAgent {
                 }
                 agent.execute(payload).await
             }
+            PersonaBackend::OpenAiApi => {
+                // TODO: Implement OpenAI API agent
+                Err(AgentError::ExecutionFailed(
+                    "OpenAI API backend not yet implemented".to_string(),
+                ))
+            }
+            PersonaBackend::CodexCli => {
+                let mut agent = CodexAgent::new();
+                // Set workspace root if provided
+                if let Some(workspace) = workspace_root {
+                    agent = agent.with_cwd(workspace);
+                }
+                // Apply model if specified
+                if let Some(ref model_str) = self.model_name {
+                    tracing::info!("[PersonaBackendAgent] Using Codex model: {}", model_str);
+                    agent = agent.with_model_str(model_str);
+                }
+                agent.execute(payload).await
+            }
         }
     }
 }
@@ -129,8 +154,11 @@ impl Agent for PersonaBackendAgent {
     fn expertise(&self) -> &str {
         match self.backend {
             PersonaBackend::ClaudeCli => "Claude CLI persona agent",
+            PersonaBackend::ClaudeApi => "Claude API persona agent",
             PersonaBackend::GeminiCli => "Gemini CLI persona agent",
             PersonaBackend::GeminiApi => "Gemini API persona agent",
+            PersonaBackend::OpenAiApi => "OpenAI API persona agent",
+            PersonaBackend::CodexCli => "Codex CLI persona agent",
         }
     }
 

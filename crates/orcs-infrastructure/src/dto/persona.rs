@@ -24,8 +24,11 @@ impl Default for PersonaSourceDTO {
 #[serde(rename_all = "snake_case")]
 pub enum PersonaBackendDTO {
     ClaudeCli,
+    ClaudeApi,
     GeminiCli,
     GeminiApi,
+    OpenAiApi,
+    CodexCli,
 }
 
 impl Default for PersonaBackendDTO {
@@ -99,7 +102,7 @@ pub struct PersonaConfigV1_2_0 {
     /// Source of the persona (System or User).
     #[serde(default)]
     pub source: PersonaSourceDTO,
-    /// Backend to execute persona with.
+    /// Backend to execute persona with (supports all 6 backends: ClaudeCli, ClaudeApi, GeminiCli, GeminiApi, OpenAiApi, CodexCli).
     #[serde(default)]
     pub backend: PersonaBackendDTO,
     /// Model name for the backend (e.g., "claude-sonnet-4-5-20250929", "gemini-2.5-flash")
@@ -186,8 +189,11 @@ impl From<PersonaBackendDTO> for PersonaBackend {
     fn from(dto: PersonaBackendDTO) -> Self {
         match dto {
             PersonaBackendDTO::ClaudeCli => PersonaBackend::ClaudeCli,
+            PersonaBackendDTO::ClaudeApi => PersonaBackend::ClaudeApi,
             PersonaBackendDTO::GeminiCli => PersonaBackend::GeminiCli,
             PersonaBackendDTO::GeminiApi => PersonaBackend::GeminiApi,
+            PersonaBackendDTO::OpenAiApi => PersonaBackend::OpenAiApi,
+            PersonaBackendDTO::CodexCli => PersonaBackend::CodexCli,
         }
     }
 }
@@ -196,8 +202,11 @@ impl From<PersonaBackend> for PersonaBackendDTO {
     fn from(backend: PersonaBackend) -> Self {
         match backend {
             PersonaBackend::ClaudeCli => PersonaBackendDTO::ClaudeCli,
+            PersonaBackend::ClaudeApi => PersonaBackendDTO::ClaudeApi,
             PersonaBackend::GeminiCli => PersonaBackendDTO::GeminiCli,
             PersonaBackend::GeminiApi => PersonaBackendDTO::GeminiApi,
+            PersonaBackend::OpenAiApi => PersonaBackendDTO::OpenAiApi,
+            PersonaBackend::CodexCli => PersonaBackendDTO::CodexCli,
         }
     }
 }
@@ -257,7 +266,7 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_2_0 {
 ///
 /// - V1.0.0 → V1.1.0: Adds `backend` field with default value
 /// - V1.1.0 → V1.2.0: Adds `model_name` field (optional)
-/// - V1.2.0 → Persona: Converts DTO to domain model
+/// - V1.2.0 → Persona: Converts DTO to domain model (supports all 6 backends via enum expansion)
 ///
 /// # Example
 ///

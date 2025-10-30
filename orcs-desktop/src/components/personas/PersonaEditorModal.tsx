@@ -4,8 +4,11 @@ import { PersonaConfig } from '../../types/agent';
 
 const BACKEND_OPTIONS = [
   { value: 'claude_cli', label: 'Claude CLI' },
+  { value: 'claude_api', label: 'Claude API' },
   { value: 'gemini_cli', label: 'Gemini CLI' },
   { value: 'gemini_api', label: 'Gemini API' },
+  { value: 'openai_api', label: 'OpenAI API' },
+  { value: 'codex_cli', label: 'Codex CLI' },
 ];
 
 const CLAUDE_MODEL_OPTIONS = [

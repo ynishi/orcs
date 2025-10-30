@@ -10,12 +10,18 @@ use version_migrate::DeriveQueryable as Queryable;
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PersonaBackend {
-    /// Default Anthropic Claude Code CLI backend
+    /// Anthropic Claude Code CLI backend
     ClaudeCli,
+    /// Anthropic Claude API backend
+    ClaudeApi,
     /// Google Gemini CLI backend
     GeminiCli,
     /// Google Gemini API backend
     GeminiApi,
+    /// OpenAI API backend (GPT-4, GPT-3.5, etc.)
+    OpenAiApi,
+    /// Codex CLI backend
+    CodexCli,
 }
 
 impl Default for PersonaBackend {

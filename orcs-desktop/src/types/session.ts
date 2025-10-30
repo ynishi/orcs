@@ -11,6 +11,9 @@ export interface Session {
   persona_histories: Record<string, ConversationMessage[]>;
   app_mode: AppMode;
   workspace_id?: string; // Optional workspace ID for filtering
+  active_participant_ids: string[]; // Active participants
+  execution_strategy: string; // "broadcast" or "sequential"
+  system_messages: ConversationMessage[]; // System messages (join/leave events, etc.)
 }
 
 /**
@@ -88,16 +91,50 @@ export function getCurrentPersonaMessages(session: Session): ConversationMessage
 }
 
 /**
- * 全Personaの会話履歴を時系列順に統合
+ * メッセージと発話者情報のペア
  */
-export function getAllMessages(session: Session): ConversationMessage[] {
-  if (!session || !session.persona_histories) {
+export interface MessageWithAuthor {
+  message: ConversationMessage;
+  authorId: string; // Persona ID or "You" or "System"
+}
+
+/**
+ * 全Personaの会話履歴とsystem_messagesを時系列順に統合（発話者情報付き）
+ */
+export function getAllMessagesWithAuthors(session: Session): MessageWithAuthor[] {
+  if (!session) {
     return [];
   }
-  const allMessages = Object.values(session.persona_histories).flat();
-  return allMessages.sort((a, b) =>
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+
+  const messagesWithAuthors: MessageWithAuthor[] = [];
+
+  // persona_historiesから取得
+  if (session.persona_histories) {
+    for (const [personaId, messages] of Object.entries(session.persona_histories)) {
+      for (const msg of messages) {
+        messagesWithAuthors.push({ message: msg, authorId: personaId });
+      }
+    }
+  }
+
+  // system_messagesから取得
+  if (session.system_messages) {
+    for (const msg of session.system_messages) {
+      messagesWithAuthors.push({ message: msg, authorId: 'System' });
+    }
+  }
+
+  // 時系列順にソート
+  return messagesWithAuthors.sort((a, b) =>
+    new Date(a.message.timestamp).getTime() - new Date(b.message.timestamp).getTime()
   );
+}
+
+/**
+ * 全Personaの会話履歴とsystem_messagesを時系列順に統合
+ */
+export function getAllMessages(session: Session): ConversationMessage[] {
+  return getAllMessagesWithAuthors(session).map(item => item.message);
 }
 
 /**
@@ -132,7 +169,38 @@ export function getPlan(mode: AppMode): Plan | null {
 import type { Message, MessageType } from './message';
 
 /**
- * ConversationMessageをUI用のMessageに変換
+ * ConversationMessageとauthorIdをUI用のMessageに変換
+ */
+export function convertToUIMessageWithAuthor(
+  msg: ConversationMessage,
+  authorId: string,
+  userNickname: string = 'You'
+): Message {
+  const messageType: MessageType = msg.role === 'User' ? 'user' : msg.role === 'Assistant' ? 'ai' : 'system';
+
+  // authorIdが"You"ならユーザー、"System"ならシステム、それ以外はペルソナID（またはペルソナ名）
+  let author: string;
+  if (msg.role === 'User') {
+    author = authorId === 'You' ? userNickname : authorId;
+  } else if (msg.role === 'System') {
+    author = 'SYSTEM';
+  } else {
+    // Assistant: authorIdがUUIDならペルソナ名に変換したいが、ここでは一旦authorIdを使う
+    // TODO: ペルソナIDから名前を解決する
+    author = authorId;
+  }
+
+  return {
+    id: `${msg.timestamp}-${Math.random()}`,
+    type: messageType,
+    author,
+    text: msg.content,
+    timestamp: new Date(msg.timestamp),
+  };
+}
+
+/**
+ * ConversationMessageをUI用のMessageに変換（後方互換性のため残す）
  */
 export function convertToUIMessage(msg: ConversationMessage, userNickname: string = 'You'): Message {
   const messageType: MessageType = msg.role === 'User' ? 'user' : msg.role === 'Assistant' ? 'ai' : 'system';
@@ -150,5 +218,7 @@ export function convertToUIMessage(msg: ConversationMessage, userNickname: strin
  * セッションの会話履歴をUI用Messageの配列に変換
  */
 export function convertSessionToMessages(session: Session, userNickname: string = 'You'): Message[] {
-  return getAllMessages(session).map(msg => convertToUIMessage(msg, userNickname));
+  return getAllMessagesWithAuthors(session).map(item =>
+    convertToUIMessageWithAuthor(item.message, item.authorId, userNickname)
+  );
 }

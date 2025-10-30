@@ -102,6 +102,39 @@ pub struct SessionV2_1_0 {
     pub execution_strategy: String,
 }
 
+/// Represents V2.2.0 of the session data schema.
+/// Added system_messages for persisting system notifications (join/leave events, etc.).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Versioned)]
+#[versioned(version = "2.2.0")]
+pub struct SessionV2_2_0 {
+    /// Unique session identifier
+    pub id: String,
+    /// Human-readable session title
+    pub title: String,
+    /// Timestamp when the session was created (ISO 8601 format)
+    pub created_at: String,
+    /// Timestamp when the session was last updated (ISO 8601 format)
+    pub updated_at: String,
+    /// The currently active persona ID
+    pub current_persona_id: String,
+    /// Conversation history for each persona
+    pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
+    /// Current application mode
+    pub app_mode: AppMode,
+    /// Workspace ID if this session is associated with a workspace
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    /// Active participant persona IDs
+    #[serde(default)]
+    pub active_participant_ids: Vec<String>,
+    /// Execution strategy ("broadcast" or "sequential")
+    #[serde(default = "default_execution_strategy")]
+    pub execution_strategy: String,
+    /// System messages (join/leave notifications, etc.)
+    #[serde(default)]
+    pub system_messages: Vec<ConversationMessage>,
+}
+
 fn default_execution_strategy() -> String {
     "broadcast".to_string()
 }
@@ -162,12 +195,32 @@ impl MigratesTo<SessionV2_1_0> for SessionV2_0_0 {
     }
 }
 
+/// Migration from SessionV2_1_0 to SessionV2_2_0.
+/// Added system_messages field for system notifications.
+impl MigratesTo<SessionV2_2_0> for SessionV2_1_0 {
+    fn migrate(self) -> SessionV2_2_0 {
+        SessionV2_2_0 {
+            id: self.id,
+            title: self.title,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            current_persona_id: self.current_persona_id,
+            persona_histories: self.persona_histories,
+            app_mode: self.app_mode,
+            workspace_id: self.workspace_id,
+            active_participant_ids: self.active_participant_ids,
+            execution_strategy: self.execution_strategy,
+            system_messages: Vec::new(), // No system messages in old sessions
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
 
-/// Convert SessionV2_1_0 DTO to domain model.
-impl IntoDomain<Session> for SessionV2_1_0 {
+/// Convert SessionV2_2_0 DTO to domain model.
+impl IntoDomain<Session> for SessionV2_2_0 {
     fn into_domain(self) -> Session {
         Session {
             id: self.id,
@@ -180,14 +233,15 @@ impl IntoDomain<Session> for SessionV2_1_0 {
             workspace_id: self.workspace_id,
             active_participant_ids: self.active_participant_ids,
             execution_strategy: self.execution_strategy,
+            system_messages: self.system_messages,
         }
     }
 }
 
-/// Convert domain model to SessionV2_1_0 DTO for persistence.
-impl version_migrate::FromDomain<Session> for SessionV2_1_0 {
+/// Convert domain model to SessionV2_2_0 DTO for persistence.
+impl version_migrate::FromDomain<Session> for SessionV2_2_0 {
     fn from_domain(session: Session) -> Self {
-        SessionV2_1_0 {
+        SessionV2_2_0 {
             id: session.id,
             title: session.title,
             created_at: session.created_at,
@@ -198,6 +252,7 @@ impl version_migrate::FromDomain<Session> for SessionV2_1_0 {
             workspace_id: session.workspace_id,
             active_participant_ids: session.active_participant_ids,
             execution_strategy: session.execution_strategy,
+            system_messages: session.system_messages,
         }
     }
 }
@@ -208,7 +263,7 @@ impl version_migrate::FromDomain<Session> for SessionV2_1_0 {
 
 /// Creates and configures a Migrator instance for Session entities.
 ///
-/// The migrator handles automatic schema migration from V1.0.0 to V2.1.0
+/// The migrator handles automatic schema migration from V1.0.0 to V2.2.0
 /// and conversion to the domain model.
 ///
 /// # Migration Path
@@ -216,7 +271,8 @@ impl version_migrate::FromDomain<Session> for SessionV2_1_0 {
 /// - V1.0.0 → V1.1.0: Renames `name` field to `title`
 /// - V1.1.0 → V2.0.0: Adds `workspace_id` field with default value None
 /// - V2.0.0 → V2.1.0: Adds `active_participant_ids` and `execution_strategy` fields
-/// - V2.1.0 → Session: Converts DTO to domain model
+/// - V2.1.0 → V2.2.0: Adds `system_messages` field for system notifications
+/// - V2.2.0 → Session: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -227,12 +283,13 @@ impl version_migrate::FromDomain<Session> for SessionV2_1_0 {
 pub fn create_session_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> V1.1.0 -> V2.0.0 -> V2.1.0 -> Session
+    // Register migration path: V1.0.0 -> V1.1.0 -> V2.0.0 -> V2.1.0 -> V2.2.0 -> Session
     let session_path = version_migrate::Migrator::define("session")
         .from::<SessionV1_0_0>()
         .step::<SessionV1_1_0>()
         .step::<SessionV2_0_0>()
         .step::<SessionV2_1_0>()
+        .step::<SessionV2_2_0>()
         .into_with_save::<Session>();
 
     migrator

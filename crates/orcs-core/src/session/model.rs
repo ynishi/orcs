@@ -12,6 +12,7 @@ use std::collections::HashMap;
 ///
 /// A session contains:
 /// - Conversation history for each participating persona
+/// - System messages (participant join/leave notifications, etc.)
 /// - The currently active persona
 /// - Active participants (personas participating in the conversation)
 /// - Execution strategy (broadcast or sequential)
@@ -45,6 +46,9 @@ pub struct Session {
     /// Execution strategy ("broadcast" or "sequential")
     #[serde(default = "default_execution_strategy")]
     pub execution_strategy: String,
+    /// System messages (join/leave notifications, etc.)
+    #[serde(default)]
+    pub system_messages: Vec<ConversationMessage>,
 }
 
 fn default_execution_strategy() -> String {

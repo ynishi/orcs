@@ -244,6 +244,8 @@ pub struct InteractionManager {
     execution_strategy: Arc<RwLock<String>>,
     /// Active participant persona IDs (restored from session or populated dynamically)
     restored_participant_ids: Arc<RwLock<Option<Vec<String>>>>,
+    /// System messages (join/leave notifications, etc.)
+    system_messages: Arc<RwLock<Vec<ConversationMessage>>>,
 }
 
 impl InteractionManager {
@@ -288,6 +290,7 @@ impl InteractionManager {
             user_service,
             execution_strategy: Arc::new(RwLock::new("broadcast".to_string())),
             restored_participant_ids: Arc::new(RwLock::new(None)),
+            system_messages: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -326,6 +329,7 @@ impl InteractionManager {
             user_service,
             execution_strategy: Arc::new(RwLock::new(data.execution_strategy)),
             restored_participant_ids: Arc::new(RwLock::new(restored_ids)),
+            system_messages: Arc::new(RwLock::new(data.system_messages)),
         }
     }
 
@@ -403,6 +407,7 @@ impl InteractionManager {
         let title = self.title.read().await.clone();
         let instance_workspace_id = self.workspace_id.read().await.clone();
         let execution_strategy = self.execution_strategy.read().await.clone();
+        let system_messages = self.system_messages.read().await.clone();
 
         // Use the first default participant as current_persona_id
         let current_persona_id = self
@@ -434,6 +439,7 @@ impl InteractionManager {
             workspace_id: final_workspace_id,
             active_participant_ids,
             execution_strategy,
+            system_messages,
         }
     }
 
@@ -497,6 +503,14 @@ impl InteractionManager {
             .ok_or_else(|| format!("Persona with id '{}' not found", persona_id))?;
         let persona = domain_to_llm_persona(&persona_config);
 
+        // Record system message
+        let system_msg = ConversationMessage {
+            role: MessageRole::System,
+            content: format!("{} が会話に参加しました", persona_config.name),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        };
+        self.system_messages.write().await.push(system_msg);
+
         // Lock the dialogue and add participant
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
@@ -530,6 +544,14 @@ impl InteractionManager {
             .find(|p| p.id == persona_id)
             .ok_or_else(|| format!("Persona with id '{}' not found", persona_id))?;
         let persona = domain_to_llm_persona(&persona_config);
+
+        // Record system message
+        let system_msg = ConversationMessage {
+            role: MessageRole::System,
+            content: format!("{} が会話から退出しました", persona_config.name),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        };
+        self.system_messages.write().await.push(system_msg);
 
         // Lock the dialogue and remove participant
         let mut dialogue_guard = self.dialogue.lock().await;

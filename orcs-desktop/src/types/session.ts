@@ -14,6 +14,7 @@ export interface Session {
   active_participant_ids: string[]; // Active participants
   execution_strategy: string; // "broadcast" or "sequential"
   system_messages: ConversationMessage[]; // System messages (join/leave events, etc.)
+  participants: Record<string, string>; // Persona ID -> name mapping
 }
 
 /**
@@ -174,20 +175,20 @@ import type { Message, MessageType } from './message';
 export function convertToUIMessageWithAuthor(
   msg: ConversationMessage,
   authorId: string,
+  participants: Record<string, string>,
   userNickname: string = 'You'
 ): Message {
   const messageType: MessageType = msg.role === 'User' ? 'user' : msg.role === 'Assistant' ? 'ai' : 'system';
 
-  // authorIdが"You"ならユーザー、"System"ならシステム、それ以外はペルソナID（またはペルソナ名）
+  // authorIdが"You"ならユーザー、"System"ならシステム、それ以外はペルソナIDから名前を解決
   let author: string;
   if (msg.role === 'User') {
-    author = authorId === 'You' ? userNickname : authorId;
+    author = authorId === 'You' ? userNickname : (participants[authorId] || authorId);
   } else if (msg.role === 'System') {
     author = 'SYSTEM';
   } else {
-    // Assistant: authorIdがUUIDならペルソナ名に変換したいが、ここでは一旦authorIdを使う
-    // TODO: ペルソナIDから名前を解決する
-    author = authorId;
+    // Assistant: participantsマップから名前を解決、見つからない場合はauthorIdをそのまま使用
+    author = participants[authorId] || authorId;
   }
 
   return {
@@ -219,6 +220,6 @@ export function convertToUIMessage(msg: ConversationMessage, userNickname: strin
  */
 export function convertSessionToMessages(session: Session, userNickname: string = 'You'): Message[] {
   return getAllMessagesWithAuthors(session).map(item =>
-    convertToUIMessageWithAuthor(item.message, item.authorId, userNickname)
+    convertToUIMessageWithAuthor(item.message, item.authorId, session.participants || {}, userNickname)
   );
 }

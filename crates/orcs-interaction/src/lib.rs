@@ -428,6 +428,22 @@ impl InteractionManager {
         // Get active participants if dialogue is initialized
         let active_participant_ids = self.get_active_participants().await.unwrap_or_default();
 
+        // Build participants map: persona ID -> name
+        let mut participants = HashMap::new();
+
+        // Add user name
+        let user_name = self.user_service.get_user_name();
+        participants.insert(user_name.clone(), user_name);
+
+        // Add all personas from persona_histories
+        if let Ok(all_personas) = self.persona_repository.get_all() {
+            for persona_id in persona_histories.keys() {
+                if let Some(persona) = all_personas.iter().find(|p| &p.id == persona_id) {
+                    participants.insert(persona_id.clone(), persona.name.clone());
+                }
+            }
+        }
+
         Session {
             id: self.session_id.clone(),
             title,
@@ -440,6 +456,7 @@ impl InteractionManager {
             active_participant_ids,
             execution_strategy,
             system_messages,
+            participants,
         }
     }
 

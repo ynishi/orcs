@@ -49,6 +49,9 @@ pub struct Session {
     /// System messages (join/leave notifications, etc.)
     #[serde(default)]
     pub system_messages: Vec<ConversationMessage>,
+    /// Participant persona ID to name mapping for display
+    #[serde(default)]
+    pub participants: HashMap<String, String>,
 }
 
 fn default_execution_strategy() -> String {

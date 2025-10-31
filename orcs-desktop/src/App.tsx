@@ -707,11 +707,11 @@ function App() {
 
       // ワークスペースに保存（セッションID、メッセージタイムスタンプ、作者を含める）
       await invoke('upload_file_from_bytes', {
-        workspaceId: workspace.id,
+        workspace_id: workspace.id,
         filename: filename,
-        fileData: fileData,
-        sessionId: currentSessionId || null,
-        messageTimestamp: message.timestamp.toISOString(),
+        file_data: fileData,
+        session_id: currentSessionId || null,
+        message_timestamp: message.timestamp.toISOString(),
         author: message.author,
       });
 

@@ -167,6 +167,29 @@ function App() {
     loadGitInfo();
   }, []);
 
+  // Load active session messages on startup or when currentSessionId changes
+  useEffect(() => {
+    const loadActiveSessionMessages = async () => {
+      if (!currentSessionId || sessionsLoading) {
+        return;
+      }
+
+      try {
+        console.log('[App] Loading messages for active session:', currentSessionId);
+        const activeSession = sessions.find(s => s.id === currentSessionId);
+        if (activeSession) {
+          const restoredMessages = convertSessionToMessages(activeSession, userNickname);
+          setMessages(restoredMessages);
+          console.log('[App] Loaded', restoredMessages.length, 'messages from session', currentSessionId);
+        }
+      } catch (error) {
+        console.error('[App] Failed to load active session messages:', error);
+      }
+    };
+
+    loadActiveSessionMessages();
+  }, [currentSessionId, sessions, sessionsLoading, userNickname]);
+
   const refreshCustomCommands = useCallback(async () => {
     try {
       const commands = await invoke<SlashCommand[]>('list_slash_commands');

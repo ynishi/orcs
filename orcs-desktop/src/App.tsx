@@ -461,14 +461,17 @@ function App() {
           for (const file of currentFiles) {
             try {
               const arrayBuffer = await file.arrayBuffer();
-              const bytes = Array.from(new Uint8Array(arrayBuffer));
-              const path = await invoke<string>("upload_file_from_bytes", {
-                workspaceId: workspace.id,
-                fileName: file.name,
-                bytes: bytes,
+              const fileData = Array.from(new Uint8Array(arrayBuffer));
+              const uploadedFile = await invoke<{ path: string }>("upload_file_from_bytes", {
+                workspace_id: workspace.id,
+                filename: file.name,
+                file_data: fileData,
+                session_id: currentSessionId || null,
+                message_timestamp: null,
+                author: null,
               });
-              filePaths.push(path);
-              console.log('[FILE] Uploaded file:', file.name, 'to', path);
+              filePaths.push(uploadedFile.path);
+              console.log('[FILE] Uploaded file:', file.name, 'to', uploadedFile.path);
             } catch (uploadError) {
               console.error('[FILE] Failed to upload file:', file.name, uploadError);
               addMessage('error', 'System', `Failed to upload file ${file.name}: ${uploadError}`);

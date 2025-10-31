@@ -623,4 +623,45 @@ impl SessionUseCase {
     pub fn workspace_manager(&self) -> &Arc<dyn WorkspaceManager> {
         &self.workspace_manager
     }
+
+    /// Enriches session participants field by resolving persona IDs to names.
+    ///
+    /// For sessions loaded from storage (especially after migration from older versions),
+    /// the participants HashMap may be empty. This method populates it by:
+    /// 1. Adding user name mapping (user_name -> user_name)
+    /// 2. Resolving persona IDs from persona_histories keys to persona names
+    ///
+    /// # Arguments
+    ///
+    /// * `session` - The session to enrich
+    ///
+    /// # Returns
+    ///
+    /// The enriched session with populated participants field.
+    pub fn enrich_session_participants(&self, mut session: Session) -> Session {
+        use std::collections::HashMap;
+
+        // If participants is already populated, return as-is
+        if !session.participants.is_empty() {
+            return session;
+        }
+
+        let mut participants = HashMap::new();
+
+        // Add user name
+        let user_name = self.user_service.get_user_name();
+        participants.insert(user_name.clone(), user_name);
+
+        // Resolve persona IDs to names
+        if let Ok(all_personas) = self.persona_repository.get_all() {
+            for persona_id in session.persona_histories.keys() {
+                if let Some(persona) = all_personas.iter().find(|p| &p.id == persona_id) {
+                    participants.insert(persona_id.clone(), persona.name.clone());
+                }
+            }
+        }
+
+        session.participants = participants;
+        session
+    }
 }

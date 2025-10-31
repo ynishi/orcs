@@ -114,14 +114,22 @@ async fn create_session(state: State<'_, AppState>) -> Result<Session, String> {
     Ok(session)
 }
 
-/// Lists all saved sessions
+/// Lists all saved sessions with enriched participants
 #[tauri::command]
 async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, String> {
-    state
+    let sessions = state
         .session_manager
         .list_sessions()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // Enrich each session's participants field
+    let enriched_sessions = sessions
+        .into_iter()
+        .map(|session| state.session_usecase.enrich_session_participants(session))
+        .collect();
+
+    Ok(enriched_sessions)
 }
 
 /// Switches to a different session

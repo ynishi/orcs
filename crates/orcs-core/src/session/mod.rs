@@ -30,7 +30,7 @@ mod user_input;
 // Re-export public API
 pub use app_mode::{AppMode, Plan};
 pub use manager::{InteractionManagerTrait, SessionManager};
-pub use message::{ConversationMessage, MessageRole};
+pub use message::{ConversationMessage, ErrorSeverity, MessageMetadata, MessageRole, SystemEventType};
 pub use model::Session;
 pub use repository::SessionRepository;
 pub use user_input::UserInput;

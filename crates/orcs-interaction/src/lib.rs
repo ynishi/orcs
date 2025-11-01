@@ -14,7 +14,10 @@ use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
 use orcs_core::persona::{Persona as PersonaDomain, PersonaBackend};
 use orcs_core::repository::PersonaRepository;
-use orcs_core::session::{AppMode, ConversationMessage, MessageRole, Plan, Session};
+use orcs_core::session::{
+    AppMode, ConversationMessage, ErrorSeverity, MessageMetadata, MessageRole, Plan, Session,
+    SystemEventType,
+};
 use orcs_core::user::UserService;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -613,6 +616,11 @@ impl InteractionManager {
             role: MessageRole::System,
             content: format!("{} が会話に参加しました", persona_config.name),
             timestamp: chrono::Utc::now().to_rfc3339(),
+            metadata: MessageMetadata {
+                system_event_type: Some(SystemEventType::ParticipantJoined),
+                error_severity: None,
+                include_in_dialogue: true,
+            },
         };
         self.system_messages.write().await.push(system_msg);
 
@@ -655,6 +663,11 @@ impl InteractionManager {
             role: MessageRole::System,
             content: format!("{} が会話から退出しました", persona_config.name),
             timestamp: chrono::Utc::now().to_rfc3339(),
+            metadata: MessageMetadata {
+                system_event_type: Some(SystemEventType::ParticipantLeft),
+                error_severity: None,
+                include_in_dialogue: true,
+            },
         };
         self.system_messages.write().await.push(system_msg);
 
@@ -700,6 +713,19 @@ impl InteractionManager {
     /// This will invalidate the current dialogue instance, which will be recreated
     /// with the new strategy on the next interaction.
     pub async fn set_execution_strategy(&self, strategy: String) {
+        // Record system message for context visibility to agents
+        let system_msg = ConversationMessage {
+            role: MessageRole::System,
+            content: format!("実行戦略を {} に変更しました", strategy),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            metadata: MessageMetadata {
+                system_event_type: Some(SystemEventType::ExecutionStrategyChanged),
+                error_severity: None,
+                include_in_dialogue: true,
+            },
+        };
+        self.system_messages.write().await.push(system_msg);
+
         *self.execution_strategy.write().await = strategy;
         // Clear the dialogue to force recreation with new strategy
         *self.dialogue.lock().await = None;
@@ -883,10 +909,23 @@ impl InteractionManager {
                         callback(&error_turn);
                     }
 
-                    // Add error to history for persistence
-                    // Use special persona_id "Error" to distinguish from regular system messages
-                    self.add_to_history("Error", MessageRole::System, &error_msg)
-                        .await;
+                    // Add error to history for persistence with metadata
+                    let error_history = ConversationMessage {
+                        role: MessageRole::System,
+                        content: error_msg.clone(),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                        metadata: MessageMetadata {
+                            system_event_type: None,
+                            error_severity: Some(ErrorSeverity::Critical),
+                            include_in_dialogue: true,
+                        },
+                    };
+                    self.persona_histories
+                        .write()
+                        .await
+                        .entry("Error".to_string())
+                        .or_insert_with(Vec::new)
+                        .push(error_history);
 
                     // Return empty dialogue messages (error already streamed via callback)
                     return InteractionResult::NewDialogueMessages(Vec::new());
@@ -921,6 +960,7 @@ impl InteractionManager {
             role,
             content: content.to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
+            metadata: MessageMetadata::default(), // User/Assistant messages with default metadata
         });
     }
 }

@@ -4,6 +4,7 @@
 //! including roles and message content.
 
 use serde::{Deserialize, Serialize};
+use version_migrate::DeriveQueryable as Queryable;
 
 /// Represents the role of a message in a conversation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -16,11 +17,69 @@ pub enum MessageRole {
     System,
 }
 
+/// Type of system event being recorded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemEventType {
+    /// A participant joined the conversation.
+    ParticipantJoined,
+    /// A participant left the conversation.
+    ParticipantLeft,
+    /// Execution strategy was changed (broadcast/sequential).
+    ExecutionStrategyChanged,
+    /// Application mode changed (idle/planning/etc).
+    ModeChanged,
+    /// Workspace was switched.
+    WorkspaceSwitched,
+    /// Generic system notification.
+    Notification,
+}
+
+/// Severity level for error messages.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorSeverity {
+    /// Critical error - show in thread + toast.
+    Critical,
+    /// Warning - show in thread only.
+    Warning,
+    /// Info - toast only, not in thread.
+    Info,
+}
+
+/// Metadata for conversation messages.
+///
+/// This provides additional context about the message that helps
+/// the frontend determine how to display it and helps agents
+/// understand the conversation context.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct MessageMetadata {
+    /// For System messages: the type of system event.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_event_type: Option<SystemEventType>,
+
+    /// For System messages with errors: the severity level.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_severity: Option<ErrorSeverity>,
+
+    /// Whether this message should be included in agent dialogue context.
+    /// Defaults to true for backward compatibility.
+    #[serde(default = "default_true")]
+    pub include_in_dialogue: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 /// A single message in a conversation history.
 ///
 /// Each message has a role (user, assistant, or system), content,
 /// and a timestamp indicating when it was created.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Version 2 adds metadata field for extended information.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Queryable)]
+#[queryable(entity = "conversation_message")]
 pub struct ConversationMessage {
     /// The role of the message sender.
     pub role: MessageRole,
@@ -28,4 +87,7 @@ pub struct ConversationMessage {
     pub content: String,
     /// Timestamp when the message was created (ISO 8601 format).
     pub timestamp: String,
+    /// Additional metadata about the message.
+    #[serde(default)]
+    pub metadata: MessageMetadata,
 }

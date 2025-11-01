@@ -198,7 +198,18 @@ impl FileSystemWorkspaceManager {
 impl WorkspaceManager for FileSystemWorkspaceManager {
 
     async fn get_or_create_workspace(&self, repo_path: &Path) -> Result<Workspace> {
-        let workspace_id = Self::get_workspace_id(repo_path)?;
+        // Validate root_path: must not be root directory
+        let canonical_path = repo_path.canonicalize().map_err(|e| {
+            OrcsError::Io(format!("Failed to canonicalize path {:?}: {}", repo_path, e))
+        })?;
+
+        if canonical_path == Path::new("/") || canonical_path == Path::new("C:\\") {
+            return Err(OrcsError::Io(
+                "Cannot create workspace at root directory '/'".to_string(),
+            ));
+        }
+
+        let workspace_id = Self::get_workspace_id(&canonical_path)?;
 
         // Check if workspace already exists
         if let Ok(Some(workspace)) = self.get_workspace(&workspace_id).await {
@@ -214,8 +225,8 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         let workspace = Workspace {
             id: workspace_id.clone(),
-            name: Self::get_workspace_name(repo_path),
-            root_path: repo_path.to_path_buf(),
+            name: Self::get_workspace_name(&canonical_path),
+            root_path: canonical_path,
             workspace_dir,
             resources: WorkspaceResources::default(),
             project_context: ProjectContext::default(),

@@ -123,7 +123,29 @@ impl PersonaRepository for AsyncDirPersonaRepository {
         // Block on async operation (since trait is sync)
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                // Save each persona individually (1 persona = 1 file)
+                // 1. Load all existing personas to identify orphaned files
+                let existing = self
+                    .storage
+                    .load_all::<Persona>("persona")
+                    .await
+                    .map_err(|e| format!("Failed to load existing personas: {}", e))?;
+
+                let existing_ids: std::collections::HashSet<String> =
+                    existing.iter().map(|(id, _)| id.clone()).collect();
+                let new_ids: std::collections::HashSet<String> =
+                    personas.iter().map(|p| p.id.clone()).collect();
+
+                // 2. Delete orphaned personas (exist in storage but not in new list)
+                for orphaned_id in existing_ids.difference(&new_ids) {
+                    self.storage
+                        .delete(orphaned_id)
+                        .await
+                        .map_err(|e| {
+                            format!("Failed to delete orphaned persona {}: {}", orphaned_id, e)
+                        })?;
+                }
+
+                // 3. Save each persona individually (1 persona = 1 file)
                 for persona in personas {
                     self.storage
                         .save("persona", &persona.id, persona)

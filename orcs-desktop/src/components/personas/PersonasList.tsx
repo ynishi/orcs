@@ -17,7 +17,7 @@ const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
   claude_api: 'Claude API',
   gemini_cli: 'Gemini CLI',
   gemini_api: 'Gemini API',
-  openai_api: 'OpenAI API',
+  open_ai_api: 'OpenAI API',
   codex_cli: 'Codex CLI',
 };
 

@@ -1,15 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, TextInput, Textarea, Switch, Button, Stack, Group, Select } from '@mantine/core';
+import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
-
-const BACKEND_OPTIONS = [
-  { value: 'claude_cli', label: 'Claude CLI' },
-  { value: 'claude_api', label: 'Claude API' },
-  { value: 'gemini_cli', label: 'Gemini CLI' },
-  { value: 'gemini_api', label: 'Gemini API' },
-  { value: 'openai_api', label: 'OpenAI API' },
-  { value: 'codex_cli', label: 'Codex CLI' },
-];
 
 const CLAUDE_MODEL_OPTIONS = [
   { value: '', label: 'Default (Sonnet 4.5)' },
@@ -39,6 +31,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
   persona,
   onSave,
 }) => {
+  const [backendOptions, setBackendOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [formData, setFormData] = useState<Partial<PersonaConfig>>({
     id: '',
     name: '',
@@ -49,6 +42,21 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
     backend: 'claude_cli',
     model_name: undefined,
   });
+
+  // Fetch backend options on mount
+  useEffect(() => {
+    const fetchBackendOptions = async () => {
+      try {
+        const options = await invoke<Array<[string, string]>>('get_persona_backend_options');
+        setBackendOptions(options.map(([value, label]) => ({ value, label })));
+      } catch (error) {
+        console.error('Failed to fetch backend options:', error);
+        // Fallback to empty array
+        setBackendOptions([]);
+      }
+    };
+    fetchBackendOptions();
+  }, []);
 
   // Update form data when persona prop changes
   useEffect(() => {
@@ -79,14 +87,17 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
 
   const handleSave = () => {
     // Validate required fields
-    if (!formData.id || !formData.name) {
-      alert('ID and Name are required fields');
+    if (!formData.name) {
+      alert('Name is a required field');
       return;
     }
 
+    // Auto-generate UUID for new personas
+    const personaId = formData.id || crypto.randomUUID();
+
     // Cast to PersonaConfig since we've validated required fields
     const validatedPersona: PersonaConfig = {
-      id: formData.id,
+      id: personaId,
       name: formData.name,
       role: formData.role || '',
       background: formData.background || '',
@@ -110,14 +121,15 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
       size="lg"
     >
       <Stack gap="md">
-        <TextInput
-          label="ID"
-          placeholder="unique-persona-id"
-          value={formData.id}
-          onChange={(e) => setFormData({ ...formData, id: e.currentTarget.value })}
-          disabled={isEditing}
-          required
-        />
+        {isEditing && (
+          <TextInput
+            label="ID"
+            placeholder="unique-persona-id"
+            value={formData.id}
+            disabled
+            description="UUID (auto-generated, read-only)"
+          />
+        )}
 
         <TextInput
           label="Name"
@@ -137,7 +149,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         <Select
           label="Backend"
           placeholder="Select LLM backend"
-          data={BACKEND_OPTIONS}
+          data={backendOptions}
           value={formData.backend || 'claude_cli'}
           onChange={(value) =>
             setFormData({ ...formData, backend: (value as PersonaConfig['backend']) || 'claude_cli' })

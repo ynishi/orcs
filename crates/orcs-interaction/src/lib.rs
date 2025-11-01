@@ -1,9 +1,13 @@
+pub mod claude_api_agent;
 pub mod gemini_api_agent;
 pub mod local_agents;
+pub mod openai_api_agent;
 pub mod persona_agent;
 
+use crate::claude_api_agent::ClaudeApiAgent;
 use crate::gemini_api_agent::GeminiApiAgent;
-use llm_toolkit::agent::dialogue::{Dialogue, ExecutionModel};
+use crate::openai_api_agent::OpenAIApiAgent;
+use llm_toolkit::agent::dialogue::{Dialogue, DialogueTurn, ExecutionModel};
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, CodexAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
@@ -97,10 +101,13 @@ impl PersonaBackendAgent {
                 agent.execute(payload).await
             }
             PersonaBackend::ClaudeApi => {
-                // TODO: Implement Claude API agent
-                Err(AgentError::ExecutionFailed(
-                    "Claude API backend not yet implemented".to_string(),
-                ))
+                let mut agent = ClaudeApiAgent::try_from_env()?;
+                // Override model if specified
+                if let Some(ref model_str) = self.model_name {
+                    tracing::info!("[PersonaBackendAgent] Using Claude model: {}", model_str);
+                    agent = agent.with_model(model_str);
+                }
+                agent.execute(payload).await
             }
             PersonaBackend::GeminiCli => {
                 let mut agent = GeminiAgent::new();
@@ -125,10 +132,13 @@ impl PersonaBackendAgent {
                 agent.execute(payload).await
             }
             PersonaBackend::OpenAiApi => {
-                // TODO: Implement OpenAI API agent
-                Err(AgentError::ExecutionFailed(
-                    "OpenAI API backend not yet implemented".to_string(),
-                ))
+                let mut agent = OpenAIApiAgent::try_from_env()?;
+                // Override model if specified
+                if let Some(ref model_str) = self.model_name {
+                    tracing::info!("[PersonaBackendAgent] Using OpenAI model: {}", model_str);
+                    agent = agent.with_model(model_str);
+                }
+                agent.execute(payload).await
             }
             PersonaBackend::CodexCli => {
                 let mut agent = CodexAgent::new();
@@ -344,6 +354,72 @@ impl InteractionManager {
             .map(|p| p.id.clone())
     }
 
+    /// Resolves a persona UUID to its display name.
+    ///
+    /// This is used to convert persona IDs back to names for DialogueTurn.
+    fn get_persona_name_by_id(&self, persona_id: &str) -> Option<String> {
+        let personas = self.persona_repository.get_all().ok()?;
+        personas
+            .iter()
+            .find(|p| p.id == persona_id)
+            .map(|p| p.name.clone())
+    }
+
+    /// Rebuilds dialogue history from persona_histories for restoration.
+    ///
+    /// This method converts the stored conversation messages into DialogueTurn format,
+    /// sorted by timestamp, to restore the conversation context when recreating a Dialogue.
+    ///
+    /// # Returns
+    ///
+    /// A vector of DialogueTurn representing the full conversation history.
+    async fn rebuild_dialogue_history(&self) -> Vec<DialogueTurn> {
+        let histories = self.persona_histories.read().await;
+
+        // Flatten all messages with (persona_id, timestamp, message)
+        let mut all_messages: Vec<(String, String, ConversationMessage)> = Vec::new();
+
+        for (persona_id, messages) in histories.iter() {
+            for msg in messages {
+                all_messages.push((
+                    persona_id.clone(),
+                    msg.timestamp.clone(),
+                    msg.clone(),
+                ));
+            }
+        }
+
+        // Sort by timestamp to maintain chronological order
+        all_messages.sort_by(|a, b| a.1.cmp(&b.1));
+
+        // Convert to DialogueTurn
+        all_messages
+            .iter()
+            .filter_map(|(persona_id, _, msg)| {
+                match msg.role {
+                    MessageRole::User => {
+                        // User input is recorded as "System" turn in Dialogue
+                        Some(DialogueTurn {
+                            participant_name: "System".to_string(),
+                            content: msg.content.clone(),
+                        })
+                    }
+                    MessageRole::Assistant => {
+                        // Assistant response - convert persona_id to display name
+                        let name = self
+                            .get_persona_name_by_id(persona_id)
+                            .unwrap_or_else(|| persona_id.clone());
+                        Some(DialogueTurn {
+                            participant_name: name,
+                            content: msg.content.clone(),
+                        })
+                    }
+                    MessageRole::System => None, // Skip system messages for dialogue history
+                }
+            })
+            .collect()
+    }
+
     /// Ensures the dialogue is initialized. If not, creates it from a blueprint.
     ///
     /// # Errors
@@ -357,10 +433,16 @@ impl InteractionManager {
 
         let strategy_str = self.execution_strategy.read().await.clone();
         let strategy_model = string_to_execution_model(&strategy_str);
+
+        // Rebuild dialogue history from persona_histories
+        let history_turns = self.rebuild_dialogue_history().await;
+
+        // Create dialogue with restored history
         let mut dialogue = match strategy_model {
             ExecutionModel::Sequential => Dialogue::sequential(),
             ExecutionModel::Broadcast => Dialogue::broadcast(),
-        };
+        }
+        .with_history(history_turns);
 
         // Check if we have restored participant IDs from session
         let restored_ids_opt = self.restored_participant_ids.read().await.clone();
@@ -622,6 +704,17 @@ impl InteractionManager {
         self.execution_strategy.read().await.clone()
     }
 
+    /// Invalidates the current dialogue, forcing it to be recreated with latest persona settings.
+    ///
+    /// This should be called when:
+    /// - Persona configurations are updated
+    /// - Persona settings (role, background, etc.) are changed
+    ///
+    /// The dialogue will be recreated with the latest settings on the next interaction.
+    pub async fn invalidate_dialogue(&self) {
+        *self.dialogue.lock().await = None;
+    }
+
     /// Handles user input based on the current application mode.
     ///
     /// # Arguments
@@ -756,7 +849,34 @@ impl InteractionManager {
                     messages.push(message);
                 }
                 Err(e) => {
-                    return InteractionResult::NewMessage(format!("Error: {}", e));
+                    // Log the error for debugging
+                    tracing::error!(
+                        "[DIALOGUE] Agent execution failed: {}",
+                        e
+                    );
+
+                    // Create a user-friendly error message
+                    let error_msg = format!(
+                        "{}\n\nPlease check the logs for more details.",
+                        e
+                    );
+
+                    // Emit error as a system message via callback if provided
+                    if let Some(ref callback) = on_turn {
+                        let error_turn = DialogueMessage {
+                            author: String::new(), // Empty author for error messages
+                            content: error_msg.clone(),
+                        };
+                        callback(&error_turn);
+                    }
+
+                    // Add error to history for persistence
+                    // Use special persona_id "Error" to distinguish from regular system messages
+                    self.add_to_history("Error", MessageRole::System, &error_msg)
+                        .await;
+
+                    // Return empty dialogue messages (error already streamed via callback)
+                    return InteractionResult::NewDialogueMessages(Vec::new());
                 }
             }
         }

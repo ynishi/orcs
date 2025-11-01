@@ -137,12 +137,20 @@ impl OrcsPaths {
         }
 
         // Create typed template using SecretConfig
-        use orcs_core::config::{SecretConfig, GeminiConfig};
+        use orcs_core::config::{SecretConfig, ClaudeConfig, GeminiConfig, OpenAIConfig};
 
         let template_config = SecretConfig {
+            claude: Some(ClaudeConfig {
+                api_key: String::new(),
+                model_name: Some("claude-sonnet-4-20250514".to_string()),
+            }),
             gemini: Some(GeminiConfig {
                 api_key: String::new(),
                 model_name: Some("gemini-2.5-flash".to_string()),
+            }),
+            openai: Some(OpenAIConfig {
+                api_key: String::new(),
+                model_name: Some("gpt-4o".to_string()),
             }),
         };
 

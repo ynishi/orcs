@@ -178,6 +178,17 @@ export function convertToUIMessageWithAuthor(
   participants: Record<string, string>,
   userNickname: string = 'You'
 ): Message {
+  // Check if this is an error message (special authorId "Error")
+  if (authorId === 'Error') {
+    return {
+      id: `${msg.timestamp}-${Math.random()}`,
+      type: 'error',
+      author: '',
+      text: msg.content,
+      timestamp: new Date(msg.timestamp),
+    };
+  }
+
   const messageType: MessageType = msg.role === 'User' ? 'user' : msg.role === 'Assistant' ? 'ai' : 'system';
 
   // authorIdが"You"ならユーザー、"System"ならシステム、それ以外はペルソナIDから名前を解決

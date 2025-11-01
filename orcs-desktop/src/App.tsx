@@ -47,6 +47,7 @@ import { SlashCommand, ExpandedSlashCommand } from "./types/slash_command";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
+  | { type: 'NewMessage'; data: string }
   | { type: 'ModeChanged'; data: { [key: string]: any } }
   | { type: 'TasksToDispatch'; data: { tasks: string[] } }
   | { type: 'NoOp' };
@@ -126,7 +127,22 @@ function App() {
       unlisten = await listen<{ author: string; content: string }>('dialogue-turn', (event) => {
         console.log('[STREAM] Event received:', event.payload.author);
         console.log('[STREAM] Adding message:', event.payload.author);
-        addMessage('ai', event.payload.author, event.payload.content);
+
+        // If author is empty, it's an error message
+        if (event.payload.author === '') {
+          addMessage('error', '', event.payload.content);
+
+          // Show error toast
+          notifications.show({
+            title: 'Agent Error',
+            message: event.payload.content,
+            color: 'red',
+            icon: '❌',
+            autoClose: 10000,
+          });
+        } else {
+          addMessage('ai', event.payload.author, event.payload.content);
+        }
       });
       console.log('[EFFECT] Listener setup complete');
     };
@@ -463,11 +479,11 @@ function App() {
               const arrayBuffer = await file.arrayBuffer();
               const fileData = Array.from(new Uint8Array(arrayBuffer));
               const uploadedFile = await invoke<{ path: string }>("upload_file_from_bytes", {
-                workspace_id: workspace.id,
+                workspaceId: workspace.id,
                 filename: file.name,
-                file_data: fileData,
-                session_id: currentSessionId || null,
-                message_timestamp: null,
+                fileData: fileData,
+                sessionId: currentSessionId || null,
+                messageTimestamp: null,
                 author: null,
               });
               filePaths.push(uploadedFile.path);
@@ -486,6 +502,19 @@ function App() {
 
         if (result.type === 'NewDialogueMessages') {
           console.log('[BATCH] Received', result.data.length, 'messages (already streamed)');
+          // Note: Errors are also returned as NewDialogueMessages (empty array) after streaming
+        } else if (result.type === 'NewMessage') {
+          // This should not happen anymore, but keep for backward compatibility
+          console.error('[ERROR] Backend returned error:', result.data);
+          addMessage('error', '', result.data);
+
+          notifications.show({
+            title: 'Agent Error',
+            message: result.data,
+            color: 'red',
+            icon: '❌',
+            autoClose: 10000,
+          });
         }
 
         await saveCurrentSession();
@@ -707,11 +736,11 @@ function App() {
 
       // ワークスペースに保存（セッションID、メッセージタイムスタンプ、作者を含める）
       await invoke('upload_file_from_bytes', {
-        workspace_id: workspace.id,
+        workspaceId: workspace.id,
         filename: filename,
-        file_data: fileData,
-        session_id: currentSessionId || null,
-        message_timestamp: message.timestamp.toISOString(),
+        fileData: fileData,
+        sessionId: currentSessionId || null,
+        messageTimestamp: message.timestamp.toISOString(),
         author: message.author,
       });
 

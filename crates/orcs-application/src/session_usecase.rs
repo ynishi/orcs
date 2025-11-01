@@ -386,6 +386,20 @@ impl SessionUseCase {
                 );
                 match self.switch_session(last_session_id).await {
                     Ok(_) => {
+                        // Update session's workspace_id to the new workspace
+                        if let Some(manager) = self.session_manager.active_session().await {
+                            manager
+                                .set_workspace_id(
+                                    Some(workspace.id.clone()),
+                                    Some(workspace.root_path.clone()),
+                                )
+                                .await;
+                            // Persist the updated workspace association
+                            let _ = self
+                                .session_manager
+                                .save_active_session(orcs_core::session::AppMode::Idle)
+                                .await;
+                        }
                         println!(
                             "[SessionUseCase] Successfully switched to workspace {} with last active session {}",
                             workspace_id, last_session_id
@@ -420,6 +434,20 @@ impl SessionUseCase {
             );
             match self.switch_session(&most_recent.id).await {
                 Ok(_) => {
+                    // Update session's workspace_id to the new workspace
+                    if let Some(manager) = self.session_manager.active_session().await {
+                        manager
+                            .set_workspace_id(
+                                Some(workspace.id.clone()),
+                                Some(workspace.root_path.clone()),
+                            )
+                            .await;
+                        // Persist the updated workspace association
+                        let _ = self
+                            .session_manager
+                            .save_active_session(orcs_core::session::AppMode::Idle)
+                            .await;
+                    }
                     println!(
                         "[SessionUseCase] Successfully switched to workspace {} with recent session {}",
                         workspace_id, most_recent.id

@@ -207,7 +207,22 @@ async fn save_persona_configs(
     configs: Vec<Persona>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.persona_repository.save_all(&configs)
+    // Save the configurations
+    state.persona_repository.save_all(&configs)?;
+
+    // Invalidate the dialogue so it will be recreated with new persona settings
+    if let Some(manager) = state.session_manager.active_session().await {
+        manager.invalidate_dialogue().await;
+    }
+
+    Ok(())
+}
+
+/// Gets all available persona backend options
+#[tauri::command]
+async fn get_persona_backend_options() -> Result<Vec<(String, String)>, String> {
+    use orcs_core::persona::PersonaBackend;
+    Ok(PersonaBackend::all_variants())
 }
 
 /// Gets the user's nickname from the config
@@ -1210,6 +1225,7 @@ fn main() {
                 get_active_session,
                 get_personas,
                 save_persona_configs,
+                get_persona_backend_options,
                 get_user_nickname,
                 add_participant,
                 remove_participant,

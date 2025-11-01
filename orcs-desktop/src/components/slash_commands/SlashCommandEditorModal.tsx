@@ -133,8 +133,8 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
           }
           description={
             isShellCommand
-              ? 'Command to execute. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}'
-              : 'Prompt template. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}'
+              ? 'Command to execute. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
+              : 'Prompt template. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
           }
           value={formData.content}
           onChange={(e) => setFormData({ ...formData, content: e.currentTarget.value })}

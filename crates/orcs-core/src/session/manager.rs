@@ -379,6 +379,10 @@ mod tests {
                 persona_histories: HashMap::new(),
                 app_mode,
                 workspace_id,
+                active_participant_ids: Vec::new(),
+                execution_strategy: "broadcast".to_string(),
+                system_messages: Vec::new(),
+                participants: HashMap::new(),
             }
         }
 

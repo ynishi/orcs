@@ -9,6 +9,7 @@ export interface CommandDefinition {
   description: string;
   usage: string;
   examples?: string[];
+  argsDescription?: string;
 }
 
 /**
@@ -94,9 +95,17 @@ export function filterCommands(input: string): CommandDefinition[] {
  * SlashCommand を CommandDefinition に変換
  */
 export function slashCommandToDefinition(cmd: SlashCommand): CommandDefinition {
-  const usage = cmd.type === 'prompt'
-    ? `/${cmd.name}`
-    : `/${cmd.name} (shell)`;
+  // コマンドが {args} を使用しているか、または argsDescription が設定されている場合
+  const usesArgs = cmd.content.includes('{args}') ||
+                   (cmd.workingDir?.includes('{args}')) ||
+                   !!cmd.argsDescription;
+
+  let usage: string;
+  if (cmd.type === 'prompt') {
+    usage = usesArgs ? `/${cmd.name} <args>` : `/${cmd.name}`;
+  } else {
+    usage = usesArgs ? `/${cmd.name} <args>` : `/${cmd.name}`;
+  }
 
   return {
     name: cmd.name,
@@ -104,6 +113,7 @@ export function slashCommandToDefinition(cmd: SlashCommand): CommandDefinition {
     description: cmd.description,
     usage,
     examples: [],
+    argsDescription: cmd.argsDescription,
   };
 }
 

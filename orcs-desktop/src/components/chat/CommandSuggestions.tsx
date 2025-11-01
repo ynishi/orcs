@@ -102,6 +102,11 @@ export function CommandSuggestions({
                   <Text size="xs" c="dimmed">
                     {command.description}
                   </Text>
+                  {command.argsDescription && (
+                    <Text size="xs" c="dimmed" mt={4} style={{ opacity: 0.8 }}>
+                      Args: {command.argsDescription}
+                    </Text>
+                  )}
                   {command.examples && command.examples.length > 0 && (
                     <Text size="xs" c="dimmed" mt={4} style={{ fontStyle: 'italic' }}>
                       e.g. {command.examples[0]}

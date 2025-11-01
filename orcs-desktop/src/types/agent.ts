@@ -28,7 +28,7 @@ export interface PersonaInfo {
 /**
  * ペルソナ設定(バックエンドのPersonaConfigに対応)
  */
-export type PersonaBackend = 'claude_cli' | 'claude_api' | 'gemini_cli' | 'gemini_api' | 'openai_api' | 'codex_cli';
+export type PersonaBackend = 'claude_cli' | 'claude_api' | 'gemini_cli' | 'gemini_api' | 'open_ai_api' | 'codex_cli';
 
 export interface PersonaConfig {
   id: string;

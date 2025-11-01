@@ -743,6 +743,44 @@ impl InteractionManager {
         self.execution_strategy.read().await.clone()
     }
 
+    /// Sets the conversation mode for controlling dialogue verbosity.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode` - The conversation mode to use (Normal/Concise/Brief/Discussion)
+    ///
+    /// # Note
+    ///
+    /// This affects how AI agents respond to prevent response escalation.
+    /// The mode's system instruction will be injected on the next interaction.
+    pub async fn set_conversation_mode(&self, mode: ConversationMode) {
+        // Record system message for mode change
+        let mode_str = match mode {
+            ConversationMode::Normal => "通常",
+            ConversationMode::Concise => "簡潔 (300文字)",
+            ConversationMode::Brief => "極簡潔 (150文字)",
+            ConversationMode::Discussion => "議論",
+        };
+        let system_msg = ConversationMessage {
+            role: MessageRole::System,
+            content: format!("会話モードを {} に変更しました", mode_str),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            metadata: MessageMetadata {
+                system_event_type: Some(SystemEventType::ModeChanged),
+                error_severity: None,
+                include_in_dialogue: true,
+            },
+        };
+        self.system_messages.write().await.push(system_msg);
+
+        *self.conversation_mode.write().await = mode;
+    }
+
+    /// Gets the current conversation mode.
+    pub async fn get_conversation_mode(&self) -> ConversationMode {
+        self.conversation_mode.read().await.clone()
+    }
+
     /// Invalidates the current dialogue, forcing it to be recreated with latest persona settings.
     ///
     /// This should be called when:
@@ -845,6 +883,13 @@ impl InteractionManager {
             Speaker::user(user_name, "User"),
             input.to_string(),
         );
+
+        // Inject conversation mode system instruction if available
+        let conversation_mode = self.conversation_mode.read().await;
+        if let Some(instruction) = conversation_mode.system_instruction() {
+            payload = payload.prepend_system(instruction);
+        }
+        drop(conversation_mode);
 
         // Add file attachments if provided
         if let Some(paths) = file_paths {

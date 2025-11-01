@@ -318,6 +318,58 @@ async fn get_execution_strategy(state: State<'_, AppState>) -> Result<String, St
     Ok(manager.get_execution_strategy().await)
 }
 
+/// Sets the conversation mode for the active session
+#[tauri::command]
+async fn set_conversation_mode(
+    mode: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use orcs_core::session::ConversationMode;
+
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    // Parse mode string to ConversationMode enum
+    let conversation_mode = match mode.as_str() {
+        "normal" => ConversationMode::Normal,
+        "concise" => ConversationMode::Concise,
+        "brief" => ConversationMode::Brief,
+        "discussion" => ConversationMode::Discussion,
+        _ => return Err(format!("Unknown conversation mode: {}", mode)),
+    };
+
+    manager.set_conversation_mode(conversation_mode).await;
+
+    // Auto-save after changing mode
+    let app_mode = state.app_mode.lock().await.clone();
+    let _ = state.session_manager.save_active_session(app_mode).await;
+
+    Ok(())
+}
+
+/// Gets the current conversation mode for the active session
+#[tauri::command]
+async fn get_conversation_mode(state: State<'_, AppState>) -> Result<String, String> {
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let mode = manager.get_conversation_mode().await;
+    let mode_str = match mode {
+        orcs_core::session::ConversationMode::Normal => "normal",
+        orcs_core::session::ConversationMode::Concise => "concise",
+        orcs_core::session::ConversationMode::Brief => "brief",
+        orcs_core::session::ConversationMode::Discussion => "discussion",
+    };
+
+    Ok(mode_str.to_string())
+}
+
 /// Gets the path to the configuration file, creating it if it doesn't exist
 #[tauri::command]
 async fn get_config_path(state: State<'_, AppState>) -> Result<String, String> {
@@ -1232,6 +1284,8 @@ fn main() {
                 get_active_participants,
                 set_execution_strategy,
                 get_execution_strategy,
+                set_conversation_mode,
+                get_conversation_mode,
                 get_config_path,
                 get_sessions_directory,
                 get_workspaces_directory,

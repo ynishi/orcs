@@ -33,9 +33,10 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   {
     name: 'mode',
     icon: '🔄',
-    description: 'Switch between different operation modes',
-    usage: '/mode <mode_name>',
-    examples: ['/mode analysis', '/mode debug', '/mode chat'],
+    description: 'Switch conversation mode to control agent verbosity',
+    usage: '/mode [normal|concise|brief|discussion]',
+    examples: ['/mode', '/mode concise', '/mode brief', '/mode discussion'],
+    argsDescription: 'normal (通常) | concise (簡潔・300文字) | brief (極簡潔・150文字) | discussion (議論)',
   },
   {
     name: 'status',
@@ -141,4 +142,42 @@ export function filterCommandsWithCustom(
     cmd.name.toLowerCase().startsWith(query) ||
     cmd.description.toLowerCase().includes(query)
   );
+}
+
+/**
+ * ヘルプテキストを動的生成
+ */
+export function generateCommandHelp(command?: string): string {
+  if (!command) {
+    // 全コマンドのリストを生成
+    const commandList = COMMAND_DEFINITIONS
+      .map(cmd => `${cmd.icon} ${cmd.usage.padEnd(25)} - ${cmd.description}`)
+      .join('\n');
+    return `Available commands:\n${commandList}`;
+  }
+
+  // 特定コマンドの詳細ヘルプ
+  const cmdDef = getCommandDefinition(command);
+  if (!cmdDef) {
+    return `Unknown command: /${command}`;
+  }
+
+  let helpText = `${cmdDef.icon} ${cmdDef.usage}\n\n${cmdDef.description}`;
+
+  if (cmdDef.argsDescription) {
+    helpText += `\n\nArguments:\n  ${cmdDef.argsDescription}`;
+  }
+
+  if (cmdDef.examples && cmdDef.examples.length > 0) {
+    helpText += `\n\nExamples:\n${cmdDef.examples.map(ex => `  ${ex}`).join('\n')}`;
+  }
+
+  return helpText;
+}
+
+/**
+ * ビルトインコマンド名のリストを取得
+ */
+export function getBuiltinCommandNames(): readonly string[] {
+  return COMMAND_DEFINITIONS.map(cmd => cmd.name);
 }

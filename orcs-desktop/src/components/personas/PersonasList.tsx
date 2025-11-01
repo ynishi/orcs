@@ -12,6 +12,14 @@ const STRATEGIES = [
   { value: 'sequential', label: 'Sequential' },
 ];
 
+// Available conversation modes
+const CONVERSATION_MODES = [
+  { value: 'normal', label: '通常 (Normal)' },
+  { value: 'concise', label: '簡潔 (300文字)' },
+  { value: 'brief', label: '極簡潔 (150文字)' },
+  { value: 'discussion', label: '議論 (Discussion)' },
+];
+
 const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
   claude_cli: 'Claude CLI',
   claude_api: 'Claude API',
@@ -32,6 +40,7 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPersona, setEditingPersona] = useState<Partial<PersonaConfig> | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<string>('default');
+  const [selectedConversationMode, setSelectedConversationMode] = useState<string>('normal');
 
   const handleStrategyChange = async (value: string | null) => {
     const strategy = value || 'broadcast';
@@ -64,15 +73,47 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
     }
   };
 
+  const handleConversationModeChange = async (value: string | null) => {
+    const mode = value || 'normal';
+    setSelectedConversationMode(mode);
+
+    // Update backend
+    try {
+      await invoke('set_conversation_mode', { mode });
+
+      // Show system message
+      const modeLabel = CONVERSATION_MODES.find(m => m.value === mode)?.label || mode;
+      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+      handleSystemMessage(
+        conversationMessage(
+          `Conversation mode changed to: ${modeLabel} [${timestamp}]`,
+          'info'
+        ),
+        onMessage
+      );
+    } catch (error) {
+      console.error('Failed to set conversation mode:', error);
+      handleSystemMessage(
+        conversationMessage(
+          `Failed to set conversation mode: ${error}`,
+          'error'
+        ),
+        onMessage
+      );
+    }
+  };
+
   // Fetch personas from backend
   const fetchPersonas = async () => {
     try {
       const personas = await invoke<PersonaConfig[]>('get_personas');
       const activeIds = await invoke<string[]>('get_active_participants');
       const strategy = await invoke<string>('get_execution_strategy');
+      const conversationMode = await invoke<string>('get_conversation_mode');
       setPersonaConfigs(personas);
       setActiveParticipantIds(activeIds);
       setSelectedStrategy(strategy);
+      setSelectedConversationMode(conversationMode);
     } catch (error) {
       console.error('Failed to fetch personas:', error);
     }
@@ -274,6 +315,21 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
             value={selectedStrategy}
             onChange={handleStrategyChange}
             placeholder="Select strategy"
+            allowDeselect={false}
+          />
+        </Box>
+
+        {/* Conversation Mode Selection */}
+        <Box>
+          <Text size="xs" c="dimmed" mb={4}>
+            Conversation Mode
+          </Text>
+          <Select
+            size="xs"
+            data={CONVERSATION_MODES}
+            value={selectedConversationMode}
+            onChange={handleConversationModeChange}
+            placeholder="Select mode"
             allowDeselect={false}
           />
         </Box>

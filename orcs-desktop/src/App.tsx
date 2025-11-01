@@ -389,6 +389,43 @@ function App() {
                 : 'No files in current workspace';
               addMessage('system', 'System', `Files in workspace "${workspace?.name}":\n${fileList}`);
               return;
+            case 'mode':
+              if (parsed.args && parsed.args.length > 0) {
+                const mode = parsed.args[0].toLowerCase();
+                const validModes = ['normal', 'concise', 'brief', 'discussion'];
+
+                if (!validModes.includes(mode)) {
+                  addMessage('error', 'System', `Invalid mode: ${mode}\n\nAvailable modes:\n- normal (通常)\n- concise (簡潔・300文字)\n- brief (極簡潔・150文字)\n- discussion (議論)`);
+                  return;
+                }
+
+                try {
+                  await invoke('set_conversation_mode', { mode });
+                  const modeLabels: Record<string, string> = {
+                    normal: '通常 (Normal)',
+                    concise: '簡潔 (300文字)',
+                    brief: '極簡潔 (150文字)',
+                    discussion: '議論 (Discussion)',
+                  };
+                  addMessage('system', 'System', `✅ Conversation mode changed to: ${modeLabels[mode]}`);
+                } catch (error) {
+                  addMessage('error', 'System', `Failed to set conversation mode: ${error}`);
+                }
+              } else {
+                try {
+                  const currentMode = await invoke<string>('get_conversation_mode');
+                  const modeLabels: Record<string, string> = {
+                    normal: '通常 (Normal)',
+                    concise: '簡潔 (300文字)',
+                    brief: '極簡潔 (150文字)',
+                    discussion: '議論 (Discussion)',
+                  };
+                  addMessage('system', 'System', `Current mode: ${modeLabels[currentMode] || currentMode}\n\nUsage: /mode <normal|concise|brief|discussion>`);
+                } catch (error) {
+                  addMessage('error', 'System', 'Usage: /mode <normal|concise|brief|discussion>');
+                }
+              }
+              return;
             default:
               break;
           }

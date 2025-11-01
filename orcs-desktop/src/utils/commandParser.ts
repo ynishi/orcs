@@ -1,3 +1,5 @@
+import { getBuiltinCommandNames, generateCommandHelp } from '../types/command';
+
 /**
  * コマンドの解析結果
  */
@@ -7,21 +9,6 @@ export interface ParsedCommand {
   args?: string[];
   rawInput: string;
 }
-
-/**
- * 利用可能なコマンドリスト
- */
-export const AVAILABLE_COMMANDS = [
-  'help',
-  'task',
-  'mode',
-  'status',
-  'agents',
-  'workspace',
-  'files',
-] as const;
-
-export type AvailableCommand = typeof AVAILABLE_COMMANDS[number];
 
 /**
  * 入力文字列がコマンドかどうかを判定し、解析する
@@ -54,36 +41,16 @@ export function parseCommand(input: string): ParsedCommand {
 }
 
 /**
- * コマンドが有効かどうかを確認
+ * コマンドが有効なビルトインコマンドかどうかを確認
  */
 export function isValidCommand(command: string): boolean {
-  return AVAILABLE_COMMANDS.includes(command as AvailableCommand);
+  return getBuiltinCommandNames().includes(command);
 }
 
 /**
  * コマンドのヘルプテキストを取得
+ * @deprecated Use generateCommandHelp from command.ts instead
  */
 export function getCommandHelp(command?: string): string {
-  if (!command) {
-    return `Available commands:
-/help          - Show this help message
-/task [text]   - Create a new task
-/mode [name]   - Switch mode
-/status        - Show current status
-/agents        - List available agents
-/workspace [name] - Switch workspace or list workspaces
-/files         - List files in current workspace`;
-  }
-
-  const helpTexts: Record<string, string> = {
-    help: '/help - Show available commands',
-    task: '/task [text] - Create a new task with the given text',
-    mode: '/mode [name] - Switch to the specified mode (e.g., chat, analysis, debug)',
-    status: '/status - Display current system status',
-    agents: '/agents - List all available agents and their status',
-    workspace: '/workspace [name] - Switch to a workspace or list all workspaces',
-    files: '/files - List files in the current workspace',
-  };
-
-  return helpTexts[command] || `Unknown command: /${command}`;
+  return generateCommandHelp(command);
 }

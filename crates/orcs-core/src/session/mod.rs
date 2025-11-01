@@ -28,7 +28,7 @@ mod repository;
 mod user_input;
 
 // Re-export public API
-pub use app_mode::{AppMode, Plan};
+pub use app_mode::{AppMode, ConversationMode, Plan};
 pub use manager::{InteractionManagerTrait, SessionManager};
 pub use message::{ConversationMessage, ErrorSeverity, MessageMetadata, MessageRole, SystemEventType};
 pub use model::Session;

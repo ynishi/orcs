@@ -3,7 +3,7 @@
 //! This module contains the core Session entity that represents
 //! a user session in the application's domain layer.
 
-use super::app_mode::AppMode;
+use super::app_mode::{AppMode, ConversationMode};
 use super::message::ConversationMessage;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -52,6 +52,9 @@ pub struct Session {
     /// Participant persona ID to name mapping for display
     #[serde(default)]
     pub participants: HashMap<String, String>,
+    /// Conversation mode (controls verbosity and style)
+    #[serde(default)]
+    pub conversation_mode: ConversationMode,
 }
 
 fn default_execution_strategy() -> String {

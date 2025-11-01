@@ -15,8 +15,8 @@ use llm_toolkit::attachment::Attachment;
 use orcs_core::persona::{Persona as PersonaDomain, PersonaBackend};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{
-    AppMode, ConversationMessage, ErrorSeverity, MessageMetadata, MessageRole, Plan, Session,
-    SystemEventType,
+    AppMode, ConversationMessage, ConversationMode, ErrorSeverity, MessageMetadata, MessageRole,
+    Plan, Session, SystemEventType,
 };
 use orcs_core::user::UserService;
 use serde::Serialize;
@@ -259,6 +259,8 @@ pub struct InteractionManager {
     restored_participant_ids: Arc<RwLock<Option<Vec<String>>>>,
     /// System messages (join/leave notifications, etc.)
     system_messages: Arc<RwLock<Vec<ConversationMessage>>>,
+    /// Conversation mode (controls verbosity and style)
+    conversation_mode: Arc<RwLock<ConversationMode>>,
 }
 
 impl InteractionManager {
@@ -304,6 +306,7 @@ impl InteractionManager {
             execution_strategy: Arc::new(RwLock::new("broadcast".to_string())),
             restored_participant_ids: Arc::new(RwLock::new(None)),
             system_messages: Arc::new(RwLock::new(Vec::new())),
+            conversation_mode: Arc::new(RwLock::new(ConversationMode::default())),
         }
     }
 
@@ -343,6 +346,7 @@ impl InteractionManager {
             execution_strategy: Arc::new(RwLock::new(data.execution_strategy)),
             restored_participant_ids: Arc::new(RwLock::new(restored_ids)),
             system_messages: Arc::new(RwLock::new(data.system_messages)),
+            conversation_mode: Arc::new(RwLock::new(data.conversation_mode)),
         }
     }
 
@@ -535,6 +539,8 @@ impl InteractionManager {
             }
         }
 
+        let conversation_mode = self.conversation_mode.read().await.clone();
+
         Session {
             id: self.session_id.clone(),
             title,
@@ -548,6 +554,7 @@ impl InteractionManager {
             execution_strategy,
             system_messages,
             participants,
+            conversation_mode,
         }
     }
 

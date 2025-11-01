@@ -414,7 +414,13 @@ impl InteractionManager {
                             })
                         }
                     }
-                    MessageRole::System => None, // Skip system messages for dialogue history
+                    MessageRole::System => {
+                        // System/Error messages included in dialogue history
+                        Some(DialogueTurn {
+                            speaker: Speaker::System,
+                            content: msg.content.clone(),
+                        })
+                    }
                 }
             })
             .collect()

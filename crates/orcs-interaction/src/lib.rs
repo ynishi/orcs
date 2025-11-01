@@ -361,7 +361,7 @@ impl InteractionManager {
             .map(|p| p.id.clone())
     }
 
-    /// Rebuilds dialogue history from persona_histories for restoration.
+    /// Rebuilds dialogue history from persona_histories and system_messages for restoration.
     ///
     /// This method converts the stored conversation messages into DialogueTurn format,
     /// sorted by timestamp, to restore the conversation context when recreating a Dialogue.
@@ -375,10 +375,23 @@ impl InteractionManager {
         // Flatten all messages with (persona_id, timestamp, message)
         let mut all_messages: Vec<(String, String, ConversationMessage)> = Vec::new();
 
+        // Add messages from persona_histories
         for (persona_id, messages) in histories.iter() {
             for msg in messages {
                 all_messages.push((
                     persona_id.clone(),
+                    msg.timestamp.clone(),
+                    msg.clone(),
+                ));
+            }
+        }
+
+        // Add system_messages that should be included in dialogue
+        let system_msgs = self.system_messages.read().await;
+        for msg in system_msgs.iter() {
+            if msg.metadata.include_in_dialogue {
+                all_messages.push((
+                    "system".to_string(), // Use "system" as pseudo persona_id for system messages
                     msg.timestamp.clone(),
                     msg.clone(),
                 ));

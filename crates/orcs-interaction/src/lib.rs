@@ -7,7 +7,7 @@ pub mod persona_agent;
 use crate::claude_api_agent::ClaudeApiAgent;
 use crate::gemini_api_agent::GeminiApiAgent;
 use crate::openai_api_agent::OpenAIApiAgent;
-use llm_toolkit::agent::dialogue::{Dialogue, DialogueTurn, ExecutionModel};
+use llm_toolkit::agent::dialogue::{Dialogue, DialogueTurn, ExecutionModel, Speaker};
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, CodexAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
@@ -345,24 +345,13 @@ impl InteractionManager {
 
     /// Resolves a persona name to its UUID.
     ///
-    /// This is used to convert DialogueTurn participant names to persona IDs.
+    /// This is used to convert speaker names to persona IDs.
     fn get_persona_id_by_name(&self, name: &str) -> Option<String> {
         let personas = self.persona_repository.get_all().ok()?;
         personas
             .iter()
             .find(|p| p.name == name)
             .map(|p| p.id.clone())
-    }
-
-    /// Resolves a persona UUID to its display name.
-    ///
-    /// This is used to convert persona IDs back to names for DialogueTurn.
-    fn get_persona_name_by_id(&self, persona_id: &str) -> Option<String> {
-        let personas = self.persona_repository.get_all().ok()?;
-        personas
-            .iter()
-            .find(|p| p.id == persona_id)
-            .map(|p| p.name.clone())
     }
 
     /// Rebuilds dialogue history from persona_histories for restoration.
@@ -392,27 +381,38 @@ impl InteractionManager {
         // Sort by timestamp to maintain chronological order
         all_messages.sort_by(|a, b| a.1.cmp(&b.1));
 
-        // Convert to DialogueTurn
+        // Convert to DialogueTurn with explicit Speaker attribution
         all_messages
             .iter()
             .filter_map(|(persona_id, _, msg)| {
                 match msg.role {
                     MessageRole::User => {
-                        // User input is recorded as "System" turn in Dialogue
+                        // User input with explicit User speaker
+                        let user_name = self.user_service.get_user_name();
                         Some(DialogueTurn {
-                            participant_name: "System".to_string(),
+                            speaker: Speaker::user(user_name, "User"),
                             content: msg.content.clone(),
                         })
                     }
                     MessageRole::Assistant => {
-                        // Assistant response - convert persona_id to display name
-                        let name = self
-                            .get_persona_name_by_id(persona_id)
-                            .unwrap_or_else(|| persona_id.clone());
-                        Some(DialogueTurn {
-                            participant_name: name,
-                            content: msg.content.clone(),
-                        })
+                        // Assistant response - convert persona_id to Agent speaker
+                        if let Some(persona) = self
+                            .persona_repository
+                            .get_all()
+                            .ok()
+                            .and_then(|personas| personas.into_iter().find(|p| &p.id == persona_id))
+                        {
+                            Some(DialogueTurn {
+                                speaker: Speaker::agent(&persona.name, &persona.role),
+                                content: msg.content.clone(),
+                            })
+                        } else {
+                            // Fallback if persona not found
+                            Some(DialogueTurn {
+                                speaker: Speaker::agent(persona_id, "Agent"),
+                                content: msg.content.clone(),
+                            })
+                        }
                     }
                     MessageRole::System => None, // Skip system messages for dialogue history
                 }
@@ -800,8 +800,14 @@ impl InteractionManager {
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
 
-        // Create a payload with text and optional file attachments
-        let mut payload = Payload::text(input.to_string());
+        // Create a payload with explicit User speaker attribution
+        let user_name = self.user_service.get_user_name();
+        let mut payload = Payload::new().with_message(
+            Speaker::user(user_name, "User"),
+            input.to_string(),
+        );
+
+        // Add file attachments if provided
         if let Some(paths) = file_paths {
             for path in paths {
                 tracing::info!("[InteractionManager] Attaching file: {}", path);
@@ -819,25 +825,26 @@ impl InteractionManager {
             match result {
                 Ok(turn) => {
                     // Log the turn for debugging sequential execution with timestamp
+                    let speaker_name = turn.speaker.name();
                     let preview: String = turn.content.chars().take(50).collect();
                     tracing::debug!(
                         "[DIALOGUE] Turn received: {} - {}...",
-                        turn.participant_name,
+                        speaker_name,
                         preview
                     );
 
-                    // Convert participant_name (display name) to persona_id (UUID)
+                    // Convert speaker name to persona_id (UUID)
                     let persona_id = self
-                        .get_persona_id_by_name(&turn.participant_name)
-                        .unwrap_or_else(|| turn.participant_name.clone());
+                        .get_persona_id_by_name(speaker_name)
+                        .unwrap_or_else(|| speaker_name.to_string());
 
                     // Add each response to history using persona_id
                     self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content)
                         .await;
 
-                    // Create DialogueMessage (still using name for UI display)
+                    // Create DialogueMessage for UI display
                     let message = DialogueMessage {
-                        author: turn.participant_name.clone(),
+                        author: speaker_name.to_string(),
                         content: turn.content.clone(),
                     };
 

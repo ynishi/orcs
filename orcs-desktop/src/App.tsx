@@ -339,7 +339,7 @@ function App() {
               addMessage('system', 'System', getCommandHelp());
               return;
             case 'status':
-              addMessage('system', 'System', `Status: ${status.connection}\nTasks: ${status.activeTasks}\nAgent: ${status.currentAgent}\nMode: ${status.mode}`);
+              addMessage('system', 'System', `Connection: ${status.connection}\nTasks: ${status.activeTasks}\nAgent: ${status.currentAgent}\nApp Status: ${status.mode}`);
               return;
             case 'task':
               if (parsed.args && parsed.args.length > 0) {
@@ -837,11 +837,12 @@ function App() {
       const restoredMessages = convertSessionToMessages(fullSession, userNickname);
       setMessages(restoredMessages);
 
-      // AppModeを復元
+      // AppModeをステータスに反映
       if (isIdleMode(fullSession.app_mode)) {
-        // Idle mode - 特に何もしない
+        setStatus(prev => ({ ...prev, mode: 'Idle' }));
       } else {
-        // AwaitingConfirmation mode - 将来的に対応
+        // AwaitingConfirmation mode
+        setStatus(prev => ({ ...prev, mode: 'Awaiting' }));
         console.log('Session has AwaitingConfirmation mode:', fullSession.app_mode);
       }
 

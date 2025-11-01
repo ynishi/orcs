@@ -1,4 +1,4 @@
-import { Paper, Group, Badge, Text, Divider, Avatar } from '@mantine/core';
+import { Paper, Group, Badge, Text, Divider } from '@mantine/core';
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
 
@@ -77,26 +77,22 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoM
 
         <Divider orientation="vertical" />
 
-        {/* モード（丸に一文字目） */}
+        {/* ステータス（Idle/Awaiting/Thinking等） */}
         <Group gap={6} wrap="nowrap">
           <Text size="sm" c="dimmed">
-            Mode:
+            Status:
           </Text>
-          <Avatar
-            color="blue"
+          <Badge
+            color={
+              status.mode === 'Idle' ? 'gray' :
+              status.mode === 'Awaiting' ? 'yellow' :
+              status.mode === 'Thinking' ? 'blue' : 'gray'
+            }
             size="sm"
-            radius="xl"
-            styles={{
-              root: {
-                width: '24px',
-                height: '24px',
-              },
-            }}
+            variant="filled"
           >
-            <Text size="xs" fw={700}>
-              {status.mode.charAt(0).toUpperCase()}
-            </Text>
-          </Avatar>
+            {status.mode}
+          </Badge>
         </Group>
 
         {/* AUTOモード */}

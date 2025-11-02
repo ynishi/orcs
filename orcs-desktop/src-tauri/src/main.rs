@@ -1095,6 +1095,7 @@ fn main() {
         .with_target(true)
         .with_thread_ids(true)
         .with_line_number(true)
+        .with_max_level(tracing::Level::TRACE)
         .init();
 
     tracing::info!("ORCS Desktop starting...");

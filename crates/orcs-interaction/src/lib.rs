@@ -863,17 +863,9 @@ impl InteractionManager {
     where
         F: Fn(&DialogueMessage),
     {
-        let trimmed = input.trim();
-
-        if trimmed == "/plan" {
-            // Create a sample plan
-            let plan = Plan {
-                steps: vec![
-                    "Step 1: Refactor module A".to_string(),
-                    "Step 2: Add tests for B".to_string(),
-                ],
-            };
-            return InteractionResult::ModeChanged(AppMode::AwaitingConfirmation { plan });
+        let trimmed: &str = input.trim();
+        if trimmed.is_empty() {
+            return InteractionResult::NoOp;
         }
 
         // Ensure dialogue is initialized
@@ -885,17 +877,20 @@ impl InteractionManager {
         let user_name = self.user_service.get_user_name();
         self.add_to_history(&user_name, MessageRole::User, input)
             .await;
+        let user_name_str = if user_name.to_lowercase() == "you" {
+            tracing::warn!("[InteractionManager] Detected user name 'You', which may cause speaker attribution issues.");
+            "User"
+        } else {
+            &user_name
+        };
+        let speaker = Speaker::user(user_name_str, "User");
 
         // Run the dialogue with the user's input using partial_session for streaming
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
 
-        // Create a payload with explicit User speaker attribution
-        let user_name = self.user_service.get_user_name();
-        let mut payload = Payload::new().with_message(
-            Speaker::user(user_name, "User"),
-            input.to_string(),
-        );
+        // Note: Dialogue/Persona agents handle speaker attribution internally
+        let mut payload = Payload::new().with_message(speaker, input);
 
         // Inject conversation mode system instruction if available
         let conversation_mode = self.conversation_mode.read().await;
@@ -911,6 +906,11 @@ impl InteractionManager {
                 payload = payload.with_attachment(Attachment::local(path));
             }
         }
+
+        // Debug: Log payload content before partial_session
+        tracing::debug!("[InteractionManager] Payload before partial_session: user_input='{}', payload={:?}",
+            input.chars().take(100).collect::<String>(),
+            payload.clone());
 
         // Create a partial session for incremental turn processing
         // partial_session now accepts impl Into<Payload>, so both String and Payload work

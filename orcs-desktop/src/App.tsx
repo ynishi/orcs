@@ -78,6 +78,7 @@ function App() {
   const [customCommands, setCustomCommands] = useState<SlashCommand[]>([]);
   const [conversationMode, setConversationMode] = useState<string>('normal');
   const [talkStyle, setTalkStyle] = useState<string | null>(null);
+  const [executionStrategy, setExecutionStrategy] = useState<string>('sequential');
 
   // セッション管理をカスタムフックに切り替え
   const {
@@ -186,7 +187,7 @@ function App() {
     loadGitInfo();
   }, []);
 
-  // Load conversation mode and talk style on session change
+  // Load conversation mode, talk style, and execution strategy on session change
   useEffect(() => {
     const loadConversationSettings = async () => {
       if (!currentSessionId) return;
@@ -203,6 +204,13 @@ function App() {
         setTalkStyle(style);
       } catch (error) {
         console.error('Failed to load talk style:', error);
+      }
+
+      try {
+        const strategy = await invoke<string>('get_execution_strategy');
+        setExecutionStrategy(strategy);
+      } catch (error) {
+        console.error('Failed to load execution strategy:', error);
       }
     };
     loadConversationSettings();
@@ -1042,6 +1050,10 @@ function App() {
     setTalkStyle(style);
   };
 
+  const handleStrategyChange = (strategy: string) => {
+    setExecutionStrategy(strategy);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1114,6 +1126,7 @@ function App() {
           onRunSlashCommand={handleRunSlashCommand}
           onConversationModeChange={handleConversationModeChange}
           onTalkStyleChange={handleTalkStyleChange}
+          onStrategyChange={handleStrategyChange}
         />
       </AppShell.Navbar>
 
@@ -1305,7 +1318,7 @@ function App() {
               autoMode={autoMode}
               conversationMode={conversationMode}
               talkStyle={talkStyle}
-              executionStrategy={sessions.find(s => s.id === currentSessionId)?.execution_strategy || 'sequential'}
+              executionStrategy={executionStrategy}
             />
           </Stack>
         </Container>

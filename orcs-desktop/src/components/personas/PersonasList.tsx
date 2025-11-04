@@ -6,6 +6,7 @@ import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
 import { handleSystemMessage, conversationMessage } from '../../utils/systemMessage';
 import { CONVERSATION_MODES, TALK_STYLES } from '../../types/conversation';
+import { MessageType } from '../../types/message';
 
 // Available execution strategies
 const STRATEGIES = [
@@ -26,7 +27,7 @@ interface PersonasListProps {
   onStrategyChange?: (strategy: string) => void;
   onConversationModeChange?: (mode: string) => void;
   onTalkStyleChange?: (style: string | null) => void;
-  onMessage?: (type: 'system' | 'error', author: string, text: string) => void;
+  onMessage?: (type: MessageType, author: string, text: string) => void;
 }
 
 export function PersonasList({ onStrategyChange, onConversationModeChange, onTalkStyleChange, onMessage }: PersonasListProps) {

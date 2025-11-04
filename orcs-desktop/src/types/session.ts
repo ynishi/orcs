@@ -1,3 +1,6 @@
+
+import type { Message, MessageType } from './message';
+
 /**
  * セッション（会話履歴）
  * Matches Rust's SessionData structure exactly
@@ -18,6 +21,17 @@ export interface Session {
 }
 
 /**
+ * 会話履歴メタデータ
+ * Mirrors Rust's MessageMetadata
+ */
+export interface ConversationMessageMetadata {
+  system_event_type?: string;
+  error_severity?: 'critical' | 'warning' | 'info';
+  system_message_type?: MessageType;
+  include_in_dialogue?: boolean;
+}
+
+/**
  * 会話履歴の1メッセージ
  * Matches Rust's ConversationMessage
  */
@@ -25,6 +39,7 @@ export interface ConversationMessage {
   role: 'User' | 'Assistant' | 'System';
   content: string;
   timestamp: string; // ISO 8601 timestamp
+  metadata?: ConversationMessageMetadata;
 }
 
 /**
@@ -167,7 +182,40 @@ export function getPlan(mode: AppMode): Plan | null {
 // UI Message変換
 // ============================================================================
 
-import type { Message, MessageType } from './message';
+const KNOWN_MESSAGE_TYPES: MessageType[] = [
+  'user',
+  'ai',
+  'system',
+  'error',
+  'command',
+  'task',
+  'thinking',
+  'shell_output',
+];
+
+const isMessageType = (value?: string): value is MessageType =>
+  typeof value === 'string' && (KNOWN_MESSAGE_TYPES as string[]).includes(value);
+
+function resolveMessageType(msg: ConversationMessage): MessageType {
+  const metadataType = msg.metadata?.system_message_type;
+  if (isMessageType(metadataType)) {
+    return metadataType;
+  }
+
+  if (msg.role === 'User') {
+    return 'user';
+  }
+
+  if (msg.role === 'Assistant') {
+    return 'ai';
+  }
+
+  if (msg.metadata?.error_severity === 'critical') {
+    return 'error';
+  }
+
+  return 'system';
+}
 
 /**
  * ConversationMessageとauthorIdをUI用のMessageに変換
@@ -189,7 +237,7 @@ export function convertToUIMessageWithAuthor(
     };
   }
 
-  const messageType: MessageType = msg.role === 'User' ? 'user' : msg.role === 'Assistant' ? 'ai' : 'system';
+  const messageType = resolveMessageType(msg);
 
   // authorIdが"You"ならユーザー、"System"ならシステム、それ以外はペルソナIDから名前を解決
   let author: string;
@@ -215,7 +263,7 @@ export function convertToUIMessageWithAuthor(
  * ConversationMessageをUI用のMessageに変換（後方互換性のため残す）
  */
 export function convertToUIMessage(msg: ConversationMessage, userNickname: string = 'You'): Message {
-  const messageType: MessageType = msg.role === 'User' ? 'user' : msg.role === 'Assistant' ? 'ai' : 'system';
+  const messageType = resolveMessageType(msg);
 
   return {
     id: `${msg.timestamp}-${Math.random()}`,

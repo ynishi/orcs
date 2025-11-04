@@ -6,7 +6,7 @@ mod slash_commands;
 use orcs_application::SessionUseCase;
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
-use orcs_core::session::{AppMode, Session, SessionManager};
+use orcs_core::session::{AppMode, ErrorSeverity, Session, SessionManager};
 use orcs_core::slash_command::SlashCommandRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::{UploadedFile, Workspace};
@@ -17,7 +17,7 @@ use orcs_infrastructure::{
     AsyncDirSlashCommandRepository,
 };
 use orcs_interaction::{InteractionManager, InteractionResult};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
 use tauri::{Emitter, State};
@@ -44,6 +44,17 @@ struct AppState {
 pub struct SerializableDialogueMessage {
     pub author: String,
     pub content: String,
+}
+
+/// Payload for persisting system messages emitted by frontend-only actions.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PersistedSystemMessage {
+    content: String,
+    #[serde(default)]
+    message_type: Option<String>,
+    #[serde(default)]
+    severity: Option<String>,
 }
 
 /// Git repository information
@@ -175,6 +186,49 @@ async fn rename_session(
 /// Saves the current session
 #[tauri::command]
 async fn save_current_session(state: State<'_, AppState>) -> Result<(), String> {
+    let app_mode = state.app_mode.lock().await.clone();
+    state
+        .session_manager
+        .save_active_session(app_mode)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Appends system messages to the active session and persists immediately.
+#[tauri::command]
+async fn append_system_messages(
+    messages: Vec<PersistedSystemMessage>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or_else(|| "No active session".to_string())?;
+
+    for message in messages {
+        let PersistedSystemMessage {
+            content,
+            message_type,
+            severity,
+        } = message;
+
+        let severity_enum =
+            severity
+                .as_ref()
+                .map(|s| s.to_lowercase())
+                .and_then(|level| match level.as_str() {
+                    "error" => Some(ErrorSeverity::Critical),
+                    "warning" => Some(ErrorSeverity::Warning),
+                    "info" => Some(ErrorSeverity::Info),
+                    _ => None,
+                });
+
+        manager
+            .add_system_conversation_message(content, message_type, severity_enum)
+            .await;
+    }
+
     let app_mode = state.app_mode.lock().await.clone();
     state
         .session_manager
@@ -320,10 +374,7 @@ async fn get_execution_strategy(state: State<'_, AppState>) -> Result<String, St
 
 /// Sets the conversation mode for the active session
 #[tauri::command]
-async fn set_conversation_mode(
-    mode: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+async fn set_conversation_mode(mode: String, state: State<'_, AppState>) -> Result<(), String> {
     use orcs_core::session::ConversationMode;
 
     let manager = state
@@ -372,10 +423,7 @@ async fn get_conversation_mode(state: State<'_, AppState>) -> Result<String, Str
 
 /// Sets the talk style for the active session
 #[tauri::command]
-async fn set_talk_style(
-    style: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+async fn set_talk_style(style: Option<String>, state: State<'_, AppState>) -> Result<(), String> {
     use llm_toolkit::agent::dialogue::TalkStyle;
 
     let manager = state
@@ -421,15 +469,18 @@ async fn get_talk_style(state: State<'_, AppState>) -> Result<Option<String>, St
         .ok_or("No active session")?;
 
     let style = manager.get_talk_style().await;
-    let style_str = style.map(|s| match s {
-        TalkStyle::Brainstorm => "brainstorm",
-        TalkStyle::Casual => "casual",
-        TalkStyle::DecisionMaking => "decision_making",
-        TalkStyle::Debate => "debate",
-        TalkStyle::ProblemSolving => "problem_solving",
-        TalkStyle::Review => "review",
-        TalkStyle::Planning => "planning",
-    }.to_string());
+    let style_str = style.map(|s| {
+        match s {
+            TalkStyle::Brainstorm => "brainstorm",
+            TalkStyle::Casual => "casual",
+            TalkStyle::DecisionMaking => "decision_making",
+            TalkStyle::Debate => "debate",
+            TalkStyle::ProblemSolving => "problem_solving",
+            TalkStyle::Review => "review",
+            TalkStyle::Planning => "planning",
+        }
+        .to_string()
+    });
 
     Ok(style_str)
 }
@@ -507,8 +558,8 @@ async fn get_slash_commands_directory(state: State<'_, AppState>) -> Result<Stri
 /// Gets the root directory where the application is running from
 #[tauri::command]
 async fn get_root_directory() -> Result<String, String> {
-    let current_dir = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    let current_dir =
+        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     let path_str = current_dir
         .to_str()
@@ -740,7 +791,10 @@ async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspace, 
 
     // Priority 1: Use last selected workspace from AppStateService (user's explicit selection)
     if let Some(workspace_id) = state.app_state_service.get_last_selected_workspace().await {
-        println!("[Backend] AppStateService last selected workspace: {}", workspace_id);
+        println!(
+            "[Backend] AppStateService last selected workspace: {}",
+            workspace_id
+        );
         let workspace = state
             .workspace_manager
             .get_workspace(&workspace_id)
@@ -751,7 +805,10 @@ async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspace, 
             println!("[Backend] Found workspace: {} ({})", ws.name, ws.id);
             return Ok(ws);
         } else {
-            println!("[Backend] AppStateService workspace not found: {}", workspace_id);
+            println!(
+                "[Backend] AppStateService workspace not found: {}",
+                workspace_id
+            );
         }
     }
 
@@ -968,7 +1025,10 @@ async fn upload_file_from_bytes(
     app.emit("workspace-files-changed", &workspace_id)
         .map_err(|e| e.to_string())?;
 
-    tracing::info!("upload_file_from_bytes: Emitted workspace-files-changed event for workspace: {}", workspace_id);
+    tracing::info!(
+        "upload_file_from_bytes: Emitted workspace-files-changed event for workspace: {}",
+        workspace_id
+    );
 
     Ok(result)
 }
@@ -1019,8 +1079,8 @@ async fn read_workspace_file(file_path: String) -> Result<Vec<u8>, String> {
 /// Gets Git repository information for the current workspace
 #[tauri::command]
 async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String> {
-    use std::process::Command;
     use orcs_core::workspace::manager::WorkspaceManager;
+    use std::process::Command;
 
     // Get the current workspace
     let workspace = match state.session_manager.active_session().await {
@@ -1226,7 +1286,7 @@ fn main() {
         let app_state_service = Arc::new(
             AppStateService::new()
                 .await
-                .expect("Failed to initialize AppStateService")
+                .expect("Failed to initialize AppStateService"),
         );
 
         // Create SessionUseCase for coordinated session-workspace management
@@ -1286,9 +1346,7 @@ fn main() {
                             most_recent.id
                         );
 
-                        if let Err(e) =
-                            session_usecase.switch_workspace(&most_recent.id).await
-                        {
+                        if let Err(e) = session_usecase.switch_workspace(&most_recent.id).await {
                             tracing::warn!(
                                 "[Startup] Failed to switch to most recent workspace: {}",
                                 e
@@ -1339,6 +1397,7 @@ fn main() {
                 delete_session,
                 rename_session,
                 save_current_session,
+                append_system_messages,
                 get_active_session,
                 get_personas,
                 save_persona_configs,
@@ -1394,7 +1453,10 @@ fn main() {
                         let app_mode_locked = AppMode::Idle;
                         let session = session_mgr.to_session(app_mode_locked, None).await;
                         if let Some(workspace_id) = session.workspace_id {
-                            tracing::info!("[Startup] Emitting workspace-switched event for: {}", workspace_id);
+                            tracing::info!(
+                                "[Startup] Emitting workspace-switched event for: {}",
+                                workspace_id
+                            );
                             let _ = handle.emit("workspace-switched", &workspace_id);
                         }
                     }

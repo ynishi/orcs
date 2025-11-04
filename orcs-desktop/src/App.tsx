@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { notifications } from '@mantine/notifications';
+import { handleSystemMessage, conversationMessage, commandMessage, shellOutputMessage, taskMessage, MessageSeverity } from './utils/systemMessage';
 import {
   Textarea,
   Button,
@@ -353,17 +354,19 @@ function App() {
       let promptCommandExecuted = false;
 
       if (parsed.isCommand && parsed.command) {
-        addMessage('command', userNickname, rawInput);
+        handleSystemMessage(commandMessage(rawInput), addMessage);
 
         const isBuiltinCommand = isValidCommand(parsed.command);
 
         if (isBuiltinCommand) {
           switch (parsed.command) {
             case 'help':
-              addMessage('system', 'System', getCommandHelp());
+              handleSystemMessage(conversationMessage(getCommandHelp()), addMessage);
+              await saveCurrentSession();
               return;
             case 'status':
-              addMessage('system', 'System', `Connection: ${status.connection}\nTasks: ${status.activeTasks}\nAgent: ${status.currentAgent}\nApp Status: ${status.mode}`);
+              handleSystemMessage(conversationMessage(`Connection: ${status.connection}\nTasks: ${status.activeTasks}\nAgent: ${status.currentAgent}\nApp Status: ${status.mode}`), addMessage);
+              await saveCurrentSession();
               return;
             case 'task':
               if (parsed.args && parsed.args.length > 0) {
@@ -376,10 +379,11 @@ function App() {
                 };
                 setTasks((prev) => [...prev, newTask]);
                 setStatus(prev => ({ ...prev, activeTasks: prev.activeTasks + 1 }));
-                addMessage('task', 'System', `✅ Task created: ${taskText}`);
+                handleSystemMessage(taskMessage(`✅ Task created: ${taskText}`), addMessage);
               } else {
-                addMessage('error', 'System', 'Usage: /task [description]');
+                handleSystemMessage(conversationMessage('Usage: /task [description]', 'error'), addMessage);
               }
+              await saveCurrentSession();
               return;
             case 'workspace':
               if (parsed.args && parsed.args.length > 0) {
@@ -388,30 +392,31 @@ function App() {
                   ws.name.toLowerCase() === workspaceName.toLowerCase()
                 );
                 if (targetWorkspace && currentSessionId) {
-                  switchWorkspace(currentSessionId, targetWorkspace.id)
-                    .then(() => {
-                      addMessage('system', 'System', `✅ Switched to workspace: ${targetWorkspace.name}`);
-                    })
-                    .catch(err => {
-                      addMessage('error', 'System', `Failed to switch workspace: ${err}`);
-                    });
+                  try {
+                    await switchWorkspace(currentSessionId, targetWorkspace.id);
+                    handleSystemMessage(conversationMessage(`✅ Switched to workspace: ${targetWorkspace.name}`), addMessage);
+                  } catch (err) {
+                    handleSystemMessage(conversationMessage(`Failed to switch workspace: ${err}`, 'error'), addMessage);
+                  }
                 } else if (!targetWorkspace) {
-                  addMessage('error', 'System', `Workspace not found: ${workspaceName}\n\nAvailable workspaces:\n${allWorkspaces.map(ws => `- ${ws.name}`).join('\n')}`);
+                  handleSystemMessage(conversationMessage(`Workspace not found: ${workspaceName}\n\nAvailable workspaces:\n${allWorkspaces.map(ws => `- ${ws.name}`).join('\n')}`, 'error'), addMessage);
                 } else {
-                  addMessage('error', 'System', 'No active session');
+                  handleSystemMessage(conversationMessage('No active session', 'error'), addMessage);
                 }
               } else {
                 const workspaceList = allWorkspaces.map(ws =>
                   `${ws.id === workspace?.id ? '📍' : '  '} ${ws.name}${ws.isFavorite ? ' ⭐' : ''}`
                 ).join('\n');
-                addMessage('system', 'System', `Available workspaces:\n${workspaceList}\n\nUsage: /workspace <name>`);
+                handleSystemMessage(conversationMessage(`Available workspaces:\n${workspaceList}\n\nUsage: /workspace <name>`), addMessage);
               }
+              await saveCurrentSession();
               return;
             case 'files':
               const fileList = workspaceFiles.length > 0
                 ? workspaceFiles.map(f => `📄 ${f.name} (${(f.size / 1024).toFixed(2)} KB)${f.author ? ` - by ${f.author}` : ''}`).join('\n')
                 : 'No files in current workspace';
-              addMessage('system', 'System', `Files in workspace "${workspace?.name}":\n${fileList}`);
+              handleSystemMessage(conversationMessage(`Files in workspace "${workspace?.name}":\n${fileList}`), addMessage);
+              await saveCurrentSession();
               return;
             case 'mode':
               if (parsed.args && parsed.args.length > 0) {
@@ -419,7 +424,7 @@ function App() {
                 const validModes = ['normal', 'concise', 'brief', 'discussion'];
 
                 if (!validModes.includes(mode)) {
-                  addMessage('error', 'System', `Invalid mode: ${mode}\n\nAvailable modes:\n- normal (通常)\n- concise (簡潔・300文字)\n- brief (極簡潔・150文字)\n- discussion (議論)`);
+                  handleSystemMessage(conversationMessage(`Invalid mode: ${mode}\n\nAvailable modes:\n- normal (通常)\n- concise (簡潔・300文字)\n- brief (極簡潔・150文字)\n- discussion (議論)`, 'error'), addMessage);
                   return;
                 }
 
@@ -432,9 +437,9 @@ function App() {
                     brief: '極簡潔 (150文字)',
                     discussion: '議論 (Discussion)',
                   };
-                  addMessage('system', 'System', `✅ Conversation mode changed to: ${modeLabels[mode]}`);
+                  handleSystemMessage(conversationMessage(`✅ Conversation mode changed to: ${modeLabels[mode]}`), addMessage);
                 } catch (error) {
-                  addMessage('error', 'System', `Failed to set conversation mode: ${error}`);
+                  handleSystemMessage(conversationMessage(`Failed to set conversation mode: ${error}`, 'error'), addMessage);
                 }
               } else {
                 try {
@@ -445,11 +450,12 @@ function App() {
                     brief: '極簡潔 (150文字)',
                     discussion: '議論 (Discussion)',
                   };
-                  addMessage('system', 'System', `Current mode: ${modeLabels[currentMode] || currentMode}\n\nUsage: /mode <normal|concise|brief|discussion>`);
+                  handleSystemMessage(conversationMessage(`Current mode: ${modeLabels[currentMode] || currentMode}\n\nUsage: /mode <normal|concise|brief|discussion>`), addMessage);
                 } catch (error) {
-                  addMessage('error', 'System', 'Usage: /mode <normal|concise|brief|discussion>');
+                  handleSystemMessage(conversationMessage('Usage: /mode <normal|concise|brief|discussion>', 'error'), addMessage);
                 }
               }
+              await saveCurrentSession();
               return;
             case 'talk':
               if (parsed.args && parsed.args.length > 0) {
@@ -457,7 +463,8 @@ function App() {
                 const validStyles = ['brainstorm', 'casual', 'decision_making', 'debate', 'problem_solving', 'review', 'planning', 'none'];
 
                 if (!validStyles.includes(style)) {
-                  addMessage('error', 'System', `Invalid style: ${style}\n\nAvailable styles:\n- brainstorm (ブレインストーミング)\n- casual (カジュアル)\n- decision_making (意思決定)\n- debate (議論)\n- problem_solving (問題解決)\n- review (レビュー)\n- planning (計画)\n- none (解除)`);
+                  handleSystemMessage(conversationMessage(`Invalid style: ${style}\n\nAvailable styles:\n- brainstorm (ブレインストーミング)\n- casual (カジュアル)\n- decision_making (意思決定)\n- debate (議論)\n- problem_solving (問題解決)\n- review (レビュー)\n- planning (計画)\n- none (解除)`, 'error'), addMessage);
+                  await saveCurrentSession();
                   return;
                 }
 
@@ -475,9 +482,9 @@ function App() {
                     planning: '計画 (Planning)',
                     none: '解除 (None)',
                   };
-                  addMessage('system', 'System', `✅ Talk style changed to: ${styleLabels[style]}`);
+                  handleSystemMessage(conversationMessage(`✅ Talk style changed to: ${styleLabels[style]}`), addMessage);
                 } catch (error) {
-                  addMessage('error', 'System', `Failed to set talk style: ${error}`);
+                  handleSystemMessage(conversationMessage(`Failed to set talk style: ${error}`, 'error'), addMessage);
                 }
               } else {
                 try {
@@ -492,21 +499,48 @@ function App() {
                     planning: '計画 (Planning)',
                   };
                   const currentLabel = currentStyle ? (styleLabels[currentStyle] || currentStyle) : 'Not set';
-                  addMessage('system', 'System', `Current talk style: ${currentLabel}\n\nUsage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>`);
+                  handleSystemMessage(conversationMessage(`Current talk style: ${currentLabel}\n\nUsage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>`), addMessage);
                 } catch (error) {
-                  addMessage('error', 'System', 'Usage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>');
+                  handleSystemMessage(conversationMessage('Usage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>', 'error'), addMessage);
                 }
               }
+              await saveCurrentSession();
               return;
             default:
               break;
           }
         } else {
+          const persistedSystemMessages: { content: string; messageType: MessageType; severity?: MessageSeverity }[] = [];
+          const persistMessages = async () => {
+            if (persistedSystemMessages.length === 0) {
+              return;
+            }
+            const messagesToPersist = [...persistedSystemMessages];
+            persistedSystemMessages.length = 0;
+            try {
+              await invoke('append_system_messages', { messages: messagesToPersist });
+            } catch (persistError) {
+              console.error('Failed to persist slash command messages:', persistError);
+              persistedSystemMessages.unshift(...messagesToPersist);
+            }
+          };
+          const queuePersistedMessage = (
+            content: string,
+            messageType: MessageType,
+            severity?: MessageSeverity
+          ) => {
+            persistedSystemMessages.push({ content, messageType, severity });
+          };
+
           try {
             const customCommand = await invoke<SlashCommand | null>('get_slash_command', { name: parsed.command });
 
             if (!customCommand) {
-              addMessage('error', 'System', `Unknown command: /${parsed.command}\n\nType /help for available commands.`);
+              const messageText = `Unknown command: /${parsed.command}\n\nType /help for available commands.`;
+              handleSystemMessage(conversationMessage(messageText, 'error'), addMessage);
+              queuePersistedMessage(messageText, 'error', 'error');
+              await persistMessages();
+              await saveCurrentSession();
               return;
             }
 
@@ -517,37 +551,58 @@ function App() {
             });
 
             if (customCommand.type === 'prompt') {
-              addMessage('system', 'System', `✨ Executing custom command: /${customCommand.name}`);
+              const messageText = `✨ Executing custom command: /${customCommand.name}`;
+              handleSystemMessage(conversationMessage(messageText), addMessage);
+              queuePersistedMessage(messageText, 'system');
               backendInput = expanded.content;
               promptCommandExecuted = true;
             } else {
-              addMessage('system', 'System', `⚡ Executing shell command: /${customCommand.name}`);
+              const executingMessage = `⚡ Executing shell command: /${customCommand.name}`;
+              handleSystemMessage(conversationMessage(executingMessage), addMessage);
+              queuePersistedMessage(executingMessage, 'command');
               if (expanded.workingDir) {
-                addMessage('shell_output', 'System', `(cwd: ${expanded.workingDir})`);
+                const cwdMessage = `(cwd: ${expanded.workingDir})`;
+                handleSystemMessage(shellOutputMessage(cwdMessage), addMessage);
+                queuePersistedMessage(cwdMessage, 'shell_output');
               }
-              addMessage('shell_output', 'System', `$ ${expanded.content}`);
+              const commandLine = `$ ${expanded.content}`;
+              handleSystemMessage(shellOutputMessage(commandLine), addMessage);
+              queuePersistedMessage(commandLine, 'shell_output');
 
               try {
                 const output = await invoke<string>('execute_shell_command', {
                   command: expanded.content,
                   workingDir: expanded.workingDir ?? null,
                 });
-                addMessage('shell_output', 'System', output || '(no output)');
+                const outputText = output || '(no output)';
+                handleSystemMessage(shellOutputMessage(outputText), addMessage);
+                queuePersistedMessage(outputText, 'shell_output');
               } catch (shellError) {
-                addMessage('error', 'System', `Shell command failed: ${shellError}`);
+                const errorMessage = `Shell command failed: ${shellError}`;
+                handleSystemMessage(conversationMessage(errorMessage, 'error'), addMessage);
+                queuePersistedMessage(errorMessage, 'error', 'error');
               }
+              await persistMessages();
+              await saveCurrentSession();
               return;
             }
           } catch (error) {
             console.error('Failed to execute custom command:', error);
-            addMessage('error', 'System', `Failed to execute command: ${error}`);
+            const errorMessage = `Failed to execute command: ${error}`;
+            handleSystemMessage(conversationMessage(errorMessage, 'error'), addMessage);
+            queuePersistedMessage(errorMessage, 'error', 'error');
+            await persistMessages();
+            await saveCurrentSession();
             return;
           }
+
+          await persistMessages();
         }
       }
 
       if (promptCommandExecuted && !backendInput.trim()) {
-        addMessage('error', 'System', `Command ${rawInput} produced empty content.`);
+        handleSystemMessage(conversationMessage(`Command ${rawInput} produced empty content.`, 'error'), addMessage);
+        await saveCurrentSession();
         return;
       }
 
@@ -1250,6 +1305,7 @@ function App() {
               autoMode={autoMode}
               conversationMode={conversationMode}
               talkStyle={talkStyle}
+              executionStrategy={sessions.find(s => s.id === currentSessionId)?.execution_strategy || 'sequential'}
             />
           </Stack>
         </Container>

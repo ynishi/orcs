@@ -1,4 +1,4 @@
-import { Paper, Group, Badge, Text, Divider } from '@mantine/core';
+import { Paper, Group, Badge, Text, Divider, Tooltip } from '@mantine/core';
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
 import { getConversationModeOption, getTalkStyleOption } from '../../types/conversation';
@@ -10,9 +10,10 @@ interface StatusBarProps {
   autoMode?: boolean;
   conversationMode?: string;
   talkStyle?: string | null;
+  executionStrategy?: string;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoMode = false, conversationMode = 'normal', talkStyle = null }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential' }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -38,6 +39,18 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoM
         return '◐';
       default:
         return '○';
+    }
+  };
+
+  // Execution Strategy の絵文字とTooltip
+  const getExecutionStrategyDisplay = () => {
+    switch (executionStrategy) {
+      case 'broadcast':
+        return { icon: '📢', label: 'Broadcast' };
+      case 'sequential':
+        return { icon: '➡️', label: 'Sequential' };
+      default:
+        return { icon: '➡️', label: 'Sequential' };
     }
   };
 
@@ -100,46 +113,41 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoM
 
         {/* AUTOモード */}
         <Divider orientation="vertical" />
-        <Group gap={6} wrap="nowrap">
-          <Text size="sm" c="dimmed">
-            AUTO:
+        <Tooltip label={autoMode ? 'AUTO: ON' : 'AUTO: OFF'} withArrow>
+          <Text size="lg" c={autoMode ? 'green' : 'red'} fw={700} style={{ cursor: 'default' }}>
+            ●
           </Text>
-          <Badge color={autoMode ? 'green' : 'red'} size="sm" variant="filled">
-            {autoMode ? 'ON' : 'OFF'}
-          </Badge>
-        </Group>
-
-        {/* Conversation Mode */}
-        {conversationMode !== 'normal' && (
-          <>
-            <Divider orientation="vertical" />
-            <Group gap={4} wrap="nowrap">
-              <Text size="sm">
-                {getConversationModeOption(conversationMode as any)?.icon || '💬'}
-              </Text>
-              <Badge
-                color="blue"
-                size="sm"
-                variant="light"
-              >
-                {getConversationModeOption(conversationMode as any)?.label || conversationMode}
-              </Badge>
-            </Group>
-          </>
-        )}
+        </Tooltip>
 
         {/* Talk Style */}
         {talkStyle && (
           <>
             <Divider orientation="vertical" />
-            <Group gap={4} wrap="nowrap">
-              <Text size="sm">
+            <Tooltip label={getTalkStyleOption(talkStyle as any)?.label || talkStyle} withArrow>
+              <Text size="lg" style={{ cursor: 'default' }}>
                 {getTalkStyleOption(talkStyle as any)?.icon || '💬'}
               </Text>
-              <Badge color="violet" size="sm" variant="light">
-                {getTalkStyleOption(talkStyle as any)?.label || talkStyle}
-              </Badge>
-            </Group>
+            </Tooltip>
+          </>
+        )}
+
+        {/* Execution Strategy */}
+        <Divider orientation="vertical" />
+        <Tooltip label={getExecutionStrategyDisplay().label} withArrow>
+          <Text size="lg" style={{ cursor: 'default' }}>
+            {getExecutionStrategyDisplay().icon}
+          </Text>
+        </Tooltip>
+
+        {/* Conversation Mode (Response Style) */}
+        {conversationMode !== 'normal' && (
+          <>
+            <Divider orientation="vertical" />
+            <Tooltip label={getConversationModeOption(conversationMode as any)?.label || conversationMode} withArrow>
+              <Text size="lg" style={{ cursor: 'default' }}>
+                {getConversationModeOption(conversationMode as any)?.icon || '💬'}
+              </Text>
+            </Tooltip>
           </>
         )}
 

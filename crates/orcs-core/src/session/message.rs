@@ -62,6 +62,10 @@ pub struct MessageMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_severity: Option<ErrorSeverity>,
 
+    /// Optional UI message type hint (e.g., command, shell_output).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_message_type: Option<String>,
+
     /// Whether this message should be included in agent dialogue context.
     /// Defaults to true for backward compatibility.
     #[serde(default = "default_true")]

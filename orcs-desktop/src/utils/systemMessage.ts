@@ -1,4 +1,5 @@
 import { notifications } from '@mantine/notifications';
+import { MessageType } from '../types/message';
 
 /**
  * System message categories based on persistence and context requirements
@@ -28,6 +29,8 @@ export type MessageSeverity = 'info' | 'success' | 'warning' | 'error';
 export interface SystemMessage {
   /** Message category determines display method */
   category: MessageCategory;
+  /** Message type (for CONVERSATION_EVENT, determines chat display style) */
+  messageType?: MessageType;
   /** Title for toast notifications */
   title?: string;
   /** Message content */
@@ -42,7 +45,7 @@ export interface SystemMessage {
  * Callback type for adding messages to chat
  */
 export type OnMessageCallback = (
-  type: 'system' | 'error',
+  type: MessageType,
   author: string,
   text: string
 ) => void;
@@ -91,7 +94,8 @@ export function handleSystemMessage(
     case MessageCategory.CONVERSATION_EVENT:
       // Add to chat conversation (persisted)
       if (onMessage) {
-        const type = msg.severity === 'error' ? 'error' : 'system';
+        // Use explicit messageType if provided, otherwise infer from severity
+        const type = msg.messageType || (msg.severity === 'error' ? 'error' : 'system');
         const prefix = msg.icon ? `${msg.icon} ` : '';
         onMessage(type, 'SYSTEM', `${prefix}${msg.message}`);
       } else {
@@ -146,12 +150,50 @@ export function transientMessage(
 export function conversationMessage(
   message: string,
   severity: MessageSeverity = 'info',
-  icon?: string
+  icon?: string,
+  messageType?: MessageType
 ): SystemMessage {
   return {
     category: MessageCategory.CONVERSATION_EVENT,
     message,
     severity,
     icon,
+    messageType,
+  };
+}
+
+/**
+ * Helper: Create command message (displayed with "COMMAND" label)
+ */
+export function commandMessage(message: string): SystemMessage {
+  return {
+    category: MessageCategory.CONVERSATION_EVENT,
+    message,
+    severity: 'info',
+    messageType: 'command',
+  };
+}
+
+/**
+ * Helper: Create shell output message (displayed with monospace font)
+ */
+export function shellOutputMessage(message: string): SystemMessage {
+  return {
+    category: MessageCategory.CONVERSATION_EVENT,
+    message,
+    severity: 'info',
+    messageType: 'shell_output',
+  };
+}
+
+/**
+ * Helper: Create task message (displayed with task styling)
+ */
+export function taskMessage(message: string): SystemMessage {
+  return {
+    category: MessageCategory.CONVERSATION_EVENT,
+    message,
+    severity: 'info',
+    messageType: 'task',
   };
 }

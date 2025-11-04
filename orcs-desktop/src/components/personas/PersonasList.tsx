@@ -12,6 +12,7 @@ import { MessageType } from '../../types/message';
 const STRATEGIES = [
   { value: 'broadcast', label: '📢 Broadcast' },
   { value: 'sequential', label: '➡️ Sequential' },
+  { value: 'mentioned', label: '👤 Mentioned' },
 ];
 
 const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {

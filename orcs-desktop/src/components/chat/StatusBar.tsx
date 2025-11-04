@@ -49,6 +49,8 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoM
         return { icon: '📢', label: 'Broadcast' };
       case 'sequential':
         return { icon: '➡️', label: 'Sequential' };
+      case 'mentioned':
+        return { icon: '👤', label: 'Mentioned (@mention to specify)' };
       default:
         return { icon: '➡️', label: 'Sequential' };
     }

@@ -1264,7 +1264,11 @@ function App() {
                     value={input}
                     onChange={(e) => setInput(e.currentTarget.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type your message or /help for commands... (⌘+Enter to send)"
+                    placeholder={
+                      executionStrategy === 'mentioned'
+                        ? "Type @PersonaName to mention, or /help for commands... (⌘+Enter to send)"
+                        : "Type your message or /help for commands... (⌘+Enter to send)"
+                    }
                     size="md"
                     minRows={1}
                     maxRows={4}

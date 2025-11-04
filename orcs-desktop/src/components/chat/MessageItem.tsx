@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip } from '@mantine/core';
+import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor } from '@mantine/core';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { Message, getMessageStyle } from '../../types/message';
 
@@ -7,6 +7,9 @@ interface MessageItemProps {
   message: Message;
   onSaveToWorkspace?: (message: Message) => void;
 }
+
+// 長いテキストを折りたたむしきい値（文字数）
+const COLLAPSE_THRESHOLD = 200;
 
 // メンションをハイライト表示するヘルパー
 function renderTextWithMentions(text: string) {
@@ -49,6 +52,13 @@ function renderTextWithMentions(text: string) {
 export function MessageItem({ message, onSaveToWorkspace }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // テキストが長い場合の判定
+  const isLongText = message.text.length > COLLAPSE_THRESHOLD;
+  const displayText = isLongText && !isExpanded
+    ? message.text.slice(0, COLLAPSE_THRESHOLD) + '...'
+    : message.text;
 
   // バッジタイプのメッセージ（System, Error, Command, Task）
   if (style.showBadge) {
@@ -88,8 +98,26 @@ export function MessageItem({ message, onSaveToWorkspace }: MessageItemProps) {
                 c={style.textColor}
                 style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
               >
-                {renderTextWithMentions(message.text)}
+                {renderTextWithMentions(displayText)}
               </Text>
+
+              {/* 折りたたみトグル */}
+              {isLongText && (
+                <Anchor
+                  size="xs"
+                  c="dimmed"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  style={{
+                    cursor: 'pointer',
+                    display: 'inline-block',
+                    marginTop: '4px',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  {isExpanded ? 'Show less' : 'Show more'}
+                </Anchor>
+              )}
+
               <Text size="xs" c="dimmed" mt={4}>
                 {message.timestamp.toLocaleTimeString()}
               </Text>

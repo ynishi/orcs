@@ -6,6 +6,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+#[cfg(test)]
+use super::app_mode::ConversationMode;
+
 // Forward declaration - orcs-interaction will provide this
 // We use dynamic dispatch to avoid circular dependencies
 pub trait InteractionManagerTrait: Send + Sync {
@@ -383,6 +386,8 @@ mod tests {
                 execution_strategy: "broadcast".to_string(),
                 system_messages: Vec::new(),
                 participants: HashMap::new(),
+                conversation_mode: ConversationMode::Normal,
+                talk_style: None,
             }
         }
 

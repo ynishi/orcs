@@ -470,6 +470,7 @@ impl InteractionManager {
         let mut dialogue = match strategy_model {
             ExecutionModel::Sequential => Dialogue::sequential(),
             ExecutionModel::Broadcast => Dialogue::broadcast(),
+            ExecutionModel::Mentioned => Dialogue::mentioned(),
         };
 
         // Apply context settings
@@ -488,7 +489,9 @@ impl InteractionManager {
             dialogue.with_talk_style(style);
         }
 
-        let mut dialogue = dialogue.with_history(history_turns);
+        tracing::info!("[InteractionManager] Restored dialogue with {} history turns", history_turns.len());
+
+        let mut dialogue = dialogue.with_history_as_system_prompt(history_turns);
 
         // Check if we have restored participant IDs from session
         let restored_ids_opt = self.restored_participant_ids.read().await.clone();

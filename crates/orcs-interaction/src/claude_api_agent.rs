@@ -128,9 +128,7 @@ impl ClaudeApiAgent {
         }
 
         let bytes = attachment.load_bytes().await.map_err(|err| {
-            AgentError::ExecutionFailed(format!(
-                "Failed to load attachment for Claude API: {err}"
-            ))
+            AgentError::ExecutionFailed(format!("Failed to load attachment for Claude API: {err}"))
         })?;
 
         let media_type = attachment
@@ -227,12 +225,8 @@ struct Message {
 }
 
 enum ContentBlock {
-    Text {
-        text: String,
-    },
-    Image {
-        source: ImageSource,
-    },
+    Text { text: String },
+    Image { source: ImageSource },
 }
 
 // Custom serialization for ContentBlock to match Claude API format

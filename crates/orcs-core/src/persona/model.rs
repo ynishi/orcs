@@ -137,11 +137,7 @@ mod tests {
         for (key, _label) in variants {
             let json = format!(r#""{}""#, key);
             let result: Result<PersonaBackend, _> = serde_json::from_str(&json);
-            assert!(
-                result.is_ok(),
-                "Failed to deserialize variant key: {}",
-                key
-            );
+            assert!(result.is_ok(), "Failed to deserialize variant key: {}", key);
         }
     }
 }

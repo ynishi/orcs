@@ -101,10 +101,7 @@ impl SessionUseCase {
         tracing::info!("[SessionUseCase] Creating new session");
 
         // 1. Get selected workspace ID from AppStateService
-        let workspace_id_opt = self
-            .app_state_service
-            .get_last_selected_workspace()
-            .await;
+        let workspace_id_opt = self.app_state_service.get_last_selected_workspace().await;
 
         // 2. If no workspace is selected, try to auto-select one
         let workspace_id_opt = if workspace_id_opt.is_none() {
@@ -126,13 +123,18 @@ impl SessionUseCase {
                         .set_last_selected_workspace(most_recent.id.clone())
                         .await
                     {
-                        tracing::warn!("[SessionUseCase] Failed to save auto-selected workspace: {}", e);
+                        tracing::warn!(
+                            "[SessionUseCase] Failed to save auto-selected workspace: {}",
+                            e
+                        );
                     }
 
                     Some(most_recent.id.clone())
                 }
                 Ok(_) => {
-                    tracing::info!("[SessionUseCase] No workspaces found, creating session without workspace");
+                    tracing::info!(
+                        "[SessionUseCase] No workspaces found, creating session without workspace"
+                    );
                     None
                 }
                 Err(e) => {
@@ -203,7 +205,9 @@ impl SessionUseCase {
                 }
             }
         } else {
-            tracing::info!("[SessionUseCase] No workspace available, session created without workspace association");
+            tracing::info!(
+                "[SessionUseCase] No workspace available, session created without workspace association"
+            );
         }
 
         // 5. Persist session
@@ -381,7 +385,10 @@ impl SessionUseCase {
             .set_last_selected_workspace(workspace_id.to_string())
             .await
             .map_err(|e| anyhow!("Failed to save last selected workspace: {}", e))?;
-        println!("[SessionUseCase] Saved to AppStateService: {}", workspace_id);
+        println!(
+            "[SessionUseCase] Saved to AppStateService: {}",
+            workspace_id
+        );
 
         // 1. Validate workspace exists
         let mut workspace = self

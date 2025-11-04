@@ -139,14 +139,12 @@ impl AppStateService {
 
     /// Synchronous wrapper for get_last_selected_workspace (for non-async contexts)
     pub fn get_last_selected_workspace_sync(&self) -> Option<String> {
-        tokio::runtime::Handle::current()
-            .block_on(self.get_last_selected_workspace())
+        tokio::runtime::Handle::current().block_on(self.get_last_selected_workspace())
     }
 
     /// Synchronous wrapper for set_last_selected_workspace (for non-async contexts)
     pub fn set_last_selected_workspace_sync(&self, workspace_id: String) -> Result<(), String> {
-        tokio::runtime::Handle::current()
-            .block_on(self.set_last_selected_workspace(workspace_id))
+        tokio::runtime::Handle::current().block_on(self.set_last_selected_workspace(workspace_id))
     }
 }
 

@@ -137,7 +137,7 @@ impl OrcsPaths {
         }
 
         // Create typed template using SecretConfig
-        use orcs_core::config::{SecretConfig, ClaudeConfig, GeminiConfig, OpenAIConfig};
+        use orcs_core::config::{ClaudeConfig, GeminiConfig, OpenAIConfig, SecretConfig};
 
         let template_config = SecretConfig {
             claude: Some(ClaudeConfig {

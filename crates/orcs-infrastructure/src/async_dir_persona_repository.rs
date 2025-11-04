@@ -137,12 +137,9 @@ impl PersonaRepository for AsyncDirPersonaRepository {
 
                 // 2. Delete orphaned personas (exist in storage but not in new list)
                 for orphaned_id in existing_ids.difference(&new_ids) {
-                    self.storage
-                        .delete(orphaned_id)
-                        .await
-                        .map_err(|e| {
-                            format!("Failed to delete orphaned persona {}: {}", orphaned_id, e)
-                        })?;
+                    self.storage.delete(orphaned_id).await.map_err(|e| {
+                        format!("Failed to delete orphaned persona {}: {}", orphaned_id, e)
+                    })?;
                 }
 
                 // 3. Save each persona individually (1 persona = 1 file)

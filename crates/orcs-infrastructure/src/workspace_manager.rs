@@ -196,11 +196,13 @@ impl FileSystemWorkspaceManager {
 
 #[async_trait]
 impl WorkspaceManager for FileSystemWorkspaceManager {
-
     async fn get_or_create_workspace(&self, repo_path: &Path) -> Result<Workspace> {
         // Validate root_path: must not be root directory
         let canonical_path = repo_path.canonicalize().map_err(|e| {
-            OrcsError::Io(format!("Failed to canonicalize path {:?}: {}", repo_path, e))
+            OrcsError::Io(format!(
+                "Failed to canonicalize path {:?}: {}",
+                repo_path, e
+            ))
         })?;
 
         if canonical_path == Path::new("/") || canonical_path == Path::new("C:\\") {

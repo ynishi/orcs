@@ -86,7 +86,8 @@ impl PersonaBackendAgent {
         // Log the intention but do not change the directory
         tracing::info!(
             "[PersonaBackendAgent] Executing with workspace context: {:?} for backend: {:?}",
-            workspace_root, self.backend
+            workspace_root,
+            self.backend
         );
 
         match self.backend {
@@ -266,7 +267,6 @@ pub struct InteractionManager {
 }
 
 impl InteractionManager {
-
     /// Creates a new session with empty conversation history.
     ///
     /// # Arguments
@@ -383,11 +383,7 @@ impl InteractionManager {
         // Add messages from persona_histories
         for (persona_id, messages) in histories.iter() {
             for msg in messages {
-                all_messages.push((
-                    persona_id.clone(),
-                    msg.timestamp.clone(),
-                    msg.clone(),
-                ));
+                all_messages.push((persona_id.clone(), msg.timestamp.clone(), msg.clone()));
             }
         }
 
@@ -421,11 +417,10 @@ impl InteractionManager {
                     }
                     MessageRole::Assistant => {
                         // Assistant response - convert persona_id to Agent speaker
-                        if let Some(persona) = self
-                            .persona_repository
-                            .get_all()
-                            .ok()
-                            .and_then(|personas| personas.into_iter().find(|p| &p.id == persona_id))
+                        if let Some(persona) =
+                            self.persona_repository.get_all().ok().and_then(|personas| {
+                                personas.into_iter().find(|p| &p.id == persona_id)
+                            })
                         {
                             Some(DialogueTurn {
                                 speaker: Speaker::agent(&persona.name, &persona.role),
@@ -616,7 +611,8 @@ impl InteractionManager {
     ) {
         tracing::info!(
             "[InteractionManager::set_workspace_id] Called with workspace_id={:?}, workspace_root={:?}",
-            workspace_id, workspace_root
+            workspace_id,
+            workspace_root
         );
 
         let mut ws_id = self.workspace_id.write().await;
@@ -671,6 +667,7 @@ impl InteractionManager {
             metadata: MessageMetadata {
                 system_event_type: Some(SystemEventType::ParticipantJoined),
                 error_severity: None,
+                system_message_type: None,
                 include_in_dialogue: true,
             },
         };
@@ -718,6 +715,7 @@ impl InteractionManager {
             metadata: MessageMetadata {
                 system_event_type: Some(SystemEventType::ParticipantLeft),
                 error_severity: None,
+                system_message_type: None,
                 include_in_dialogue: true,
             },
         };
@@ -731,6 +729,28 @@ impl InteractionManager {
             .map_err(|e| e.to_string())?;
 
         Ok(())
+    }
+
+    /// Records a system-level conversation message so it persists with the session.
+    pub async fn add_system_conversation_message(
+        &self,
+        content: String,
+        message_type: Option<String>,
+        error_severity: Option<ErrorSeverity>,
+    ) {
+        let message = ConversationMessage {
+            role: MessageRole::System,
+            content,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            metadata: MessageMetadata {
+                system_event_type: Some(SystemEventType::Notification),
+                error_severity,
+                system_message_type: message_type,
+                include_in_dialogue: true,
+            },
+        };
+
+        self.system_messages.write().await.push(message);
     }
 
     /// Returns a list of active participant IDs.
@@ -773,6 +793,7 @@ impl InteractionManager {
             metadata: MessageMetadata {
                 system_event_type: Some(SystemEventType::ExecutionStrategyChanged),
                 error_severity: None,
+                system_message_type: None,
                 include_in_dialogue: true,
             },
         };
@@ -813,6 +834,7 @@ impl InteractionManager {
             metadata: MessageMetadata {
                 system_event_type: Some(SystemEventType::ModeChanged),
                 error_severity: None,
+                system_message_type: None,
                 include_in_dialogue: true,
             },
         };
@@ -855,6 +877,7 @@ impl InteractionManager {
                 metadata: MessageMetadata {
                     system_event_type: Some(SystemEventType::ModeChanged),
                     error_severity: None,
+                    system_message_type: None,
                     include_in_dialogue: true,
                 },
             };
@@ -924,7 +947,10 @@ impl InteractionManager {
         F: Fn(&DialogueMessage),
     {
         match mode {
-            AppMode::Idle => self.handle_idle_mode(input, file_paths, Some(on_turn)).await,
+            AppMode::Idle => {
+                self.handle_idle_mode(input, file_paths, Some(on_turn))
+                    .await
+            }
             AppMode::AwaitingConfirmation { plan } => {
                 self.handle_awaiting_confirmation(input, plan)
             }
@@ -956,7 +982,9 @@ impl InteractionManager {
         self.add_to_history(&user_name, MessageRole::User, input)
             .await;
         let user_name_str = if user_name.to_lowercase() == "you" {
-            tracing::warn!("[InteractionManager] Detected user name 'You', which may cause speaker attribution issues.");
+            tracing::warn!(
+                "[InteractionManager] Detected user name 'You', which may cause speaker attribution issues."
+            );
             "User"
         } else {
             &user_name
@@ -986,9 +1014,11 @@ impl InteractionManager {
         }
 
         // Debug: Log payload content before partial_session
-        tracing::debug!("[InteractionManager] Payload before partial_session: user_input='{}', payload={:?}",
+        tracing::debug!(
+            "[InteractionManager] Payload before partial_session: user_input='{}', payload={:?}",
             input.chars().take(100).collect::<String>(),
-            payload.clone());
+            payload.clone()
+        );
 
         // Create a partial session for incremental turn processing
         // partial_session now accepts impl Into<Payload>, so both String and Payload work
@@ -1032,16 +1062,10 @@ impl InteractionManager {
                 }
                 Err(e) => {
                     // Log the error for debugging
-                    tracing::error!(
-                        "[DIALOGUE] Agent execution failed: {}",
-                        e
-                    );
+                    tracing::error!("[DIALOGUE] Agent execution failed: {}", e);
 
                     // Create a user-friendly error message
-                    let error_msg = format!(
-                        "{}\n\nPlease check the logs for more details.",
-                        e
-                    );
+                    let error_msg = format!("{}\n\nPlease check the logs for more details.", e);
 
                     // Emit error as a system message via callback if provided
                     if let Some(ref callback) = on_turn {
@@ -1060,6 +1084,7 @@ impl InteractionManager {
                         metadata: MessageMetadata {
                             system_event_type: None,
                             error_severity: Some(ErrorSeverity::Critical),
+                            system_message_type: None,
                             include_in_dialogue: true,
                         },
                     };

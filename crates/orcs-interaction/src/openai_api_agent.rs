@@ -125,9 +125,7 @@ impl OpenAIApiAgent {
         }
 
         let bytes = attachment.load_bytes().await.map_err(|err| {
-            AgentError::ExecutionFailed(format!(
-                "Failed to load attachment for OpenAI API: {err}"
-            ))
+            AgentError::ExecutionFailed(format!("Failed to load attachment for OpenAI API: {err}"))
         })?;
 
         let mime_type = attachment
@@ -146,10 +144,7 @@ impl OpenAIApiAgent {
         }))
     }
 
-    async fn send_request(
-        &self,
-        body: &ChatCompletionRequest,
-    ) -> Result<String, AgentError> {
+    async fn send_request(&self, body: &ChatCompletionRequest) -> Result<String, AgentError> {
         let response = self
             .client
             .post(BASE_URL)
@@ -175,9 +170,10 @@ impl OpenAIApiAgent {
             return Err(map_http_error(status, body_text, retry_after));
         }
 
-        let parsed: ChatCompletionResponse = response.json().await.map_err(|err| {
-            AgentError::Other(format!("Failed to parse OpenAI response: {err}"))
-        })?;
+        let parsed: ChatCompletionResponse = response
+            .json()
+            .await
+            .map_err(|err| AgentError::Other(format!("Failed to parse OpenAI response: {err}")))?;
 
         extract_text_response(parsed)
     }
@@ -289,9 +285,7 @@ fn extract_text_response(response: ChatCompletionResponse) -> Result<String, Age
         .next()
         .and_then(|choice| choice.message.content)
         .ok_or_else(|| {
-            AgentError::ExecutionFailed(
-                "OpenAI API returned no content in the response".into(),
-            )
+            AgentError::ExecutionFailed("OpenAI API returned no content in the response".into())
         })
 }
 

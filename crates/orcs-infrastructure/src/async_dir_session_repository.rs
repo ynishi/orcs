@@ -207,9 +207,7 @@ impl SessionRepository for AsyncDirSessionRepository {
     }
 
     async fn save(&self, session: &Session) -> Result<()> {
-        let result = self.storage
-            .save("session", &session.id, session)
-            .await;
+        let result = self.storage.save("session", &session.id, session).await;
         eprintln!("Save result: {:?}", result);
         result.context("Failed to save session")?;
         Ok(())

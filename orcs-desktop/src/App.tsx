@@ -261,8 +261,10 @@ function App() {
     try {
       const personasList = await invoke<import('./types/agent').PersonaConfig[]>('get_personas');
       const activeIds = await invoke<string[]>('get_active_participants');
+      const strategy = await invoke<string>('get_execution_strategy');
       setPersonas(personasList);
       setActiveParticipantIds(activeIds);
+      setExecutionStrategy(strategy);
     } catch (error) {
       console.error('Failed to load personas:', error);
     }
@@ -1365,7 +1367,8 @@ function App() {
             <StatusBar
               status={status}
               gitInfo={gitInfo}
-              participatingAgentsCount={0}
+              participatingAgentsCount={activeParticipantIds.length}
+              totalPersonas={personas.length}
               autoMode={autoMode}
               conversationMode={conversationMode}
               talkStyle={talkStyle}

@@ -1,4 +1,5 @@
-import { ScrollArea, Box, Accordion, Group, Text, Badge } from '@mantine/core';
+import { useState } from 'react';
+import { ScrollArea, Box, Stack, Text } from '@mantine/core';
 import { Session } from '../../types/session';
 import { Task } from '../../types/task';
 import { MessageType } from '../../types/message';
@@ -8,6 +9,7 @@ import { TaskList } from '../tasks/TaskList';
 import { PersonasList } from '../personas/PersonasList';
 import { SlashCommandList } from '../slash_commands/SlashCommandList';
 import { SlashCommand } from '../../types/slash_command';
+import { NavbarIcon } from './NavbarIcon';
 
 interface NavbarProps {
   // Sessions
@@ -71,116 +73,119 @@ export function Navbar({
   activeParticipantIds,
   onRefreshPersonas,
 }: NavbarProps) {
+  const [activeTab, setActiveTab] = useState<'sessions' | 'workspace' | 'tasks' | 'personas' | 'commands'>('sessions');
+
+  const activeTasks = tasks.filter(t => t.status !== 'completed').length;
+
   return (
-    <ScrollArea h="100vh" type="auto">
-      <Box p="md">
-        <Accordion
-          defaultValue={['sessions', 'files', 'tasks', 'personas', 'commands']}
-          multiple
-          variant="separated"
-        >
-          {/* セッション */}
-          <Accordion.Item value="sessions">
-            <Accordion.Control>
-              <Group gap="xs">
-                <Text>💬</Text>
-                <Text fw={600}>Sessions</Text>
-                <Badge size="sm" color="blue" variant="light">
-                  {sessions.length}
-                </Badge>
-              </Group>
-            </Accordion.Control>
-            <Accordion.Panel>
-              <SessionList
-                sessions={sessions}
-                currentSessionId={currentSessionId || undefined}
-                currentWorkspaceId={currentWorkspaceId}
-                onSessionSelect={onSessionSelect}
-                onSessionDelete={onSessionDelete}
-                onSessionRename={onSessionRename}
-                onNewSession={onNewSession}
-              />
-            </Accordion.Panel>
-          </Accordion.Item>
+    <Box style={{ display: 'flex', height: '100vh' }}>
+      {/* Icon Bar */}
+      <Stack gap={0} style={{
+        width: 48,
+        borderRight: '1px solid var(--mantine-color-gray-3)',
+        flexShrink: 0,
+      }}>
+        <NavbarIcon
+          icon="💬"
+          label="Sessions"
+          active={activeTab === 'sessions'}
+          onClick={() => setActiveTab('sessions')}
+          badge={sessions.length}
+        />
+        <NavbarIcon
+          icon="📁"
+          label="Workspace"
+          active={activeTab === 'workspace'}
+          onClick={() => setActiveTab('workspace')}
+        />
+        <NavbarIcon
+          icon="✅"
+          label="Tasks"
+          active={activeTab === 'tasks'}
+          onClick={() => setActiveTab('tasks')}
+          badge={activeTasks}
+        />
+        <NavbarIcon
+          icon="⭐️"
+          label="Personas"
+          active={activeTab === 'personas'}
+          onClick={() => setActiveTab('personas')}
+        />
+        <NavbarIcon
+          icon="⚡"
+          label="Slash Commands"
+          active={activeTab === 'commands'}
+          onClick={() => setActiveTab('commands')}
+        />
+      </Stack>
 
-          {/* ワークスペース */}
-          <Accordion.Item value="files">
-            <Accordion.Control>
-              <Group gap="xs">
-                <Text>📁</Text>
-                <Text fw={600}>Workspace</Text>
-              </Group>
-            </Accordion.Control>
-            <Accordion.Panel>
-              <WorkspacePanel
-                onAttachFile={onAttachFile}
-                includeInPrompt={includeWorkspaceInPrompt}
-                onToggleIncludeInPrompt={onToggleIncludeWorkspaceInPrompt}
-                onGoToSession={onGoToSession}
-                onRefresh={onRefreshWorkspace}
-              />
-            </Accordion.Panel>
-          </Accordion.Item>
+      {/* Content Panel */}
+      <ScrollArea h="100vh" style={{ flex: 1 }} type="auto">
+        <Box p="md">
+          {/* Section Header */}
+          <Text size="lg" fw={600} mb="md" style={{
+            paddingBottom: '8px',
+            borderBottom: '2px solid var(--mantine-color-gray-3)'
+          }}>
+            {activeTab === 'sessions' && 'Sessions'}
+            {activeTab === 'workspace' && 'Workspace'}
+            {activeTab === 'tasks' && 'Tasks'}
+            {activeTab === 'personas' && 'Personas'}
+            {activeTab === 'commands' && 'Slash Commands'}
+          </Text>
 
-          {/* タスク */}
-          <Accordion.Item value="tasks">
-            <Accordion.Control>
-              <Group gap="xs">
-                <Text>✅</Text>
-                <Text fw={600}>Tasks</Text>
-                <Badge size="sm" color="blue" variant="light">
-                  {tasks.filter(t => t.status !== 'completed').length}
-                </Badge>
-              </Group>
-            </Accordion.Control>
-            <Accordion.Panel>
-              <TaskList
-                tasks={tasks}
-                onTaskToggle={onTaskToggle}
-                onTaskDelete={onTaskDelete}
-              />
-            </Accordion.Panel>
-          </Accordion.Item>
+          {/* Content */}
+          {activeTab === 'sessions' && (
+            <SessionList
+              sessions={sessions}
+              currentSessionId={currentSessionId || undefined}
+              currentWorkspaceId={currentWorkspaceId}
+              onSessionSelect={onSessionSelect}
+              onSessionDelete={onSessionDelete}
+              onSessionRename={onSessionRename}
+              onNewSession={onNewSession}
+            />
+          )}
 
-          {/* ペルソナ */}
-          <Accordion.Item value="personas">
-            <Accordion.Control>
-              <Group gap="xs">
-                <Text>⭐️</Text>
-                <Text fw={600}>Personas</Text>
-              </Group>
-            </Accordion.Control>
-            <Accordion.Panel>
-              <PersonasList
-                onMessage={onMessage}
-                onConversationModeChange={onConversationModeChange}
-                onTalkStyleChange={onTalkStyleChange}
-                onStrategyChange={onStrategyChange}
-                personas={personas}
-                activeParticipantIds={activeParticipantIds}
-                onRefresh={onRefreshPersonas}
-              />
-            </Accordion.Panel>
-          </Accordion.Item>
+          {activeTab === 'workspace' && (
+            <WorkspacePanel
+              onAttachFile={onAttachFile}
+              includeInPrompt={includeWorkspaceInPrompt}
+              onToggleIncludeInPrompt={onToggleIncludeWorkspaceInPrompt}
+              onGoToSession={onGoToSession}
+              onRefresh={onRefreshWorkspace}
+            />
+          )}
 
-          {/* スラッシュコマンド */}
-          <Accordion.Item value="commands">
-            <Accordion.Control>
-              <Group gap="xs">
-                <Text>⚡</Text>
-                <Text fw={600}>Slash Commands</Text>
-              </Group>
-            </Accordion.Control>
-            <Accordion.Panel>
-              <SlashCommandList
-                onMessage={onMessage}
-                onCommandsUpdated={onSlashCommandsUpdated}
-                onRunCommand={onRunSlashCommand}
-              />
-            </Accordion.Panel>
-          </Accordion.Item>
-        </Accordion>
-      </Box>
-    </ScrollArea>
+          {activeTab === 'tasks' && (
+            <TaskList
+              tasks={tasks}
+              onTaskToggle={onTaskToggle}
+              onTaskDelete={onTaskDelete}
+            />
+          )}
+
+          {activeTab === 'personas' && (
+            <PersonasList
+              onMessage={onMessage}
+              onConversationModeChange={onConversationModeChange}
+              onTalkStyleChange={onTalkStyleChange}
+              onStrategyChange={onStrategyChange}
+              personas={personas}
+              activeParticipantIds={activeParticipantIds}
+              onRefresh={onRefreshPersonas}
+            />
+          )}
+
+          {activeTab === 'commands' && (
+            <SlashCommandList
+              onMessage={onMessage}
+              onCommandsUpdated={onSlashCommandsUpdated}
+              onRunCommand={onRunSlashCommand}
+            />
+          )}
+        </Box>
+      </ScrollArea>
+    </Box>
   );
 }

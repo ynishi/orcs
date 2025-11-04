@@ -64,7 +64,7 @@ export function SessionList({
   };
 
   return (
-    <Stack gap="xs" style={{ maxHeight: '400px' }}>
+    <Stack gap="xs" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* ヘッダー */}
       <Stack gap="xs" px="sm">
         <Group justify="space-between">
@@ -95,7 +95,7 @@ export function SessionList({
       </Stack>
 
       {/* セッションリスト */}
-      <ScrollArea h={340} px="sm">
+      <ScrollArea style={{ flex: 1 }} px="sm" type="auto">
         <Stack gap={4}>
           {sortedSessions.map((session) => (
             <Group

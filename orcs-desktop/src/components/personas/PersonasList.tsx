@@ -9,8 +9,8 @@ import { CONVERSATION_MODES, TALK_STYLES } from '../../types/conversation';
 
 // Available execution strategies
 const STRATEGIES = [
-  { value: 'broadcast', label: 'Broadcast' },
-  { value: 'sequential', label: 'Sequential' },
+  { value: 'broadcast', label: '📢 Broadcast' },
+  { value: 'sequential', label: '➡️ Sequential' },
 ];
 
 const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
@@ -338,6 +338,27 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
           </Text>
         </Group>
 
+        {/* Talk Style Selection */}
+        <Box>
+          <Text size="xs" c="dimmed" mb={4}>
+            Talk Style
+          </Text>
+          <Select
+            size="xs"
+            data={[
+              { value: '', label: '❌ None' },
+              ...TALK_STYLES.map(style => ({
+                value: style.value,
+                label: `${style.icon} ${style.label}`,
+              })),
+            ]}
+            value={selectedTalkStyle || ''}
+            onChange={handleTalkStyleChange}
+            placeholder="None"
+            clearable
+          />
+        </Box>
+
         {/* Strategy Selection */}
         <Box>
           <Text size="xs" c="dimmed" mb={4}>
@@ -368,27 +389,6 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
             onChange={handleConversationModeChange}
             placeholder="Select mode"
             allowDeselect={false}
-          />
-        </Box>
-
-        {/* Talk Style Selection */}
-        <Box>
-          <Text size="xs" c="dimmed" mb={4}>
-            Talk Style
-          </Text>
-          <Select
-            size="xs"
-            data={[
-              { value: '', label: '❌ None' },
-              ...TALK_STYLES.map(style => ({
-                value: style.value,
-                label: `${style.icon} ${style.label}`,
-              })),
-            ]}
-            value={selectedTalkStyle || ''}
-            onChange={handleTalkStyleChange}
-            placeholder="None"
-            clearable
           />
         </Box>
       </Stack>

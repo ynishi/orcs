@@ -7,13 +7,14 @@ interface StatusBarProps {
   status: StatusInfo;
   gitInfo?: GitInfo;
   participatingAgentsCount?: number;
+  totalPersonas?: number;
   autoMode?: boolean;
   conversationMode?: string;
   talkStyle?: string | null;
   executionStrategy?: string;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential' }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential' }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -83,13 +84,13 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoM
 
         <Divider orientation="vertical" />
 
-        {/* エージェント（参加中の人数） */}
+        {/* エージェント（参加中の人数/全体） */}
         <Group gap={6} wrap="nowrap">
           <Text size="sm" c="dimmed">
             Personas:
           </Text>
           <Badge color={participatingAgentsCount > 0 ? 'green' : 'gray'} size="sm" variant="filled">
-            {participatingAgentsCount}
+            {participatingAgentsCount}/{totalPersonas}
           </Badge>
         </Group>
 

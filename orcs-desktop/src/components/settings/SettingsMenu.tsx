@@ -5,11 +5,13 @@ import {
   IconFolder,
   IconFolderOpen,
   IconInfoCircle,
+  IconCopy,
 } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { notifications } from '@mantine/notifications';
 import { useState, useEffect } from 'react';
+import { PERSONA_CONFIG_TEMPLATE, CONFIG_TOML_TEMPLATE, SECRETS_TEMPLATE } from '../../utils/configTemplates';
 
 /**
  * Settings menu component that provides access to configuration files and directories.
@@ -165,6 +167,63 @@ export function SettingsMenu() {
     }
   };
 
+  const handleCopyPersonaTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(PERSONA_CONFIG_TEMPLATE);
+      notifications.show({
+        title: 'Template Copied!',
+        message: 'Persona configuration guide copied to clipboard. Paste it into a chat session for help!',
+        color: 'green',
+        autoClose: 5000,
+      });
+    } catch (error) {
+      console.error('[Settings] Failed to copy template:', error);
+      notifications.show({
+        title: 'Failed to Copy Template',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  const handleCopyConfigTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(CONFIG_TOML_TEMPLATE);
+      notifications.show({
+        title: 'Template Copied!',
+        message: 'Config template copied to clipboard',
+        color: 'green',
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error('[Settings] Failed to copy template:', error);
+      notifications.show({
+        title: 'Failed to Copy Template',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  const handleCopySecretsTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(SECRETS_TEMPLATE);
+      notifications.show({
+        title: 'Template Copied!',
+        message: 'Secrets template copied to clipboard',
+        color: 'green',
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error('[Settings] Failed to copy template:', error);
+      notifications.show({
+        title: 'Failed to Copy Template',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
   return (
     <Menu shadow="md" width={250}>
       <Menu.Target>
@@ -207,6 +266,28 @@ export function SettingsMenu() {
           onClick={handleOpenLogsDirectory}
         >
           <Text size="sm">Open Logs Directory</Text>
+        </Menu.Item>
+
+        <Menu.Divider />
+
+        <Menu.Label>Config Templates</Menu.Label>
+        <Menu.Item
+          leftSection={<IconCopy size={16} />}
+          onClick={handleCopyPersonaTemplate}
+        >
+          <Text size="sm">Copy Persona Guide</Text>
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<IconCopy size={16} />}
+          onClick={handleCopyConfigTemplate}
+        >
+          <Text size="sm">Copy Config Template</Text>
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<IconCopy size={16} />}
+          onClick={handleCopySecretsTemplate}
+        >
+          <Text size="sm">Copy Secrets Template</Text>
         </Menu.Item>
 
         <Menu.Divider />

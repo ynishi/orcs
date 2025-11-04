@@ -6,12 +6,19 @@ import {
   IconFolderOpen,
   IconInfoCircle,
   IconCopy,
+  IconWand,
 } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { notifications } from '@mantine/notifications';
 import { useState, useEffect } from 'react';
-import { PERSONA_CONFIG_TEMPLATE, CONFIG_TOML_TEMPLATE, SECRETS_TEMPLATE } from '../../utils/configTemplates';
+import { PERSONA_CONFIG_TEMPLATE, CONFIG_TOML_TEMPLATE, SECRETS_TEMPLATE, generateConfigSessionPrompt } from '../../utils/configTemplates';
+import type { PersonaConfig } from '../../types/agent';
+import type { Session } from '../../types/session';
+
+interface SettingsMenuProps {
+  onSelectSession?: (session: Session) => void;
+}
 
 /**
  * Settings menu component that provides access to configuration files and directories.
@@ -23,8 +30,11 @@ import { PERSONA_CONFIG_TEMPLATE, CONFIG_TOML_TEMPLATE, SECRETS_TEMPLATE } from 
  * - Open personas directory
  * - Open slash commands directory
  * - Display app root directory
+ * - Start Config Session (AI-assisted configuration)
  */
-export function SettingsMenu() {
+export function SettingsMenu({
+  onSelectSession,
+}: SettingsMenuProps = {}) {
   const [rootDir, setRootDir] = useState<string>('');
 
   useEffect(() => {
@@ -224,6 +234,68 @@ export function SettingsMenu() {
     }
   };
 
+  const handleStartConfigSession = async () => {
+    if (!onSelectSession) {
+      notifications.show({
+        title: 'Feature Not Available',
+        message: 'Config Session feature is not initialized',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    try {
+      // 1. Get ORCS config directory (will use as Admin Workspace root)
+      const orcsConfigDir = await invoke<string>('get_config_path');
+      const orcsDir = orcsConfigDir.replace('/config.toml', '');
+
+      // 2. Gather configuration information
+      const personas = await invoke<PersonaConfig[]>('get_personas');
+      const configPath = await invoke<string>('get_config_path');
+      const personasDir = await invoke<string>('get_personas_directory');
+      const slashCommandsDir = await invoke<string>('get_slash_commands_directory');
+      const secretsPath = await invoke<string>('get_secret_path');
+
+      // 3. Generate Config Session system prompt
+      const systemPrompt = generateConfigSessionPrompt({
+        personas,
+        configPath,
+        personasDir,
+        slashCommandsDir,
+        secretsPath,
+        orcsConfigDir: orcsDir,
+      });
+
+      // 4. Create Config Session (backend handles everything)
+      console.log('[Settings] Creating config session at:', orcsDir);
+      const session = await invoke<Session>('create_config_session', {
+        workspaceRootPath: orcsDir,
+        systemPrompt,
+      });
+
+      console.log('[Settings] Config session created:', session);
+
+      // 5. Select the session
+      onSelectSession(session);
+
+      notifications.show({
+        title: '🛠️ Config Session Started',
+        message: 'Ask me anything about ORCS configuration!',
+        color: 'blue',
+        autoClose: 5000,
+      });
+
+    } catch (error) {
+      console.error('[Settings] Failed to start config session:', error);
+      notifications.show({
+        title: 'Failed to Start Config Session',
+        message: String(error),
+        color: 'red',
+        autoClose: 10000,
+      });
+    }
+  };
+
   return (
     <Menu shadow="md" width={250}>
       <Menu.Target>
@@ -266,6 +338,16 @@ export function SettingsMenu() {
           onClick={handleOpenLogsDirectory}
         >
           <Text size="sm">Open Logs Directory</Text>
+        </Menu.Item>
+
+        <Menu.Divider />
+
+        <Menu.Label>AI Assistant</Menu.Label>
+        <Menu.Item
+          leftSection={<IconWand size={16} />}
+          onClick={handleStartConfigSession}
+        >
+          <Text size="sm">Start Config Session</Text>
         </Menu.Item>
 
         <Menu.Divider />

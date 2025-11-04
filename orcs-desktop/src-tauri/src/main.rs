@@ -125,6 +125,26 @@ async fn create_session(state: State<'_, AppState>) -> Result<Session, String> {
     Ok(session)
 }
 
+/// Creates a new config session with system prompt in admin workspace
+#[tauri::command]
+async fn create_config_session(
+    workspace_root_path: String,
+    system_prompt: String,
+    state: State<'_, AppState>,
+) -> Result<Session, String> {
+    // Use SessionUseCase for proper workspace and system prompt setup
+    let session = state
+        .session_usecase
+        .create_config_session(workspace_root_path, system_prompt)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Reset app mode
+    *state.app_mode.lock().await = AppMode::Idle;
+
+    Ok(session)
+}
+
 /// Lists all saved sessions with enriched participants
 #[tauri::command]
 async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, String> {
@@ -1392,6 +1412,7 @@ fn main() {
             })
             .invoke_handler(tauri::generate_handler![
                 create_session,
+                create_config_session,
                 list_sessions,
                 switch_session,
                 delete_session,

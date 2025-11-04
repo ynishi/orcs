@@ -1216,7 +1216,9 @@ function App() {
                 )}
 
                 {/* Settings Menu */}
-                <SettingsMenu />
+                <SettingsMenu
+                  onSelectSession={handleSessionSelect}
+                />
               </Group>
             </Group>
 

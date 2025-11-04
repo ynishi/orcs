@@ -220,6 +220,99 @@ impl SessionUseCase {
         Ok(session)
     }
 
+    /// Creates a new config session with system prompt in a specific workspace.
+    ///
+    /// This is a specialized version of `create_session` for configuration assistance.
+    /// It creates a session in the specified workspace (typically ~/.config/orcs) and
+    /// adds a system prompt to guide the AI in configuration tasks.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_root_path` - The root path for the admin workspace (e.g., ~/.config/orcs)
+    /// * `system_prompt` - The system prompt containing configuration guidance
+    ///
+    /// # Returns
+    ///
+    /// Returns the newly created config session with the system prompt added.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace cannot be created or retrieved
+    /// - The session creation fails
+    /// - Adding the system prompt fails
+    pub async fn create_config_session(
+        &self,
+        workspace_root_path: String,
+        system_prompt: String,
+    ) -> Result<Session> {
+        tracing::info!("[SessionUseCase] Creating config session at workspace: {}", workspace_root_path);
+
+        // 1. Get or create the admin workspace
+        let workspace = self
+            .workspace_manager
+            .get_or_create_workspace(&std::path::PathBuf::from(&workspace_root_path))
+            .await
+            .map_err(|e| anyhow!("Failed to get/create admin workspace: {}", e))?;
+
+        tracing::info!("[SessionUseCase] Admin workspace: {} ({})", workspace.name, workspace.id);
+
+        // 2. Update AppStateService to use this workspace
+        self.app_state_service
+            .set_last_selected_workspace(workspace.id.clone())
+            .await
+            .map_err(|e| anyhow!("Failed to set workspace selection: {}", e))?;
+
+        // 3. Create session
+        let session_id = Uuid::new_v4().to_string();
+        tracing::debug!("[SessionUseCase] Generated config session ID: {}", session_id);
+
+        let manager = self
+            .session_manager
+            .create_session(session_id.clone(), |sid| {
+                InteractionManager::new_session(
+                    sid,
+                    self.persona_repository.clone(),
+                    self.user_service.clone(),
+                )
+            })
+            .await?;
+
+        // 4. Associate with admin workspace
+        manager
+            .set_workspace_id(
+                Some(workspace.id.clone()),
+                Some(workspace.root_path.clone()),
+            )
+            .await;
+
+        tracing::info!(
+            "[SessionUseCase] Config session {} associated with workspace {}",
+            session_id,
+            workspace.id
+        );
+
+        // 5. Add system prompt as a system message
+        manager
+            .add_system_conversation_message(
+                system_prompt,
+                Some("config_assistant".to_string()),
+                None,
+            )
+            .await;
+
+        tracing::info!("[SessionUseCase] System prompt added to config session");
+
+        // 6. Persist session
+        self.session_manager
+            .save_active_session(AppMode::Idle)
+            .await?;
+
+        // 7. Return session
+        let session = manager.to_session(AppMode::Idle, None).await;
+        Ok(session)
+    }
+
     /// Switches to an existing session and restores its workspace context.
     ///
     /// This method implements UC2 (Session Switching):

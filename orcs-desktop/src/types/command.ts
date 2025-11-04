@@ -39,6 +39,14 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     argsDescription: 'normal (通常) | concise (簡潔・300文字) | brief (極簡潔・150文字) | discussion (議論)',
   },
   {
+    name: 'talk',
+    icon: '💬',
+    description: 'Set dialogue style for multi-agent conversation',
+    usage: '/talk [brainstorm|casual|decision_making|debate|problem_solving|review|planning|none]',
+    examples: ['/talk', '/talk brainstorm', '/talk debate', '/talk none'],
+    argsDescription: 'brainstorm (ブレインストーミング) | casual (カジュアル) | decision_making (意思決定) | debate (議論) | problem_solving (問題解決) | review (レビュー) | planning (計画) | none (解除)',
+  },
+  {
     name: 'status',
     icon: '📊',
     description: 'Display current system status and active tasks',

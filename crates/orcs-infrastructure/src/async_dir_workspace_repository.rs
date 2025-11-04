@@ -214,6 +214,7 @@ mod tests {
             project_context: ProjectContext::default(),
             last_accessed: 1000,
             is_favorite: true,
+            last_active_session_id: None,
         };
 
         // Save workspace
@@ -246,6 +247,7 @@ mod tests {
             project_context: ProjectContext::default(),
             last_accessed: 1000,
             is_favorite: false,
+            last_active_session_id: None,
         };
 
         repo.save(&workspace).await.unwrap();
@@ -271,6 +273,7 @@ mod tests {
             project_context: ProjectContext::default(),
             last_accessed: 1000,
             is_favorite: false,
+            last_active_session_id: None,
         };
 
         let workspace2 = Workspace {
@@ -282,6 +285,7 @@ mod tests {
             project_context: ProjectContext::default(),
             last_accessed: 2000,
             is_favorite: true,
+            last_active_session_id: None,
         };
 
         repo.save(&workspace1).await.unwrap();
@@ -324,6 +328,7 @@ mod tests {
             project_context: ProjectContext::default(),
             last_accessed: 1000,
             is_favorite: false,
+            last_active_session_id: None,
         };
 
         repo.save(&workspace).await.unwrap();

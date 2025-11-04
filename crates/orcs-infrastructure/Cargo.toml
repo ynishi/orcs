@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 orcs-core = { path = "../orcs-core" }
+llm-toolkit = { workspace = true }
 toml = "0.8"
 dirs = "5.0"
 serde = { version = "1.0", features = ["derive"] }

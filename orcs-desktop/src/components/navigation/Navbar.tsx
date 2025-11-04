@@ -35,6 +35,8 @@ interface NavbarProps {
   onMessage: (type: MessageType, author: string, text: string) => void;
   onSlashCommandsUpdated?: (commands: SlashCommand[]) => void;
   onRunSlashCommand?: (command: SlashCommand, args: string) => void | Promise<void>;
+  onConversationModeChange?: (mode: string) => void;
+  onTalkStyleChange?: (style: string | null) => void;
 }
 
 export function Navbar({
@@ -56,6 +58,8 @@ export function Navbar({
   onMessage,
   onSlashCommandsUpdated,
   onRunSlashCommand,
+  onConversationModeChange,
+  onTalkStyleChange,
 }: NavbarProps) {
   return (
     <ScrollArea h="100vh" type="auto">
@@ -137,7 +141,11 @@ export function Navbar({
               </Group>
             </Accordion.Control>
             <Accordion.Panel>
-              <PersonasList onMessage={onMessage} />
+              <PersonasList
+                onMessage={onMessage}
+                onConversationModeChange={onConversationModeChange}
+                onTalkStyleChange={onTalkStyleChange}
+              />
             </Accordion.Panel>
           </Accordion.Item>
 

@@ -37,3 +37,4 @@ orcs-execution = { path = "../../crates/orcs-execution" }
 orcs-infrastructure = { path = "../../crates/orcs-infrastructure" }
 orcs-interaction = { path = "../../crates/orcs-interaction" }
 orcs-application = { path = "../../crates/orcs-application" }
+llm-toolkit = { workspace = true }

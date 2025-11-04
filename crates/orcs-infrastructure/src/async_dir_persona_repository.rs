@@ -180,6 +180,7 @@ mod tests {
             default_participant: true,
             source: PersonaSource::User,
             backend: PersonaBackend::ClaudeCli,
+            model_name: None,
         };
 
         // Save
@@ -208,6 +209,7 @@ mod tests {
             default_participant: true,
             source: PersonaSource::System,
             backend: PersonaBackend::ClaudeCli,
+            model_name: None,
         };
 
         let persona2 = Persona {
@@ -219,6 +221,7 @@ mod tests {
             default_participant: false,
             source: PersonaSource::User,
             backend: PersonaBackend::GeminiCli,
+            model_name: None,
         };
 
         // Save multiple

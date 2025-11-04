@@ -2058,9 +2058,9 @@ checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
 
 [[package]]
 name = "llm-toolkit"
-version = "0.43.10"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c477c4f3033158fcdd96ad03774895cd073ffe2962af003a362320ead2b606e1"
+checksum = "5e593f4c70810aee5a585e3e88c80be9f87e1db6fa33f2f193aac690acd2e71b"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2086,9 +2086,9 @@ dependencies = [
 
 [[package]]
 name = "llm-toolkit-macros"
-version = "0.43.10"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b20ddc07a4d4834378f0591437abc53bfe72346507af53472c8a3260e96554a"
+checksum = "09e772d62af3d262f81447725ed08f36a8e41a525ef6339cc80895928fb04950"
 dependencies = [
  "minijinja",
  "proc-macro-crate 3.4.0",
@@ -2732,6 +2732,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "dirs 5.0.1",
+ "llm-toolkit",
  "orcs-application",
  "orcs-core",
  "orcs-execution",
@@ -2768,6 +2769,7 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "fs2",
+ "llm-toolkit",
  "mime_guess",
  "orcs-core",
  "semver",

@@ -35,6 +35,7 @@ async fn test_save_and_load_personas() {
             default_participant: true,
             source: PersonaSource::User,
             backend: PersonaBackend::ClaudeCli,
+            model_name: None,
         },
         Persona {
             id: uuid::Uuid::new_v4().to_string(),
@@ -45,6 +46,7 @@ async fn test_save_and_load_personas() {
             default_participant: false,
             source: PersonaSource::System,
             backend: PersonaBackend::GeminiCli,
+            model_name: None,
         },
     ];
 
@@ -84,6 +86,7 @@ async fn test_persona_fields() {
         default_participant: true,
         source: PersonaSource::User,
         backend: PersonaBackend::ClaudeCli,
+        model_name: None,
     };
 
     // Save
@@ -124,6 +127,7 @@ async fn test_multiple_personas_stored_separately() {
         default_participant: true,
         source: PersonaSource::User,
         backend: PersonaBackend::ClaudeCli,
+        model_name: None,
     };
 
     let persona2 = Persona {
@@ -135,6 +139,7 @@ async fn test_multiple_personas_stored_separately() {
         default_participant: false,
         source: PersonaSource::System,
         backend: PersonaBackend::GeminiCli,
+        model_name: None,
     };
 
     // Save first persona

@@ -32,8 +32,8 @@ thiserror = "1.0"
 # 2. Update the version number below
 # 3. Run `cargo update -p llm-toolkit -p llm-toolkit-macros`
 # 4. NEVER use path dependencies like: path = "workspace/llm-toolkit/..."
-llm-toolkit = { version = "0.43.10", features = ["agent"] }
-llm-toolkit-macros = { version = "0.43.10" }
+llm-toolkit = { version = "0.45.0", features = ["agent"] }
+llm-toolkit-macros = { version = "0.45.0" }
 # IMPORTANT: NEVER use path dependencies for version-migrate. Always use version from crates.io.
 # DO NOT change to: path = "version-migrate/..."
 version-migrate = { version = "0.11.0", features = ["async"] }

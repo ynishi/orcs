@@ -1,15 +1,18 @@
 import { Paper, Group, Badge, Text, Divider } from '@mantine/core';
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
+import { getConversationModeOption, getTalkStyleOption } from '../../types/conversation';
 
 interface StatusBarProps {
   status: StatusInfo;
   gitInfo?: GitInfo;
   participatingAgentsCount?: number;
   autoMode?: boolean;
+  conversationMode?: string;
+  talkStyle?: string | null;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoMode = false }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoMode = false, conversationMode = 'normal', talkStyle = null }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -105,6 +108,40 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, autoM
             {autoMode ? 'ON' : 'OFF'}
           </Badge>
         </Group>
+
+        {/* Conversation Mode */}
+        {conversationMode !== 'normal' && (
+          <>
+            <Divider orientation="vertical" />
+            <Group gap={4} wrap="nowrap">
+              <Text size="sm">
+                {getConversationModeOption(conversationMode as any)?.icon || '💬'}
+              </Text>
+              <Badge
+                color="blue"
+                size="sm"
+                variant="light"
+              >
+                {getConversationModeOption(conversationMode as any)?.label || conversationMode}
+              </Badge>
+            </Group>
+          </>
+        )}
+
+        {/* Talk Style */}
+        {talkStyle && (
+          <>
+            <Divider orientation="vertical" />
+            <Group gap={4} wrap="nowrap">
+              <Text size="sm">
+                {getTalkStyleOption(talkStyle as any)?.icon || '💬'}
+              </Text>
+              <Badge color="violet" size="sm" variant="light">
+                {getTalkStyleOption(talkStyle as any)?.label || talkStyle}
+              </Badge>
+            </Group>
+          </>
+        )}
 
         {/* Git リポジトリ情報 */}
         {gitInfo?.is_repo && (

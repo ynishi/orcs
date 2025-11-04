@@ -101,26 +101,48 @@ impl SessionUseCase {
         tracing::info!("[SessionUseCase] Creating new session");
 
         // 1. Get selected workspace ID from AppStateService
-        let workspace_id = self
+        let workspace_id_opt = self
             .app_state_service
             .get_last_selected_workspace()
-            .await
-            .ok_or_else(|| anyhow!("No workspace selected"))?;
+            .await;
 
-        tracing::info!("[SessionUseCase] Selected workspace ID: {}", workspace_id);
+        // 2. If no workspace is selected, try to auto-select one
+        let workspace_id_opt = if workspace_id_opt.is_none() {
+            tracing::info!("[SessionUseCase] No workspace selected, attempting auto-selection");
 
-        // 2. Get workspace details from WorkspaceManager
-        let workspace = self
-            .workspace_manager
-            .get_workspace(&workspace_id)
-            .await?
-            .ok_or_else(|| anyhow!("Selected workspace not found: {}", workspace_id))?;
+            match self.workspace_manager.list_all_workspaces().await {
+                Ok(workspaces) if !workspaces.is_empty() => {
+                    // Use most recently accessed workspace
+                    let most_recent = &workspaces[0];
+                    tracing::info!(
+                        "[SessionUseCase] Auto-selected workspace: {} ({})",
+                        most_recent.name,
+                        most_recent.id
+                    );
 
-        tracing::info!(
-            "[SessionUseCase] Found workspace: {} ({})",
-            workspace.name,
-            workspace.id
-        );
+                    // Save this selection to AppStateService
+                    if let Err(e) = self
+                        .app_state_service
+                        .set_last_selected_workspace(most_recent.id.clone())
+                        .await
+                    {
+                        tracing::warn!("[SessionUseCase] Failed to save auto-selected workspace: {}", e);
+                    }
+
+                    Some(most_recent.id.clone())
+                }
+                Ok(_) => {
+                    tracing::info!("[SessionUseCase] No workspaces found, creating session without workspace");
+                    None
+                }
+                Err(e) => {
+                    tracing::warn!("[SessionUseCase] Failed to list workspaces: {}", e);
+                    None
+                }
+            }
+        } else {
+            workspace_id_opt
+        };
 
         // 3. Create session
         let session_id = Uuid::new_v4().to_string();
@@ -137,30 +159,57 @@ impl SessionUseCase {
             })
             .await?;
 
-        // 4. Associate with workspace
-        tracing::debug!(
-            "[SessionUseCase] Associating session with workspace {} at path: {}",
-            workspace.id,
-            workspace.root_path.display()
-        );
+        // 4. Associate with workspace if available
+        if let Some(workspace_id) = workspace_id_opt {
+            match self.workspace_manager.get_workspace(&workspace_id).await {
+                Ok(Some(workspace)) => {
+                    tracing::info!(
+                        "[SessionUseCase] Found workspace: {} ({})",
+                        workspace.name,
+                        workspace.id
+                    );
 
-        manager
-            .set_workspace_id(
-                Some(workspace.id.clone()),
-                Some(workspace.root_path.clone()),
-            )
-            .await;
+                    tracing::debug!(
+                        "[SessionUseCase] Associating session with workspace {} at path: {}",
+                        workspace.id,
+                        workspace.root_path.display()
+                    );
 
-        // 5. Persist session (now includes workspace_id)
+                    manager
+                        .set_workspace_id(
+                            Some(workspace.id.clone()),
+                            Some(workspace.root_path.clone()),
+                        )
+                        .await;
+
+                    tracing::info!(
+                        "[SessionUseCase] Session {} created and associated with workspace {}",
+                        session_id,
+                        workspace.id
+                    );
+                }
+                Ok(None) => {
+                    tracing::warn!(
+                        "[SessionUseCase] Selected workspace {} not found, creating session without workspace",
+                        workspace_id
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "[SessionUseCase] Failed to get workspace {}: {}, creating session without workspace",
+                        workspace_id,
+                        e
+                    );
+                }
+            }
+        } else {
+            tracing::info!("[SessionUseCase] No workspace available, session created without workspace association");
+        }
+
+        // 5. Persist session
         self.session_manager
             .save_active_session(AppMode::Idle)
             .await?;
-
-        tracing::info!(
-            "[SessionUseCase] Session {} created and persisted with workspace {}",
-            session_id,
-            workspace.id
-        );
 
         // 6. Return session
         let session = manager.to_session(AppMode::Idle, None).await;

@@ -75,6 +75,8 @@ function App() {
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [thinkingPersona, setThinkingPersona] = useState<string>('AI');
   const [customCommands, setCustomCommands] = useState<SlashCommand[]>([]);
+  const [conversationMode, setConversationMode] = useState<string>('normal');
+  const [talkStyle, setTalkStyle] = useState<string | null>(null);
 
   // セッション管理をカスタムフックに切り替え
   const {
@@ -182,6 +184,28 @@ function App() {
     };
     loadGitInfo();
   }, []);
+
+  // Load conversation mode and talk style on session change
+  useEffect(() => {
+    const loadConversationSettings = async () => {
+      if (!currentSessionId) return;
+
+      try {
+        const mode = await invoke<string>('get_conversation_mode');
+        setConversationMode(mode);
+      } catch (error) {
+        console.error('Failed to load conversation mode:', error);
+      }
+
+      try {
+        const style = await invoke<string | null>('get_talk_style');
+        setTalkStyle(style);
+      } catch (error) {
+        console.error('Failed to load talk style:', error);
+      }
+    };
+    loadConversationSettings();
+  }, [currentSessionId]);
 
   // Load active session messages on startup or when currentSessionId changes
   useEffect(() => {
@@ -401,6 +425,7 @@ function App() {
 
                 try {
                   await invoke('set_conversation_mode', { mode });
+                  setConversationMode(mode);
                   const modeLabels: Record<string, string> = {
                     normal: '通常 (Normal)',
                     concise: '簡潔 (300文字)',
@@ -423,6 +448,53 @@ function App() {
                   addMessage('system', 'System', `Current mode: ${modeLabels[currentMode] || currentMode}\n\nUsage: /mode <normal|concise|brief|discussion>`);
                 } catch (error) {
                   addMessage('error', 'System', 'Usage: /mode <normal|concise|brief|discussion>');
+                }
+              }
+              return;
+            case 'talk':
+              if (parsed.args && parsed.args.length > 0) {
+                const style = parsed.args[0].toLowerCase();
+                const validStyles = ['brainstorm', 'casual', 'decision_making', 'debate', 'problem_solving', 'review', 'planning', 'none'];
+
+                if (!validStyles.includes(style)) {
+                  addMessage('error', 'System', `Invalid style: ${style}\n\nAvailable styles:\n- brainstorm (ブレインストーミング)\n- casual (カジュアル)\n- decision_making (意思決定)\n- debate (議論)\n- problem_solving (問題解決)\n- review (レビュー)\n- planning (計画)\n- none (解除)`);
+                  return;
+                }
+
+                try {
+                  const styleValue = style === 'none' ? null : style;
+                  await invoke('set_talk_style', { style: styleValue });
+                  setTalkStyle(styleValue);
+                  const styleLabels: Record<string, string> = {
+                    brainstorm: 'ブレインストーミング (Brainstorm)',
+                    casual: 'カジュアル (Casual)',
+                    decision_making: '意思決定 (Decision Making)',
+                    debate: '議論 (Debate)',
+                    problem_solving: '問題解決 (Problem Solving)',
+                    review: 'レビュー (Review)',
+                    planning: '計画 (Planning)',
+                    none: '解除 (None)',
+                  };
+                  addMessage('system', 'System', `✅ Talk style changed to: ${styleLabels[style]}`);
+                } catch (error) {
+                  addMessage('error', 'System', `Failed to set talk style: ${error}`);
+                }
+              } else {
+                try {
+                  const currentStyle = await invoke<string | null>('get_talk_style');
+                  const styleLabels: Record<string, string> = {
+                    brainstorm: 'ブレインストーミング (Brainstorm)',
+                    casual: 'カジュアル (Casual)',
+                    decision_making: '意思決定 (Decision Making)',
+                    debate: '議論 (Debate)',
+                    problem_solving: '問題解決 (Problem Solving)',
+                    review: 'レビュー (Review)',
+                    planning: '計画 (Planning)',
+                  };
+                  const currentLabel = currentStyle ? (styleLabels[currentStyle] || currentStyle) : 'Not set';
+                  addMessage('system', 'System', `Current talk style: ${currentLabel}\n\nUsage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>`);
+                } catch (error) {
+                  addMessage('error', 'System', 'Usage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>');
                 }
               }
               return;
@@ -907,6 +979,14 @@ function App() {
     }
   };
 
+  const handleConversationModeChange = (mode: string) => {
+    setConversationMode(mode);
+  };
+
+  const handleTalkStyleChange = (style: string | null) => {
+    setTalkStyle(style);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -977,6 +1057,8 @@ function App() {
           onMessage={addMessage}
           onSlashCommandsUpdated={refreshCustomCommands}
           onRunSlashCommand={handleRunSlashCommand}
+          onConversationModeChange={handleConversationModeChange}
+          onTalkStyleChange={handleTalkStyleChange}
         />
       </AppShell.Navbar>
 
@@ -1166,6 +1248,8 @@ function App() {
               gitInfo={gitInfo}
               participatingAgentsCount={0}
               autoMode={autoMode}
+              conversationMode={conversationMode}
+              talkStyle={talkStyle}
             />
           </Stack>
         </Container>

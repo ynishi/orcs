@@ -5,6 +5,7 @@
 
 use super::app_mode::{AppMode, ConversationMode};
 use super::message::ConversationMessage;
+use llm_toolkit::agent::dialogue::TalkStyle;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -55,6 +56,9 @@ pub struct Session {
     /// Conversation mode (controls verbosity and style)
     #[serde(default)]
     pub conversation_mode: ConversationMode,
+    /// Talk style for dialogue context (Brainstorm, Debate, etc.)
+    #[serde(default)]
+    pub talk_style: Option<TalkStyle>,
 }
 
 fn default_execution_strategy() -> String {

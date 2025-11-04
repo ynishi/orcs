@@ -370,6 +370,70 @@ async fn get_conversation_mode(state: State<'_, AppState>) -> Result<String, Str
     Ok(mode_str.to_string())
 }
 
+/// Sets the talk style for the active session
+#[tauri::command]
+async fn set_talk_style(
+    style: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use llm_toolkit::agent::dialogue::TalkStyle;
+
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    // Parse style string to TalkStyle enum
+    let talk_style = if let Some(s) = style {
+        match s.as_str() {
+            "brainstorm" => Some(TalkStyle::Brainstorm),
+            "casual" => Some(TalkStyle::Casual),
+            "decision_making" => Some(TalkStyle::DecisionMaking),
+            "debate" => Some(TalkStyle::Debate),
+            "problem_solving" => Some(TalkStyle::ProblemSolving),
+            "review" => Some(TalkStyle::Review),
+            "planning" => Some(TalkStyle::Planning),
+            _ => return Err(format!("Unknown talk style: {}", s)),
+        }
+    } else {
+        None
+    };
+
+    manager.set_talk_style(talk_style).await;
+
+    // Auto-save after changing style
+    let app_mode = state.app_mode.lock().await.clone();
+    let _ = state.session_manager.save_active_session(app_mode).await;
+
+    Ok(())
+}
+
+/// Gets the current talk style for the active session
+#[tauri::command]
+async fn get_talk_style(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    use llm_toolkit::agent::dialogue::TalkStyle;
+
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let style = manager.get_talk_style().await;
+    let style_str = style.map(|s| match s {
+        TalkStyle::Brainstorm => "brainstorm",
+        TalkStyle::Casual => "casual",
+        TalkStyle::DecisionMaking => "decision_making",
+        TalkStyle::Debate => "debate",
+        TalkStyle::ProblemSolving => "problem_solving",
+        TalkStyle::Review => "review",
+        TalkStyle::Planning => "planning",
+    }.to_string());
+
+    Ok(style_str)
+}
+
 /// Gets the path to the configuration file, creating it if it doesn't exist
 #[tauri::command]
 async fn get_config_path(state: State<'_, AppState>) -> Result<String, String> {
@@ -1287,6 +1351,8 @@ fn main() {
                 get_execution_strategy,
                 set_conversation_mode,
                 get_conversation_mode,
+                set_talk_style,
+                get_talk_style,
                 get_config_path,
                 get_sessions_directory,
                 get_workspaces_directory,

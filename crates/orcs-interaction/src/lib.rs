@@ -7,7 +7,7 @@ pub mod persona_agent;
 use crate::claude_api_agent::ClaudeApiAgent;
 use crate::gemini_api_agent::GeminiApiAgent;
 use crate::openai_api_agent::OpenAIApiAgent;
-use llm_toolkit::agent::dialogue::{Dialogue, DialogueTurn, ExecutionModel, Speaker};
+use llm_toolkit::agent::dialogue::{Dialogue, DialogueTurn, ExecutionModel, Speaker, TalkStyle};
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, CodexAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
@@ -261,9 +261,12 @@ pub struct InteractionManager {
     system_messages: Arc<RwLock<Vec<ConversationMessage>>>,
     /// Conversation mode (controls verbosity and style)
     conversation_mode: Arc<RwLock<ConversationMode>>,
+    /// Talk style for dialogue context (Brainstorm, Debate, etc.)
+    talk_style: Arc<RwLock<Option<TalkStyle>>>,
 }
 
 impl InteractionManager {
+
     /// Creates a new session with empty conversation history.
     ///
     /// # Arguments
@@ -307,6 +310,7 @@ impl InteractionManager {
             restored_participant_ids: Arc::new(RwLock::new(None)),
             system_messages: Arc::new(RwLock::new(Vec::new())),
             conversation_mode: Arc::new(RwLock::new(ConversationMode::default())),
+            talk_style: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -347,6 +351,7 @@ impl InteractionManager {
             restored_participant_ids: Arc::new(RwLock::new(restored_ids)),
             system_messages: Arc::new(RwLock::new(data.system_messages)),
             conversation_mode: Arc::new(RwLock::new(data.conversation_mode)),
+            talk_style: Arc::new(RwLock::new(data.talk_style)),
         }
     }
 
@@ -463,12 +468,32 @@ impl InteractionManager {
         // Rebuild dialogue history from persona_histories
         let history_turns = self.rebuild_dialogue_history().await;
 
-        // Create dialogue with restored history
+        // Read current talk style
+        let talk_style = self.talk_style.read().await.clone();
+
+        // Create dialogue with restored history and context
         let mut dialogue = match strategy_model {
             ExecutionModel::Sequential => Dialogue::sequential(),
             ExecutionModel::Broadcast => Dialogue::broadcast(),
+        };
+
+        // Apply context settings
+        dialogue
+            .with_environment("ORCS (Orchestrated Reasoning & Collaboration System) マルチエージェント対話アプリケーション")
+            .with_additional_context(
+                "【協調ガイドライン】\n\
+                 - 複数の AI ペルソナが協力してユーザーをサポートします\n\
+                 - 他の参加者の意見を尊重し、重複を避けて新しい視点を提供してください\n\
+                 - ユーザーのワークスペース環境で実行されています\n\
+                 - 建設的で協調的なコミュニケーションを心がけてください".to_string()
+            );
+
+        // Apply talk style if set
+        if let Some(style) = talk_style {
+            dialogue.with_talk_style(style);
         }
-        .with_history(history_turns);
+
+        let mut dialogue = dialogue.with_history(history_turns);
 
         // Check if we have restored participant IDs from session
         let restored_ids_opt = self.restored_participant_ids.read().await.clone();
@@ -539,13 +564,18 @@ impl InteractionManager {
         // Build participants map: persona ID -> name
         let mut participants = HashMap::new();
 
-        // Add user name
+        // Always add user name first (user is always a participant)
         let user_name = self.user_service.get_user_name();
-        participants.insert(user_name.clone(), user_name);
+        participants.insert(user_name.clone(), user_name.clone());
 
-        // Add all personas from persona_histories
+        // Add all personas from persona_histories (AI participants)
         if let Ok(all_personas) = self.persona_repository.get_all() {
             for persona_id in persona_histories.keys() {
+                // Skip user's history key if it exists
+                if persona_id == &user_name {
+                    continue;
+                }
+
                 if let Some(persona) = all_personas.iter().find(|p| &p.id == persona_id) {
                     participants.insert(persona_id.clone(), persona.name.clone());
                 }
@@ -553,6 +583,7 @@ impl InteractionManager {
         }
 
         let conversation_mode = self.conversation_mode.read().await.clone();
+        let talk_style = self.talk_style.read().await.clone();
 
         Session {
             id: self.session_id.clone(),
@@ -568,6 +599,7 @@ impl InteractionManager {
             system_messages,
             participants,
             conversation_mode,
+            talk_style,
         }
     }
 
@@ -794,6 +826,52 @@ impl InteractionManager {
         self.conversation_mode.read().await.clone()
     }
 
+    /// Sets the talk style for dialogue context.
+    ///
+    /// # Arguments
+    ///
+    /// * `style` - The talk style to use (Brainstorm/Debate/ProblemSolving/etc.)
+    ///
+    /// # Note
+    ///
+    /// This affects the dialogue context and conversation tone.
+    /// The style will be applied on the next dialogue creation.
+    pub async fn set_talk_style(&self, style: Option<TalkStyle>) {
+        // Record system message for talk style change
+        if let Some(s) = &style {
+            let style_str = match s {
+                TalkStyle::Brainstorm => "ブレインストーミング",
+                TalkStyle::Casual => "カジュアル",
+                TalkStyle::DecisionMaking => "意思決定",
+                TalkStyle::Debate => "議論",
+                TalkStyle::ProblemSolving => "問題解決",
+                TalkStyle::Review => "レビュー",
+                TalkStyle::Planning => "計画",
+            };
+            let system_msg = ConversationMessage {
+                role: MessageRole::System,
+                content: format!("会話スタイルを {} に変更しました", style_str),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                metadata: MessageMetadata {
+                    system_event_type: Some(SystemEventType::ModeChanged),
+                    error_severity: None,
+                    include_in_dialogue: true,
+                },
+            };
+            self.system_messages.write().await.push(system_msg);
+        }
+
+        *self.talk_style.write().await = style;
+
+        // Invalidate dialogue to apply new style
+        self.invalidate_dialogue().await;
+    }
+
+    /// Gets the current talk style.
+    pub async fn get_talk_style(&self) -> Option<TalkStyle> {
+        self.talk_style.read().await.clone()
+    }
+
     /// Invalidates the current dialogue, forcing it to be recreated with latest persona settings.
     ///
     /// This should be called when:
@@ -892,7 +970,7 @@ impl InteractionManager {
         // Note: Dialogue/Persona agents handle speaker attribution internally
         let mut payload = Payload::new().with_message(speaker, input);
 
-        // Inject conversation mode system instruction if available
+        // Prepend conversation mode system instruction if available
         let conversation_mode = self.conversation_mode.read().await;
         if let Some(instruction) = conversation_mode.system_instruction() {
             payload = payload.prepend_system(instruction);

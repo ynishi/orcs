@@ -207,10 +207,11 @@ impl SessionRepository for AsyncDirSessionRepository {
     }
 
     async fn save(&self, session: &Session) -> Result<()> {
-        self.storage
+        let result = self.storage
             .save("session", &session.id, session)
-            .await
-            .context("Failed to save session")?;
+            .await;
+        eprintln!("Save result: {:?}", result);
+        result.context("Failed to save session")?;
         Ok(())
     }
 
@@ -274,7 +275,7 @@ impl SessionRepository for AsyncDirSessionRepository {
 mod tests {
     use super::*;
     use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
-    use orcs_core::session::{AppMode, ConversationMessage, MessageRole};
+    use orcs_core::session::{AppMode, ConversationMessage, MessageMetadata, MessageRole};
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
@@ -296,6 +297,7 @@ mod tests {
                     default_participant: true,
                     source: PersonaSource::System,
                     backend: PersonaBackend::ClaudeCli,
+                    model_name: None,
                 }]),
             }
         }
@@ -320,11 +322,13 @@ mod tests {
                     role: MessageRole::User,
                     content: "Hello".to_string(),
                     timestamp: "2024-01-01T00:00:00Z".to_string(),
+                    metadata: MessageMetadata::default(),
                 },
                 ConversationMessage {
                     role: MessageRole::Assistant,
                     content: "Hi there!".to_string(),
                     timestamp: "2024-01-01T00:00:01Z".to_string(),
+                    metadata: MessageMetadata::default(),
                 },
             ],
         );
@@ -338,6 +342,12 @@ mod tests {
             persona_histories,
             app_mode: AppMode::Idle,
             workspace_id: None,
+            active_participant_ids: vec![],
+            execution_strategy: "broadcast".to_string(),
+            system_messages: vec![],
+            participants: HashMap::new(),
+            conversation_mode: Default::default(),
+            talk_style: None,
         }
     }
 

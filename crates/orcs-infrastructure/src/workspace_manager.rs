@@ -749,7 +749,6 @@ mod tests {
         assert_eq!(workspace.name, "test-repo");
         assert_eq!(workspace.root_path, repo_path);
         assert!(workspace.resources.uploaded_files.is_empty());
-        assert!(workspace.resources.generated_docs.is_empty());
         assert!(workspace.resources.temp_files.is_empty());
     }
 

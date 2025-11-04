@@ -5,19 +5,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
 import { handleSystemMessage, conversationMessage } from '../../utils/systemMessage';
+import { CONVERSATION_MODES, TALK_STYLES } from '../../types/conversation';
 
 // Available execution strategies
 const STRATEGIES = [
   { value: 'broadcast', label: 'Broadcast' },
   { value: 'sequential', label: 'Sequential' },
-];
-
-// Available conversation modes
-const CONVERSATION_MODES = [
-  { value: 'normal', label: '通常 (Normal)' },
-  { value: 'concise', label: '簡潔 (300文字)' },
-  { value: 'brief', label: '極簡潔 (150文字)' },
-  { value: 'discussion', label: '議論 (Discussion)' },
 ];
 
 const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
@@ -31,16 +24,19 @@ const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
 
 interface PersonasListProps {
   onStrategyChange?: (strategy: string) => void;
+  onConversationModeChange?: (mode: string) => void;
+  onTalkStyleChange?: (style: string | null) => void;
   onMessage?: (type: 'system' | 'error', author: string, text: string) => void;
 }
 
-export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps) {
+export function PersonasList({ onStrategyChange, onConversationModeChange, onTalkStyleChange, onMessage }: PersonasListProps) {
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfig[]>([]);
   const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPersona, setEditingPersona] = useState<Partial<PersonaConfig> | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<string>('default');
   const [selectedConversationMode, setSelectedConversationMode] = useState<string>('normal');
+  const [selectedTalkStyle, setSelectedTalkStyle] = useState<string | null>(null);
 
   const handleStrategyChange = async (value: string | null) => {
     const strategy = value || 'broadcast';
@@ -81,6 +77,9 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
     try {
       await invoke('set_conversation_mode', { mode });
 
+      // Notify parent component
+      onConversationModeChange?.(mode);
+
       // Show system message
       const modeLabel = CONVERSATION_MODES.find(m => m.value === mode)?.label || mode;
       const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
@@ -103,6 +102,39 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
     }
   };
 
+  const handleTalkStyleChange = async (value: string | null) => {
+    const style = value || null;
+    setSelectedTalkStyle(style);
+
+    // Update backend
+    try {
+      await invoke('set_talk_style', { style });
+
+      // Notify parent component
+      onTalkStyleChange?.(style);
+
+      // Show system message
+      const styleLabel = style ? (TALK_STYLES.find(s => s.value === style)?.label || style) : 'None';
+      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+      handleSystemMessage(
+        conversationMessage(
+          `Talk style changed to: ${styleLabel} [${timestamp}]`,
+          'info'
+        ),
+        onMessage
+      );
+    } catch (error) {
+      console.error('Failed to set talk style:', error);
+      handleSystemMessage(
+        conversationMessage(
+          `Failed to set talk style: ${error}`,
+          'error'
+        ),
+        onMessage
+      );
+    }
+  };
+
   // Fetch personas from backend
   const fetchPersonas = async () => {
     try {
@@ -110,10 +142,12 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
       const activeIds = await invoke<string[]>('get_active_participants');
       const strategy = await invoke<string>('get_execution_strategy');
       const conversationMode = await invoke<string>('get_conversation_mode');
+      const talkStyle = await invoke<string | null>('get_talk_style');
       setPersonaConfigs(personas);
       setActiveParticipantIds(activeIds);
       setSelectedStrategy(strategy);
       setSelectedConversationMode(conversationMode);
+      setSelectedTalkStyle(talkStyle);
     } catch (error) {
       console.error('Failed to fetch personas:', error);
     }
@@ -326,11 +360,35 @@ export function PersonasList({ onStrategyChange, onMessage }: PersonasListProps)
           </Text>
           <Select
             size="xs"
-            data={CONVERSATION_MODES}
+            data={CONVERSATION_MODES.map(mode => ({
+              value: mode.value,
+              label: `${mode.icon} ${mode.label}`,
+            }))}
             value={selectedConversationMode}
             onChange={handleConversationModeChange}
             placeholder="Select mode"
             allowDeselect={false}
+          />
+        </Box>
+
+        {/* Talk Style Selection */}
+        <Box>
+          <Text size="xs" c="dimmed" mb={4}>
+            Talk Style
+          </Text>
+          <Select
+            size="xs"
+            data={[
+              { value: '', label: '❌ None' },
+              ...TALK_STYLES.map(style => ({
+                value: style.value,
+                label: `${style.icon} ${style.label}`,
+              })),
+            ]}
+            value={selectedTalkStyle || ''}
+            onChange={handleTalkStyleChange}
+            placeholder="None"
+            clearable
           />
         </Box>
       </Stack>

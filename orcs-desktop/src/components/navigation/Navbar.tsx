@@ -38,6 +38,11 @@ interface NavbarProps {
   onConversationModeChange?: (mode: string) => void;
   onTalkStyleChange?: (style: string | null) => void;
   onStrategyChange?: (strategy: string) => void;
+
+  // Personas
+  personas?: import('../../types/agent').PersonaConfig[];
+  activeParticipantIds?: string[];
+  onRefreshPersonas?: () => Promise<void>;
 }
 
 export function Navbar({
@@ -62,6 +67,9 @@ export function Navbar({
   onConversationModeChange,
   onTalkStyleChange,
   onStrategyChange,
+  personas,
+  activeParticipantIds,
+  onRefreshPersonas,
 }: NavbarProps) {
   return (
     <ScrollArea h="100vh" type="auto">
@@ -148,6 +156,9 @@ export function Navbar({
                 onConversationModeChange={onConversationModeChange}
                 onTalkStyleChange={onTalkStyleChange}
                 onStrategyChange={onStrategyChange}
+                personas={personas}
+                activeParticipantIds={activeParticipantIds}
+                onRefresh={onRefreshPersonas}
               />
             </Accordion.Panel>
           </Accordion.Item>

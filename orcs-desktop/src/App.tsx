@@ -1171,6 +1171,9 @@ function App() {
           onConversationModeChange={handleConversationModeChange}
           onTalkStyleChange={handleTalkStyleChange}
           onStrategyChange={handleStrategyChange}
+          personas={personas}
+          activeParticipantIds={activeParticipantIds}
+          onRefreshPersonas={refreshPersonas}
         />
       </AppShell.Navbar>
 

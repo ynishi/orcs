@@ -29,11 +29,26 @@ interface PersonasListProps {
   onConversationModeChange?: (mode: string) => void;
   onTalkStyleChange?: (style: string | null) => void;
   onMessage?: (type: MessageType, author: string, text: string) => void;
+  personas?: PersonaConfig[];
+  activeParticipantIds?: string[];
+  onRefresh?: () => Promise<void>;
 }
 
-export function PersonasList({ onStrategyChange, onConversationModeChange, onTalkStyleChange, onMessage }: PersonasListProps) {
+export function PersonasList({
+  onStrategyChange,
+  onConversationModeChange,
+  onTalkStyleChange,
+  onMessage,
+  personas: propsPersonas,
+  activeParticipantIds: propsActiveParticipantIds,
+  onRefresh,
+}: PersonasListProps) {
+  // Use props if provided, otherwise maintain local state for backwards compatibility
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfig[]>([]);
   const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
+
+  const personas = propsPersonas ?? personaConfigs;
+  const activeIds = propsActiveParticipantIds ?? activeParticipantIds;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPersona, setEditingPersona] = useState<Partial<PersonaConfig> | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<string>('default');
@@ -137,7 +152,7 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
     }
   };
 
-  // Fetch personas from backend
+  // Fetch personas from backend (only if not provided via props)
   const fetchPersonas = async () => {
     try {
       const personas = await invoke<PersonaConfig[]>('get_personas');
@@ -156,12 +171,15 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
   };
 
   useEffect(() => {
-    fetchPersonas();
-  }, []);
+    // Only fetch if personas not provided via props
+    if (!propsPersonas) {
+      fetchPersonas();
+    }
+  }, [propsPersonas]);
 
   const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
     try {
-      const persona = personaConfigs.find(p => p.id === personaId);
+      const persona = personas.find(p => p.id === personaId);
       if (!persona) return;
 
       if (isChecked) {
@@ -178,8 +196,14 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
         );
       }
 
-      const updatedIds = await invoke<string[]>('get_active_participants');
-      setActiveParticipantIds(updatedIds);
+      // If onRefresh provided, call it to sync with parent
+      if (onRefresh) {
+        await onRefresh();
+      } else {
+        // Otherwise update local state for backwards compatibility
+        const updatedIds = await invoke<string[]>('get_active_participants');
+        setActiveParticipantIds(updatedIds);
+      }
     } catch (error) {
       console.error(error);
       handleSystemMessage(
@@ -205,7 +229,14 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
   const saveAndReload = async (updatedConfigs: PersonaConfig[]) => {
     try {
       await invoke('save_persona_configs', { configs: updatedConfigs });
-      await fetchPersonas();
+
+      // Refresh using callback if provided, otherwise fetch locally
+      if (onRefresh) {
+        await onRefresh();
+      } else {
+        await fetchPersonas();
+      }
+
       handleSystemMessage(
         conversationMessage('Persona configuration saved successfully.', 'success', '✅'),
         onMessage
@@ -221,16 +252,16 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
 
   // Handler for saving a persona (create or update)
   const handleSavePersona = async (personaToSave: PersonaConfig) => {
-    const existingIndex = personaConfigs.findIndex(p => p.id === personaToSave.id);
+    const existingIndex = personas.findIndex(p => p.id === personaToSave.id);
     let updatedConfigs: PersonaConfig[];
 
     if (existingIndex >= 0) {
       // Update existing persona
-      updatedConfigs = [...personaConfigs];
+      updatedConfigs = [...personas];
       updatedConfigs[existingIndex] = personaToSave;
     } else {
       // Add new persona
-      updatedConfigs = [...personaConfigs, personaToSave];
+      updatedConfigs = [...personas, personaToSave];
     }
 
     await saveAndReload(updatedConfigs);
@@ -243,12 +274,12 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
       return;
     }
 
-    const updatedConfigs = personaConfigs.filter(p => p.id !== id);
+    const updatedConfigs = personas.filter(p => p.id !== id);
     await saveAndReload(updatedConfigs);
   };
 
   const renderPersona = (persona: PersonaConfig) => {
-    const isActive = activeParticipantIds.includes(persona.id);
+    const isActive = activeIds.includes(persona.id);
 
     return (
       <Group
@@ -336,7 +367,7 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
             </Tooltip>
           </Group>
           <Text size="sm" c="dimmed">
-            {activeParticipantIds.length} participating
+            {activeIds.length} participating
           </Text>
         </Group>
 
@@ -399,16 +430,16 @@ export function PersonasList({ onStrategyChange, onConversationModeChange, onTal
       <ScrollArea style={{ flex: 1 }} px="sm">
         <Stack gap="md">
           {/* ペルソナリスト */}
-          {personaConfigs.length > 0 && (
+          {personas.length > 0 && (
             <Box>
               <Stack gap={4}>
-                {personaConfigs.map(renderPersona)}
+                {personas.map(renderPersona)}
               </Stack>
             </Box>
           )}
 
           {/* 空の状態 */}
-          {personaConfigs.length === 0 && (
+          {personas.length === 0 && (
             <Box p="md" style={{ textAlign: 'center' }}>
               <Text size="sm" c="dimmed">
                 No personas available

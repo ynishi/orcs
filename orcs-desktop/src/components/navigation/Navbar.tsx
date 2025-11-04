@@ -44,7 +44,9 @@ interface NavbarProps {
   // Personas
   personas?: import('../../types/agent').PersonaConfig[];
   activeParticipantIds?: string[];
+  executionStrategy?: string;
   onRefreshPersonas?: () => Promise<void>;
+  onRefreshSessions?: () => Promise<void>;
 }
 
 export function Navbar({
@@ -71,7 +73,9 @@ export function Navbar({
   onStrategyChange,
   personas,
   activeParticipantIds,
+  executionStrategy,
   onRefreshPersonas,
+  onRefreshSessions,
 }: NavbarProps) {
   const [activeTab, setActiveTab] = useState<'sessions' | 'workspace' | 'tasks' | 'personas' | 'commands'>('sessions');
 
@@ -173,7 +177,9 @@ export function Navbar({
               onStrategyChange={onStrategyChange}
               personas={personas}
               activeParticipantIds={activeParticipantIds}
+              executionStrategy={executionStrategy}
               onRefresh={onRefreshPersonas}
+              onRefreshSessions={onRefreshSessions}
             />
           )}
 

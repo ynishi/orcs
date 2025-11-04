@@ -31,7 +31,9 @@ interface PersonasListProps {
   onMessage?: (type: MessageType, author: string, text: string) => void;
   personas?: PersonaConfig[];
   activeParticipantIds?: string[];
+  executionStrategy?: string;
   onRefresh?: () => Promise<void>;
+  onRefreshSessions?: () => Promise<void>;
 }
 
 export function PersonasList({
@@ -41,7 +43,9 @@ export function PersonasList({
   onMessage,
   personas: propsPersonas,
   activeParticipantIds: propsActiveParticipantIds,
+  executionStrategy: propsExecutionStrategy,
   onRefresh,
+  onRefreshSessions,
 }: PersonasListProps) {
   // Use props if provided, otherwise maintain local state for backwards compatibility
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfig[]>([]);
@@ -63,6 +67,11 @@ export function PersonasList({
     // Update backend
     try {
       await invoke('set_execution_strategy', { strategy });
+
+      // Refresh sessions to update execution_strategy field
+      if (onRefreshSessions) {
+        await onRefreshSessions();
+      }
 
       // Show system message
       const strategyLabel = STRATEGIES.find(s => s.value === strategy)?.label || strategy;
@@ -176,6 +185,13 @@ export function PersonasList({
       fetchPersonas();
     }
   }, [propsPersonas]);
+
+  // Sync execution strategy from props
+  useEffect(() => {
+    if (propsExecutionStrategy) {
+      setSelectedStrategy(propsExecutionStrategy);
+    }
+  }, [propsExecutionStrategy]);
 
   const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
     try {

@@ -208,12 +208,7 @@ function App() {
         console.error('Failed to load talk style:', error);
       }
 
-      try {
-        const strategy = await invoke<string>('get_execution_strategy');
-        setExecutionStrategy(strategy);
-      } catch (error) {
-        console.error('Failed to load execution strategy:', error);
-      }
+      // Note: execution_strategy is now loaded from Session object in loadActiveSessionMessages effect
     };
     loadConversationSettings();
   }, [currentSessionId]);
@@ -232,6 +227,12 @@ function App() {
           const restoredMessages = convertSessionToMessages(activeSession, userNickname);
           setMessages(restoredMessages);
           console.log('[App] Loaded', restoredMessages.length, 'messages from session', currentSessionId);
+
+          // Restore execution strategy from session
+          if (activeSession.execution_strategy) {
+            setExecutionStrategy(activeSession.execution_strategy);
+            console.log('[App] Restored execution strategy:', activeSession.execution_strategy);
+          }
         }
       } catch (error) {
         console.error('[App] Failed to load active session messages:', error);
@@ -261,10 +262,9 @@ function App() {
     try {
       const personasList = await invoke<import('./types/agent').PersonaConfig[]>('get_personas');
       const activeIds = await invoke<string[]>('get_active_participants');
-      const strategy = await invoke<string>('get_execution_strategy');
       setPersonas(personasList);
       setActiveParticipantIds(activeIds);
-      setExecutionStrategy(strategy);
+      // Note: execution_strategy is loaded from Session object, not from backend command
     } catch (error) {
       console.error('Failed to load personas:', error);
     }
@@ -1175,7 +1175,9 @@ function App() {
           onStrategyChange={handleStrategyChange}
           personas={personas}
           activeParticipantIds={activeParticipantIds}
+          executionStrategy={executionStrategy}
           onRefreshPersonas={refreshPersonas}
+          onRefreshSessions={refreshSessions}
         />
       </AppShell.Navbar>
 

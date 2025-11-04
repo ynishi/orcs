@@ -32,6 +32,7 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
         role: persona.role.clone(),
         background: persona.background.clone(),
         communication_style: persona.communication_style.clone(),
+        visual_identity: None,
     }
 }
 
@@ -39,6 +40,7 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
 fn string_to_execution_model(s: &str) -> ExecutionModel {
     match s {
         "sequential" => ExecutionModel::Sequential,
+        "mentioned" => ExecutionModel::Mentioned,
         _ => ExecutionModel::Broadcast,
     }
 }

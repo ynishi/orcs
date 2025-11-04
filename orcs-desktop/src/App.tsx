@@ -79,6 +79,8 @@ function App() {
   const [conversationMode, setConversationMode] = useState<string>('normal');
   const [talkStyle, setTalkStyle] = useState<string | null>(null);
   const [executionStrategy, setExecutionStrategy] = useState<string>('sequential');
+  const [personas, setPersonas] = useState<import('./types/agent').PersonaConfig[]>([]);
+  const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
 
   // セッション管理をカスタムフックに切り替え
   const {
@@ -254,6 +256,22 @@ function App() {
     refreshCustomCommands();
   }, [refreshCustomCommands]);
 
+  // Load personas and active participants
+  const refreshPersonas = useCallback(async () => {
+    try {
+      const personasList = await invoke<import('./types/agent').PersonaConfig[]>('get_personas');
+      const activeIds = await invoke<string[]>('get_active_participants');
+      setPersonas(personasList);
+      setActiveParticipantIds(activeIds);
+    } catch (error) {
+      console.error('Failed to load personas:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshPersonas();
+  }, [refreshPersonas]);
+
   // Listen for workspace-switched events to refresh workspace data and Git info
   useEffect(() => {
     const unlisten = listen<string>('workspace-switched', async () => {
@@ -323,14 +341,23 @@ function App() {
     const mentionFilter = getCurrentMention(input, cursorPosition);
 
     if (mentionFilter !== null) {
-      const filtered: Agent[] = [];
+      // Filter personas by name (case-insensitive)
+      const filtered: Agent[] = personas
+        .filter(p => p.name.toLowerCase().includes(mentionFilter.toLowerCase()))
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          status: activeParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
+          description: `${p.role} - ${p.background}`,
+          isActive: activeParticipantIds.includes(p.id),
+        }));
       setFilteredAgents(filtered);
       setShowAgentSuggestions(filtered.length > 0);
       setSelectedAgentIndex(0);
     } else {
       setShowAgentSuggestions(false);
     }
-  }, [input, customCommands]);
+  }, [input, customCommands, personas, activeParticipantIds]);
 
   // メッセージを追加するヘルパー関数
   const addMessage = (type: MessageType, author: string, text: string) => {
@@ -1063,6 +1090,23 @@ function App() {
 
     const currentInput = input;
     const currentFiles = [...attachedFiles];
+
+    // Check for @mentions and auto-add inactive personas
+    const mentions = extractMentions(currentInput);
+    for (const mention of mentions) {
+      const persona = personas.find(p => p.name === mention.agentName);
+      if (persona && !activeParticipantIds.includes(persona.id)) {
+        try {
+          await invoke('add_participant', { personaId: persona.id });
+          addMessage('system', 'System', `${persona.name} が参加しました`);
+          // Refresh participants list
+          await refreshPersonas();
+        } catch (error) {
+          console.error(`Failed to add participant ${persona.name}:`, error);
+        }
+      }
+    }
+
     setInput("");
     setAttachedFiles([]);
     setShowSuggestions(false);

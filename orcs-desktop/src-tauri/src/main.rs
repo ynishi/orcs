@@ -3,6 +3,7 @@
 
 mod slash_commands;
 
+use llm_toolkit::agent::dialogue::ExecutionModel;
 use orcs_application::SessionUseCase;
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::PersonaRepository;
@@ -362,7 +363,7 @@ async fn get_active_participants(state: State<'_, AppState>) -> Result<Vec<Strin
 /// Sets the execution strategy for the active session
 #[tauri::command]
 async fn set_execution_strategy(
-    strategy: String,
+    strategy: ExecutionModel,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let manager = state
@@ -382,7 +383,7 @@ async fn set_execution_strategy(
 
 /// Gets the current execution strategy for the active session
 #[tauri::command]
-async fn get_execution_strategy(state: State<'_, AppState>) -> Result<String, String> {
+async fn get_execution_strategy(state: State<'_, AppState>) -> Result<ExecutionModel, String> {
     let manager = state
         .session_manager
         .active_session()

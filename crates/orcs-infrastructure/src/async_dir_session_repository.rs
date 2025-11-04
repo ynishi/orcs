@@ -10,6 +10,7 @@
 use crate::dto::create_session_migrator;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use llm_toolkit::agent::dialogue::ExecutionModel;
 use orcs_core::repository::{PersonaRepository, SessionRepository};
 use orcs_core::session::{ConversationMessage, Session};
 use std::collections::HashMap;
@@ -341,7 +342,7 @@ mod tests {
             app_mode: AppMode::Idle,
             workspace_id: None,
             active_participant_ids: vec![],
-            execution_strategy: "broadcast".to_string(),
+            execution_strategy: ExecutionModel::Broadcast,
             system_messages: vec![],
             participants: HashMap::new(),
             conversation_mode: Default::default(),

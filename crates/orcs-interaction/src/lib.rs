@@ -36,14 +36,6 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
     }
 }
 
-/// Converts a string strategy name to ExecutionModel enum.
-fn string_to_execution_model(s: &str) -> ExecutionModel {
-    match s {
-        "sequential" => ExecutionModel::Sequential,
-        "mentioned" => ExecutionModel::Mentioned,
-        _ => ExecutionModel::Broadcast,
-    }
-}
 
 /// Agent wrapper that delegates to the configured backend.
 #[derive(Clone, Debug)]
@@ -256,8 +248,8 @@ pub struct InteractionManager {
     persona_repository: Arc<dyn PersonaRepository>,
     /// Service for retrieving user information
     user_service: Arc<dyn UserService>,
-    /// Execution strategy for dialogue (e.g., "broadcast", "sequential")
-    execution_strategy: Arc<RwLock<String>>,
+    /// Execution strategy for dialogue
+    execution_strategy: Arc<RwLock<ExecutionModel>>,
     /// Active participant persona IDs (restored from session or populated dynamically)
     restored_participant_ids: Arc<RwLock<Option<Vec<String>>>>,
     /// System messages (join/leave notifications, etc.)
@@ -308,7 +300,7 @@ impl InteractionManager {
             persona_histories: Arc::new(RwLock::new(persona_histories_map)),
             persona_repository,
             user_service,
-            execution_strategy: Arc::new(RwLock::new("broadcast".to_string())),
+            execution_strategy: Arc::new(RwLock::new(ExecutionModel::Broadcast)),
             restored_participant_ids: Arc::new(RwLock::new(None)),
             system_messages: Arc::new(RwLock::new(Vec::new())),
             conversation_mode: Arc::new(RwLock::new(ConversationMode::default())),
@@ -459,8 +451,7 @@ impl InteractionManager {
             return Ok(());
         }
 
-        let strategy_str = self.execution_strategy.read().await.clone();
-        let strategy_model = string_to_execution_model(&strategy_str);
+        let strategy_model = *self.execution_strategy.read().await;
 
         // Rebuild dialogue history from persona_histories
         let history_turns = self.rebuild_dialogue_history().await;
@@ -539,7 +530,7 @@ impl InteractionManager {
         let persona_histories = self.persona_histories.read().await.clone();
         let title = self.title.read().await.clone();
         let instance_workspace_id = self.workspace_id.read().await.clone();
-        let execution_strategy = self.execution_strategy.read().await.clone();
+        let execution_strategy = *self.execution_strategy.read().await;
         let system_messages = self.system_messages.read().await.clone();
 
         // Use the first default participant as current_persona_id
@@ -783,17 +774,22 @@ impl InteractionManager {
     ///
     /// # Arguments
     ///
-    /// * `strategy` - The execution strategy to use (e.g., "broadcast", "sequential")
+    /// * `strategy` - The execution strategy to use
     ///
     /// # Note
     ///
     /// This will invalidate the current dialogue instance, which will be recreated
     /// with the new strategy on the next interaction.
-    pub async fn set_execution_strategy(&self, strategy: String) {
+    pub async fn set_execution_strategy(&self, strategy: ExecutionModel) {
         // Record system message for context visibility to agents
+        let strategy_name = match strategy {
+            ExecutionModel::Broadcast => "Broadcast",
+            ExecutionModel::Sequential => "Sequential",
+            ExecutionModel::Mentioned => "Mentioned",
+        };
         let system_msg = ConversationMessage {
             role: MessageRole::System,
-            content: format!("実行戦略を {} に変更しました", strategy),
+            content: format!("実行戦略を {} に変更しました", strategy_name),
             timestamp: chrono::Utc::now().to_rfc3339(),
             metadata: MessageMetadata {
                 system_event_type: Some(SystemEventType::ExecutionStrategyChanged),
@@ -810,8 +806,8 @@ impl InteractionManager {
     }
 
     /// Gets the current execution strategy.
-    pub async fn get_execution_strategy(&self) -> String {
-        self.execution_strategy.read().await.clone()
+    pub async fn get_execution_strategy(&self) -> ExecutionModel {
+        *self.execution_strategy.read().await
     }
 
     /// Sets the conversation mode for controlling dialogue verbosity.

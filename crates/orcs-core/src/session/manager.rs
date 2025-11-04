@@ -2,6 +2,7 @@ use super::app_mode::AppMode;
 use super::model::Session;
 use super::repository::SessionRepository;
 use anyhow::Result;
+use llm_toolkit::agent::dialogue::ExecutionModel;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -383,7 +384,7 @@ mod tests {
                 app_mode,
                 workspace_id,
                 active_participant_ids: Vec::new(),
-                execution_strategy: "broadcast".to_string(),
+                execution_strategy: ExecutionModel::Broadcast,
                 system_messages: Vec::new(),
                 participants: HashMap::new(),
                 conversation_mode: ConversationMode::Normal,

@@ -5,7 +5,7 @@
 
 use super::app_mode::{AppMode, ConversationMode};
 use super::message::ConversationMessage;
-use llm_toolkit::agent::dialogue::TalkStyle;
+use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -44,9 +44,9 @@ pub struct Session {
     /// Active participant persona IDs
     #[serde(default)]
     pub active_participant_ids: Vec<String>,
-    /// Execution strategy ("broadcast" or "sequential")
+    /// Execution strategy
     #[serde(default = "default_execution_strategy")]
-    pub execution_strategy: String,
+    pub execution_strategy: ExecutionModel,
     /// System messages (join/leave notifications, etc.)
     #[serde(default)]
     pub system_messages: Vec<ConversationMessage>,
@@ -61,6 +61,6 @@ pub struct Session {
     pub talk_style: Option<TalkStyle>,
 }
 
-fn default_execution_strategy() -> String {
-    "broadcast".to_string()
+fn default_execution_strategy() -> ExecutionModel {
+    ExecutionModel::Broadcast
 }

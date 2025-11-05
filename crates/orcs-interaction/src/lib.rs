@@ -96,7 +96,13 @@ impl PersonaBackendAgent {
 
         match self.backend {
             PersonaBackend::ClaudeCli => {
-                let mut agent = ClaudeCodeAgent::new();
+                let mut agent = ClaudeCodeAgent::new()
+                    // Pre-approve Edit and Write tools to avoid constant approval prompts
+                    .with_args(vec![
+                        "--allow-tools".to_string(),
+                        "Edit,Write".to_string(),
+                    ]);
+
                 // Set workspace root if provided
                 if let Some(workspace) = workspace_root {
                     agent = agent.with_cwd(workspace);

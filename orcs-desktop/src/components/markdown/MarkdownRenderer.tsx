@@ -8,6 +8,7 @@ import 'highlight.js/styles/github-dark.css';
 interface MarkdownRendererProps {
   content: string;
   onSaveFile?: (path: string, content: string) => Promise<void>;
+  workspaceRootPath?: string;
 }
 
 interface CodeBlockMetadata {
@@ -53,7 +54,7 @@ function parseCodeBlockMetadata(info: string): CodeBlockMetadata {
   return { language, saveable, path };
 }
 
-export function MarkdownRenderer({ content, onSaveFile }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, onSaveFile, workspaceRootPath }: MarkdownRendererProps) {
   return (
     <Box>
       <ReactMarkdown
@@ -88,6 +89,7 @@ export function MarkdownRenderer({ content, onSaveFile }: MarkdownRendererProps)
                   code={codeString}
                   suggestedPath={metadata.path}
                   onSave={onSaveFile}
+                  workspaceRootPath={workspaceRootPath}
                 />
               );
             }

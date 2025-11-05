@@ -1238,6 +1238,7 @@ function App() {
                       key={message.id}
                       message={message}
                       onSaveToWorkspace={handleSaveMessageToWorkspace}
+                      workspaceRootPath={workspace?.rootPath}
                     />
                   ))}
                   {isAiThinking && (

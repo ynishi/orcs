@@ -8,9 +8,10 @@ interface SaveableCodeBlockProps {
   code: string;
   suggestedPath?: string;
   onSave: (path: string, content: string) => Promise<void>;
+  workspaceRootPath?: string;
 }
 
-export function SaveableCodeBlock({ language, code, suggestedPath, onSave }: SaveableCodeBlockProps) {
+export function SaveableCodeBlock({ language, code, suggestedPath, onSave, workspaceRootPath }: SaveableCodeBlockProps) {
   const [isEditingPath, setIsEditingPath] = useState(false);
   const [targetPath, setTargetPath] = useState(suggestedPath || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -18,9 +19,19 @@ export function SaveableCodeBlock({ language, code, suggestedPath, onSave }: Sav
   // Check if the path is relative (not absolute)
   const isRelativePath = targetPath && !targetPath.startsWith('/') && !targetPath.match(/^[A-Za-z]:\\/);
 
-  // Auto-open edit mode if path is just a filename
+  // Resolve relative path to absolute using workspace root
+  const getAbsolutePath = (): string => {
+    if (!targetPath) return '';
+    if (!isRelativePath) return targetPath;
+    if (workspaceRootPath) {
+      return `${workspaceRootPath}/${targetPath}`;
+    }
+    return targetPath;
+  };
+
+  // Auto-open edit mode if path is just a filename and no workspace
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
-  if (!hasAutoOpened && isRelativePath && targetPath) {
+  if (!hasAutoOpened && isRelativePath && targetPath && !workspaceRootPath) {
     setIsEditingPath(true);
     setHasAutoOpened(true);
   }
@@ -35,12 +46,14 @@ export function SaveableCodeBlock({ language, code, suggestedPath, onSave }: Sav
       return;
     }
 
+    const absolutePath = getAbsolutePath();
+
     setIsSaving(true);
     try {
-      await onSave(targetPath, code);
+      await onSave(absolutePath, code);
       notifications.show({
         title: 'Success',
-        message: `File saved to ${targetPath}`,
+        message: `File saved to ${absolutePath}`,
         color: 'green',
       });
     } catch (error) {
@@ -77,8 +90,17 @@ export function SaveableCodeBlock({ language, code, suggestedPath, onSave }: Sav
         backgroundColor: 'var(--mantine-color-dark-8)',
       }}
     >
-      {/* Warning for relative paths */}
-      {isRelativePath && !isEditingPath && (
+      {/* Info for workspace-relative paths */}
+      {isRelativePath && !isEditingPath && workspaceRootPath && (
+        <Alert icon={<IconAlertCircle size={16} />} title="Workspace-relative path" color="blue" mb="sm">
+          <Text size="xs">
+            Will save to: {getAbsolutePath()}
+          </Text>
+        </Alert>
+      )}
+
+      {/* Warning for relative paths without workspace */}
+      {isRelativePath && !isEditingPath && !workspaceRootPath && (
         <Alert icon={<IconAlertCircle size={16} />} title="Relative path detected" color="yellow" mb="sm">
           <Text size="xs">
             The suggested path "{targetPath}" is relative. Please click edit to specify an absolute path.
@@ -108,8 +130,11 @@ export function SaveableCodeBlock({ language, code, suggestedPath, onSave }: Sav
             </>
           ) : (
             <>
-              <Text size="xs" c={isRelativePath ? 'yellow' : 'dimmed'} ff="monospace">
+              <Text size="xs" c={isRelativePath && !workspaceRootPath ? 'yellow' : 'dimmed'} ff="monospace">
                 {targetPath || 'No path specified'}
+                {isRelativePath && workspaceRootPath && (
+                  <Text component="span" c="blue" size="xs"> (workspace-relative)</Text>
+                )}
               </Text>
               <ActionIcon size="xs" variant="subtle" onClick={handleEditPath}>
                 <IconEdit size={14} />

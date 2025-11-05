@@ -8,6 +8,7 @@ import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
 interface MessageItemProps {
   message: Message;
   onSaveToWorkspace?: (message: Message) => void;
+  workspaceRootPath?: string;
 }
 
 // 長いテキストを折りたたむしきい値（文字数）
@@ -51,7 +52,7 @@ function renderTextWithMentions(text: string) {
   return parts.length > 0 ? parts : text;
 }
 
-export function MessageItem({ message, onSaveToWorkspace }: MessageItemProps) {
+export function MessageItem({ message, onSaveToWorkspace, workspaceRootPath }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -242,7 +243,11 @@ export function MessageItem({ message, onSaveToWorkspace }: MessageItemProps) {
           </Group>
 
           <Box>
-            <MarkdownRenderer content={message.text} onSaveFile={handleSaveFile} />
+            <MarkdownRenderer
+              content={message.text}
+              onSaveFile={handleSaveFile}
+              workspaceRootPath={workspaceRootPath}
+            />
           </Box>
           <Text size="xs" c="dimmed" mt={8}>
             {message.timestamp.toLocaleTimeString()}

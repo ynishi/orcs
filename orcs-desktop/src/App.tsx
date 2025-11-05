@@ -372,16 +372,21 @@ function App() {
   }, [input, customCommands, personas, activeParticipantIds]);
 
   // メッセージを追加するヘルパー関数
-  const addMessage = (type: MessageType, author: string, text: string) => {
+  const addMessage = useCallback((type: MessageType, author: string, text: string) => {
+    // Find persona by name to get icon and base_color
+    const persona = personas.find(p => p.name === author);
+
     const newMessage: Message = {
       id: `${Date.now()}-${Math.random()}`,
       type,
       author,
       text,
       timestamp: new Date(),
+      icon: persona?.icon,
+      baseColor: persona?.base_color,
     };
     setMessages((prev) => [...prev, newMessage]);
-  };
+  }, [personas]);
 
   const processInput = useCallback(
     async (rawInput: string, attachedFiles: File[] = []) => {

@@ -1097,6 +1097,53 @@ async fn read_workspace_file(file_path: String) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed to read file: {}", e))
 }
 
+/// Saves code snippet to a file
+#[tauri::command]
+async fn save_code_snippet(
+    file_path: String,
+    content: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use tokio::fs;
+    use std::path::Path;
+
+    let path = Path::new(&file_path);
+
+    // Validate that the path is absolute
+    if !path.is_absolute() {
+        return Err("Path must be absolute".to_string());
+    }
+
+    // Create parent directories if they don't exist
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    // Write the file
+    fs::write(path, content)
+        .await
+        .map_err(|e| format!("Failed to write file: {}", e))?;
+
+    // Log the save operation as a system message
+    if let Some(manager) = state.session_manager.active_session().await {
+        manager
+            .add_system_conversation_message(
+                format!("Saved file: {}", file_path),
+                Some("file_save".to_string()),
+                None,
+            )
+            .await;
+
+        // Auto-save session after file save
+        let app_mode = state.app_mode.lock().await.clone();
+        let _ = state.session_manager.save_active_session(app_mode).await;
+    }
+
+    Ok(())
+}
+
 /// Gets Git repository information for the current workspace
 #[tauri::command]
 async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String> {
@@ -1455,6 +1502,7 @@ fn main() {
                 delete_file_from_workspace,
                 rename_file_in_workspace,
                 read_workspace_file,
+                save_code_snippet,
                 handle_input,
                 slash_commands::list_slash_commands,
                 slash_commands::get_slash_command,

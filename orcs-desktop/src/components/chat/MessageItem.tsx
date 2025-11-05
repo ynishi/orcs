@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor } from '@mantine/core';
 import { IconDeviceFloppy } from '@tabler/icons-react';
+import { invoke } from '@tauri-apps/api/core';
 import { Message, getMessageStyle } from '../../types/message';
+import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
 
 interface MessageItemProps {
   message: Message;
@@ -59,6 +61,14 @@ export function MessageItem({ message, onSaveToWorkspace }: MessageItemProps) {
   const displayText = isLongText && !isExpanded
     ? message.text.slice(0, COLLAPSE_THRESHOLD) + '...'
     : message.text;
+
+  // Handle file save from markdown code blocks
+  const handleSaveFile = async (path: string, content: string) => {
+    await invoke('save_code_snippet', {
+      filePath: path,
+      content: content,
+    });
+  };
 
   // バッジタイプのメッセージ（System, Error, Command, Task）
   if (style.showBadge) {
@@ -231,13 +241,9 @@ export function MessageItem({ message, onSaveToWorkspace }: MessageItemProps) {
             )}
           </Group>
 
-          <Text
-            size="sm"
-            c={style.textColor}
-            style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-          >
-            {renderTextWithMentions(message.text)}
-          </Text>
+          <Box>
+            <MarkdownRenderer content={message.text} onSaveFile={handleSaveFile} />
+          </Box>
           <Text size="xs" c="dimmed" mt={8}>
             {message.timestamp.toLocaleTimeString()}
           </Text>

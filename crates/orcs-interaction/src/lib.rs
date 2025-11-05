@@ -26,12 +26,22 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
 /// Converts a Persona domain model to llm-toolkit Persona.
+///
+/// Automatically injects runtime capabilities based on the backend type
+/// into the communication_style to help the AI understand what it can and cannot do.
 fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
+    // Inject runtime capabilities into communication style
+    let enhanced_communication_style = format!(
+        "{}\n\n{}",
+        persona.communication_style,
+        persona.backend.capabilities_markdown()
+    );
+
     LlmPersona {
         name: persona.name.clone(),
         role: persona.role.clone(),
         background: persona.background.clone(),
-        communication_style: persona.communication_style.clone(),
+        communication_style: enhanced_communication_style,
         visual_identity: None,
     }
 }

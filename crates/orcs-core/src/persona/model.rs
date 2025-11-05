@@ -36,6 +36,106 @@ impl PersonaBackend {
             ("codex_cli".to_string(), "Codex CLI".to_string()),
         ]
     }
+
+    /// Returns the display name for this backend.
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            PersonaBackend::ClaudeCli => "Claude CLI",
+            PersonaBackend::ClaudeApi => "Claude API",
+            PersonaBackend::GeminiCli => "Gemini CLI",
+            PersonaBackend::GeminiApi => "Gemini API",
+            PersonaBackend::OpenAiApi => "OpenAI API",
+            PersonaBackend::CodexCli => "Codex CLI",
+        }
+    }
+
+    /// Returns the access type for this backend.
+    pub fn access_type(&self) -> &'static str {
+        match self {
+            PersonaBackend::ClaudeCli | PersonaBackend::GeminiCli | PersonaBackend::CodexCli => {
+                "Local CLI"
+            }
+            PersonaBackend::ClaudeApi | PersonaBackend::GeminiApi | PersonaBackend::OpenAiApi => {
+                "Remote API"
+            }
+        }
+    }
+
+    /// Returns whether this backend has direct file system access.
+    pub fn has_direct_file_access(&self) -> bool {
+        matches!(
+            self,
+            PersonaBackend::ClaudeCli | PersonaBackend::GeminiCli | PersonaBackend::CodexCli
+        )
+    }
+
+    /// Returns whether this backend can execute shell commands directly.
+    pub fn can_execute_commands(&self) -> bool {
+        matches!(
+            self,
+            PersonaBackend::ClaudeCli | PersonaBackend::GeminiCli | PersonaBackend::CodexCli
+        )
+    }
+
+    /// Returns whether this backend can edit files directly.
+    pub fn can_edit_files(&self) -> bool {
+        matches!(
+            self,
+            PersonaBackend::ClaudeCli | PersonaBackend::GeminiCli | PersonaBackend::CodexCli
+        )
+    }
+
+    /// Returns a markdown-formatted capabilities description for system prompts.
+    pub fn capabilities_markdown(&self) -> String {
+        let access_type = self.access_type();
+        let backend_name = self.display_name();
+
+        if self.has_direct_file_access() {
+            format!(
+                r#"## Your Runtime Capabilities
+
+**Identity**: {backend_name} ({access_type})
+**Access Level**: Direct local access
+
+### What You CAN Do:
+✅ Direct file system access (read, write, edit)
+✅ Execute shell commands
+✅ Run local tools and scripts
+✅ Access environment variables
+✅ Full development workflow
+
+### Collaboration:
+For tasks requiring different capabilities, you can work with other agents using @mention."#,
+                backend_name = backend_name,
+                access_type = access_type
+            )
+        } else {
+            format!(
+                r#"## Your Runtime Capabilities
+
+**Identity**: {backend_name} ({access_type})
+**Access Level**: Remote API only
+
+### What You CAN Do:
+✅ Read file contents (via tool calls)
+✅ Search and analyze code
+✅ Provide suggestions and designs
+✅ Call available tools
+
+### What You CANNOT Do:
+❌ Direct file system access
+❌ Edit files directly (suggest changes instead)
+❌ Execute local commands
+❌ Access local environment variables
+
+### Collaboration:
+**Important**: For implementation tasks, delegate to agents with local access (e.g., @coder with CLI backend).
+For file modifications, provide exact code suggestions that CLI agents can implement."#,
+                backend_name = backend_name,
+                access_type = access_type
+            )
+        }
+    }
 }
 
 impl Default for PersonaBackend {

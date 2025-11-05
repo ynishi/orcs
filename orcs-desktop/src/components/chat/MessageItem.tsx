@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor } from '@mantine/core';
-import { IconDeviceFloppy } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRocket } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Message, getMessageStyle } from '../../types/message';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
@@ -8,6 +8,7 @@ import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
 interface MessageItemProps {
   message: Message;
   onSaveToWorkspace?: (message: Message) => void;
+  onExecuteAsTask?: (message: Message) => void;
   workspaceRootPath?: string;
 }
 
@@ -52,7 +53,7 @@ function renderTextWithMentions(text: string) {
   return parts.length > 0 ? parts : text;
 }
 
-export function MessageItem({ message, onSaveToWorkspace, workspaceRootPath }: MessageItemProps) {
+export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, workspaceRootPath }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -245,6 +246,19 @@ export function MessageItem({ message, onSaveToWorkspace, workspaceRootPath }: M
                       size="sm"
                     >
                       <IconDeviceFloppy size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+
+                {onExecuteAsTask && message.type === 'ai' && (
+                  <Tooltip label="Execute as Task" withArrow>
+                    <ActionIcon
+                      color="violet"
+                      variant="subtle"
+                      onClick={() => onExecuteAsTask(message)}
+                      size="sm"
+                    >
+                      <IconRocket size={16} />
                     </ActionIcon>
                   </Tooltip>
                 )}

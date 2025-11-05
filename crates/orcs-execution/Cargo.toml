@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 orcs-core = { path = "../orcs-core" }
-llm-toolkit = { workspace = true }
+tracing = { workspace = true }

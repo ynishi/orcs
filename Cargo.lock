@@ -2879,8 +2879,8 @@ dependencies = [
 name = "orcs-execution"
 version = "0.1.0"
 dependencies = [
- "llm-toolkit",
  "orcs-core",
+ "tracing",
 ]
 
 [[package]]

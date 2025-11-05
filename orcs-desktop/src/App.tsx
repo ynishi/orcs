@@ -980,6 +980,37 @@ function App() {
     }
   };
 
+  // Task実行ハンドラー
+  const handleExecuteAsTask = async (message: Message) => {
+    try {
+      addMessage('system', 'SYSTEM', `🚀 Executing task: "${message.text.slice(0, 50)}..."`);
+
+      // TODO: Backend command implementation
+      const result = await invoke<string>('execute_message_as_task', {
+        messageContent: message.text,
+      });
+
+      addMessage('system', 'SYSTEM', `✅ Task completed: ${result}`);
+
+      notifications.show({
+        title: 'Task Executed',
+        message: 'Task execution completed successfully',
+        color: 'green',
+        icon: '✅',
+      });
+    } catch (err) {
+      console.error('Failed to execute task:', err);
+      addMessage('error', '', `❌ Task execution failed: ${String(err)}`);
+
+      notifications.show({
+        title: 'Task Execution Failed',
+        message: String(err),
+        color: 'red',
+        icon: '❌',
+      });
+    }
+  };
+
   // タスク操作ハンドラー
   const handleTaskToggle = (taskId: string) => {
     setTasks((prev) =>
@@ -1254,6 +1285,7 @@ function App() {
                       key={message.id}
                       message={message}
                       onSaveToWorkspace={handleSaveMessageToWorkspace}
+                      onExecuteAsTask={handleExecuteAsTask}
                       workspaceRootPath={workspace?.rootPath}
                     />
                   ))}

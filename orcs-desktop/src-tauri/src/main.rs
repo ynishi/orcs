@@ -11,6 +11,7 @@ use orcs_core::session::{AppMode, ErrorSeverity, Session, SessionManager};
 use orcs_core::slash_command::SlashCommandRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::{UploadedFile, Workspace};
+use orcs_execution::TaskExecutor;
 use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_infrastructure::{
@@ -38,6 +39,7 @@ struct AppState {
     slash_command_repository: Arc<dyn SlashCommandRepository>,
     slash_command_repository_concrete: Arc<AsyncDirSlashCommandRepository>,
     app_state_service: Arc<AppStateService>,
+    task_executor: Arc<TaskExecutor>,
 }
 
 /// Serializable version of DialogueMessage for Tauri IPC
@@ -304,6 +306,19 @@ async fn get_persona_backend_options() -> Result<Vec<(String, String)>, String> 
 #[tauri::command]
 async fn get_user_nickname(state: State<'_, AppState>) -> Result<String, String> {
     Ok(state.user_service.get_user_name())
+}
+
+/// Executes a message content as a task using TaskExecutor
+#[tauri::command]
+async fn execute_message_as_task(
+    message_content: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    state
+        .task_executor
+        .execute_from_message(message_content)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Adds a participant to the active session
@@ -1412,6 +1427,9 @@ fn main() {
             user_service.clone(),
         ));
 
+        // Create TaskExecutor for task execution
+        let task_executor = Arc::new(TaskExecutor::new());
+
         // Try to restore last session using SessionUseCase
         let restored = session_usecase.restore_last_session().await.ok().flatten();
 
@@ -1503,6 +1521,7 @@ fn main() {
                 slash_command_repository,
                 slash_command_repository_concrete: slash_command_repository_concrete.clone(),
                 app_state_service: app_state_service.clone(),
+                task_executor,
             })
             .invoke_handler(tauri::generate_handler![
                 create_session,
@@ -1518,6 +1537,7 @@ fn main() {
                 save_persona_configs,
                 get_persona_backend_options,
                 get_user_nickname,
+                execute_message_as_task,
                 add_participant,
                 remove_participant,
                 get_active_participants,

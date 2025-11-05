@@ -243,12 +243,13 @@ export function convertToUIMessageWithAuthor(
 
   const messageType = resolveMessageType(msg);
 
-  // authorIdが"You"ならユーザー、"System"ならシステム、それ以外はペルソナIDから名前を解決
+  // Resolve author name based on message role
   let author: string;
   let icon: string | undefined;
   let baseColor: string | undefined;
   if (msg.role === 'User') {
-    author = authorId === 'You' ? userNickname : (participants[authorId] || authorId);
+    // User messages always use the configured nickname
+    author = userNickname;
     // User has no icon or color
   } else if (msg.role === 'System') {
     author = 'SYSTEM';

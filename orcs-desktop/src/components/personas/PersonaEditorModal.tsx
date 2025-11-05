@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, TextInput, Textarea, Switch, Button, Stack, Group, Select } from '@mantine/core';
+import { Modal, TextInput, Textarea, Switch, Button, Stack, Group, Select, ColorInput } from '@mantine/core';
 import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
 
@@ -42,6 +42,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
     backend: 'claude_cli',
     model_name: undefined,
     icon: undefined,
+    base_color: undefined,
   });
 
   // Fetch backend options on mount
@@ -72,6 +73,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         backend: persona.backend || 'claude_cli',
         model_name: persona.model_name,
         icon: persona.icon,
+        base_color: persona.base_color,
       });
     } else {
       setFormData({
@@ -84,6 +86,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         backend: 'claude_cli',
         model_name: undefined,
         icon: undefined,
+        base_color: undefined,
       });
     }
   }, [persona]);
@@ -110,6 +113,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
       source: 'User',
       model_name: formData.model_name || undefined,
       icon: formData.icon || undefined,
+      base_color: formData.base_color || undefined,
     };
 
     onSave(validatedPersona);
@@ -150,6 +154,16 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
           onChange={(e) => setFormData({ ...formData, icon: e.currentTarget.value || undefined })}
           description="Optional emoji/icon to represent this persona"
           maxLength={10}
+        />
+
+        <ColorInput
+          label="Base Color"
+          placeholder="Pick a color"
+          value={formData.base_color || ''}
+          onChange={(value) => setFormData({ ...formData, base_color: value || undefined })}
+          description="Color for message background tinting (e.g., #FFB6C1 for light pink)"
+          format="hex"
+          swatches={['#FFB6C1', '#ADD8E6', '#E6F3E6', '#FFF4E6', '#F3E5F5', '#E3F2FD', '#FFF9C4']}
         />
 
         <TextInput

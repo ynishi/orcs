@@ -220,6 +220,11 @@ export function PersonasList({
         const updatedIds = await invoke<string[]>('get_active_participants');
         setActiveParticipantIds(updatedIds);
       }
+
+      // Refresh sessions to update participant_icons and participant_colors
+      if (onRefreshSessions) {
+        await onRefreshSessions();
+      }
     } catch (error) {
       console.error(error);
       handleSystemMessage(

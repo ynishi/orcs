@@ -1111,8 +1111,9 @@ function App() {
         try {
           await invoke('add_participant', { personaId: persona.id });
           addMessage('system', 'System', `${persona.name} が参加しました`);
-          // Refresh participants list
+          // Refresh participants list and sessions to update participant_icons/colors
           await refreshPersonas();
+          await refreshSessions();
         } catch (error) {
           console.error(`Failed to add participant ${persona.name}:`, error);
         }

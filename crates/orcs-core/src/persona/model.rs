@@ -218,6 +218,10 @@ pub struct Persona {
     /// Visual icon/emoji representing this persona (e.g., "🎨", "🔧", "📊")
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Base color for UI theming (e.g., "#FF5733", "#3357FF")
+    /// Used for message background tinting and visual identification
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_color: Option<String>,
 }
 
 #[cfg(test)]

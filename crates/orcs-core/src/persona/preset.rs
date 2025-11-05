@@ -23,6 +23,7 @@ pub fn get_default_presets() -> Vec<Persona> {
             backend: Default::default(),
             model_name: None,
             icon: Some("🎨".to_string()),
+            base_color: Some("#FFB6C1".to_string()), // Light pink for UX
         },
         Persona {
             id: Uuid::new_v4().to_string(),
@@ -35,6 +36,7 @@ pub fn get_default_presets() -> Vec<Persona> {
             backend: Default::default(),
             model_name: None,
             icon: Some("🔧".to_string()),
+            base_color: Some("#ADD8E6".to_string()), // Light blue for Engineer
         },
     ]
 }

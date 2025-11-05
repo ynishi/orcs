@@ -41,6 +41,7 @@ export interface PersonaConfig {
   backend: PersonaBackend;
   model_name?: string;
   icon?: string;
+  base_color?: string;
 }
 
 /**

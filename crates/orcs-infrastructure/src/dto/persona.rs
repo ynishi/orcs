@@ -282,6 +282,7 @@ impl IntoDomain<Persona> for PersonaConfigV1_3_0 {
             backend: self.backend.into(),
             model_name: self.model_name,
             icon: self.icon,
+            base_color: None, // V1.3.0 doesn't have base_color
         }
     }
 }

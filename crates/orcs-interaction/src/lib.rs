@@ -40,7 +40,14 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
     );
 
     // Create visual identity if icon is present
-    let visual_identity = persona.icon.as_ref().map(|icon| VisualIdentity::new(icon.clone()));
+    let visual_identity = persona.icon.as_ref().map(|icon| {
+        let mut identity = VisualIdentity::new(icon.clone());
+        // Add base_color if present
+        if let Some(ref color) = persona.base_color {
+            identity = identity.with_color(color.clone());
+        }
+        identity
+    });
 
     // Get capabilities from backend
     let capabilities = Some(persona.backend.capabilities());
@@ -538,8 +545,9 @@ impl InteractionManager {
             );
         }
 
-        // Clear restored IDs after using them once
-        *self.restored_participant_ids.write().await = None;
+        // Keep restored_participant_ids for future dialogue recreations
+        // Do NOT clear them - they should persist to maintain participant list
+        // across dialogue invalidations (e.g., when execution strategy changes)
 
         *dialogue_guard = Some(dialogue);
         Ok(())
@@ -581,11 +589,13 @@ impl InteractionManager {
         let mut participants = HashMap::new();
         // Build participant_icons map: persona ID -> icon
         let mut participant_icons = HashMap::new();
+        // Build participant_colors map: persona ID -> base_color
+        let mut participant_colors = HashMap::new();
 
         // Always add user name first (user is always a participant)
         let user_name = self.user_service.get_user_name();
         participants.insert(user_name.clone(), user_name.clone());
-        // User has no icon for now
+        // User has no icon/color for now
 
         // Add all personas from persona_histories (AI participants)
         if let Ok(all_personas) = self.persona_repository.get_all() {
@@ -600,6 +610,10 @@ impl InteractionManager {
                     // Add icon if persona has one
                     if let Some(icon) = &persona.icon {
                         participant_icons.insert(persona_id.clone(), icon.clone());
+                    }
+                    // Add base_color if persona has one
+                    if let Some(color) = &persona.base_color {
+                        participant_colors.insert(persona_id.clone(), color.clone());
                     }
                 }
             }
@@ -622,6 +636,7 @@ impl InteractionManager {
             system_messages,
             participants,
             participant_icons,
+            participant_colors,
             conversation_mode,
             talk_style,
         }
@@ -710,6 +725,22 @@ impl InteractionManager {
             agent_for_persona(&persona_config, self.agent_workspace_root.clone()),
         );
 
+        // Update restored_participant_ids to persist across dialogue recreations
+        // Get current active participants and add the new one
+        let current_ids = dialogue
+            .participants()
+            .iter()
+            .filter_map(|p| {
+                self.persona_repository
+                    .get_all()
+                    .ok()
+                    .and_then(|all| all.into_iter().find(|persona| persona.name == p.name))
+                    .map(|persona| persona.id)
+            })
+            .collect::<Vec<_>>();
+
+        *self.restored_participant_ids.write().await = Some(current_ids);
+
         Ok(())
     }
 
@@ -756,6 +787,25 @@ impl InteractionManager {
         dialogue
             .remove_participant(&persona.name)
             .map_err(|e| e.to_string())?;
+
+        // Update restored_participant_ids to persist across dialogue recreations
+        let current_ids = dialogue
+            .participants()
+            .iter()
+            .filter_map(|p| {
+                self.persona_repository
+                    .get_all()
+                    .ok()
+                    .and_then(|all| all.into_iter().find(|persona| persona.name == p.name))
+                    .map(|persona| persona.id)
+            })
+            .collect::<Vec<_>>();
+
+        if current_ids.is_empty() {
+            *self.restored_participant_ids.write().await = None;
+        } else {
+            *self.restored_participant_ids.write().await = Some(current_ids);
+        }
 
         Ok(())
     }

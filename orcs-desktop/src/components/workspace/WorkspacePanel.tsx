@@ -1,5 +1,5 @@
 import { Stack, Text, Loader, Center, Alert, ActionIcon, Group, Tooltip, Switch, ScrollArea, Box } from '@mantine/core';
-import { IconPlus, IconRefresh } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconFolder } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { useCallback } from 'react';
@@ -139,6 +139,17 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
     }
   };
 
+  // Handle opening workspace directory in Finder/Explorer
+  const handleOpenWorkspaceDir = async () => {
+    if (!workspace) return;
+
+    try {
+      await openPath(workspace.rootPath);
+    } catch (err) {
+      console.error('Failed to open workspace directory:', err);
+    }
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -172,6 +183,18 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
             Workspace Files
           </Text>
           <Group gap={4}>
+            <Tooltip label="Open workspace folder" withArrow>
+              <ActionIcon
+                onClick={() => {
+                  void handleOpenWorkspaceDir();
+                }}
+                variant="subtle"
+                color="gray"
+                aria-label="Open folder"
+              >
+                <IconFolder size={18} />
+              </ActionIcon>
+            </Tooltip>
             <ActionIcon
               onClick={() => {
                 void refreshWorkspaceState();
@@ -227,6 +250,18 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
           Workspace Files
         </Text>
         <Group gap={4}>
+          <Tooltip label="Open workspace folder" withArrow>
+            <ActionIcon
+              onClick={() => {
+                void handleOpenWorkspaceDir();
+              }}
+              variant="subtle"
+              color="gray"
+              aria-label="Open folder"
+            >
+              <IconFolder size={18} />
+            </ActionIcon>
+          </Tooltip>
           <ActionIcon
             onClick={() => {
               void refreshWorkspaceState();

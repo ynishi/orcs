@@ -14,6 +14,7 @@ export interface Message {
   timestamp: Date;
   metadata?: MessageMetadata;
   icon?: string; // Optional icon/emoji for the author
+  baseColor?: string; // Optional base color for message background tinting
 }
 
 /**

@@ -57,6 +57,11 @@ export function MessageItem({ message, onSaveToWorkspace, workspaceRootPath }: M
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Apply base color with opacity for subtle background tinting
+  const backgroundColor = message.baseColor && message.type === 'ai'
+    ? `${message.baseColor}20` // Add alpha channel for ~12% opacity
+    : style.backgroundColor;
+
   // テキストが長い場合の判定
   const isLongText = message.text.length > COLLAPSE_THRESHOLD;
   const displayText = isLongText && !isExpanded
@@ -87,7 +92,7 @@ export function MessageItem({ message, onSaveToWorkspace, workspaceRootPath }: M
           p="xs"
           radius="md"
           style={{
-            backgroundColor: style.backgroundColor,
+            backgroundColor,
             borderLeft: style.borderColor ? `4px solid ${style.borderColor}` : undefined,
             maxWidth: '80%',
             display: 'inline-block',
@@ -198,7 +203,7 @@ export function MessageItem({ message, onSaveToWorkspace, workspaceRootPath }: M
           p="md"
           radius="lg"
           style={{
-            backgroundColor: style.backgroundColor,
+            backgroundColor,
             flex: 1,
             position: 'relative',
           }}

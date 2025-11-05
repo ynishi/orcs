@@ -19,6 +19,7 @@ export interface Session {
   system_messages: ConversationMessage[]; // System messages (join/leave events, etc.)
   participants: Record<string, string>; // Persona ID -> name mapping
   participant_icons: Record<string, string>; // Persona ID -> icon mapping
+  participant_colors: Record<string, string>; // Persona ID -> base color mapping for UI theming
 }
 
 /**
@@ -226,6 +227,7 @@ export function convertToUIMessageWithAuthor(
   authorId: string,
   participants: Record<string, string>,
   participantIcons: Record<string, string> = {},
+  participantColors: Record<string, string> = {},
   userNickname: string = 'You'
 ): Message {
   // Check if this is an error message (special authorId "Error")
@@ -244,17 +246,19 @@ export function convertToUIMessageWithAuthor(
   // authorIdが"You"ならユーザー、"System"ならシステム、それ以外はペルソナIDから名前を解決
   let author: string;
   let icon: string | undefined;
+  let baseColor: string | undefined;
   if (msg.role === 'User') {
     author = authorId === 'You' ? userNickname : (participants[authorId] || authorId);
-    // User has no icon
+    // User has no icon or color
   } else if (msg.role === 'System') {
     author = 'SYSTEM';
-    // System has no icon
+    // System has no icon or color
   } else {
     // Assistant: participantsマップから名前を解決、見つからない場合はauthorIdをそのまま使用
     author = participants[authorId] || authorId;
-    // Get icon from participantIcons if available
+    // Get icon and color from participantIcons/participantColors if available
     icon = participantIcons[authorId];
+    baseColor = participantColors[authorId];
   }
 
   return {
@@ -264,6 +268,7 @@ export function convertToUIMessageWithAuthor(
     text: msg.content,
     timestamp: new Date(msg.timestamp),
     icon,
+    baseColor,
   };
 }
 
@@ -292,6 +297,7 @@ export function convertSessionToMessages(session: Session, userNickname: string 
       item.authorId,
       session.participants || {},
       session.participant_icons || {},
+      session.participant_colors || {},
       userNickname
     )
   );

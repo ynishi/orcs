@@ -142,6 +142,41 @@ pub struct PersonaConfigV1_3_0 {
     pub icon: Option<String>,
 }
 
+/// V1.4.0: Added base_color for UI theming
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.4.0")]
+pub struct PersonaConfigV1_4_0 {
+    /// Unique persona identifier (UUID format).
+    pub id: String,
+    /// Display name of the persona.
+    pub name: String,
+    /// Role or title of the persona.
+    pub role: String,
+    /// Background description of the persona.
+    pub background: String,
+    /// Communication style of the persona.
+    pub communication_style: String,
+    /// Whether this persona is a default participant in new sessions.
+    #[serde(default)]
+    pub default_participant: bool,
+    /// Source of the persona (System or User).
+    #[serde(default)]
+    pub source: PersonaSourceDTO,
+    /// Backend to execute persona with (supports all 6 backends: ClaudeCli, ClaudeApi, GeminiCli, GeminiApi, OpenAiApi, CodexCli).
+    #[serde(default)]
+    pub backend: PersonaBackendDTO,
+    /// Model name for the backend (e.g., "claude-sonnet-4-5-20250929", "gemini-2.5-flash")
+    /// If None, uses the backend's default model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_name: Option<String>,
+    /// Visual icon/emoji representing this persona (e.g., "🎨", "🔧", "📊")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Base color for UI theming (e.g., "#FF5733", "#3357FF")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_color: Option<String>,
+}
+
 // ============================================================================
 // Migration implementations
 // ============================================================================
@@ -210,6 +245,25 @@ impl MigratesTo<PersonaConfigV1_3_0> for PersonaConfigV1_2_0 {
     }
 }
 
+/// Migration from PersonaConfigV1_3_0 to PersonaConfigV1_4_0.
+impl MigratesTo<PersonaConfigV1_4_0> for PersonaConfigV1_3_0 {
+    fn migrate(self) -> PersonaConfigV1_4_0 {
+        PersonaConfigV1_4_0 {
+            id: self.id,
+            name: self.name,
+            role: self.role,
+            background: self.background,
+            communication_style: self.communication_style,
+            default_participant: self.default_participant,
+            source: self.source,
+            backend: self.backend,
+            model_name: self.model_name,
+            icon: self.icon,
+            base_color: None, // V1_3_0 doesn't have base_color field
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
@@ -260,14 +314,14 @@ impl From<PersonaBackend> for PersonaBackendDTO {
     }
 }
 
-/// Convert PersonaConfigV1_3_0 DTO to domain model.
-impl IntoDomain<Persona> for PersonaConfigV1_3_0 {
+/// Convert PersonaConfigV1_4_0 DTO to domain model.
+impl IntoDomain<Persona> for PersonaConfigV1_4_0 {
     fn into_domain(self) -> Persona {
         // Validate and fix ID if needed
         let id = if Uuid::parse_str(&self.id).is_ok() {
             self.id
         } else {
-            // Legacy data: V1.3.0 schema but non-UUID ID
+            // Legacy data: V1.4.0 schema but non-UUID ID
             generate_uuid_from_name(&self.name)
         };
 
@@ -282,15 +336,15 @@ impl IntoDomain<Persona> for PersonaConfigV1_3_0 {
             backend: self.backend.into(),
             model_name: self.model_name,
             icon: self.icon,
-            base_color: None, // V1.3.0 doesn't have base_color
+            base_color: self.base_color,
         }
     }
 }
 
-/// Convert domain model to PersonaConfigV1_3_0 DTO for persistence.
-impl version_migrate::FromDomain<Persona> for PersonaConfigV1_3_0 {
+/// Convert domain model to PersonaConfigV1_4_0 DTO for persistence.
+impl version_migrate::FromDomain<Persona> for PersonaConfigV1_4_0 {
     fn from_domain(persona: Persona) -> Self {
-        PersonaConfigV1_3_0 {
+        PersonaConfigV1_4_0 {
             id: persona.id,
             name: persona.name,
             role: persona.role,
@@ -301,6 +355,7 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_3_0 {
             backend: persona.backend.into(),
             model_name: persona.model_name,
             icon: persona.icon,
+            base_color: persona.base_color,
         }
     }
 }
@@ -311,7 +366,7 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_3_0 {
 
 /// Creates and configures a Migrator instance for Persona entities.
 ///
-/// The migrator handles automatic schema migration from V1.0.0 to V1.3.0
+/// The migrator handles automatic schema migration from V1.0.0 to V1.4.0
 /// and conversion to the domain model.
 ///
 /// # Migration Path
@@ -319,7 +374,8 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_3_0 {
 /// - V1.0.0 → V1.1.0: Adds `backend` field with default value
 /// - V1.1.0 → V1.2.0: Adds `model_name` field (optional)
 /// - V1.2.0 → V1.3.0: Adds `icon` field (optional)
-/// - V1.3.0 → Persona: Converts DTO to domain model (supports all 6 backends via enum expansion)
+/// - V1.3.0 → V1.4.0: Adds `base_color` field (optional)
+/// - V1.4.0 → Persona: Converts DTO to domain model (supports all 6 backends via enum expansion)
 ///
 /// # Example
 ///
@@ -330,12 +386,13 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_3_0 {
 pub fn create_persona_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> V1.1.0 -> V1.2.0 -> V1.3.0 -> Persona
+    // Register migration path: V1.0.0 -> V1.1.0 -> V1.2.0 -> V1.3.0 -> V1.4.0 -> Persona
     let persona_path = version_migrate::Migrator::define("persona")
         .from::<PersonaConfigV1_0_0>()
         .step::<PersonaConfigV1_1_0>()
         .step::<PersonaConfigV1_2_0>()
         .step::<PersonaConfigV1_3_0>()
+        .step::<PersonaConfigV1_4_0>()
         .into_with_save::<Persona>();
 
     migrator

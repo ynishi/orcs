@@ -1144,6 +1144,52 @@ async fn save_code_snippet(
     Ok(())
 }
 
+/// Opens a terminal in the specified directory
+#[tauri::command]
+async fn open_terminal(directory: String) -> Result<(), String> {
+    use std::process::Command;
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .args(["-a", "Terminal", &directory])
+            .spawn()
+            .map_err(|e| format!("Failed to open terminal: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "cmd", "/K", "cd", "/D", &directory])
+            .spawn()
+            .map_err(|e| format!("Failed to open terminal: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Try common terminal emulators in order of preference
+        let terminals = [
+            ("x-terminal-emulator", vec!["--working-directory", &directory]),
+            ("gnome-terminal", vec!["--working-directory", &directory]),
+            ("xterm", vec!["-e", &format!("cd '{}' && bash", directory)]),
+        ];
+
+        let mut success = false;
+        for (terminal, args) in &terminals {
+            if Command::new(terminal).args(args.iter()).spawn().is_ok() {
+                success = true;
+                break;
+            }
+        }
+
+        if !success {
+            return Err("No terminal emulator found".to_string());
+        }
+    }
+
+    Ok(())
+}
+
 /// Gets Git repository information for the current workspace
 #[tauri::command]
 async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String> {
@@ -1503,6 +1549,7 @@ fn main() {
                 rename_file_in_workspace,
                 read_workspace_file,
                 save_code_snippet,
+                open_terminal,
                 handle_input,
                 slash_commands::list_slash_commands,
                 slash_commands::get_slash_command,

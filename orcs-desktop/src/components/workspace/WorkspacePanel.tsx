@@ -1,5 +1,5 @@
 import { Stack, Text, Loader, Center, Alert, ActionIcon, Group, Tooltip, Switch, ScrollArea, Box } from '@mantine/core';
-import { IconPlus, IconRefresh, IconFolder } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconFolder, IconTerminal } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { useCallback } from 'react';
@@ -150,6 +150,19 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
     }
   };
 
+  // Handle opening terminal in workspace directory
+  const handleOpenTerminal = async () => {
+    if (!workspace) return;
+
+    try {
+      await invoke('open_terminal', {
+        directory: workspace.rootPath,
+      });
+    } catch (err) {
+      console.error('Failed to open terminal:', err);
+    }
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -193,6 +206,18 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
                 aria-label="Open folder"
               >
                 <IconFolder size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Open terminal in workspace" withArrow>
+              <ActionIcon
+                onClick={() => {
+                  void handleOpenTerminal();
+                }}
+                variant="subtle"
+                color="gray"
+                aria-label="Open terminal"
+              >
+                <IconTerminal size={18} />
               </ActionIcon>
             </Tooltip>
             <ActionIcon
@@ -260,6 +285,18 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
               aria-label="Open folder"
             >
               <IconFolder size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Open terminal in workspace" withArrow>
+            <ActionIcon
+              onClick={() => {
+                void handleOpenTerminal();
+              }}
+              variant="subtle"
+              color="gray"
+              aria-label="Open terminal"
+            >
+              <IconTerminal size={18} />
             </ActionIcon>
           </Tooltip>
           <ActionIcon

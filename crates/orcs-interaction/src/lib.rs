@@ -42,12 +42,16 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
     // Create visual identity if icon is present
     let visual_identity = persona.icon.as_ref().map(|icon| VisualIdentity::new(icon.clone()));
 
+    // Get capabilities from backend
+    let capabilities = Some(persona.backend.capabilities());
+
     LlmPersona {
         name: persona.name.clone(),
         role: persona.role.clone(),
         background: persona.background.clone(),
         communication_style: enhanced_communication_style,
         visual_identity,
+        capabilities,
     }
 }
 

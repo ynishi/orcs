@@ -85,6 +85,32 @@ impl PersonaBackend {
         )
     }
 
+    /// Returns the capabilities for this backend as llm-toolkit Capability objects.
+    pub fn capabilities(&self) -> Vec<llm_toolkit::agent::Capability> {
+        use llm_toolkit::agent::Capability;
+
+        if self.has_direct_file_access() {
+            // CLI backends: full local access
+            vec![
+                Capability::new("file:read").with_description("Read file contents from disk"),
+                Capability::new("file:write").with_description("Write content to files on disk"),
+                Capability::new("file:edit").with_description("Edit existing files on disk"),
+                Capability::new("command:execute").with_description("Execute shell commands and scripts"),
+                Capability::new("env:access").with_description("Access environment variables"),
+                Capability::new("payload:read").with_description("Read input payload and messages"),
+                Capability::new("attachment:read").with_description("Read file attachments"),
+            ]
+        } else {
+            // API backends: read-only, remote access
+            vec![
+                Capability::new("payload:read").with_description("Read input payload and messages"),
+                Capability::new("attachment:read").with_description("Read file attachments"),
+                Capability::new("analysis:code").with_description("Analyze and review code"),
+                Capability::new("suggestion:provide").with_description("Provide suggestions and designs"),
+            ]
+        }
+    }
+
     /// Returns a markdown-formatted capabilities description for system prompts.
     pub fn capabilities_markdown(&self) -> String {
         let access_type = self.access_type();

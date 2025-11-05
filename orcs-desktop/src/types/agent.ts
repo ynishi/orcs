@@ -40,6 +40,7 @@ export interface PersonaConfig {
   source: 'System' | 'User';
   backend: PersonaBackend;
   model_name?: string;
+  icon?: string;
 }
 
 /**

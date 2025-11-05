@@ -387,6 +387,7 @@ mod tests {
                 execution_strategy: ExecutionModel::Broadcast,
                 system_messages: Vec::new(),
                 participants: HashMap::new(),
+                participant_icons: HashMap::new(),
                 conversation_mode: ConversationMode::Normal,
                 talk_style: None,
             }

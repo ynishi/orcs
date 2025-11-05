@@ -13,6 +13,7 @@ export interface Message {
   text: string;
   timestamp: Date;
   metadata?: MessageMetadata;
+  icon?: string; // Optional icon/emoji for the author
 }
 
 /**

@@ -18,6 +18,7 @@ export interface Session {
   execution_strategy: string; // "broadcast" or "sequential"
   system_messages: ConversationMessage[]; // System messages (join/leave events, etc.)
   participants: Record<string, string>; // Persona ID -> name mapping
+  participant_icons: Record<string, string>; // Persona ID -> icon mapping
 }
 
 /**
@@ -224,6 +225,7 @@ export function convertToUIMessageWithAuthor(
   msg: ConversationMessage,
   authorId: string,
   participants: Record<string, string>,
+  participantIcons: Record<string, string> = {},
   userNickname: string = 'You'
 ): Message {
   // Check if this is an error message (special authorId "Error")
@@ -241,13 +243,18 @@ export function convertToUIMessageWithAuthor(
 
   // authorIdが"You"ならユーザー、"System"ならシステム、それ以外はペルソナIDから名前を解決
   let author: string;
+  let icon: string | undefined;
   if (msg.role === 'User') {
     author = authorId === 'You' ? userNickname : (participants[authorId] || authorId);
+    // User has no icon
   } else if (msg.role === 'System') {
     author = 'SYSTEM';
+    // System has no icon
   } else {
     // Assistant: participantsマップから名前を解決、見つからない場合はauthorIdをそのまま使用
     author = participants[authorId] || authorId;
+    // Get icon from participantIcons if available
+    icon = participantIcons[authorId];
   }
 
   return {
@@ -256,6 +263,7 @@ export function convertToUIMessageWithAuthor(
     author,
     text: msg.content,
     timestamp: new Date(msg.timestamp),
+    icon,
   };
 }
 
@@ -279,6 +287,12 @@ export function convertToUIMessage(msg: ConversationMessage, userNickname: strin
  */
 export function convertSessionToMessages(session: Session, userNickname: string = 'You'): Message[] {
   return getAllMessagesWithAuthors(session).map(item =>
-    convertToUIMessageWithAuthor(item.message, item.authorId, session.participants || {}, userNickname)
+    convertToUIMessageWithAuthor(
+      item.message,
+      item.authorId,
+      session.participants || {},
+      session.participant_icons || {},
+      userNickname
+    )
   );
 }

@@ -224,6 +224,16 @@ function App() {
         console.log('[App] Loading messages for active session:', currentSessionId);
         const activeSession = sessions.find(s => s.id === currentSessionId);
         if (activeSession) {
+          // Enrich participant_icons from current personas if missing
+          if (!activeSession.participant_icons || Object.keys(activeSession.participant_icons).length === 0) {
+            activeSession.participant_icons = {};
+            personas.forEach(persona => {
+              if (persona.icon && activeSession.participants[persona.id]) {
+                activeSession.participant_icons[persona.id] = persona.icon;
+              }
+            });
+          }
+          console.log('[App] Session participant_icons:', activeSession.participant_icons);
           const restoredMessages = convertSessionToMessages(activeSession, userNickname);
           setMessages(restoredMessages);
           console.log('[App] Loaded', restoredMessages.length, 'messages from session', currentSessionId);

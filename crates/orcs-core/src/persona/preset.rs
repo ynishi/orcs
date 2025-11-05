@@ -22,6 +22,7 @@ pub fn get_default_presets() -> Vec<Persona> {
             source: PersonaSource::System,
             backend: Default::default(),
             model_name: None,
+            icon: Some("🎨".to_string()),
         },
         Persona {
             id: Uuid::new_v4().to_string(),
@@ -33,6 +34,7 @@ pub fn get_default_presets() -> Vec<Persona> {
             source: PersonaSource::System,
             backend: Default::default(),
             model_name: None,
+            icon: Some("🔧".to_string()),
         },
     ]
 }

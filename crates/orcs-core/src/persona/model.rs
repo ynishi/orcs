@@ -189,6 +189,9 @@ pub struct Persona {
     /// If None, uses the backend's default model
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_name: Option<String>,
+    /// Visual icon/emoji representing this persona (e.g., "🎨", "🔧", "📊")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 #[cfg(test)]

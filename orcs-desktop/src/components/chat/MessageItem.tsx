@@ -204,9 +204,14 @@ export function MessageItem({ message, onSaveToWorkspace, workspaceRootPath }: M
           }}
         >
           <Group justify="space-between" mb={4}>
-            <Text fw={600} size="sm" c="dimmed">
-              {message.author}
-            </Text>
+            <Group gap={4}>
+              {message.icon && (
+                <Text size="sm">{message.icon}</Text>
+              )}
+              <Text fw={600} size="sm" c="dimmed">
+                {message.author}
+              </Text>
+            </Group>
 
             {/* アクションボタン */}
             {isHovered && (

@@ -41,6 +41,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
     default_participant: false,
     backend: 'claude_cli',
     model_name: undefined,
+    icon: undefined,
   });
 
   // Fetch backend options on mount
@@ -70,6 +71,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         default_participant: persona.default_participant || false,
         backend: persona.backend || 'claude_cli',
         model_name: persona.model_name,
+        icon: persona.icon,
       });
     } else {
       setFormData({
@@ -81,6 +83,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         default_participant: false,
         backend: 'claude_cli',
         model_name: undefined,
+        icon: undefined,
       });
     }
   }, [persona]);
@@ -106,6 +109,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
       backend: formData.backend || 'claude_cli',
       source: 'User',
       model_name: formData.model_name || undefined,
+      icon: formData.icon || undefined,
     };
 
     onSave(validatedPersona);
@@ -137,6 +141,15 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.currentTarget.value })}
           required
+        />
+
+        <TextInput
+          label="Icon (Emoji)"
+          placeholder="e.g., 🎨, 🔧, 📊"
+          value={formData.icon || ''}
+          onChange={(e) => setFormData({ ...formData, icon: e.currentTarget.value || undefined })}
+          description="Optional emoji/icon to represent this persona"
+          maxLength={10}
         />
 
         <TextInput

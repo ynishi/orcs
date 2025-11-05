@@ -30,6 +30,8 @@ use tokio::sync::{Mutex, RwLock};
 /// Automatically injects runtime capabilities based on the backend type
 /// into the communication_style to help the AI understand what it can and cannot do.
 fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
+    use llm_toolkit::agent::persona::VisualIdentity;
+
     // Inject runtime capabilities into communication style
     let enhanced_communication_style = format!(
         "{}\n\n{}",
@@ -37,12 +39,15 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
         persona.backend.capabilities_markdown()
     );
 
+    // Create visual identity if icon is present
+    let visual_identity = persona.icon.as_ref().map(|icon| VisualIdentity::new(icon.clone()));
+
     LlmPersona {
         name: persona.name.clone(),
         role: persona.role.clone(),
         background: persona.background.clone(),
         communication_style: enhanced_communication_style,
-        visual_identity: None,
+        visual_identity,
     }
 }
 
@@ -99,7 +104,7 @@ impl PersonaBackendAgent {
                 let mut agent = ClaudeCodeAgent::new()
                     // Pre-approve Edit and Write tools to avoid constant approval prompts
                     .with_args(vec![
-                        "--allow-tools".to_string(),
+                        "--allowed-tools".to_string(),
                         "Edit,Write".to_string(),
                     ]);
 
@@ -570,10 +575,13 @@ impl InteractionManager {
 
         // Build participants map: persona ID -> name
         let mut participants = HashMap::new();
+        // Build participant_icons map: persona ID -> icon
+        let mut participant_icons = HashMap::new();
 
         // Always add user name first (user is always a participant)
         let user_name = self.user_service.get_user_name();
         participants.insert(user_name.clone(), user_name.clone());
+        // User has no icon for now
 
         // Add all personas from persona_histories (AI participants)
         if let Ok(all_personas) = self.persona_repository.get_all() {
@@ -585,6 +593,10 @@ impl InteractionManager {
 
                 if let Some(persona) = all_personas.iter().find(|p| &p.id == persona_id) {
                     participants.insert(persona_id.clone(), persona.name.clone());
+                    // Add icon if persona has one
+                    if let Some(icon) = &persona.icon {
+                        participant_icons.insert(persona_id.clone(), icon.clone());
+                    }
                 }
             }
         }
@@ -605,6 +617,7 @@ impl InteractionManager {
             execution_strategy,
             system_messages,
             participants,
+            participant_icons,
             conversation_mode,
             talk_style,
         }

@@ -53,6 +53,9 @@ pub struct Session {
     /// Participant persona ID to name mapping for display
     #[serde(default)]
     pub participants: HashMap<String, String>,
+    /// Participant persona ID to icon mapping for display
+    #[serde(default)]
+    pub participant_icons: HashMap<String, String>,
     /// Conversation mode (controls verbosity and style)
     #[serde(default)]
     pub conversation_mode: ConversationMode,

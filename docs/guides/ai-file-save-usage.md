@@ -8,13 +8,23 @@ AIペルソナがファイル内容を提示する際、ユーザーがワンク
 
 ### How to Enable File Save Button
 
-When providing file content that should be saveable, use this markdown syntax:
+When providing file content that should be saveable, use one of these markdown formats:
 
+**Full format (recommended):**
 ````markdown
 ```<language>:path=<absolute_path>:saveable
 <file content here>
 ```
 ````
+
+**Simple format (also supported):**
+````markdown
+```<language>:filename.ext
+<file content here>
+```
+````
+
+The simple format is easier to use but requires the user to edit the path to add the full directory.
 
 ### Examples
 
@@ -73,27 +83,53 @@ if __name__ == "__main__":
 ```
 ````
 
+#### Example 4: Simple Format (Filename Only)
+
+````markdown
+Quick script for you:
+
+```python:hello.py
+def greet(name):
+    print(f"Hello, {name}!")
+
+greet("World")
+```
+
+The path will default to "hello.py" - you can edit it to add the full directory path.
+````
+
 ### Syntax Breakdown
+
+#### Full Format
 
 1. **Language**: Specify the programming language for syntax highlighting
    - Example: `toml`, `python`, `json`, `yaml`, `rust`, `javascript`, etc.
 
 2. **Path**: Absolute path where the file should be saved
    - Format: `:path=/absolute/path/to/file.ext`
-   - Must be an absolute path (starting with `/` on Unix or `C:\` on Windows)
+   - Recommended: Use absolute paths (starting with `/` on Unix or `C:\` on Windows)
    - Parent directories will be created automatically
 
 3. **Saveable Flag**: Indicates this code block should show a save button
    - Format: `:saveable`
-   - Must be present for the save button to appear
+   - Can be omitted if using `:path=...`
+
+#### Simple Format
+
+1. **Language**: Programming language
+2. **Filename**: Just the filename with extension
+   - Format: `:filename.ext`
+   - Example: `:hello.py`, `:config.toml`
+   - Automatically enables save button
+   - User must edit to add full directory path (yellow warning will appear)
 
 ### Best Practices
 
-1. **Always use absolute paths**
+1. **Prefer absolute paths when possible**
    ```
-   ✅ Good: /Users/username/projects/orcs/config.toml
-   ❌ Bad:  ./config.toml
-   ❌ Bad:  ~/config.toml  (won't expand)
+   ✅ Best:  /Users/username/projects/orcs/config.toml
+   ⚠️ OK:    config.toml (user will edit to add path)
+   ❌ Bad:   ~/config.toml  (won't expand, use full path)
    ```
 
 2. **Expand user paths manually**

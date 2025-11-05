@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Paper, Text, Group, Button, TextInput, ActionIcon, Box, CopyButton, Tooltip } from '@mantine/core';
-import { IconDeviceFloppy, IconEdit, IconCheck, IconX } from '@tabler/icons-react';
+import { Paper, Text, Group, Button, TextInput, ActionIcon, Box, CopyButton, Tooltip, Alert } from '@mantine/core';
+import { IconDeviceFloppy, IconEdit, IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 
 interface SaveableCodeBlockProps {
@@ -14,6 +14,16 @@ export function SaveableCodeBlock({ language, code, suggestedPath, onSave }: Sav
   const [isEditingPath, setIsEditingPath] = useState(false);
   const [targetPath, setTargetPath] = useState(suggestedPath || '');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Check if the path is relative (not absolute)
+  const isRelativePath = targetPath && !targetPath.startsWith('/') && !targetPath.match(/^[A-Za-z]:\\/);
+
+  // Auto-open edit mode if path is just a filename
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
+  if (!hasAutoOpened && isRelativePath && targetPath) {
+    setIsEditingPath(true);
+    setHasAutoOpened(true);
+  }
 
   const handleSave = async () => {
     if (!targetPath.trim()) {
@@ -67,6 +77,15 @@ export function SaveableCodeBlock({ language, code, suggestedPath, onSave }: Sav
         backgroundColor: 'var(--mantine-color-dark-8)',
       }}
     >
+      {/* Warning for relative paths */}
+      {isRelativePath && !isEditingPath && (
+        <Alert icon={<IconAlertCircle size={16} />} title="Relative path detected" color="yellow" mb="sm">
+          <Text size="xs">
+            The suggested path "{targetPath}" is relative. Please click edit to specify an absolute path.
+          </Text>
+        </Alert>
+      )}
+
       {/* Header with path and actions */}
       <Group justify="space-between" mb="sm">
         <Group gap="xs" style={{ flex: 1 }}>
@@ -75,9 +94,10 @@ export function SaveableCodeBlock({ language, code, suggestedPath, onSave }: Sav
               <TextInput
                 value={targetPath}
                 onChange={(e) => setTargetPath(e.currentTarget.value)}
-                placeholder="/path/to/file"
+                placeholder="/absolute/path/to/file"
                 size="xs"
                 style={{ flex: 1 }}
+                error={isRelativePath}
               />
               <ActionIcon color="green" size="sm" onClick={handleConfirmPath}>
                 <IconCheck size={16} />
@@ -88,7 +108,7 @@ export function SaveableCodeBlock({ language, code, suggestedPath, onSave }: Sav
             </>
           ) : (
             <>
-              <Text size="xs" c="dimmed" ff="monospace">
+              <Text size="xs" c={isRelativePath ? 'yellow' : 'dimmed'} ff="monospace">
                 {targetPath || 'No path specified'}
               </Text>
               <ActionIcon size="xs" variant="subtle" onClick={handleEditPath}>

@@ -18,14 +18,37 @@ interface CodeBlockMetadata {
 
 /**
  * Parse code block metadata from info string
- * Example: ```toml:path=/path/to/file.toml:saveable
+ * Supported formats:
+ * - ```toml:path=/path/to/file.toml:saveable (full format)
+ * - ```toml:file.toml (filename only, saveable assumed)
+ * - ```toml:path=/path/to/file.toml (path without saveable flag)
+ * - ```python:script.py (any extension triggers saveable mode)
  */
 function parseCodeBlockMetadata(info: string): CodeBlockMetadata {
   const parts = info.split(':');
   const language = parts[0] || '';
-  const saveable = parts.includes('saveable');
+
+  // Check for explicit saveable flag
+  let saveable = parts.includes('saveable');
+
+  // Check for explicit path=...
   const pathPart = parts.find(p => p.startsWith('path='));
-  const path = pathPart ? pathPart.replace('path=', '') : undefined;
+  let path = pathPart ? pathPart.replace('path=', '') : undefined;
+
+  // If no explicit path, check for filename pattern (e.g., :filename.ext)
+  // This supports formats like ```python:hello.py
+  if (!path && parts.length > 1) {
+    const possibleFilename = parts[1];
+    // Check if it looks like a filename (contains a dot and extension)
+    if (possibleFilename && possibleFilename.includes('.')) {
+      // It's just a filename, not a full path
+      path = possibleFilename;
+      saveable = true; // Auto-enable saveable mode for filename format
+    }
+  }
+
+  // If path is set but not absolute, it's just a suggested filename
+  // User will need to edit it to add the full path
 
   return { language, saveable, path };
 }

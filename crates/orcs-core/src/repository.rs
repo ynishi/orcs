@@ -11,3 +11,7 @@ pub use crate::persona::PersonaRepository;
 
 // Re-export TaskRepository from task module
 pub use crate::task::TaskRepository;
+
+pub use crate::slash_command::SlashCommandRepository;
+
+pub use crate::workspace::WorkspaceRepository;

@@ -29,7 +29,6 @@ mod task;
 mod uploaded_file;
 mod user_profile;
 mod workspace;
-mod workspace_metadata;
 
 // Re-export app_state DTOs and migrator
 pub use app_state::{AppStateDTO, AppStateV1_0, AppStateV1_1, create_app_state_migrator};
@@ -67,9 +66,4 @@ pub use workspace::{
     ProjectContextV1, SessionWorkspaceV1, TempFileV1, WorkspaceResourcesV1, WorkspaceV1,
     WorkspaceV1_1_0, create_project_context_migrator, create_session_workspace_migrator,
     create_temp_file_migrator, create_workspace_migrator, create_workspace_resources_migrator,
-};
-
-// Re-export workspace_metadata DTOs and migrator
-pub use workspace_metadata::{
-    WorkspaceMetadataDTO, WorkspaceMetadataV1_0, create_workspace_metadata_migrator,
 };

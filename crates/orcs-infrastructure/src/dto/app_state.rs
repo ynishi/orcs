@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use version_migrate::{IntoDomain, Versioned};
 
-use orcs_core::app_state::AppState;
+use orcs_core::state::model::AppState;
 
 /// Application state configuration V1.0.0 (initial version).
 ///

@@ -1,10 +1,9 @@
 //! AsyncDirStorage-based TaskRepository implementation
 
-use crate::dto::create_task_migrator;
+use crate::{dto::create_task_migrator, storage_repository::{StorageRepository, is_not_found}, paths::{OrcsPaths, ServiceType}};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use orcs_core::repository::TaskRepository;
-use orcs_core::task::Task;
+use orcs_core::{repository::TaskRepository, task::Task, error::OrcsError};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use version_migrate::{
@@ -22,97 +21,59 @@ use version_migrate::{
 /// ```
 pub struct AsyncDirTaskRepository {
     storage: AsyncDirStorage,
-    _base_dir: PathBuf,
+}
+
+impl StorageRepository for AsyncDirTaskRepository {
+    const SERVICE_TYPE: crate::paths::ServiceType = ServiceType::Task;
+    const ENTITY_NAME: &'static str = Self::ENTITY_NAME;
+    fn storage(&self) -> &AsyncDirStorage {
+        &self.storage
+    }
 }
 
 impl AsyncDirTaskRepository {
     /// Creates an AsyncDirTaskRepository instance at the default location.
     ///
-    /// Uses centralized path management via `ServiceType::Task`.
+    /// Uses centralized path management and storage creation via `OrcsPaths`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the configuration directory cannot be determined or if
-    /// the directory structure cannot be created.
-    pub async fn default_location() -> Result<Self> {
-        use crate::paths::{OrcsPaths, ServiceType};
-        let path_type = OrcsPaths::get_path(ServiceType::Task)
-            .map_err(|e| anyhow::anyhow!("Failed to get task directory: {}", e))?;
-        let base_dir = path_type.into_path_buf();
-        Self::new(base_dir).await
+    /// Returns an error if the storage cannot be created.
+    pub async fn default() -> Result<Self> {
+        Ok(Self::new(None))
     }
 
-    /// Creates a new AsyncDirTaskRepository.
-    ///
-    /// # Arguments
-    ///
-    /// * `base_dir` - Base directory for tasks (e.g., ~/.config/orcs)
-    ///
-    /// # Errors
-    ///
-    /// Returns error if:
-    /// - Directory creation fails
-    /// - AsyncDirStorage initialization fails
-    pub async fn new(base_dir: impl AsRef<Path>) -> Result<Self> {
-        let base_dir = base_dir.as_ref().to_path_buf();
-
-        // Ensure base directory exists
-        fs::create_dir_all(&base_dir)
-            .await
-            .context("Failed to create base directory")?;
-
-        // Setup AppPaths with CustomBase strategy to use our base_dir
-        let paths = AppPaths::new("orcs").data_strategy(PathStrategy::CustomBase(base_dir.clone()));
-
-        // Setup migrator
+    /// Creates a new AsyncDirTaskRepository with custom base directory (for testing).
+    pub async fn new(base_dir: Option<&Path>) -> Result<Self> {
+        // Create AsyncDirStorage via centralized helper
         let migrator = create_task_migrator();
-
-        // Setup storage strategy: TOML format, Direct filename encoding
-        let strategy = DirStorageStrategy::default()
-            .with_format(FormatStrategy::Toml)
-            .with_filename_encoding(FilenameEncoding::Direct);
-
-        // Create AsyncDirStorage
-        let storage = AsyncDirStorage::new(paths, "tasks", migrator, strategy)
+        let orcs_paths = OrcsPaths::new(base_dir);
+        let storage = orcs_paths
+            .create_async_dir_storage(Self::SERVICE_TYPE, migrator)
             .await
-            .context("Failed to create AsyncDirStorage")?;
-
-        Ok(Self {
-            storage,
-            _base_dir: base_dir,
-        })
-    }
-
-    /// Returns the actual tasks directory path.
-    ///
-    /// This returns the real path where task files are stored.
-    pub fn tasks_dir(&self) -> &Path {
-        self.storage.base_path()
+            .map_err(|e| OrcsError::Io(format!("Failed to create task storage: {}", e)))?;
+        Ok(Self { storage })
     }
 }
 
 #[async_trait]
 impl TaskRepository for AsyncDirTaskRepository {
     async fn find_by_id(&self, task_id: &str) -> Result<Option<Task>> {
-        match self.storage.load::<Task>("task", task_id).await {
+        match self.storage.load::<Task>(Self::ENTITY_NAME, task_id).await {
             Ok(task) => Ok(Some(task)),
             Err(e) => {
-                // Check if it's a "not found" error
-                let error_str = e.to_string();
-                if error_str.contains("No such file or directory")
-                    || error_str.contains("not found")
-                    || error_str.contains("cannot find")
-                {
-                    return Ok(None);
+                if is_not_found(e) {
+                    Ok(None)
+                } else {
+                    Err(anyhow::anyhow!(e))
                 }
-                Err(anyhow::anyhow!(e))
             }
         }
     }
 
     async fn save(&self, task: &Task) -> Result<()> {
         self.storage
-            .save("task", &task.id, task)
+            .save(Self::ENTITY_NAME, &task.id, task)
             .await
             .context("Failed to save task")
     }
@@ -127,7 +88,7 @@ impl TaskRepository for AsyncDirTaskRepository {
     async fn list_all(&self) -> Result<Vec<Task>> {
         let all_tasks = self
             .storage
-            .load_all::<Task>("task")
+            .load_all::<Task>(Self::ENTITY_NAME)
             .await
             .context("Failed to load all tasks")?;
 

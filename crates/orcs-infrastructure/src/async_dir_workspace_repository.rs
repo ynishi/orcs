@@ -3,10 +3,11 @@
 //! This provides a repository for full Workspace data (including resources metadata)
 //! using AsyncDirStorage from version-migrate for ACID guarantees and async I/O.
 
-use crate::dto::create_workspace_migrator;
+use crate::{ServiceType, dto::create_workspace_migrator, storage_repository::{StorageRepository, is_not_found}};
+use async_trait::async_trait;
 use orcs_core::{
     error::{OrcsError, Result},
-    workspace::Workspace,
+    workspace::{Workspace, WorkspaceRepository},
 };
 use std::path::Path;
 use tokio::fs;
@@ -31,6 +32,15 @@ pub struct AsyncDirWorkspaceRepository {
     storage: AsyncDirStorage,
 }
 
+impl StorageRepository for AsyncDirWorkspaceRepository {
+    const SERVICE_TYPE: crate::paths::ServiceType = ServiceType::Workspace;
+    const ENTITY_NAME: &'static str = "workspace";
+
+    fn storage(&self) -> &AsyncDirStorage {
+        &self.storage
+    }
+}
+
 impl AsyncDirWorkspaceRepository {
     /// Creates an AsyncDirWorkspaceRepository instance at the default location.
     ///
@@ -40,12 +50,8 @@ impl AsyncDirWorkspaceRepository {
     ///
     /// Returns an error if the configuration directory cannot be determined or if
     /// the directory structure cannot be created.
-    pub async fn default_location() -> Result<Self> {
-        use crate::paths::{OrcsPaths, ServiceType};
-        let path_type = OrcsPaths::get_path(ServiceType::Workspace)
-            .map_err(|e| OrcsError::Io(format!("Failed to get workspace directory: {}", e)))?;
-        let base_dir = path_type.into_path_buf();
-        Self::new(base_dir).await
+    pub async fn default() -> Result<Self> {
+        Self::new(None)
     }
 
     /// Creates a new AsyncDirWorkspaceRepository.
@@ -59,94 +65,65 @@ impl AsyncDirWorkspaceRepository {
     /// Returns error if:
     /// - Directory creation fails
     /// - AsyncDirStorage initialization fails
-    pub async fn new(base_dir: impl AsRef<Path>) -> Result<Self> {
-        let base_dir = base_dir.as_ref().to_path_buf();
+    pub async fn new(base_dir: Option<&Path>) -> Result<Self> {
+        use crate::paths::{OrcsPaths, ServiceType};
 
-        // Ensure base directory exists
-        fs::create_dir_all(&base_dir)
-            .await
-            .map_err(|e| OrcsError::Io(format!("Failed to create base directory: {}", e)))?;
-
-        // Setup AppPaths with CustomBase strategy
-        let paths = AppPaths::new("orcs").data_strategy(PathStrategy::CustomBase(base_dir));
-
-        // Setup migrator
+        // Create AsyncDirStorage via centralized helper
         let migrator = create_workspace_migrator();
-
-        // Setup storage strategy: TOML format, Direct filename encoding
-        let strategy = DirStorageStrategy::default()
-            .with_format(FormatStrategy::Toml)
-            .with_filename_encoding(FilenameEncoding::Direct);
-
-        // Create AsyncDirStorage for "workspace_data" subdirectory
-        let storage = AsyncDirStorage::new(paths, "workspace_data", migrator, strategy)
+        let orcs_paths = OrcsPaths::new(None);
+        let storage = orcs_paths
+            .create_async_dir_storage(ServiceType::Workspace, migrator)
             .await
-            .map_err(|e| OrcsError::Io(format!("Failed to create AsyncDirStorage: {}", e)))?;
+            .map_err(|e| OrcsError::Io(format!("Failed to create workspace storage: {}", e)))?;
 
         Ok(Self { storage })
     }
+}
 
-    /// Loads a workspace by ID.
-    ///
-    /// # Arguments
-    ///
-    /// * `workspace_id` - The ID of the workspace
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(Some(Workspace))`: Workspace found
-    /// - `Ok(None)`: Workspace not found
-    /// - `Err(_)`: Error occurred during retrieval
-    pub async fn find_by_id(&self, workspace_id: &str) -> Result<Option<Workspace>> {
+#[async_trait]
+impl WorkspaceRepository for AsyncDirWorkspaceRepository {
+    async fn find_by_id(&self, workspace_id: &str) -> Result<Option<Workspace>> {
         match self
             .storage
-            .load::<Workspace>("workspace", workspace_id)
+            .load::<Workspace>(Self::ENTITY_NAME, workspace_id)
             .await
         {
             Ok(workspace) => Ok(Some(workspace)),
             Err(e) => {
-                // Check if it's a "not found" error
-                let error_str = e.to_string();
-                if error_str.contains("No such file or directory")
-                    || error_str.contains("not found")
-                    || error_str.contains("cannot find")
-                {
-                    return Ok(None);
+                if is_not_found(e) {
+                    Ok(None)
+                } else {
+                     Err(OrcsError::Io(e.to_string()))
                 }
-                Err(OrcsError::Io(e.to_string()))
             }
         }
     }
 
-    /// Saves a workspace.
-    ///
-    /// # Arguments
-    ///
-    /// * `workspace` - The workspace to save
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(())`: Workspace saved successfully
-    /// - `Err(_)`: Error occurred during save
-    pub async fn save(&self, workspace: &Workspace) -> Result<()> {
+    async fn save(&self, workspace: &Workspace) -> Result<()> {
         self.storage
-            .save("workspace", &workspace.id, workspace)
+            .save(Self::ENTITY_NAME, &workspace.id, workspace)
             .await
             .map_err(|e| OrcsError::Io(format!("Failed to save workspace: {}", e)))?;
         Ok(())
     }
 
-    /// Deletes a workspace.
-    ///
-    /// # Arguments
-    ///
-    /// * `workspace_id` - The ID of the workspace to delete
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(())`: Workspace deleted successfully (or didn't exist)
-    /// - `Err(_)`: Error occurred during deletion
-    pub async fn delete(&self, workspace_id: &str) -> Result<()> {
+    async fn update<F>(&self, workspace_id: &str, f: F) -> Result<Workspace>
+    where
+        F: FnOnce(&mut Workspace) + Send,
+    {
+        let mut workspace = self
+            .find_by_id(workspace_id)
+            .await?
+            .ok_or_else(|| OrcsError::Io(format!("Workspace '{}' not found", workspace_id)))?;
+
+        f(&mut workspace);
+
+        self.save(&workspace).await?;
+
+        Ok(workspace)
+    }
+
+    async fn delete(&self, workspace_id: &str) -> Result<()> {
         self.storage
             .delete(workspace_id)
             .await
@@ -154,16 +131,10 @@ impl AsyncDirWorkspaceRepository {
         Ok(())
     }
 
-    /// Lists all workspaces.
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(Vec<Workspace>)`: All workspaces, sorted by last_accessed (desc)
-    /// - `Err(_)`: Error occurred during listing
-    pub async fn list_all(&self) -> Result<Vec<Workspace>> {
+    async fn list_all(&self) -> Result<Vec<Workspace>> {
         let all_workspaces = self
             .storage
-            .load_all::<Workspace>("workspace")
+            .load_all::<Workspace>(Self::ENTITY_NAME)
             .await
             .map_err(|e| OrcsError::Io(format!("Failed to load all workspaces: {}", e)))?;
 
@@ -174,21 +145,6 @@ impl AsyncDirWorkspaceRepository {
         workspaces.sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
 
         Ok(workspaces)
-    }
-
-    /// Checks if a workspace exists.
-    ///
-    /// # Arguments
-    ///
-    /// * `workspace_id` - The ID of the workspace
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(true)`: Workspace exists
-    /// - `Ok(false)`: Workspace does not exist
-    /// - `Err(_)`: Error occurred during check
-    pub async fn exists(&self, workspace_id: &str) -> Result<bool> {
-        Ok(self.find_by_id(workspace_id).await?.is_some())
     }
 }
 

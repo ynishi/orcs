@@ -66,7 +66,7 @@ impl FileSystemWorkspaceManager {
         })?;
 
         // Initialize AsyncDirWorkspaceRepository
-        let workspace_repository = Arc::new(AsyncDirWorkspaceRepository::default_location().await?);
+        let workspace_repository = Arc::new(AsyncDirWorkspaceRepository::default().await?);
 
         Ok(Self {
             root_dir,

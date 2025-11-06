@@ -1,8 +1,8 @@
 pub mod manager;
-pub mod metadata_repository;
 pub mod model;
+pub mod repository;
 
-pub use metadata_repository::{WorkspaceMetadata, WorkspaceMetadataRepository};
 pub use model::{
     ProjectContext, SessionWorkspace, TempFile, UploadedFile, Workspace, WorkspaceResources,
 };
+pub use repository::WorkspaceRepository;

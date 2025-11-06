@@ -1,7 +1,8 @@
 use super::app_mode::AppMode;
 use super::model::Session;
 use super::repository::SessionRepository;
-use anyhow::Result;
+use crate::error::{OrcsError, Result};
+use crate::state::repository::StateRepository;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -34,25 +35,29 @@ pub trait InteractionManagerTrait: Send + Sync {
 /// - Persisting session state
 /// - Managing the active session
 pub struct SessionManager<T: InteractionManagerTrait> {
-    /// Currently active session ID
-    active_session_id: Arc<RwLock<Option<String>>>,
     /// In-memory session cache
     sessions: Arc<RwLock<HashMap<String, Arc<T>>>>,
-    /// Persistent storage backend via repository pattern
-    repository: Arc<dyn SessionRepository>,
+    /// Persistent storage backend for session data
+    session_repository: Arc<dyn SessionRepository>,
+    /// Application state repository for global state (e.g., active session ID)
+    state_repository: Arc<dyn StateRepository>,
 }
 
 impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
-    /// Creates a new `SessionManager` with a custom repository backend.
+    /// Creates a new `SessionManager` with repository backends.
     ///
     /// # Arguments
     ///
-    /// * `repository` - The repository backend to use for session persistence
-    pub fn new(repository: Arc<dyn SessionRepository>) -> Self {
+    /// * `session_repository` - The repository backend for session data persistence
+    /// * `state_repository` - The repository backend for application state (e.g., active session ID)
+    pub fn new(
+        session_repository: Arc<dyn SessionRepository>,
+        state_repository: Arc<dyn StateRepository>,
+    ) -> Self {
         Self {
-            active_session_id: Arc::new(RwLock::new(None)),
             sessions: Arc::new(RwLock::new(HashMap::new())),
-            repository,
+            session_repository,
+            state_repository,
         }
     }
 
@@ -69,17 +74,14 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     where
         F: FnOnce(Session) -> T,
     {
-        // Load active session ID
-        if let Some(session_id) = self.repository.get_active_session_id().await? {
+        // Load active session ID from state repository
+        if let Some(session_id) = self.state_repository.get_active_session().await {
             // Try to load session data
-            if let Some(session) = self.repository.find_by_id(&session_id).await? {
+            if let Some(session) = self.session_repository.find_by_id(&session_id).await? {
                 let manager = Arc::new(factory(session));
 
                 let mut sessions = self.sessions.write().await;
                 sessions.insert(session_id.clone(), manager.clone());
-
-                let mut active = self.active_session_id.write().await;
-                *active = Some(session_id);
 
                 return Ok(Some(manager));
             }
@@ -107,11 +109,11 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
         let mut sessions = self.sessions.write().await;
         sessions.insert(session_id.clone(), manager.clone());
 
-        let mut active = self.active_session_id.write().await;
-        *active = Some(session_id.clone());
-
-        // Persist active session ID
-        self.repository.set_active_session_id(&session_id).await?;
+        // Persist active session ID to state repository
+        self.state_repository
+            .set_active_session(session_id)
+            .await
+            .map_err(|e| OrcsError::Internal(e.to_string()))?;
 
         Ok(manager)
     }
@@ -136,11 +138,11 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
         let mut sessions = self.sessions.write().await;
         sessions.insert(session_id.clone(), manager.clone());
 
-        let mut active = self.active_session_id.write().await;
-        *active = Some(session_id.clone());
-
-        // Persist active session ID
-        self.repository.set_active_session_id(&session_id).await?;
+        // Persist active session ID to state repository
+        self.state_repository
+            .set_active_session(session_id)
+            .await
+            .map_err(|e| OrcsError::Internal(e.to_string()))?;
 
         Ok(manager)
     }
@@ -151,10 +153,9 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     ///
     /// `Some(manager)` if there is an active session, `None` otherwise.
     pub async fn active_session(&self) -> Option<Arc<T>> {
-        let active_id = self.active_session_id.read().await;
-        if let Some(id) = active_id.as_ref() {
+        if let Some(id) = self.state_repository.get_active_session().await {
             let sessions = self.sessions.read().await;
-            sessions.get(id).cloned()
+            sessions.get(&id).cloned()
         } else {
             None
         }
@@ -173,18 +174,18 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
         let manager = self
             .active_session()
             .await
-            .ok_or_else(|| anyhow::anyhow!("No active session"))?;
+            .ok_or_else(|| OrcsError::Internal("No active session".to_string()))?;
 
         // Load existing session to preserve workspace_id
         let session_id = manager.session_id();
         let existing_workspace_id = self
-            .repository
+            .session_repository
             .find_by_id(session_id)
             .await?
             .and_then(|s| s.workspace_id);
 
         let session = manager.to_session(app_mode, existing_workspace_id).await;
-        self.repository.save(&session).await?;
+        self.session_repository.save(&session).await?;
 
         Ok(())
     }
@@ -210,20 +211,23 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
 
         // Check if already in memory
         if let Some(manager) = sessions.get(session_id) {
-            let mut active = self.active_session_id.write().await;
-            *active = Some(session_id.to_string());
-            self.repository.set_active_session_id(session_id).await?;
-            return Ok(manager.clone());
+            let manager = manager.clone();
+            drop(sessions);
+            self.state_repository
+                .set_active_session(session_id.to_string())
+                .await
+                .map_err(|e| OrcsError::Internal(e.to_string()))?;
+            return Ok(manager);
         }
 
         drop(sessions);
 
         // Load from storage
         let session = self
-            .repository
+            .session_repository
             .find_by_id(session_id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
+            .ok_or_else(|| OrcsError::Internal(format!("Session not found: {}", session_id)))?;
         self.load_session(session, factory).await
     }
 
@@ -233,7 +237,7 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     ///
     /// Returns an error if the storage cannot be accessed.
     pub async fn list_sessions(&self) -> Result<Vec<Session>> {
-        self.repository.list_all().await
+        self.session_repository.list_all().await
     }
 
     /// Deletes a session from both memory and storage.
@@ -249,14 +253,17 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
         // Remove from memory
         let mut sessions = self.sessions.write().await;
         sessions.remove(session_id);
+        drop(sessions);
 
         // Remove from storage
-        self.repository.delete(session_id).await?;
+        self.session_repository.delete(session_id).await?;
 
         // Clear active if this was the active session
-        let mut active = self.active_session_id.write().await;
-        if active.as_ref() == Some(&session_id.to_string()) {
-            *active = None;
+        if self.state_repository.get_active_session().await.as_ref() == Some(&session_id.to_string()) {
+            self.state_repository
+                .clear_active_session()
+                .await
+                .map_err(|e| OrcsError::Internal(e.to_string()))?;
         }
 
         Ok(())
@@ -294,23 +301,23 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
 
         // Load existing session from storage
         let mut session = self
-            .repository
+            .session_repository
             .find_by_id(session_id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
+            .ok_or_else(|| OrcsError::Internal(format!("Session not found: {}", session_id)))?;
 
         // Update workspace_id
         session.workspace_id = workspace_id;
 
         // Save back to storage
-        self.repository.save(&session).await?;
+        self.session_repository.save(&session).await?;
 
         Ok(())
     }
 
     /// Returns the ID of the currently active session.
     pub async fn active_session_id(&self) -> Option<String> {
-        self.active_session_id.read().await.clone()
+        self.state_repository.get_active_session().await
     }
 
     /// Renames a session by updating its title.
@@ -326,10 +333,10 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     pub async fn rename_session(&self, session_id: &str, new_title: String) -> Result<()> {
         // Load the session from storage
         let mut session = self
-            .repository
+            .session_repository
             .find_by_id(session_id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
+            .ok_or_else(|| OrcsError::Internal(format!("Session not found: {}", session_id)))?;
 
         // Update the title
         session.title = new_title;
@@ -338,7 +345,7 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
         session.updated_at = chrono::Utc::now().to_rfc3339();
 
         // Save back to storage
-        self.repository.save(&session).await?;
+        self.session_repository.save(&session).await?;
 
         Ok(())
     }
@@ -407,14 +414,12 @@ mod tests {
     // Mock SessionRepository for testing
     struct MockSessionRepository {
         sessions: Mutex<HashMap<String, Session>>,
-        active_session_id: Mutex<Option<String>>,
     }
 
     impl MockSessionRepository {
         fn new() -> Self {
             Self {
                 sessions: Mutex::new(HashMap::new()),
-                active_session_id: Mutex::new(None),
             }
         }
     }
@@ -442,23 +447,76 @@ mod tests {
             let sessions = self.sessions.lock().unwrap();
             Ok(sessions.values().cloned().collect())
         }
+    }
 
-        async fn get_active_session_id(&self) -> Result<Option<String>> {
-            let active = self.active_session_id.lock().unwrap();
-            Ok(active.clone())
+    // Mock StateRepository for testing
+    struct MockStateRepository {
+        active_session_id: Mutex<Option<String>>,
+    }
+
+    impl MockStateRepository {
+        fn new() -> Self {
+            Self {
+                active_session_id: Mutex::new(None),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl StateRepository for MockStateRepository {
+        async fn save_state(&self, _state: crate::state::model::AppState) -> Result<(), String> {
+            Ok(())
         }
 
-        async fn set_active_session_id(&self, session_id: &str) -> Result<()> {
-            let mut active = self.active_session_id.lock().unwrap();
-            *active = Some(session_id.to_string());
+        async fn get_state(&self) -> Result<crate::state::model::AppState, String> {
+            Ok(crate::state::model::AppState::default())
+        }
+
+        async fn get_last_selected_workspace(&self) -> Option<String> {
+            None
+        }
+
+        async fn set_last_selected_workspace(&self, _workspace_id: String) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn clear_last_selected_workspace(&self) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn get_default_workspace(&self) -> Option<String> {
+            None
+        }
+
+        async fn set_default_workspace(&self, _workspace_id: String) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn clear_default_workspace(&self) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn get_active_session(&self) -> Option<String> {
+            self.active_session_id.lock().unwrap().clone()
+        }
+
+        async fn set_active_session(&self, session_id: String) -> Result<(), String> {
+            *self.active_session_id.lock().unwrap() = Some(session_id);
+            Ok(())
+        }
+
+        async fn clear_active_session(&self) -> Result<(), String> {
+            *self.active_session_id.lock().unwrap() = None;
             Ok(())
         }
     }
 
     #[tokio::test]
     async fn test_create_session() {
-        let repository = Arc::new(MockSessionRepository::new());
-        let manager: SessionManager<MockInteractionManager> = SessionManager::new(repository);
+        let session_repository = Arc::new(MockSessionRepository::new());
+        let state_repository = Arc::new(MockStateRepository::new());
+        let manager: SessionManager<MockInteractionManager> =
+            SessionManager::new(session_repository, state_repository);
 
         let _session = manager
             .create_session("test-1".to_string(), MockInteractionManager::new)
@@ -473,9 +531,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_and_load_session() {
-        let repository = Arc::new(MockSessionRepository::new());
+        let session_repository = Arc::new(MockSessionRepository::new());
+        let state_repository = Arc::new(MockStateRepository::new());
         let manager: SessionManager<MockInteractionManager> =
-            SessionManager::new(repository.clone());
+            SessionManager::new(session_repository.clone(), state_repository.clone());
 
         // Create and save
         let _session = manager
@@ -486,7 +545,8 @@ mod tests {
         manager.save_active_session(AppMode::Idle).await.unwrap();
 
         // Create new manager and restore
-        let manager2: SessionManager<MockInteractionManager> = SessionManager::new(repository);
+        let manager2: SessionManager<MockInteractionManager> =
+            SessionManager::new(session_repository, state_repository);
 
         let restored = manager2
             .restore_last_session(MockInteractionManager::from_data)
@@ -499,8 +559,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_switch_session() {
-        let repository = Arc::new(MockSessionRepository::new());
-        let manager: SessionManager<MockInteractionManager> = SessionManager::new(repository);
+        let session_repository = Arc::new(MockSessionRepository::new());
+        let state_repository = Arc::new(MockStateRepository::new());
+        let manager: SessionManager<MockInteractionManager> =
+            SessionManager::new(session_repository, state_repository);
 
         // Create two sessions
         manager
@@ -535,8 +597,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_session() {
-        let repository = Arc::new(MockSessionRepository::new());
-        let manager: SessionManager<MockInteractionManager> = SessionManager::new(repository);
+        let session_repository = Arc::new(MockSessionRepository::new());
+        let state_repository = Arc::new(MockStateRepository::new());
+        let manager: SessionManager<MockInteractionManager> =
+            SessionManager::new(session_repository, state_repository);
 
         manager
             .create_session("to-delete".to_string(), MockInteractionManager::new)

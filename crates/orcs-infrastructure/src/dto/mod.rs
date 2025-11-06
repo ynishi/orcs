@@ -24,6 +24,7 @@ mod app_state;
 mod persona;
 mod session;
 mod slash_command;
+mod task;
 mod uploaded_file;
 mod user_profile;
 mod workspace;
@@ -45,6 +46,9 @@ pub use session::{SessionV1_0_0, SessionV1_1_0, SessionV2_0_0, create_session_mi
 
 // Re-export slash_command DTOs and migrator
 pub use slash_command::{SlashCommandV1, SlashCommandV1_1, create_slash_command_migrator};
+
+// Re-export task DTOs and migrator
+pub use task::{TaskV1_0_0, create_task_migrator};
 
 // Re-export uploaded_file DTOs and migrator
 pub use uploaded_file::{UploadedFileV1_0_0, UploadedFileV1_1_0, create_uploaded_file_migrator};

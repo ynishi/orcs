@@ -5,6 +5,8 @@
 
 use llm_toolkit::orchestrator::StrategyMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use version_migrate::DeriveQueryable as Queryable;
 
 /// Represents the current status of a task in the orchestration system.
 ///
@@ -112,4 +114,91 @@ pub enum ExecutionMessage {
         /// The execution strategy to use.
         strategy: StrategyMap,
     },
+}
+
+// ============================================================================
+// Task execution history and details
+// ============================================================================
+
+/// Information about a single step in task execution.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StepInfo {
+    /// Step identifier (e.g., "step_1", "analysis")
+    pub id: String,
+    /// Step description
+    pub description: String,
+    /// Status of this step
+    pub status: StepStatus,
+    /// Agent that executed this step
+    pub agent: String,
+    /// Output from this step (if available)
+    pub output: Option<serde_json::Value>,
+    /// Error message if step failed
+    pub error: Option<String>,
+}
+
+/// Status of an individual step in task execution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StepStatus {
+    /// Step is waiting to be executed
+    Pending,
+    /// Step is currently executing
+    Running,
+    /// Step completed successfully
+    Completed,
+    /// Step was skipped due to dependencies
+    Skipped,
+    /// Step failed with error
+    Failed,
+}
+
+/// Detailed execution information for a task.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExecutionDetails {
+    /// Individual steps and their status
+    pub steps: Vec<StepInfo>,
+    /// Execution context values (intermediate results)
+    pub context: HashMap<String, serde_json::Value>,
+}
+
+/// A task execution record for history and display.
+///
+/// This represents a completed or in-progress task execution that can be
+/// persisted and displayed in the UI. Unlike `TaskContext` which is a
+/// temporary execution context, `Task` is the permanent historical record.
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
+#[queryable(entity = "task")]
+pub struct Task {
+    /// Unique task identifier (UUID format)
+    pub id: String,
+    /// Session ID where this task was executed
+    pub session_id: String,
+    /// Task title (shortened from description)
+    pub title: String,
+    /// Full task description/request
+    pub description: String,
+    /// Current task status
+    pub status: TaskStatus,
+    /// Timestamp when task was created (ISO 8601 format)
+    pub created_at: String,
+    /// Timestamp when task was last updated (ISO 8601 format)
+    pub updated_at: String,
+    /// Timestamp when task completed (ISO 8601 format)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<String>,
+    /// Number of steps executed
+    pub steps_executed: u32,
+    /// Number of steps skipped
+    pub steps_skipped: u32,
+    /// Number of context keys generated
+    pub context_keys: u32,
+    /// Error message if task failed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// Result summary text
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    /// Detailed execution information
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_details: Option<ExecutionDetails>,
 }

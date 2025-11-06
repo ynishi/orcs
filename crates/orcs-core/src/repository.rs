@@ -8,3 +8,6 @@ pub use crate::session::SessionRepository;
 
 // Re-export PersonaRepository from persona module
 pub use crate::persona::PersonaRepository;
+
+// Re-export TaskRepository from task module
+pub use crate::task::TaskRepository;

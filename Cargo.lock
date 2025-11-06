@@ -2880,6 +2880,7 @@ name = "orcs-execution"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "llm-toolkit",
  "orcs-core",
  "orcs-interaction",
@@ -2887,6 +2888,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

@@ -1,12 +1,15 @@
 use async_trait::async_trait;
+use chrono::Utc;
 use llm_toolkit::agent::impls::ClaudeCodeAgent;
 use llm_toolkit::agent::{Agent, AgentError, AgentOutput, Payload};
 use llm_toolkit::orchestrator::{BlueprintWorkflow, ParallelOrchestrator};
+use orcs_core::repository::TaskRepository;
+use orcs_core::task::{Task, TaskContext, TaskStatus};
 use orcs_core::OrcsError;
-use orcs_core::task::TaskContext;
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 /// Dynamic agent adapter for ParallelOrchestrator.
 ///
@@ -43,6 +46,7 @@ impl llm_toolkit::agent::DynamicAgent for DynamicAgentAdapter {
 /// This struct implements task execution logic using ParallelOrchestrator.
 pub struct TaskExecutor {
     agent: Arc<dyn Agent<Output = String> + Send + Sync>,
+    task_repository: Option<Arc<dyn TaskRepository>>,
 }
 
 impl TaskExecutor {
@@ -50,12 +54,22 @@ impl TaskExecutor {
     pub fn new() -> Self {
         Self {
             agent: Arc::new(ClaudeCodeAgent::new()),
+            task_repository: None,
         }
     }
 
     /// Creates a new `TaskExecutor` instance with a custom agent.
     pub fn with_agent(agent: Arc<dyn Agent<Output = String> + Send + Sync>) -> Self {
-        Self { agent }
+        Self {
+            agent,
+            task_repository: None,
+        }
+    }
+
+    /// Sets the task repository for persisting task execution records.
+    pub fn with_task_repository(mut self, repository: Arc<dyn TaskRepository>) -> Self {
+        self.task_repository = Some(repository);
+        self
     }
 
     /// Executes a task based on the provided context.
@@ -85,6 +99,7 @@ impl TaskExecutor {
     ///
     /// # Arguments
     ///
+    /// * `session_id` - The session ID where this task is being executed
     /// * `message_content` - The message content to execute as a task
     ///
     /// # Returns
@@ -93,10 +108,46 @@ impl TaskExecutor {
     /// * `Err(OrcsError)` if an error occurs during execution
     pub async fn execute_from_message(
         &self,
+        session_id: String,
         message_content: String,
     ) -> Result<String, OrcsError> {
         tracing::info!("TaskExecutor: Executing task from message with ParallelOrchestrator");
         tracing::debug!("Task content: {}", message_content.chars().take(200).collect::<String>());
+
+        // Generate task ID and timestamps
+        let task_id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        let title = message_content
+            .chars()
+            .take(100)
+            .collect::<String>()
+            .trim()
+            .to_string();
+
+        // Create initial task record
+        let mut task = Task {
+            id: task_id.clone(),
+            session_id,
+            title,
+            description: message_content.clone(),
+            status: TaskStatus::Running,
+            created_at: now.clone(),
+            updated_at: now.clone(),
+            completed_at: None,
+            steps_executed: 0,
+            steps_skipped: 0,
+            context_keys: 0,
+            error: None,
+            result: None,
+            execution_details: None,
+        };
+
+        // Save initial task record if repository is available
+        if let Some(repo) = &self.task_repository {
+            if let Err(e) = repo.save(&task).await {
+                tracing::warn!("Failed to save initial task record: {}", e);
+            }
+        }
 
         // Create a blueprint using the message content as the workflow description
         let blueprint = BlueprintWorkflow::new(message_content.clone());
@@ -118,7 +169,17 @@ impl TaskExecutor {
             .await
             .map_err(|e| OrcsError::Execution(format!("Orchestrator execution failed: {}", e)))?;
 
+        // Update task record with result
+        let completed_at = Utc::now().to_rfc3339();
+        task.updated_at = completed_at.clone();
+        task.steps_executed = result.steps_executed as u32;
+        task.steps_skipped = result.steps_skipped as u32;
+        task.context_keys = result.context.keys().len() as u32;
+
         if result.success {
+            task.status = TaskStatus::Completed;
+            task.completed_at = Some(completed_at);
+
             let summary = format!(
                 "✅ Task completed successfully!\n\
                  Steps executed: {}\n\
@@ -130,14 +191,36 @@ impl TaskExecutor {
             );
 
             // Extract result from context if available
-            if let Some(execute_result) = result.context.get("execute") {
+            let result_text = if let Some(execute_result) = result.context.get("execute") {
                 tracing::debug!("Execution result: {:?}", execute_result);
-                Ok(format!("{}\n\nResult: {}", summary, execute_result))
+                format!("{}\n\nResult: {}", summary, execute_result)
             } else {
-                Ok(summary)
+                summary.clone()
+            };
+
+            task.result = Some(summary);
+
+            // Save final task record
+            if let Some(repo) = &self.task_repository {
+                if let Err(e) = repo.save(&task).await {
+                    tracing::warn!("Failed to save completed task record: {}", e);
+                }
             }
+
+            Ok(result_text)
         } else {
             let error_msg = result.error.unwrap_or_else(|| "Unknown error".to_string());
+            task.status = TaskStatus::Failed;
+            task.error = Some(error_msg.clone());
+            task.completed_at = Some(completed_at);
+
+            // Save failed task record
+            if let Some(repo) = &self.task_repository {
+                if let Err(e) = repo.save(&task).await {
+                    tracing::warn!("Failed to save failed task record: {}", e);
+                }
+            }
+
             Err(OrcsError::Execution(format!("Task execution failed: {}", error_msg)))
         }
     }

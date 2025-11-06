@@ -178,6 +178,8 @@ mod tests {
             source: PersonaSource::User,
             backend: PersonaBackend::ClaudeCli,
             model_name: None,
+            icon: None,
+            base_color: None,
         };
 
         // Save
@@ -207,6 +209,8 @@ mod tests {
             source: PersonaSource::System,
             backend: PersonaBackend::ClaudeCli,
             model_name: None,
+            icon: None,
+            base_color: None,
         };
 
         let persona2 = Persona {
@@ -219,6 +223,8 @@ mod tests {
             source: PersonaSource::User,
             backend: PersonaBackend::GeminiCli,
             model_name: None,
+            icon: None,
+            base_color: None,
         };
 
         // Save multiple

@@ -25,6 +25,7 @@ interface NavbarProps {
   tasks: Task[];
   onTaskToggle: (taskId: string) => void;
   onTaskDelete: (taskId: string) => void;
+  onRefreshTasks: () => void;
 
   // Workspace
   onAttachFile?: (file: File) => void;
@@ -60,6 +61,7 @@ export function Navbar({
   tasks,
   onTaskToggle,
   onTaskDelete,
+  onRefreshTasks,
   onAttachFile,
   includeWorkspaceInPrompt,
   onToggleIncludeWorkspaceInPrompt,
@@ -79,7 +81,7 @@ export function Navbar({
 }: NavbarProps) {
   const [activeTab, setActiveTab] = useState<'sessions' | 'workspace' | 'tasks' | 'personas' | 'commands'>('sessions');
 
-  const activeTasks = tasks.filter(t => t.status !== 'completed').length;
+  const activeTasks = tasks.filter(t => t.status === 'Running' || t.status === 'Pending').length;
 
   return (
     <Box style={{ display: 'flex', height: '100vh' }}>
@@ -166,6 +168,7 @@ export function Navbar({
               tasks={tasks}
               onTaskToggle={onTaskToggle}
               onTaskDelete={onTaskDelete}
+              onRefresh={onRefreshTasks}
             />
           )}
 

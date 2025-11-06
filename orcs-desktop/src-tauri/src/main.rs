@@ -6,7 +6,7 @@ mod slash_commands;
 use llm_toolkit::agent::dialogue::ExecutionModel;
 use orcs_application::SessionUseCase;
 use orcs_core::persona::{Persona, get_default_presets};
-use orcs_core::repository::PersonaRepository;
+use orcs_core::repository::{PersonaRepository, TaskRepository};
 use orcs_core::session::{AppMode, ErrorSeverity, Session, SessionManager};
 use orcs_core::slash_command::SlashCommandRepository;
 use orcs_core::user::UserService;
@@ -16,7 +16,7 @@ use orcs_infrastructure::user_service::ConfigBasedUserService;
 use orcs_infrastructure::workspace_manager::FileSystemWorkspaceManager;
 use orcs_infrastructure::{
     AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
-    AsyncDirSlashCommandRepository,
+    AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
 };
 use orcs_interaction::{InteractionManager, InteractionResult};
 use serde::{Deserialize, Serialize};
@@ -39,6 +39,8 @@ struct AppState {
     slash_command_repository: Arc<dyn SlashCommandRepository>,
     slash_command_repository_concrete: Arc<AsyncDirSlashCommandRepository>,
     app_state_service: Arc<AppStateService>,
+    task_repository: Arc<dyn TaskRepository>,
+    task_repository_concrete: Arc<AsyncDirTaskRepository>,
     task_executor: Arc<TaskExecutor>,
 }
 
@@ -164,6 +166,16 @@ async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, Strin
         .collect();
 
     Ok(enriched_sessions)
+}
+
+/// Lists all saved tasks
+#[tauri::command]
+async fn list_tasks(state: State<'_, AppState>) -> Result<Vec<orcs_core::task::Task>, String> {
+    state
+        .task_repository
+        .list_all()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Switches to a different session
@@ -314,9 +326,20 @@ async fn execute_message_as_task(
     message_content: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
+    // Get the active session to retrieve session_id
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let app_mode = state.app_mode.lock().await.clone();
+    let session = manager.to_session(app_mode, None).await;
+    let session_id = session.id;
+
     state
         .task_executor
-        .execute_from_message(message_content)
+        .execute_from_message(session_id, message_content)
         .await
         .map_err(|e| e.to_string())
 }
@@ -587,6 +610,20 @@ async fn get_slash_commands_directory(state: State<'_, AppState>) -> Result<Stri
     let path_str = slash_commands_dir
         .to_str()
         .ok_or("Slash commands directory path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+
+/// Gets the tasks directory path
+#[tauri::command]
+async fn get_tasks_directory(state: State<'_, AppState>) -> Result<String, String> {
+    // Get the actual tasks directory path from the repository
+    let tasks_dir = state.task_repository_concrete.tasks_dir();
+
+    // Convert Path to String
+    let path_str = tasks_dir
+        .to_str()
+        .ok_or("Tasks directory path is not valid UTF-8")?;
 
     Ok(path_str.to_string())
 }
@@ -1427,8 +1464,18 @@ fn main() {
             user_service.clone(),
         ));
 
-        // Create TaskExecutor for task execution
-        let task_executor = Arc::new(TaskExecutor::new());
+        // Create Task Repository
+        let task_repository_concrete = Arc::new(
+            AsyncDirTaskRepository::default_location()
+                .await
+                .expect("Failed to initialize Task Repository"),
+        );
+        let task_repository = task_repository_concrete.clone() as Arc<dyn TaskRepository>;
+
+        // Create TaskExecutor with task repository
+        let task_executor = Arc::new(
+            TaskExecutor::new().with_task_repository(task_repository.clone())
+        );
 
         // Try to restore last session using SessionUseCase
         let restored = session_usecase.restore_last_session().await.ok().flatten();
@@ -1521,12 +1568,15 @@ fn main() {
                 slash_command_repository,
                 slash_command_repository_concrete: slash_command_repository_concrete.clone(),
                 app_state_service: app_state_service.clone(),
+                task_repository: task_repository.clone(),
+                task_repository_concrete: task_repository_concrete.clone(),
                 task_executor,
             })
             .invoke_handler(tauri::generate_handler![
                 create_session,
                 create_config_session,
                 list_sessions,
+                list_tasks,
                 switch_session,
                 delete_session,
                 rename_session,
@@ -1552,6 +1602,7 @@ fn main() {
                 get_workspaces_directory,
                 get_personas_directory,
                 get_slash_commands_directory,
+                get_tasks_directory,
                 get_root_directory,
                 get_logs_directory,
                 get_secret_path,

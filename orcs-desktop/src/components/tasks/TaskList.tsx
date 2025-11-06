@@ -1,15 +1,17 @@
-import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon } from '@mantine/core';
-import { Task, getTaskColor } from '../../types/task';
+import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip } from '@mantine/core';
+import { Task, getTaskColor, getTaskIcon } from '../../types/task';
 
 interface TaskListProps {
   tasks: Task[];
   onTaskToggle?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
+  onRefresh?: () => void;
 }
 
-export function TaskList({ tasks, onTaskToggle, onTaskDelete }: TaskListProps) {
-  const pendingTasks = tasks.filter(t => t.status !== 'completed');
-  const completedTasks = tasks.filter(t => t.status === 'completed');
+export function TaskList({ tasks, onTaskToggle, onTaskDelete, onRefresh }: TaskListProps) {
+  const activeTasks = tasks.filter(t => t.status === 'Running' || t.status === 'Pending');
+  const completedTasks = tasks.filter(t => t.status === 'Completed');
+  const failedTasks = tasks.filter(t => t.status === 'Failed');
 
   const renderTask = (task: Task) => (
     <Group
@@ -19,33 +21,35 @@ export function TaskList({ tasks, onTaskToggle, onTaskDelete }: TaskListProps) {
       p="xs"
       style={{
         borderRadius: '8px',
-        backgroundColor: task.status === 'completed' ? '#f1f3f5' : 'transparent',
+        backgroundColor: task.status === 'Completed' ? '#f1f3f5' : 'transparent',
         transition: 'background-color 0.15s ease',
       }}
     >
-      {/* チェックボックス */}
-      <Checkbox
-        checked={task.status === 'completed'}
-        onChange={() => onTaskToggle?.(task.id)}
-        size="sm"
-        color={getTaskColor(task.status)}
-      />
+      {/* ステータスアイコン */}
+      <Text size="lg">{getTaskIcon(task.status)}</Text>
 
       {/* タスク内容 */}
       <Box style={{ flex: 1, minWidth: 0 }}>
         <Text
           size="sm"
           truncate
+          fw={task.status === 'Running' ? 600 : 400}
           style={{
-            textDecoration: task.status === 'completed' ? 'line-through' : 'none',
-            color: task.status === 'completed' ? '#868e96' : undefined,
+            textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
+            color: task.status === 'Completed' ? '#868e96' : task.status === 'Failed' ? '#fa5252' : undefined,
           }}
         >
-          {task.description}
+          {task.title}
         </Text>
-        <Text size="xs" c="dimmed">
-          {task.createdAt.toLocaleTimeString()}
-        </Text>
+        <Group gap="xs" mt={2}>
+          <Text size="xs" c="dimmed">
+            {task.steps_executed} steps
+          </Text>
+          <Text size="xs" c="dimmed">•</Text>
+          <Text size="xs" c="dimmed">
+            {formatDate(task.updated_at)}
+          </Text>
+        </Group>
       </Box>
 
       {/* 削除ボタン */}
@@ -67,22 +71,46 @@ export function TaskList({ tasks, onTaskToggle, onTaskDelete }: TaskListProps) {
         <Text size="lg" fw={700}>
           Tasks
         </Text>
-        <Text size="sm" c="dimmed">
-          {pendingTasks.length} active
-        </Text>
+        <Group gap="xs">
+          <Text size="sm" c="dimmed">
+            {activeTasks.length} active
+          </Text>
+          <Tooltip label="Refresh tasks" withArrow>
+            <ActionIcon
+              color="blue"
+              variant="light"
+              onClick={onRefresh}
+              size="xs"
+            >
+              🔄
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Group>
 
       {/* タスクリスト */}
       <ScrollArea style={{ flex: 1 }} px="sm">
         <Stack gap="md">
           {/* アクティブタスク */}
-          {pendingTasks.length > 0 && (
+          {activeTasks.length > 0 && (
             <Box>
               <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
                 ACTIVE
               </Text>
               <Stack gap={4}>
-                {pendingTasks.map(renderTask)}
+                {activeTasks.map(renderTask)}
+              </Stack>
+            </Box>
+          )}
+
+          {/* 失敗タスク */}
+          {failedTasks.length > 0 && (
+            <Box>
+              <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
+                FAILED
+              </Text>
+              <Stack gap={4}>
+                {failedTasks.map(renderTask)}
               </Stack>
             </Box>
           )}
@@ -106,7 +134,7 @@ export function TaskList({ tasks, onTaskToggle, onTaskDelete }: TaskListProps) {
                 No tasks yet
               </Text>
               <Text size="xs" c="dimmed" mt="xs">
-                Use /task to create a new task
+                Click 🚀 on a message to execute it as a task
               </Text>
             </Box>
           )}
@@ -121,4 +149,20 @@ export function TaskList({ tasks, onTaskToggle, onTaskDelete }: TaskListProps) {
       </Box>
     </Stack>
   );
+}
+
+// 日付フォーマット
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
 }

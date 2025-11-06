@@ -284,6 +284,21 @@ function App() {
     refreshPersonas();
   }, [refreshPersonas]);
 
+  // Load tasks
+  const refreshTasks = useCallback(async () => {
+    try {
+      const tasksList = await invoke<Task[]>('list_tasks');
+      setTasks(tasksList);
+      console.log('[App] Loaded tasks:', tasksList.length);
+    } catch (error) {
+      console.error('Failed to load tasks:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshTasks();
+  }, [refreshTasks]);
+
   // Listen for workspace-switched events to refresh workspace data and Git info
   useEffect(() => {
     const unlisten = listen<string>('workspace-switched', async () => {
@@ -1209,6 +1224,7 @@ function App() {
           tasks={tasks}
           onTaskToggle={handleTaskToggle}
           onTaskDelete={handleTaskDelete}
+          onRefreshTasks={refreshTasks}
           onAttachFile={handleAttachFileFromWorkspace}
           includeWorkspaceInPrompt={includeWorkspaceInPrompt}
           onToggleIncludeWorkspaceInPrompt={setIncludeWorkspaceInPrompt}

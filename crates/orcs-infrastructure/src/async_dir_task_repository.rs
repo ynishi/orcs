@@ -203,10 +203,14 @@ mod tests {
     async fn test_list_by_session() {
         let (repo, _temp_dir) = create_test_repository().await;
 
-        // Create tasks for different sessions
-        let task1 = create_test_task("task-1", "session-1", "Task 1");
-        let task2 = create_test_task("task-2", "session-1", "Task 2");
-        let task3 = create_test_task("task-3", "session-2", "Task 3");
+        // Create tasks for different sessions with valid UUIDs
+        let task1_id = "550e8400-e29b-41d4-a716-446655440001";
+        let task2_id = "550e8400-e29b-41d4-a716-446655440002";
+        let task3_id = "550e8400-e29b-41d4-a716-446655440003";
+
+        let task1 = create_test_task(task1_id, "session-1", "Task 1");
+        let task2 = create_test_task(task2_id, "session-1", "Task 2");
+        let task3 = create_test_task(task3_id, "session-2", "Task 3");
 
         repo.save(&task1).await.unwrap();
         repo.save(&task2).await.unwrap();
@@ -220,14 +224,15 @@ mod tests {
         // List tasks for session-2
         let session2_tasks = repo.list_by_session("session-2").await.unwrap();
         assert_eq!(session2_tasks.len(), 1);
-        assert_eq!(session2_tasks[0].id, "task-3");
+        assert_eq!(session2_tasks[0].id, task3_id);
     }
 
     #[tokio::test]
     async fn test_delete_task() {
         let (repo, _temp_dir) = create_test_repository().await;
 
-        let task = create_test_task("task-to-delete", "session-1", "Delete Me");
+        let task_id = "550e8400-e29b-41d4-a716-446655440004";
+        let task = create_test_task(task_id, "session-1", "Delete Me");
         repo.save(&task).await.unwrap();
 
         // Verify task exists

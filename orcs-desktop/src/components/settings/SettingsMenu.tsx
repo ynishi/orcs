@@ -124,6 +124,21 @@ export function SettingsMenu({
     }
   };
 
+  const handleOpenTasksDir = async () => {
+    try {
+      const tasksDir = await invoke<string>('get_tasks_directory');
+      console.log('[Settings] Opening tasks directory:', tasksDir);
+      await openPath(tasksDir);
+    } catch (error) {
+      console.error('[Settings] Failed to open tasks directory:', error);
+      notifications.show({
+        title: 'Failed to Open Directory',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
   const handleOpenRootDir = async () => {
     if (!rootDir) {
       notifications.show({
@@ -398,6 +413,12 @@ export function SettingsMenu({
           onClick={handleOpenSlashCommandsDir}
         >
           <Text size="sm">Slash Commands Directory</Text>
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<IconFolder size={16} />}
+          onClick={handleOpenTasksDir}
+        >
+          <Text size="sm">Tasks Directory</Text>
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>

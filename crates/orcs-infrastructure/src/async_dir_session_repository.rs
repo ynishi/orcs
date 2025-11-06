@@ -297,6 +297,8 @@ mod tests {
                     source: PersonaSource::System,
                     backend: PersonaBackend::ClaudeCli,
                     model_name: None,
+                    icon: None,
+                    base_color: None,
                 }]),
             }
         }
@@ -345,6 +347,8 @@ mod tests {
             execution_strategy: ExecutionModel::Broadcast,
             system_messages: vec![],
             participants: HashMap::new(),
+            participant_icons: HashMap::new(),
+            participant_colors: HashMap::new(),
             conversation_mode: Default::default(),
             talk_style: None,
         }

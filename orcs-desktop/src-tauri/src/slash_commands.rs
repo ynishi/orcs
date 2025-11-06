@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::process::Command;
 use tauri::State;
 
-use crate::AppState;
+use crate::app::AppState;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

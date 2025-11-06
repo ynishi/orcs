@@ -11,6 +11,7 @@ use tokio::fs;
 use uuid::Uuid;
 
 use orcs_core::error::{OrcsError, Result};
+use orcs_core::repository::WorkspaceRepository;
 use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_core::workspace::{
     ProjectContext, SessionWorkspace, TempFile, UploadedFile, Workspace, WorkspaceResources,

@@ -2,6 +2,112 @@ import { notifications } from '@mantine/notifications';
 import { MessageType } from '../types/message';
 
 /**
+ * # System Message Display Guidelines
+ *
+ * ORCS provides three ways to display messages to the user. Choose based on:
+ * 1. **Importance**: Should this be part of conversation history?
+ * 2. **Context**: Does this provide conversational context for AI agents?
+ * 3. **Persistence**: Should this survive session switches?
+ *
+ * ## Method 1: `handleSystemMessage()` with CONVERSATION_EVENT
+ *
+ * **When to use:**
+ * - Important events that should be part of conversation history
+ * - Events that provide context for AI agents
+ * - User-initiated actions with permanent effects
+ *
+ * **Examples:**
+ * - ✅ Expert persona created/saved
+ * - ✅ Participant joined/left
+ * - ✅ Execution strategy changed
+ * - ✅ Command execution results
+ * - ✅ Error messages (failures that affect conversation)
+ *
+ * **Persistence:** ⚠️ MESSAGE IS ADDED TO UI BUT NOT AUTOMATICALLY PERSISTED
+ *
+ * **To persist to backend:**
+ * ```typescript
+ * // Add to UI
+ * handleSystemMessage(conversationMessage('...'), addMessage);
+ *
+ * // THEN explicitly persist
+ * await invoke('append_system_messages', {
+ *   messages: [{ content: '...', messageType: 'info', severity: 'info' }]
+ * });
+ * ```
+ *
+ * ## Method 2: `invoke('append_system_messages')`
+ *
+ * **When to use:**
+ * - When you need GUARANTEED persistence to session history
+ * - Important events that must survive app restarts
+ * - Events that should be visible after session switching
+ *
+ * **Examples:**
+ * - ✅ Expert persona creation (with details)
+ * - ✅ Task execution results
+ * - ✅ Critical errors or warnings
+ *
+ * **Persistence:** ✅ SAVED TO SESSION FILE, SURVIVES RESTARTS
+ *
+ * **Note:** This ONLY persists to backend. You must also call handleSystemMessage()
+ * if you want immediate UI feedback.
+ *
+ * ## Method 3: `notifications.show()` (Toast)
+ *
+ * **When to use:**
+ * - Temporary feedback that doesn't need conversation context
+ * - Progress indicators
+ * - Confirmations for UI-only operations
+ *
+ * **Examples:**
+ * - ✅ "Creating expert..." (progress)
+ * - ✅ "Session switched" (transient feedback)
+ * - ✅ "File uploaded" (confirmation)
+ * - ✅ "Copied to clipboard"
+ * - ❌ Expert persona created (use CONVERSATION_EVENT instead)
+ *
+ * **Persistence:** ❌ DISAPPEARS ON NEXT RENDER, NOT PERSISTED
+ *
+ * ## Decision Tree
+ *
+ * ```
+ * Should this be conversation context?
+ * ├─ YES → Will AI agents need this info?
+ * │   ├─ YES → append_system_messages + handleSystemMessage
+ * │   └─ NO  → handleSystemMessage only
+ * └─ NO  → Is this temporary progress/feedback?
+ *     ├─ YES → notifications.show()
+ *     └─ NO  → Re-evaluate if it should be conversation context
+ * ```
+ *
+ * ## Common Patterns
+ *
+ * **Pattern 1: Important persisted event**
+ * ```typescript
+ * // Progress toast (temporary)
+ * notifications.show({ id: 'op', message: 'Processing...', autoClose: false });
+ *
+ * // Persist result to session
+ * await invoke('append_system_messages', {
+ *   messages: [{ content: '✅ Operation completed', ... }]
+ * });
+ * notifications.hide('op');
+ * ```
+ *
+ * **Pattern 2: Transient feedback only**
+ * ```typescript
+ * notifications.show({ title: 'Saved', message: 'Changes saved', color: 'green' });
+ * ```
+ *
+ * **Pattern 3: Immediate chat message (not persisted)**
+ * ```typescript
+ * handleSystemMessage(conversationMessage('Strategy changed'), addMessage);
+ * await saveCurrentSession(); // Saves via normal session save
+ * ```
+ */
+
+/**
  * System message categories based on persistence and context requirements
  */
 export enum MessageCategory {
@@ -12,8 +118,11 @@ export enum MessageCategory {
   TRANSIENT_FEEDBACK = 'transient_feedback',
 
   /**
-   * Conversation context events (Chat only, persisted)
+   * Conversation context events (Chat only, persisted via session save)
    * Examples: Persona join/leave, Strategy changes, Command execution
+   *
+   * ⚠️ Note: This adds message to UI but does NOT automatically persist to backend.
+   * For guaranteed persistence, use invoke('append_system_messages') after calling this.
    */
   CONVERSATION_EVENT = 'conversation_event',
 }
@@ -128,7 +237,16 @@ function severityToTitle(severity: MessageSeverity): string {
 }
 
 /**
- * Helper: Create transient feedback message
+ * Helper: Create transient feedback message (Toast only, not persisted)
+ *
+ * Use this for:
+ * - Temporary progress updates
+ * - UI operation confirmations
+ * - Non-conversational feedback
+ *
+ * @example
+ * handleSystemMessage(transientMessage('File saved successfully'), addMessage);
+ * // Shows toast, does NOT add to chat, does NOT persist
  */
 export function transientMessage(
   message: string,
@@ -145,7 +263,35 @@ export function transientMessage(
 }
 
 /**
- * Helper: Create conversation event message
+ * Helper: Create conversation event message (Chat display, needs explicit persistence)
+ *
+ * ⚠️ IMPORTANT: This adds message to UI chat but does NOT persist to backend automatically.
+ *
+ * For persistence, use BOTH:
+ * ```typescript
+ * // 1. Show in chat immediately
+ * handleSystemMessage(conversationMessage('Event happened'), addMessage);
+ *
+ * // 2. Persist to session file
+ * await invoke('append_system_messages', {
+ *   messages: [{ content: 'Event happened', messageType: 'info', severity: 'info' }]
+ * });
+ * ```
+ *
+ * Use this for:
+ * - Important conversation context
+ * - Events AI agents should know about
+ * - User-initiated actions
+ *
+ * @example
+ * // Non-persisted (lost on session reload)
+ * handleSystemMessage(conversationMessage('Strategy changed to broadcast'), addMessage);
+ *
+ * @example
+ * // Persisted (survives session reload)
+ * await invoke('append_system_messages', {
+ *   messages: [{ content: '🔶 Expert created', messageType: 'info', severity: 'info' }]
+ * });
  */
 export function conversationMessage(
   message: string,

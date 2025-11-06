@@ -74,6 +74,22 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     usage: '/files',
     examples: ['/files'],
   },
+  {
+    name: 'expert',
+    icon: '🔶',
+    description: 'Create an adhoc expert persona for immediate collaboration',
+    usage: '/expert <expertise>',
+    examples: ['/expert 映画制作プロセス', '/expert quantum computing', '/expert sustainable architecture'],
+    argsDescription: 'Expertise area or domain knowledge description',
+  },
+  {
+    name: 'blueprint',
+    icon: '🎯',
+    description: 'Convert discussion or task into BlueprintWorkflow format',
+    usage: '/blueprint <task description>',
+    examples: ['/blueprint Create technical article about Rust', '/blueprint Refactor auth module'],
+    argsDescription: 'Task or discussion context to convert into Blueprint',
+  },
 ];
 
 /**

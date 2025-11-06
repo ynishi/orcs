@@ -177,6 +177,8 @@ pub enum PersonaSource {
     System,
     /// User-created custom personas
     User,
+    /// Adhoc expert persona (temporary, session-specific)
+    Adhoc,
 }
 
 impl Default for PersonaSource {

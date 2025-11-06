@@ -11,6 +11,7 @@ use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
 pub enum PersonaSourceDTO {
     System,
     User,
+    Adhoc,
 }
 
 impl Default for PersonaSourceDTO {
@@ -274,6 +275,7 @@ impl From<PersonaSourceDTO> for PersonaSource {
         match dto {
             PersonaSourceDTO::System => PersonaSource::System,
             PersonaSourceDTO::User => PersonaSource::User,
+            PersonaSourceDTO::Adhoc => PersonaSource::Adhoc,
         }
     }
 }
@@ -284,6 +286,7 @@ impl From<PersonaSource> for PersonaSourceDTO {
         match source {
             PersonaSource::System => PersonaSourceDTO::System,
             PersonaSource::User => PersonaSourceDTO::User,
+            PersonaSource::Adhoc => PersonaSourceDTO::Adhoc,
         }
     }
 }

@@ -461,6 +461,75 @@ function App() {
               handleSystemMessage(conversationMessage('Use the 🚀 button on messages to execute them as tasks', 'info'), addMessage);
               await saveCurrentSession();
               return;
+            case 'expert':
+              // Create adhoc expert persona
+              if (parsed.args && parsed.args.length > 0) {
+                const expertise = parsed.args.join(' ');
+                try {
+                  handleSystemMessage(conversationMessage(`🔶 Creating expert for: ${expertise}...`), addMessage);
+                  const persona = await invoke<import('./types/agent').PersonaConfig>('create_adhoc_persona', { expertise });
+                  handleSystemMessage(conversationMessage(`✅ Expert persona created: ${persona.name} ${persona.icon || '🔶'}\nRole: ${persona.role}`), addMessage);
+                  await refreshPersonas();
+                  await refreshSessions();
+                } catch (error) {
+                  console.error('Failed to create expert:', error);
+                  handleSystemMessage(conversationMessage(`❌ Failed to create expert: ${error}`, 'error'), addMessage);
+                }
+              } else {
+                handleSystemMessage(conversationMessage('Usage: /expert <expertise>\nExample: /expert 映画制作プロセス', 'error'), addMessage);
+              }
+              await saveCurrentSession();
+              return;
+            case 'blueprint':
+              // Convert task/discussion into BlueprintWorkflow format
+              if (parsed.args && parsed.args.length > 0) {
+                const taskDescription = parsed.args.join(' ');
+                const blueprintPrompt = `# Task: Create BlueprintWorkflow for ORCS Task Execution
+
+Convert the following into a BlueprintWorkflow format:
+
+${taskDescription}
+
+## Output Format
+
+Provide a BlueprintWorkflow with:
+
+1. **Goal**: Clear, measurable goal statement
+2. **Workflow Steps**: Numbered steps with clear deliverables
+3. **Output Type**: Classify each step (📋 Clarification, 💡 Proposal, 📝 Documentation, 🔧 Implementation, ✅ Validation)
+4. **Dependencies**: Note which steps can run in parallel
+5. **Estimated Time**: Total execution time estimate
+
+Example format:
+\`\`\`
+Goal: [Goal statement]
+
+Workflow:
+1. **[Step Name]** (📋 Type): [Description]
+2. **[Step Name]** (💡 Type): [Description]
+...
+
+Dependencies: 1→2→3 (or note parallel opportunities)
+Estimated time: X minutes
+\`\`\`
+
+Generate the BlueprintWorkflow now.`;
+
+                // Add blueprint generation request as a user message
+                setInput(blueprintPrompt);
+                // Trigger send
+                setTimeout(() => {
+                  const textarea = document.querySelector('textarea');
+                  if (textarea) {
+                    const event = new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true });
+                    textarea.dispatchEvent(event);
+                  }
+                }, 100);
+              } else {
+                handleSystemMessage(conversationMessage('Usage: /blueprint <task description>\nExample: /blueprint Create technical article about Rust', 'error'), addMessage);
+              }
+              await saveCurrentSession();
+              return;
             case 'workspace':
               if (parsed.args && parsed.args.length > 0) {
                 const workspaceName = parsed.args.join(' ');

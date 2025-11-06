@@ -37,7 +37,7 @@ export interface PersonaConfig {
   background: string;
   communication_style: string;
   default_participant: boolean;
-  source: 'System' | 'User';
+  source: 'System' | 'User' | 'Adhoc';
   backend: PersonaBackend;
   model_name?: string;
   icon?: string;

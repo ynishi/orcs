@@ -4,7 +4,7 @@
 mod slash_commands;
 
 use llm_toolkit::agent::dialogue::ExecutionModel;
-use orcs_application::SessionUseCase;
+use orcs_application::{AdhocPersonaService, SessionUseCase};
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::{PersonaRepository, TaskRepository};
 use orcs_core::session::{AppMode, ErrorSeverity, Session, SessionManager};
@@ -34,6 +34,7 @@ struct AppState {
     app_mode: Mutex<AppMode>,
     persona_repository: Arc<dyn PersonaRepository>,
     persona_repository_concrete: Arc<AsyncDirPersonaRepository>,
+    adhoc_persona_service: Arc<AdhocPersonaService>,
     user_service: Arc<dyn UserService>,
     workspace_manager: Arc<FileSystemWorkspaceManager>,
     slash_command_repository: Arc<dyn SlashCommandRepository>,
@@ -186,6 +187,59 @@ async fn delete_task(task_id: String, state: State<'_, AppState>) -> Result<(), 
         .delete(&task_id)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Creates an adhoc expert persona and adds it to the active session
+#[tauri::command]
+async fn create_adhoc_persona(
+    expertise: String,
+    state: State<'_, AppState>,
+) -> Result<Persona, String> {
+    // Generate persona using service layer
+    let persona = state
+        .adhoc_persona_service
+        .generate_expert(expertise)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Add to active session
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    manager
+        .add_participant(&persona.id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Auto-save session
+    let app_mode = state.app_mode.lock().await.clone();
+    let _ = state.session_manager.save_active_session(app_mode).await;
+
+    Ok(persona)
+}
+
+/// Saves an adhoc persona to permanent user persona storage
+#[tauri::command]
+async fn save_adhoc_persona(
+    persona_id: String,
+    state: State<'_, AppState>,
+) -> Result<Persona, String> {
+    // Promote persona using service layer
+    let persona = state
+        .adhoc_persona_service
+        .promote_to_user(&persona_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Invalidate dialogue to recreate with updated persona
+    if let Some(manager) = state.session_manager.active_session().await {
+        manager.invalidate_dialogue().await;
+    }
+
+    Ok(persona)
 }
 
 /// Switches to a different session
@@ -1429,6 +1483,10 @@ fn main() {
                 .expect("Failed to initialize persona repository"),
         );
         let persona_repository: Arc<dyn PersonaRepository> = persona_repository_concrete.clone();
+
+        // Create AdhocPersonaService
+        let adhoc_persona_service = Arc::new(AdhocPersonaService::new(persona_repository.clone()));
+
         let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
 
         // Initialize FileSystemWorkspaceManager with unified path
@@ -1594,6 +1652,7 @@ fn main() {
                 app_mode,
                 persona_repository,
                 persona_repository_concrete: persona_repository_concrete.clone(),
+                adhoc_persona_service,
                 user_service,
                 workspace_manager: workspace_manager.clone(),
                 slash_command_repository,
@@ -1609,6 +1668,8 @@ fn main() {
                 list_sessions,
                 list_tasks,
                 delete_task,
+                create_adhoc_persona,
+                save_adhoc_persona,
                 switch_session,
                 delete_session,
                 rename_session,

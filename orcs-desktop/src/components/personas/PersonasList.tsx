@@ -328,6 +328,11 @@ export function PersonasList({
             <Text size="sm" fw={600} truncate>
               {persona.name}
             </Text>
+            {persona.source === 'Adhoc' && (
+              <Badge size="xs" color="orange" variant="filled">
+                🔶 Adhoc
+              </Badge>
+            )}
             <Badge size="xs" color={persona.backend === 'gemini_cli' ? 'violet' : 'gray'}>
               {BACKEND_LABELS[persona.backend] || 'Claude CLI'}
             </Badge>
@@ -347,6 +352,27 @@ export function PersonasList({
 
         {/* アクションボタン */}
         <Group gap={4}>
+          {persona.source === 'Adhoc' && (
+            <Tooltip label="Save as permanent persona" withArrow>
+              <ActionIcon
+                variant="filled"
+                color="green"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await invoke('save_adhoc_persona', { personaId: persona.id });
+                    if (onRefresh) await onRefresh();
+                    handleSystemMessage?.(conversationMessage(`✅ ${persona.name} saved as permanent persona`), onMessage);
+                  } catch (error) {
+                    console.error('Failed to save adhoc persona:', error);
+                    handleSystemMessage?.(conversationMessage(`❌ Failed to save persona: ${error}`, 'error'), onMessage);
+                  }
+                }}
+              >
+                💾
+              </ActionIcon>
+            </Tooltip>
+          )}
           <Tooltip label="Edit" withArrow>
             <ActionIcon
               variant="subtle"

@@ -9,7 +9,7 @@ interface TaskListProps {
   onRefresh?: () => void;
 }
 
-export function TaskList({ tasks, onTaskToggle, onTaskDelete, onRefresh }: TaskListProps) {
+export function TaskList({ tasks, onTaskDelete, onRefresh }: TaskListProps) {
   const activeTasks = tasks.filter(t => t.status === 'Running' || t.status === 'Pending');
   const completedTasks = tasks.filter(t => t.status === 'Completed');
   const failedTasks = tasks.filter(t => t.status === 'Failed');

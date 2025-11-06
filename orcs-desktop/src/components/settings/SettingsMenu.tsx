@@ -7,6 +7,7 @@ import {
   IconInfoCircle,
   IconCopy,
   IconWand,
+  IconUser,
 } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -20,10 +21,16 @@ interface SettingsMenuProps {
   onSelectSession?: (session: Session) => void;
 }
 
+interface UserProfile {
+  nickname: string;
+  background: string;
+}
+
 /**
  * Settings menu component that provides access to configuration files and directories.
  *
  * Features:
+ * - Display user profile (nickname)
  * - Open config file (config.toml)
  * - Open sessions directory
  * - Open workspaces directory
@@ -36,6 +43,7 @@ export function SettingsMenu({
   onSelectSession,
 }: SettingsMenuProps = {}) {
   const [rootDir, setRootDir] = useState<string>('');
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     const loadRootDir = async () => {
@@ -47,6 +55,18 @@ export function SettingsMenu({
       }
     };
     loadRootDir();
+  }, []);
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const profile = await invoke<UserProfile>('get_user_profile');
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('[Settings] Failed to load user profile:', error);
+      }
+    };
+    loadUserProfile();
   }, []);
 
   const handleOpenConfigFile = async () => {
@@ -320,6 +340,23 @@ export function SettingsMenu({
       </Menu.Target>
 
       <Menu.Dropdown>
+        <Menu.Label>User Profile</Menu.Label>
+        <Menu.Item
+          leftSection={<IconUser size={16} />}
+          closeMenuOnClick={false}
+        >
+          <Stack gap={4}>
+            <Text size="sm" fw={600}>{userProfile?.nickname || 'Loading...'}</Text>
+            {userProfile?.background && (
+              <Text size="xs" c="dimmed" lineClamp={2}>
+                {userProfile.background}
+              </Text>
+            )}
+          </Stack>
+        </Menu.Item>
+
+        <Menu.Divider />
+
         <Menu.Label>Application Info</Menu.Label>
         <Menu.Item
           leftSection={<IconInfoCircle size={16} />}

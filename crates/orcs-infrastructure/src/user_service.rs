@@ -67,6 +67,11 @@ impl ConfigBasedUserService {
 
     /// Loads UserProfile from config file using FileStorage.
     fn load_from_config() -> Result<String, String> {
+        Self::load_profile_from_config().map(|profile| profile.nickname)
+    }
+
+    /// Loads complete UserProfile from config file using FileStorage.
+    fn load_profile_from_config() -> Result<UserProfile, String> {
         // Get config path
         let config_path = Self::get_config_path()?;
 
@@ -86,9 +91,7 @@ impl ConfigBasedUserService {
 
         // user_profile is a single object, but query returns Vec
         // If empty or error, fall back to default
-        let profile = profiles.into_iter().next().unwrap_or_default();
-
-        Ok(profile.nickname)
+        Ok(profiles.into_iter().next().unwrap_or_default())
     }
 
     /// Gets the default config path (~/.config/orcs/config.toml).
@@ -106,6 +109,10 @@ impl Default for ConfigBasedUserService {
 impl UserService for ConfigBasedUserService {
     fn get_user_name(&self) -> String {
         self.load_nickname()
+    }
+
+    fn get_user_profile(&self) -> UserProfile {
+        Self::load_profile_from_config().unwrap_or_default()
     }
 }
 

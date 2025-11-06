@@ -153,7 +153,7 @@ impl PersonaBackendAgent {
                 agent.execute(payload).await
             }
             PersonaBackend::GeminiApi => {
-                let mut agent = GeminiApiAgent::try_from_env()?;
+                let mut agent = GeminiApiAgent::default();
                 // Override model if specified
                 if let Some(ref model_str) = self.model_name {
                     tracing::info!("[PersonaBackendAgent] Using Gemini model: {}", model_str);

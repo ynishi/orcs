@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 orcs-core = { path = "../orcs-core" }
+orcs-application = { path = "../orcs-application" }
 orcs-interaction = { path = "../orcs-interaction" }
 llm-toolkit = { workspace = true }
 tokio = { workspace = true }

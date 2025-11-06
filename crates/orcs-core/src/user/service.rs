@@ -22,6 +22,13 @@ pub trait UserService: Send + Sync {
     ///
     /// A string containing the user's display name.
     fn get_user_name(&self) -> String;
+
+    /// Returns the complete user profile.
+    ///
+    /// # Returns
+    ///
+    /// A UserProfile containing nickname and background.
+    fn get_user_profile(&self) -> super::model::UserProfile;
 }
 
 /// Default implementation that returns a constant user name.
@@ -44,6 +51,10 @@ pub struct DefaultUserService;
 impl UserService for DefaultUserService {
     fn get_user_name(&self) -> String {
         "user".to_string()
+    }
+
+    fn get_user_profile(&self) -> super::model::UserProfile {
+        super::model::UserProfile::default()
     }
 }
 

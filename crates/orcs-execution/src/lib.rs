@@ -3,6 +3,7 @@ use chrono::Utc;
 use llm_toolkit::agent::impls::ClaudeCodeAgent;
 use llm_toolkit::agent::{Agent, AgentError, AgentOutput, Payload};
 use llm_toolkit::orchestrator::{BlueprintWorkflow, ParallelOrchestrator};
+use orcs_application::UtilityAgentService;
 use orcs_core::repository::TaskRepository;
 use orcs_core::task::{Task, TaskContext, TaskStatus};
 use orcs_core::OrcsError;
@@ -51,6 +52,7 @@ pub struct TaskExecutor {
     agent: Arc<dyn Agent<Output = String> + Send + Sync>,
     task_repository: Option<Arc<dyn TaskRepository>>,
     event_sender: Option<mpsc::UnboundedSender<tracing_layer::OrchestratorEvent>>,
+    utility_service: Option<Arc<UtilityAgentService>>,
 }
 
 impl TaskExecutor {
@@ -60,6 +62,7 @@ impl TaskExecutor {
             agent: Arc::new(ClaudeCodeAgent::new()),
             task_repository: None,
             event_sender: None,
+            utility_service: None,
         }
     }
 
@@ -69,6 +72,7 @@ impl TaskExecutor {
             agent,
             task_repository: None,
             event_sender: None,
+            utility_service: None,
         }
     }
 
@@ -84,6 +88,12 @@ impl TaskExecutor {
         sender: mpsc::UnboundedSender<tracing_layer::OrchestratorEvent>,
     ) -> Self {
         self.event_sender = Some(sender);
+        self
+    }
+
+    /// Sets the utility agent service for lightweight LLM operations.
+    pub fn with_utility_service(mut self, service: Arc<UtilityAgentService>) -> Self {
+        self.utility_service = Some(service);
         self
     }
 
@@ -132,12 +142,19 @@ impl TaskExecutor {
         // Generate task ID and timestamps
         let task_id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
-        let title = message_content
-            .chars()
-            .take(100)
-            .collect::<String>()
-            .trim()
-            .to_string();
+
+        // Generate title using utility service if available, otherwise fallback
+        let title = if let Some(utility) = &self.utility_service {
+            utility
+                .generate_task_title(&message_content)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::warn!("Failed to generate task title: {}, using fallback", e);
+                    message_content.chars().take(100).collect::<String>().trim().to_string()
+                })
+        } else {
+            message_content.chars().take(100).collect::<String>().trim().to_string()
+        };
 
         // Create initial task record
         let mut task = Task {

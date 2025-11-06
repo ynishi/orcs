@@ -4,7 +4,7 @@
 mod slash_commands;
 
 use llm_toolkit::agent::dialogue::ExecutionModel;
-use orcs_application::{AdhocPersonaService, SessionUseCase};
+use orcs_application::{AdhocPersonaService, SessionUseCase, UtilityAgentService};
 use orcs_core::persona::{Persona, get_default_presets};
 use orcs_core::repository::{PersonaRepository, TaskRepository};
 use orcs_core::session::{AppMode, ErrorSeverity, Session, SessionManager};
@@ -382,6 +382,12 @@ async fn get_persona_backend_options() -> Result<Vec<(String, String)>, String> 
 #[tauri::command]
 async fn get_user_nickname(state: State<'_, AppState>) -> Result<String, String> {
     Ok(state.user_service.get_user_name())
+}
+
+/// Gets the complete user profile from the config
+#[tauri::command]
+async fn get_user_profile(state: State<'_, AppState>) -> Result<orcs_core::user::UserProfile, String> {
+    Ok(state.user_service.get_user_profile())
 }
 
 /// Executes a message content as a task using TaskExecutor
@@ -1559,11 +1565,15 @@ fn main() {
         );
         let task_repository = task_repository_concrete.clone() as Arc<dyn TaskRepository>;
 
-        // Create TaskExecutor with task repository and event sender
+        // Create UtilityAgentService for lightweight LLM operations
+        let utility_service = Arc::new(UtilityAgentService::new());
+
+        // Create TaskExecutor with all services
         let task_executor = Arc::new(
             TaskExecutor::new()
                 .with_task_repository(task_repository.clone())
                 .with_event_sender(event_tx.clone())
+                .with_utility_service(utility_service.clone())
         );
 
         // Try to restore last session using SessionUseCase
@@ -1680,6 +1690,7 @@ fn main() {
                 save_persona_configs,
                 get_persona_backend_options,
                 get_user_nickname,
+                get_user_profile,
                 execute_message_as_task,
                 add_participant,
                 remove_participant,

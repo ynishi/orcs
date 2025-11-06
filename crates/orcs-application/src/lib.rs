@@ -5,6 +5,8 @@
 
 pub mod adhoc_persona_service;
 pub mod session_usecase;
+pub mod utility_agent_service;
 
 pub use adhoc_persona_service::AdhocPersonaService;
 pub use session_usecase::SessionUseCase;
+pub use utility_agent_service::UtilityAgentService;

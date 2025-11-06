@@ -1,21 +1,41 @@
 //! GeminiApiAgent - Direct REST API implementation for Gemini.
 //!
 //! This agent calls the Gemini REST API directly without CLI dependency.
-//! Configuration priority: ~/.config/orcs/secret.json > environment variables
+//! Configuration is loaded from ~/.config/orcs/secret.json
 
 use async_trait::async_trait;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
+use once_cell::sync::Lazy;
 use orcs_infrastructure::storage::SecretStorage;
 use reqwest::{Client, StatusCode, header::HeaderValue};
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::time::Duration;
 
 const DEFAULT_GEMINI_MODEL: &str = "gemini-2.5-flash";
 const BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
+
+/// Global Gemini configuration loaded from ~/.config/orcs/secret.json
+static GEMINI_CONFIG: Lazy<Result<(String, String), String>> = Lazy::new(|| {
+    let storage = SecretStorage::new()
+        .map_err(|e| format!("Failed to initialize SecretStorage: {}", e))?;
+
+    let secret_config = storage
+        .load()
+        .map_err(|e| format!("Failed to load secret.json: {}", e))?;
+
+    let gemini_config = secret_config
+        .gemini
+        .ok_or_else(|| "Gemini configuration not found in secret.json".to_string())?;
+
+    let model = gemini_config
+        .model_name
+        .unwrap_or_else(|| DEFAULT_GEMINI_MODEL.into());
+
+    Ok((gemini_config.api_key, model))
+});
 
 /// Agent implementation that talks to the Gemini HTTP API.
 #[derive(Clone)]
@@ -24,6 +44,15 @@ pub struct GeminiApiAgent {
     api_key: String,
     model: String,
     system_instruction: Option<String>,
+}
+
+impl Default for GeminiApiAgent {
+    fn default() -> Self {
+        match GEMINI_CONFIG.as_ref() {
+            Ok((api_key, model)) => Self::new(api_key.clone(), model.clone()),
+            Err(e) => panic!("Failed to initialize GeminiApiAgent: {}", e),
+        }
+    }
 }
 
 impl GeminiApiAgent {
@@ -37,37 +66,6 @@ impl GeminiApiAgent {
         }
     }
 
-    /// Loads configuration from ~/.config/orcs/secret.json or environment variables.
-    ///
-    /// Priority:
-    /// 1. ~/.config/orcs/secret.json
-    /// 2. Environment variables (GEMINI_API_KEY, GEMINI_MODEL_NAME)
-    ///
-    /// Model name defaults to `gemini-2.5-flash` if not specified.
-    pub fn try_from_env() -> Result<Self, AgentError> {
-        // Try loading from SecretStorage first
-        if let Ok(storage) = SecretStorage::new() {
-            if let Ok(secret_config) = storage.load() {
-                if let Some(gemini_config) = secret_config.gemini {
-                    let model = gemini_config
-                        .model_name
-                        .unwrap_or_else(|| DEFAULT_GEMINI_MODEL.into());
-                    return Ok(Self::new(gemini_config.api_key, model));
-                }
-            }
-        }
-
-        // Fallback to environment variables
-        let api_key = env::var("GEMINI_API_KEY").map_err(|_| {
-            AgentError::ExecutionFailed(
-                "GEMINI_API_KEY not found in ~/.config/orcs/secret.json or environment variables"
-                    .into(),
-            )
-        })?;
-
-        let model = env::var("GEMINI_MODEL_NAME").unwrap_or_else(|_| DEFAULT_GEMINI_MODEL.into());
-        Ok(Self::new(api_key, model))
-    }
 
     /// Overrides the model after construction.
     pub fn with_model(mut self, model: impl Into<String>) -> Self {

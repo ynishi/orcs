@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::user::UserProfile;
+
 // Re-export from persona module for backward compatibility
 #[deprecated(since = "0.2.0", note = "Use orcs_core::persona::Persona instead")]
 pub use crate::persona::Persona as PersonaConfig;
@@ -78,4 +80,51 @@ pub struct OpenAIConfig {
     /// Optional model name (e.g., "gpt-4o")
     #[serde(default)]
     pub model_name: Option<String>,
+}
+
+// ============================================================================
+// Root configuration model (Domain layer)
+// ============================================================================
+
+/// Root configuration structure for the application (Domain model).
+///
+/// This is the domain representation of application configuration stored in config.toml.
+/// Contains static configuration that changes infrequently.
+///
+/// Infrastructure layer DTOs (ConfigRootV1_x_x) are converted to/from this type.
+///
+/// # File Location
+///
+/// - macOS: `~/Library/Preferences/com.orcs-app/config.toml`
+/// - Linux: `~/.config/com.orcs-app/config.toml`
+/// - Windows: `%APPDATA%\com.orcs-app\config.toml`
+///
+/// # Design Notes
+///
+/// - **Personas**: Managed separately in `DataDir/personas/` directory
+/// - **AppState**: Managed separately in `PrefDir/state.toml` (frequently updated)
+/// - **Workspaces**: Managed separately in `DataDir/content/workspaces/` directory
+///
+/// # Usage
+///
+/// Always use this type in application and domain logic.
+/// Infrastructure layer handles versioning and migration internally.
+///
+/// ```ignore
+/// let config = RootConfig::default();
+/// let nickname = config.user_profile.nickname;
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RootConfig {
+    /// User profile configuration (name, background, etc.).
+    /// Changes infrequently.
+    pub user_profile: UserProfile,
+}
+
+impl Default for RootConfig {
+    fn default() -> Self {
+        Self {
+            user_profile: UserProfile::default(),
+        }
+    }
 }

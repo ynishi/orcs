@@ -21,8 +21,24 @@ pub struct AppStateV1_0 {
     pub last_selected_workspace_id: Option<String>,
 }
 
+/// Application state configuration V1.1.0.
+///
+/// Added default_workspace_id field for system workspace (ConfigDir).
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.1.0")]
+pub struct AppStateV1_1 {
+    /// ID of the last selected workspace.
+    /// This is used to restore the workspace on application startup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_selected_workspace_id: Option<String>,
+
+    /// ID of the default system workspace (ConfigDir as workspace).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_workspace_id: Option<String>,
+}
+
 /// Type alias for the latest AppState version.
-pub type AppStateDTO = AppStateV1_0;
+pub type AppStateDTO = AppStateV1_1;
 
 impl Default for AppStateV1_0 {
     fn default() -> Self {
@@ -32,24 +48,50 @@ impl Default for AppStateV1_0 {
     }
 }
 
-// ============================================================================
-// Domain model conversions
-// ============================================================================
-
-/// Convert AppStateV1_0 DTO to domain model.
-impl IntoDomain<AppState> for AppStateV1_0 {
-    fn into_domain(self) -> AppState {
-        AppState {
-            last_selected_workspace_id: self.last_selected_workspace_id,
+impl Default for AppStateV1_1 {
+    fn default() -> Self {
+        Self {
+            last_selected_workspace_id: None,
+            default_workspace_id: None,
         }
     }
 }
 
-/// Convert domain model to AppStateV1_0 DTO for persistence.
-impl version_migrate::FromDomain<AppState> for AppStateV1_0 {
+// ============================================================================
+// Migration implementations
+// ============================================================================
+
+/// Migration from AppStateV1_0 to AppStateV1_1.
+/// Adds default_workspace_id field with default value (None).
+impl version_migrate::MigratesTo<AppStateV1_1> for AppStateV1_0 {
+    fn migrate(self) -> AppStateV1_1 {
+        AppStateV1_1 {
+            last_selected_workspace_id: self.last_selected_workspace_id,
+            default_workspace_id: None, // Default: no default workspace set
+        }
+    }
+}
+
+// ============================================================================
+// Domain model conversions
+// ============================================================================
+
+/// Convert AppStateV1_1 DTO to domain model.
+impl IntoDomain<AppState> for AppStateV1_1 {
+    fn into_domain(self) -> AppState {
+        AppState {
+            last_selected_workspace_id: self.last_selected_workspace_id,
+            default_workspace_id: self.default_workspace_id,
+        }
+    }
+}
+
+/// Convert domain model to AppStateV1_1 DTO for persistence.
+impl version_migrate::FromDomain<AppState> for AppStateV1_1 {
     fn from_domain(state: AppState) -> Self {
-        AppStateV1_0 {
+        AppStateV1_1 {
             last_selected_workspace_id: state.last_selected_workspace_id,
+            default_workspace_id: state.default_workspace_id,
         }
     }
 }
@@ -64,7 +106,8 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_0 {
 ///
 /// # Migration Path
 ///
-/// - V1.0 → AppState: Converts DTO to domain model
+/// - V1.0 → V1.1: Adds `default_workspace_id` field with default value (None)
+/// - V1.1 → AppState: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -75,9 +118,10 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_0 {
 pub fn create_app_state_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0 -> AppState
+    // Register migration path: V1.0 -> V1.1 -> AppState
     let app_state_path = version_migrate::Migrator::define("app_state")
         .from::<AppStateV1_0>()
+        .step::<AppStateV1_1>()
         .into_with_save::<AppState>();
 
     migrator

@@ -8,18 +8,30 @@ use version_migrate::DeriveQueryable as Queryable;
 /// Application state that persists across restarts.
 ///
 /// This struct contains application-level state information that should be
-/// preserved across application restarts, such as the last selected workspace.
+/// preserved across application restarts.
+///
+/// # File Location
+///
+/// - macOS: `~/Library/Preferences/com.orcs-app/state.toml`
+/// - Linux: `~/.config/com.orcs-app/state.toml`
+/// - Windows: `%APPDATA%\com.orcs-app\state.toml`
 ///
 /// # Fields
 ///
 /// * `last_selected_workspace_id` - The ID of the last workspace the user selected.
 ///   This is used to restore the workspace on application startup.
+/// * `default_workspace_id` - The ID of the system's default workspace (ConfigDir as workspace).
+///   This represents the ConfigDir itself as a workspace for system-wide operations.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Queryable)]
 #[queryable(entity = "app_state")]
 pub struct AppState {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.
     pub last_selected_workspace_id: Option<String>,
+
+    /// ID of the default system workspace (ConfigDir as workspace).
+    /// This workspace represents the application's configuration directory itself.
+    pub default_workspace_id: Option<String>,
 }
 
 impl AppState {
@@ -32,6 +44,7 @@ impl AppState {
     pub fn with_last_selected_workspace(workspace_id: String) -> Self {
         Self {
             last_selected_workspace_id: Some(workspace_id),
+            default_workspace_id: None,
         }
     }
 
@@ -48,6 +61,16 @@ impl AppState {
     /// Returns the last selected workspace ID, if any.
     pub fn last_selected_workspace_id(&self) -> Option<&str> {
         self.last_selected_workspace_id.as_deref()
+    }
+
+    /// Sets the default workspace ID (system workspace representing ConfigDir).
+    pub fn set_default_workspace(&mut self, workspace_id: String) {
+        self.default_workspace_id = Some(workspace_id);
+    }
+
+    /// Returns the default workspace ID, if any.
+    pub fn default_workspace_id(&self) -> Option<&str> {
+        self.default_workspace_id.as_deref()
     }
 }
 

@@ -162,42 +162,16 @@ impl OrcsPaths {
         Ok(Self::config_dir()?.join("config.toml"))
     }
 
-    /// Ensures the configuration file exists, creating it with a default template if it doesn't.
-    ///
-    /// Creates a config.toml file with default application settings if the file doesn't exist.
+    /// Returns the path to the application state file.
     ///
     /// # Returns
     ///
-    /// - `Ok(PathBuf)`: Path to the config file (existing or newly created)
-    /// - `Err(std::io::Error)`: If file creation fails
-    pub fn ensure_config_file() -> Result<PathBuf, std::io::Error> {
-        let config_path = Self::config_file()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::NotFound, e.to_string()))?;
-
-        // If file already exists, return the path
-        if config_path.exists() {
-            return Ok(config_path);
-        }
-
-        // Ensure parent directory exists
-        if let Some(parent) = config_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        // Create default config using AppConfig
-        use orcs_core::config::AppConfig;
-
-        let default_config = AppConfig::default();
-
-        // Serialize to pretty TOML
-        let config_toml = toml::to_string_pretty(&default_config)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-
-        // Write to file
-        std::fs::write(&config_path, config_toml)?;
-
-        Ok(config_path)
+    /// - `Ok(PathBuf)`: Path to state.toml
+    /// - `Err(PathError)`: Could not determine path
+    pub fn state_file() -> Result<PathBuf, PathError> {
+        Ok(Self::config_dir()?.join("state.toml"))
     }
+
 
     // (2) Secret
     // ----------------------------------------

@@ -8,8 +8,11 @@ use orcs_core::task::{Task, TaskContext, TaskStatus};
 use orcs_core::OrcsError;
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+
+pub mod tracing_layer;
 
 /// Dynamic agent adapter for ParallelOrchestrator.
 ///
@@ -47,6 +50,7 @@ impl llm_toolkit::agent::DynamicAgent for DynamicAgentAdapter {
 pub struct TaskExecutor {
     agent: Arc<dyn Agent<Output = String> + Send + Sync>,
     task_repository: Option<Arc<dyn TaskRepository>>,
+    event_sender: Option<mpsc::UnboundedSender<tracing_layer::OrchestratorEvent>>,
 }
 
 impl TaskExecutor {
@@ -55,6 +59,7 @@ impl TaskExecutor {
         Self {
             agent: Arc::new(ClaudeCodeAgent::new()),
             task_repository: None,
+            event_sender: None,
         }
     }
 
@@ -63,12 +68,22 @@ impl TaskExecutor {
         Self {
             agent,
             task_repository: None,
+            event_sender: None,
         }
     }
 
     /// Sets the task repository for persisting task execution records.
     pub fn with_task_repository(mut self, repository: Arc<dyn TaskRepository>) -> Self {
         self.task_repository = Some(repository);
+        self
+    }
+
+    /// Sets the event sender for streaming orchestrator events.
+    pub fn with_event_sender(
+        mut self,
+        sender: mpsc::UnboundedSender<tracing_layer::OrchestratorEvent>,
+    ) -> Self {
+        self.event_sender = Some(sender);
         self
     }
 
@@ -149,6 +164,25 @@ impl TaskExecutor {
             }
         }
 
+        // Send task started event
+        if let Some(sender) = &self.event_sender {
+            let event = tracing_layer::OrchestratorEvent {
+                target: "orcs_execution::task_executor".to_string(),
+                level: "INFO".to_string(),
+                message: "Task execution started".to_string(),
+                fields: serde_json::json!({
+                    "task_id": &task_id,
+                    "session_id": &task.session_id,
+                    "title": &task.title,
+                }).as_object().unwrap().clone().into_iter()
+                    .map(|(k, v)| (k, v))
+                    .collect(),
+                span: std::collections::HashMap::new(),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+            };
+            let _ = sender.send(event);
+        }
+
         // Create a blueprint using the message content as the workflow description
         let blueprint = BlueprintWorkflow::new(message_content.clone());
 
@@ -200,11 +234,38 @@ impl TaskExecutor {
 
             task.result = Some(summary);
 
+            // Save execution details with context outputs
+            task.execution_details = Some(orcs_core::task::ExecutionDetails {
+                steps: vec![], // TODO: Extract step info from orchestrator
+                context: result.context.clone(),
+            });
+
             // Save final task record
             if let Some(repo) = &self.task_repository {
                 if let Err(e) = repo.save(&task).await {
                     tracing::warn!("Failed to save completed task record: {}", e);
                 }
+            }
+
+            // Send task completed event
+            if let Some(sender) = &self.event_sender {
+                let event = tracing_layer::OrchestratorEvent {
+                    target: "orcs_execution::task_executor".to_string(),
+                    level: "INFO".to_string(),
+                    message: "Task execution completed".to_string(),
+                    fields: serde_json::json!({
+                        "task_id": &task_id,
+                        "session_id": &task.session_id,
+                        "status": "Completed",
+                        "steps_executed": task.steps_executed,
+                        "steps_skipped": task.steps_skipped,
+                    }).as_object().unwrap().clone().into_iter()
+                        .map(|(k, v)| (k, v))
+                        .collect(),
+                    span: std::collections::HashMap::new(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                };
+                let _ = sender.send(event);
             }
 
             Ok(result_text)
@@ -214,11 +275,39 @@ impl TaskExecutor {
             task.error = Some(error_msg.clone());
             task.completed_at = Some(completed_at);
 
+            // Save execution details with context outputs (even on failure)
+            task.execution_details = Some(orcs_core::task::ExecutionDetails {
+                steps: vec![], // TODO: Extract step info from orchestrator
+                context: result.context.clone(),
+            });
+
             // Save failed task record
             if let Some(repo) = &self.task_repository {
                 if let Err(e) = repo.save(&task).await {
                     tracing::warn!("Failed to save failed task record: {}", e);
                 }
+            }
+
+            // Send task failed event
+            if let Some(sender) = &self.event_sender {
+                let event = tracing_layer::OrchestratorEvent {
+                    target: "orcs_execution::task_executor".to_string(),
+                    level: "ERROR".to_string(),
+                    message: "Task execution failed".to_string(),
+                    fields: serde_json::json!({
+                        "task_id": &task_id,
+                        "session_id": &task.session_id,
+                        "status": "Failed",
+                        "error": &error_msg,
+                        "steps_executed": task.steps_executed,
+                        "steps_skipped": task.steps_skipped,
+                    }).as_object().unwrap().clone().into_iter()
+                        .map(|(k, v)| (k, v))
+                        .collect(),
+                    span: std::collections::HashMap::new(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                };
+                let _ = sender.send(event);
             }
 
             Err(OrcsError::Execution(format!("Task execution failed: {}", error_msg)))

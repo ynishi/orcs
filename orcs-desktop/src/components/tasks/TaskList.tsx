@@ -1,5 +1,6 @@
-import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip } from '@mantine/core';
-import { Task, getTaskColor, getTaskIcon } from '../../types/task';
+import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { Task, getTaskIcon } from '../../types/task';
 
 interface TaskListProps {
   tasks: Task[];
@@ -12,6 +13,52 @@ export function TaskList({ tasks, onTaskToggle, onTaskDelete, onRefresh }: TaskL
   const activeTasks = tasks.filter(t => t.status === 'Running' || t.status === 'Pending');
   const completedTasks = tasks.filter(t => t.status === 'Completed');
   const failedTasks = tasks.filter(t => t.status === 'Failed');
+
+  const handleCopyTaskOutput = async (task: Task) => {
+    try {
+      let output = `# Task: ${task.title}\n\n`;
+      output += `Status: ${task.status}\n`;
+      output += `Steps executed: ${task.steps_executed}\n`;
+      output += `Created: ${new Date(task.created_at).toLocaleString()}\n`;
+      output += `Updated: ${new Date(task.updated_at).toLocaleString()}\n\n`;
+
+      if (task.result) {
+        output += `## Summary\n${task.result}\n\n`;
+      }
+
+      if (task.error) {
+        output += `## Error\n${task.error}\n\n`;
+      }
+
+      if (task.execution_details?.context) {
+        output += `## Execution Context\n`;
+        const context = task.execution_details.context;
+        for (const [key, value] of Object.entries(context)) {
+          output += `\n### ${key}\n`;
+          if (typeof value === 'string') {
+            output += value + '\n';
+          } else {
+            output += JSON.stringify(value, null, 2) + '\n';
+          }
+        }
+      }
+
+      await navigator.clipboard.writeText(output);
+      notifications.show({
+        title: 'Copied!',
+        message: 'Task output copied to clipboard',
+        color: 'green',
+        autoClose: 2000,
+      });
+    } catch (error) {
+      console.error('Failed to copy task output:', error);
+      notifications.show({
+        title: 'Failed to Copy',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
 
   const renderTask = (task: Task) => (
     <Group
@@ -51,6 +98,23 @@ export function TaskList({ tasks, onTaskToggle, onTaskDelete, onRefresh }: TaskL
           </Text>
         </Group>
       </Box>
+
+      {/* コピーボタン */}
+      {(task.status === 'Completed' || task.status === 'Failed') && (
+        <Tooltip label="Copy output" withArrow>
+          <ActionIcon
+            size="sm"
+            variant="subtle"
+            color="blue"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCopyTaskOutput(task);
+            }}
+          >
+            📋
+          </ActionIcon>
+        </Tooltip>
+      )}
 
       {/* 削除ボタン */}
       <ActionIcon

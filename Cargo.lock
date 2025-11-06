@@ -2884,10 +2884,12 @@ dependencies = [
  "llm-toolkit",
  "orcs-core",
  "orcs-interaction",
+ "serde",
  "serde_json",
  "tokio",
  "tokio-util",
  "tracing",
+ "tracing-subscriber",
  "uuid",
 ]
 

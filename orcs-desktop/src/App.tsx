@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { notifications } from '@mantine/notifications';
-import { handleSystemMessage, conversationMessage, commandMessage, shellOutputMessage, taskMessage, MessageSeverity } from './utils/systemMessage';
+import { handleSystemMessage, conversationMessage, commandMessage, shellOutputMessage, MessageSeverity } from './utils/systemMessage';
 import {
   Textarea,
   Button,
@@ -299,6 +299,27 @@ function App() {
     refreshTasks();
   }, [refreshTasks]);
 
+  // Listen for task events (real-time task status updates)
+  useEffect(() => {
+    console.log('[App] Setting up task-event listener');
+    const unlisten = listen<any>('task-event', async (event) => {
+      console.log('[App] task-event received:', event.payload);
+      const payload = event.payload;
+      console.log('[App] Event details - target:', payload.target, 'level:', payload.level, 'message:', payload.message);
+      console.log('[App] Event fields:', payload.fields);
+
+      // Refresh task list to show updated status
+      console.log('[App] Refreshing tasks...');
+      await refreshTasks();
+      console.log('[App] Tasks refreshed');
+    });
+
+    return () => {
+      console.log('[App] Cleaning up task-event listener');
+      unlisten.then(fn => fn());
+    };
+  }, [refreshTasks]);
+
   // Listen for workspace-switched events to refresh workspace data and Git info
   useEffect(() => {
     const unlisten = listen<string>('workspace-switched', async () => {
@@ -436,20 +457,8 @@ function App() {
               await saveCurrentSession();
               return;
             case 'task':
-              if (parsed.args && parsed.args.length > 0) {
-                const taskText = parsed.args.join(' ');
-                const newTask: Task = {
-                  id: `${Date.now()}-${Math.random()}`,
-                  description: taskText,
-                  status: 'pending',
-                  createdAt: new Date(),
-                };
-                setTasks((prev) => [...prev, newTask]);
-                setStatus(prev => ({ ...prev, activeTasks: prev.activeTasks + 1 }));
-                handleSystemMessage(taskMessage(`✅ Task created: ${taskText}`), addMessage);
-              } else {
-                handleSystemMessage(conversationMessage('Usage: /task [description]', 'error'), addMessage);
-              }
+              // /task command is deprecated - tasks are now created via 🚀 button
+              handleSystemMessage(conversationMessage('Use the 🚀 button on messages to execute them as tasks', 'info'), addMessage);
               await saveCurrentSession();
               return;
             case 'workspace':
@@ -1027,28 +1036,30 @@ function App() {
   };
 
   // タスク操作ハンドラー
-  const handleTaskToggle = (taskId: string) => {
-    setTasks((prev) =>
-      prev.map((task) => {
-        if (task.id === taskId) {
-          const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-          if (newStatus === 'completed') {
-            setStatus((s) => ({ ...s, activeTasks: Math.max(0, s.activeTasks - 1) }));
-          } else {
-            setStatus((s) => ({ ...s, activeTasks: s.activeTasks + 1 }));
-          }
-          return { ...task, status: newStatus };
-        }
-        return task;
-      })
-    );
+  const handleTaskToggle = async (taskId: string) => {
+    // Tasks are managed by backend - toggle is not supported for execution tasks
+    // This is kept for compatibility but does nothing
+    console.log('[App] Task toggle not supported for execution tasks:', taskId);
   };
 
-  const handleTaskDelete = (taskId: string) => {
-    const taskToDelete = tasks.find((t) => t.id === taskId);
-    setTasks((prev) => prev.filter((task) => task.id !== taskId));
-    if (taskToDelete && taskToDelete.status !== 'completed') {
-      setStatus((prev) => ({ ...prev, activeTasks: Math.max(0, prev.activeTasks - 1) }));
+  const handleTaskDelete = async (taskId: string) => {
+    // Delete task from backend
+    try {
+      await invoke('delete_task', { taskId });
+      await refreshTasks();
+      notifications.show({
+        title: 'Task Deleted',
+        message: 'Task has been removed',
+        color: 'blue',
+        autoClose: 2000,
+      });
+    } catch (error) {
+      console.error('[App] Failed to delete task:', error);
+      notifications.show({
+        title: 'Failed to Delete Task',
+        message: String(error),
+        color: 'red',
+      });
     }
   };
 

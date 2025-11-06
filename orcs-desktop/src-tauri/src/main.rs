@@ -178,6 +178,16 @@ async fn list_tasks(state: State<'_, AppState>) -> Result<Vec<orcs_core::task::T
         .map_err(|e| e.to_string())
 }
 
+/// Deletes a task by ID
+#[tauri::command]
+async fn delete_task(task_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .task_repository
+        .delete(&task_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Switches to a different session
 #[tauri::command]
 async fn switch_session(session_id: String, state: State<'_, AppState>) -> Result<Session, String> {
@@ -1379,14 +1389,33 @@ fn main() {
 
     let (non_blocking, _guard) = tracing_appender::non_blocking(log_file);
 
-    tracing_subscriber::fmt()
-        .with_writer(non_blocking)
-        .with_ansi(false)
-        .with_target(true)
-        .with_thread_ids(true)
-        .with_line_number(true)
-        .with_max_level(tracing::Level::TRACE)
-        .init();
+    // Create channel for orchestrator events
+    let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
+
+    // Setup tracing with multiple layers
+    use tracing_subscriber::prelude::*;
+    use tracing_subscriber::filter::LevelFilter;
+
+    let subscriber = tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(non_blocking)
+                .with_ansi(false)
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_line_number(true)
+                .with_filter(LevelFilter::TRACE),
+        )
+        .with(
+            orcs_execution::tracing_layer::OrchestratorEventLayer::new(event_tx.clone())
+                .with_filter(
+                    tracing_subscriber::filter::EnvFilter::new("off")
+                        .add_directive("llm_toolkit=debug".parse().unwrap())
+                        .add_directive("orcs_execution=debug".parse().unwrap())
+                ),
+        );
+
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 
     tracing::info!("ORCS Desktop starting...");
 
@@ -1472,9 +1501,11 @@ fn main() {
         );
         let task_repository = task_repository_concrete.clone() as Arc<dyn TaskRepository>;
 
-        // Create TaskExecutor with task repository
+        // Create TaskExecutor with task repository and event sender
         let task_executor = Arc::new(
-            TaskExecutor::new().with_task_repository(task_repository.clone())
+            TaskExecutor::new()
+                .with_task_repository(task_repository.clone())
+                .with_event_sender(event_tx.clone())
         );
 
         // Try to restore last session using SessionUseCase
@@ -1577,6 +1608,7 @@ fn main() {
                 create_config_session,
                 list_sessions,
                 list_tasks,
+                delete_task,
                 switch_session,
                 delete_session,
                 rename_session,
@@ -1630,6 +1662,26 @@ fn main() {
                 slash_commands::execute_shell_command,
             ])
             .setup(move |app| {
+                // Spawn task to forward orchestrator events to frontend
+                let handle_for_events = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Use println instead of tracing to avoid infinite loop
+                    println!("[EventListener] Starting orchestrator event listener");
+                    while let Some(event) = event_rx.recv().await {
+                        println!(
+                            "[EventListener] Received event - target: {}, level: {}, message: {}",
+                            event.target,
+                            event.level,
+                            event.message
+                        );
+                        // Emit event to frontend
+                        if let Err(e) = handle_for_events.emit("task-event", &event) {
+                            eprintln!("[EventListener] Failed to emit task event: {}", e);
+                        }
+                    }
+                    println!("[EventListener] Orchestrator event listener stopped");
+                });
+
                 // Emit workspace-switched event after startup to trigger frontend session load
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {

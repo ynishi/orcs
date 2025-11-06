@@ -37,7 +37,7 @@ llm-toolkit = { path = "workspace/llm-toolkit/crates/llm-toolkit", features = ["
 llm-toolkit-macros = { path = "workspace/llm-toolkit/crates/llm-toolkit-macros" }
 # IMPORTANT: NEVER use path dependencies for version-migrate. Always use version from crates.io.
 # DO NOT change to: path = "version-migrate/..."
-version-migrate = { version = "0.12.0", features = ["async"] }
+version-migrate = { version = "0.13.0", features = ["async"] }
 tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
 ratatui = "0.27.0"

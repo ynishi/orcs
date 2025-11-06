@@ -82,6 +82,7 @@ impl IntoDomain<AppState> for AppStateV1_1 {
         AppState {
             last_selected_workspace_id: self.last_selected_workspace_id,
             default_workspace_id: self.default_workspace_id,
+            active_session_id: None,
         }
     }
 }

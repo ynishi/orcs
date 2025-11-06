@@ -3,7 +3,7 @@
 //! Defines the interface for session persistence operations.
 
 use super::model::Session;
-use anyhow::Result;
+use crate::error::Result;
 use async_trait::async_trait;
 
 /// An abstract repository for managing session persistence.
@@ -64,25 +64,4 @@ pub trait SessionRepository: Send + Sync {
     /// - `Ok(Vec<Session>)`: All stored sessions
     /// - `Err(_)`: Error occurred during listing
     async fn list_all(&self) -> Result<Vec<Session>>;
-
-    /// Gets the ID of the currently active session.
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(Some(session_id))`: Active session ID
-    /// - `Ok(None)`: No active session set
-    /// - `Err(_)`: Error occurred during retrieval
-    async fn get_active_session_id(&self) -> Result<Option<String>>;
-
-    /// Sets the ID of the currently active session.
-    ///
-    /// # Arguments
-    ///
-    /// * `session_id` - The ID of the session to set as active
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(())`: Active session set successfully
-    /// - `Err(_)`: Error occurred during setting
-    async fn set_active_session_id(&self, session_id: &str) -> Result<()>;
 }

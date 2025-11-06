@@ -7,6 +7,7 @@ use crate::dto::create_app_state_migrator;
 use crate::paths::{OrcsPaths, ServiceType};
 use orcs_core::state::model::AppState;
 use orcs_core::state::repository::StateRepository;
+use orcs_core::error::{OrcsError, Result};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
@@ -44,10 +45,11 @@ impl StateRepositoryImpl {
     /// it creates the file with default values via LoadBehavior::CreateIfMissing.
     ///
     /// Uses the centralized path management via `ServiceType::AppState`.
-    pub async fn new() -> Result<Self, String> {
+    pub async fn new() -> Result<Self> {
         // Get file path for AppState via centralized path management
         let orcs_paths = OrcsPaths::new(None);
-        let path_type = orcs_paths.get_path(ServiceType::AppState).map_err(|e| e.to_string())?;
+        let path_type = orcs_paths.get_path(ServiceType::AppState)
+            .map_err(|e| OrcsError::Internal(e.to_string()))?;
         let file_path = path_type.into_path_buf(); // app_state.toml
 
         // Setup migrator
@@ -60,7 +62,7 @@ impl StateRepositoryImpl {
 
         // Create FileStorage (automatically loads or creates empty config)
         let storage = FileStorage::new(file_path, migrator, strategy)
-            .map_err(|e| format!("Failed to create FileStorage: {}", e))?;
+            .map_err(|e| OrcsError::Internal(format!("Failed to create FileStorage: {}", e)))?;
 
         let storage = Arc::new(Mutex::new(storage));
 
@@ -69,7 +71,7 @@ impl StateRepositoryImpl {
             let storage_lock = storage.lock().await;
             let states: Vec<AppState> = storage_lock
                 .query("app_state")
-                .map_err(|e| format!("Failed to query app_state: {}", e))?;
+                .map_err(|e| OrcsError::Internal(format!("Failed to query app_state: {}", e)))?;
             states.into_iter().next().unwrap_or_default()
         };
 
@@ -81,10 +83,11 @@ impl StateRepositoryImpl {
 
 }
 
+#[async_trait::async_trait]
 impl StateRepository for StateRepositoryImpl {
 
     /// Saves the app state to storage.
-    async fn save_state(&self, state: AppState) -> Result<(), String> {
+    async fn save_state(&self, state: AppState) -> Result<()> {
         // Update in-memory cache first
         {
             let mut state_lock = self.state.lock().await;
@@ -98,10 +101,10 @@ impl StateRepository for StateRepositoryImpl {
             let mut storage = storage.blocking_lock();
             storage
                 .update_and_save("app_state", vec![state_for_save])
-                .map_err(|e| format!("Failed to save app_state: {}", e))
+                .map_err(|e| OrcsError::Internal(format!("Failed to save app_state: {}", e)))
         })
         .await
-        .map_err(|e| format!("Failed to join task: {}", e))??;
+        .map_err(|e| OrcsError::Internal(format!("Failed to join task: {}", e)))??;
 
         Ok(())
     }
@@ -114,7 +117,7 @@ impl StateRepository for StateRepositoryImpl {
     }
 
     /// Sets the last selected workspace ID.
-    async fn set_last_selected_workspace(&self, workspace_id: String) -> Result<(), String> {
+    async fn set_last_selected_workspace(&self, workspace_id: String) -> Result<()> {
         let mut state = self.state.lock().await.clone();
         state.last_selected_workspace_id = Some(workspace_id);
         let cloned_state = state.clone();
@@ -123,7 +126,7 @@ impl StateRepository for StateRepositoryImpl {
     }
 
     /// Clears the last selected workspace ID.
-    async fn clear_last_selected_workspace(&self) -> Result<(), String> {
+    async fn clear_last_selected_workspace(&self) -> Result<()> {
         let mut state = self.state.lock().await.clone();
         state.last_selected_workspace_id = None;
         let cloned_state = state.clone();
@@ -138,7 +141,7 @@ impl StateRepository for StateRepositoryImpl {
     }
 
     /// Sets the default workspace ID.
-    async fn set_default_workspace(&self, workspace_id: String) -> Result<(), String> {
+    async fn set_default_workspace(&self, workspace_id: String) -> Result<()> {
         let mut state = self.state.lock().await.clone();
         state.default_workspace_id = Some(workspace_id);
         let cloned_state = state.clone();
@@ -153,7 +156,7 @@ impl StateRepository for StateRepositoryImpl {
     }
 
     /// Sets the active session ID.
-    async fn set_active_session(&self, session_id: String) -> Result<(), String> {
+    async fn set_active_session(&self, session_id: String) -> Result<()> {
         let mut state = self.state.lock().await.clone();
         state.active_session_id = Some(session_id);
         let cloned_state = state.clone();
@@ -162,7 +165,7 @@ impl StateRepository for StateRepositoryImpl {
     }
 
     /// Clears the active session ID.
-    async fn clear_active_session(&self) -> Result<(), String> {
+    async fn clear_active_session(&self) -> Result<()> {
         let mut state = self.state.lock().await.clone();
         state.active_session_id = None;
         let cloned_state = state.clone();

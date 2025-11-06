@@ -3,7 +3,7 @@
 //! Defines the interface for task persistence operations.
 
 use super::model::Task;
-use anyhow::Result;
+use crate::error::Result;
 use async_trait::async_trait;
 
 /// An abstract repository for managing task persistence.

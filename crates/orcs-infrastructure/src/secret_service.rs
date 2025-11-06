@@ -47,7 +47,8 @@ impl SecretServiceImpl {
     /// Uses the centralized path management via `ServiceType::Secret`.
     pub fn new(base_path: Option<&Path>) -> Result<Self> {
         // Get file path for Secret via centralized path management
-        let path_type = OrcsPaths::new(base_path).get_path(ServiceType::Secret).map_err(|e| e.to_string())?;
+        let path_type = OrcsPaths::new(base_path).get_path(ServiceType::Secret)
+            .map_err(|e| anyhow::anyhow!("Failed to get secret path: {}", e))?;
         let file_path = path_type.into_path_buf(); // secret.json
 
         // Setup migrator (no versioning for secrets, just load/save)
@@ -60,7 +61,7 @@ impl SecretServiceImpl {
 
         // Create FileStorage (automatically loads or creates empty config)
         let storage = FileStorage::new(file_path.clone(), migrator, strategy)
-            .map_err(|e| format!("Failed to create FileStorage: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create FileStorage: {}", e))?;
 
         Ok(Self {
             secrets: Arc::new(RwLock::new(None)),
@@ -97,13 +98,15 @@ impl SecretServiceImpl {
     }
 }
 
+#[async_trait::async_trait]
 impl SecretService for SecretServiceImpl {
     async fn load_secrets(&self) -> Result<SecretConfig, String> {
         self.load_secrets_internal()
     }
 
     async fn secret_file_exists(&self) -> bool {
-        self.storage.read().await?.path.exists()
+        // Try to load secrets - if successful, file exists
+        self.load_secrets_internal().is_ok()
     }
 }
 

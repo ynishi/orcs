@@ -51,7 +51,7 @@ impl AsyncDirWorkspaceRepository {
     /// Returns an error if the configuration directory cannot be determined or if
     /// the directory structure cannot be created.
     pub async fn default() -> Result<Self> {
-        Self::new(None)
+        Self::new(None).await
     }
 
     /// Creates a new AsyncDirWorkspaceRepository.
@@ -90,7 +90,7 @@ impl WorkspaceRepository for AsyncDirWorkspaceRepository {
         {
             Ok(workspace) => Ok(Some(workspace)),
             Err(e) => {
-                if is_not_found(e) {
+                if is_not_found(&e) {
                     Ok(None)
                 } else {
                      Err(OrcsError::Io(e.to_string()))

@@ -15,6 +15,7 @@ use crate::config::SecretConfig;
 /// - Secret files have appropriate permissions (e.g., 600 on Unix)
 /// - Secrets are never logged or exposed in error messages
 /// - Secrets are loaded from secure locations
+#[async_trait::async_trait]
 pub trait SecretService: Send + Sync {
     /// Loads the secret configuration.
     ///
@@ -22,12 +23,12 @@ pub trait SecretService: Send + Sync {
     ///
     /// - `Ok(SecretConfig)`: Successfully loaded secrets
     /// - `Err(String)`: Failed to load (error message should not contain secrets)
-    fn load_secrets(&self) -> Result<SecretConfig, String>;
+    async fn load_secrets(&self) -> Result<SecretConfig, String>;
 
     /// Checks if the secret file exists.
     ///
     /// # Returns
     ///
     /// `true` if the secret file exists, `false` otherwise.
-    fn secret_file_exists(&self) -> bool;
+    async fn secret_file_exists(&self) -> bool;
 }

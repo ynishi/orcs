@@ -7,15 +7,13 @@
 //! - Fully async I/O (no spawn_blocking)
 //! - 1 persona = 1 file (scalable for large prompts)
 
-use crate::dto::create_persona_migrator;
-use anyhow::{Context, Result};
+use crate::{dto::create_persona_migrator, storage_repository::StorageRepository};
+use crate::OrcsPaths;
+use anyhow::Result;
 use orcs_core::persona::Persona;
 use orcs_core::repository::PersonaRepository;
-use std::path::{Path, PathBuf};
-use tokio::fs;
-use version_migrate::{
-    AppPaths, AsyncDirStorage, DirStorageStrategy, FilenameEncoding, FormatStrategy, PathStrategy,
-};
+use std::path::{Path};
+use version_migrate::AsyncDirStorage;
 
 /// AsyncDirStorage-based persona repository.
 ///
@@ -29,125 +27,79 @@ use version_migrate::{
 /// ```
 pub struct AsyncDirPersonaRepository {
     storage: AsyncDirStorage,
-    #[allow(dead_code)]
-    base_dir: PathBuf,
+}
+
+impl StorageRepository for AsyncDirPersonaRepository {
+    const SERVICE_TYPE: crate::paths::ServiceType = crate::paths::ServiceType::Persona;
+    const ENTITY_NAME: &'static str = "persona";
+
+    fn storage(&self) -> &AsyncDirStorage {
+        &self.storage
+    }
 }
 
 impl AsyncDirPersonaRepository {
-    /// Creates an AsyncDirPersonaRepository instance at the default location.
-    ///
-    /// Uses centralized path management via `ServiceType::Persona`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the configuration directory cannot be determined or if
-    /// the directory structure cannot be created.
-    pub async fn default_location() -> Result<Self> {
-        use crate::paths::{OrcsPaths, ServiceType};
-        let path_type = OrcsPaths::get_path(ServiceType::Persona)
-            .map_err(|e| anyhow::anyhow!("Failed to get persona directory: {}", e))?;
-        let base_dir = path_type.into_path_buf();
-        Self::new(base_dir).await
+    pub async fn default() -> Result<Self> {
+        Self::new(None).await
     }
 
-    /// Creates a new AsyncDirPersonaRepository.
+    /// Creates a new AsyncDirPersonaRepository with custom base directory (for testing).
     ///
     /// # Arguments
     ///
-    /// * `base_dir` - Base directory for personas (e.g., ~/.config/orcs)
-    ///
-    /// # Errors
-    ///
-    /// Returns error if:
-    /// - Directory creation fails
-    /// - AsyncDirStorage initialization fails
-    pub async fn new(base_dir: impl AsRef<Path>) -> Result<Self> {
-        let base_dir = base_dir.as_ref().to_path_buf();
-
-        // Ensure base directory exists
-        fs::create_dir_all(&base_dir)
-            .await
-            .context("Failed to create base directory")?;
-
-        // Setup AppPaths with CustomBase strategy to use our base_dir
-        let paths = AppPaths::new("orcs").data_strategy(PathStrategy::CustomBase(base_dir.clone()));
-
-        // Setup migrator
+    /// * `base_dir` - Base directory for personas
+    pub async fn new(base_dir: Option<&Path>) -> Result<Self> {
         let migrator = create_persona_migrator();
-
-        // Setup storage strategy: TOML format, Direct filename encoding
-        let strategy = DirStorageStrategy::default()
-            .with_format(FormatStrategy::Toml)
-            .with_filename_encoding(FilenameEncoding::Direct);
-
-        // Create AsyncDirStorage
-        let storage = AsyncDirStorage::new(paths, "personas", migrator, strategy)
+        let orcs_paths = OrcsPaths::new(base_dir);
+        let storage = orcs_paths
+            .create_async_dir_storage(Self::SERVICE_TYPE, migrator)
             .await
-            .context("Failed to create AsyncDirStorage")?;
-
-        Ok(Self { storage, base_dir })
-    }
-
-    /// Returns the actual personas directory path.
-    ///
-    /// This returns the real path where persona files are stored,
-    /// which is determined by the AsyncDirStorage's path resolution strategy.
-    pub fn personas_dir(&self) -> &Path {
-        self.storage.base_path()
+            .map_err(|e| anyhow::anyhow!("Failed to create storage: {}", e))?;
+        Ok(Self { storage })
     }
 }
 
+#[async_trait::async_trait]
 impl PersonaRepository for AsyncDirPersonaRepository {
-    fn get_all(&self) -> Result<Vec<Persona>, String> {
-        // Block on async operation (since trait is sync)
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let all_personas = self
-                    .storage
-                    .load_all::<Persona>("persona")
-                    .await
-                    .map_err(|e| format!("Failed to load all personas: {}", e))?;
+    async fn get_all(&self) -> Result<Vec<Persona>, orcs_core::OrcsError> {
+        let all_personas = self
+            .storage
+            .load_all::<Persona>(Self::ENTITY_NAME)
+            .await
+            .map_err(|e| orcs_core::OrcsError::DataAccess(format!("Failed to load all personas: {}", e)))?;
 
-                // Extract values from Vec<(String, Persona)>
-                let personas: Vec<Persona> = all_personas.into_iter().map(|(_, p)| p).collect();
-                Ok(personas)
-            })
-        })
+        // Extract values from Vec<(String, Persona)>
+        let personas: Vec<Persona> = all_personas.into_iter().map(|(_, p)| p).collect();
+        Ok(personas)
     }
 
-    fn save_all(&self, personas: &[Persona]) -> Result<(), String> {
-        // Block on async operation (since trait is sync)
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                // 1. Load all existing personas to identify orphaned files
-                let existing = self
-                    .storage
-                    .load_all::<Persona>("persona")
-                    .await
-                    .map_err(|e| format!("Failed to load existing personas: {}", e))?;
+    async fn save_all(&self, personas: &[Persona]) -> Result<(), orcs_core::OrcsError> {
+        let existing = self
+            .storage
+            .load_all::<Persona>(Self::ENTITY_NAME)
+            .await
+            .map_err(|e| orcs_core::OrcsError::DataAccess(format!("Failed to load existing personas: {}", e)))?;
 
-                let existing_ids: std::collections::HashSet<String> =
-                    existing.iter().map(|(id, _)| id.clone()).collect();
-                let new_ids: std::collections::HashSet<String> =
-                    personas.iter().map(|p| p.id.clone()).collect();
+        let existing_ids: std::collections::HashSet<String> =
+            existing.iter().map(|(id, _)| id.clone()).collect();
+        let new_ids: std::collections::HashSet<String> =
+            personas.iter().map(|p| p.id.clone()).collect();
 
-                // 2. Delete orphaned personas (exist in storage but not in new list)
-                for orphaned_id in existing_ids.difference(&new_ids) {
-                    self.storage.delete(orphaned_id).await.map_err(|e| {
-                        format!("Failed to delete orphaned persona {}: {}", orphaned_id, e)
-                    })?;
-                }
+        // 2. Delete orphaned personas (exist in storage but not in new list)
+        for orphaned_id in existing_ids.difference(&new_ids) {
+            self.storage.delete(orphaned_id).await.map_err(|e| {
+                orcs_core::OrcsError::DataAccess(format!("Failed to delete orphaned persona {}: {}", orphaned_id, e))
+            })?;
+        }
 
-                // 3. Save each persona individually (1 persona = 1 file)
-                for persona in personas {
-                    self.storage
-                        .save("persona", &persona.id, persona)
-                        .await
-                        .map_err(|e| format!("Failed to save persona {}: {}", persona.id, e))?;
-                }
-                Ok(())
-            })
-        })
+        // 3. Save each persona individually (1 persona = 1 file)
+        for persona in personas {
+            self.storage
+                .save(Self::ENTITY_NAME, &persona.id, persona)
+                .await
+                .map_err(|e| orcs_core::OrcsError::DataAccess(format!("Failed to save persona {}: {}", persona.id, e)))?;
+        }
+        Ok(())
     }
 }
 
@@ -160,7 +112,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_and_load_personas() {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+        let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
@@ -179,10 +131,10 @@ mod tests {
         };
 
         // Save
-        repo.save_all(&[persona.clone()]).unwrap();
+        repo.save_all(&[persona.clone()]).await.unwrap();
 
         // Load
-        let personas = repo.get_all().unwrap();
+        let personas = repo.get_all().await.unwrap();
         assert_eq!(personas.len(), 1);
         assert_eq!(personas[0].name, "Test Persona");
         assert_eq!(personas[0].id, persona.id);
@@ -191,7 +143,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_multiple_personas() {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+        let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
@@ -224,11 +176,11 @@ mod tests {
         };
 
         // Save multiple
-        repo.save_all(&[persona1.clone(), persona2.clone()])
+        repo.save_all(&[persona1.clone(), persona2.clone()]).await
             .unwrap();
 
         // Load all
-        let personas = repo.get_all().unwrap();
+        let personas = repo.get_all().await.unwrap();
         assert_eq!(personas.len(), 2);
 
         // Verify both exist
@@ -240,11 +192,11 @@ mod tests {
     #[tokio::test]
     async fn test_empty_repository() {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+        let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
-        let personas = repo.get_all().unwrap();
+        let personas = repo.get_all().await.unwrap();
         assert_eq!(personas.len(), 0);
     }
 }

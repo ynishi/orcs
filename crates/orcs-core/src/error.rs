@@ -15,6 +15,9 @@ pub enum OrcsError {
     #[error("IO error: {0}")]
     Io(String),
 
+    #[error("Data Access error: {0}")]
+    DataAccess(String),
+
     #[error("Serialization error: {0}")]
     Serialization(String),
 

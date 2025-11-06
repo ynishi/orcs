@@ -96,9 +96,9 @@ impl ConfigBasedUserService {
 
     /// Gets the default config path via centralized path management.
     fn get_config_path() -> Result<PathBuf, String> {
-        let path_type = OrcsPaths::get_path(ServiceType::Config).map_err(|e| e.to_string())?;
-        let config_dir = path_type.into_path_buf();
-        Ok(config_dir.join("config.toml"))
+        let path_type = OrcsPaths::new(None).get_path(ServiceType::Config).map_err(|e| e.to_string())?;
+        // ServiceType::Config returns PathType::File(config.toml)
+        Ok(path_type.into_path_buf())
     }
 }
 

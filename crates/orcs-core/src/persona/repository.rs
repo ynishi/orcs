@@ -3,6 +3,7 @@
 //! Defines the interface for persona persistence operations.
 
 use super::model::Persona;
+use crate::error::Result;
 
 /// An abstract repository for managing persona persistence.
 ///
@@ -16,14 +17,15 @@ use super::model::Persona;
 /// - Schema versioning and migrations
 /// - UUID validation
 /// - Concurrent access if needed
+#[async_trait::async_trait]
 pub trait PersonaRepository: Send + Sync {
     /// Retrieves all personas from storage.
     ///
     /// # Returns
     ///
     /// - `Ok(Vec<Persona>)`: All stored personas
-    /// - `Err(String)`: Error message if retrieval fails
-    fn get_all(&self) -> Result<Vec<Persona>, String>;
+    /// - `Err(OrcsError)`: Error if retrieval fails
+    async fn get_all(&self) -> Result<Vec<Persona>>;
 
     /// Saves all personas to storage, replacing existing ones.
     ///
@@ -34,6 +36,6 @@ pub trait PersonaRepository: Send + Sync {
     /// # Returns
     ///
     /// - `Ok(())`: Personas saved successfully
-    /// - `Err(String)`: Error message if save fails
-    fn save_all(&self, personas: &[Persona]) -> Result<(), String>;
+    /// - `Err(OrcsError)`: Error if save fails
+    async fn save_all(&self, personas: &[Persona]) -> Result<()>;
 }

@@ -1,16 +1,61 @@
+use async_trait::async_trait;
+use llm_toolkit::agent::impls::ClaudeCodeAgent;
+use llm_toolkit::agent::{Agent, AgentError, AgentOutput, Payload};
+use llm_toolkit::orchestrator::{BlueprintWorkflow, ParallelOrchestrator};
 use orcs_core::OrcsError;
 use orcs_core::task::TaskContext;
+use serde_json::Value as JsonValue;
+use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
+
+/// Dynamic agent adapter for ParallelOrchestrator.
+///
+/// Wraps any Agent<Output = String> to make it compatible with DynamicAgent trait.
+struct DynamicAgentAdapter {
+    agent: Arc<dyn Agent<Output = String> + Send + Sync>,
+    name: String,
+}
+
+impl DynamicAgentAdapter {
+    fn new(agent: Arc<dyn Agent<Output = String> + Send + Sync>, name: String) -> Self {
+        Self { agent, name }
+    }
+}
+
+#[async_trait]
+impl llm_toolkit::agent::DynamicAgent for DynamicAgentAdapter {
+    async fn execute_dynamic(&self, intent: Payload) -> Result<AgentOutput, AgentError> {
+        let result = self.agent.execute(intent).await?;
+        Ok(AgentOutput::Success(JsonValue::String(result)))
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn expertise(&self) -> &str {
+        self.agent.expertise()
+    }
+}
 
 /// Responsible for executing a single task.
 ///
-/// This struct implements task execution logic.
-/// For Phase 1 MVP, we use a simple placeholder implementation.
-pub struct TaskExecutor;
+/// This struct implements task execution logic using ParallelOrchestrator.
+pub struct TaskExecutor {
+    agent: Arc<dyn Agent<Output = String> + Send + Sync>,
+}
 
 impl TaskExecutor {
-    /// Creates a new `TaskExecutor` instance.
+    /// Creates a new `TaskExecutor` instance with ClaudeCodeAgent.
     pub fn new() -> Self {
-        Self
+        Self {
+            agent: Arc::new(ClaudeCodeAgent::new()),
+        }
+    }
+
+    /// Creates a new `TaskExecutor` instance with a custom agent.
+    pub fn with_agent(agent: Arc<dyn Agent<Output = String> + Send + Sync>) -> Self {
+        Self { agent }
     }
 
     /// Executes a task based on the provided context.
@@ -34,10 +79,9 @@ impl TaskExecutor {
         Ok(())
     }
 
-    /// Executes a message content as a task.
+    /// Executes a message content as a task using ParallelOrchestrator.
     ///
-    /// This is a Phase 1 MVP placeholder implementation that simulates task execution.
-    /// In Phase 2, this will integrate with ParallelOrchestrator for real workflow execution.
+    /// This Phase 2 implementation uses real ParallelOrchestrator for workflow execution.
     ///
     /// # Arguments
     ///
@@ -51,17 +95,50 @@ impl TaskExecutor {
         &self,
         message_content: String,
     ) -> Result<String, OrcsError> {
-        // Phase 1 MVP: Placeholder implementation
-        // TODO: Phase 2: Integrate with ParallelOrchestrator and actual agent execution
+        tracing::info!("TaskExecutor: Executing task from message with ParallelOrchestrator");
+        tracing::debug!("Task content: {}", message_content.chars().take(200).collect::<String>());
 
-        tracing::info!("TaskExecutor: Executing task from message");
-        tracing::debug!("Task content preview: {}", message_content.chars().take(100).collect::<String>());
+        // Create a blueprint using the message content as the workflow description
+        let blueprint = BlueprintWorkflow::new(message_content.clone());
 
-        // Simulate task execution
-        // In Phase 2, this will invoke ParallelOrchestrator with real agents
-        Ok(format!(
-            "Task execution started for message (length: {} chars). Phase 2 will implement actual ParallelOrchestrator integration.",
-            message_content.len()
-        ))
+        // Initialize ParallelOrchestrator with default internal agents
+        let mut orchestrator = ParallelOrchestrator::new(blueprint);
+
+        // Register our executor agent as a DynamicAgent
+        let executor_agent = Arc::new(DynamicAgentAdapter::new(
+            self.agent.clone(),
+            "executor".to_string(),
+        ));
+        orchestrator.add_agent("executor", executor_agent);
+
+        // Execute the task
+        let cancellation_token = CancellationToken::new();
+        let result = orchestrator
+            .execute(&message_content, cancellation_token, None, None)
+            .await
+            .map_err(|e| OrcsError::Execution(format!("Orchestrator execution failed: {}", e)))?;
+
+        if result.success {
+            let summary = format!(
+                "✅ Task completed successfully!\n\
+                 Steps executed: {}\n\
+                 Steps skipped: {}\n\
+                 Context keys: {}",
+                result.steps_executed,
+                result.steps_skipped,
+                result.context.keys().len()
+            );
+
+            // Extract result from context if available
+            if let Some(execute_result) = result.context.get("execute") {
+                tracing::debug!("Execution result: {:?}", execute_result);
+                Ok(format!("{}\n\nResult: {}", summary, execute_result))
+            } else {
+                Ok(summary)
+            }
+        } else {
+            let error_msg = result.error.unwrap_or_else(|| "Unknown error".to_string());
+            Err(OrcsError::Execution(format!("Task execution failed: {}", error_msg)))
+        }
     }
 }

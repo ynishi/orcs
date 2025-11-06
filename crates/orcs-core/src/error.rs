@@ -20,6 +20,12 @@ pub enum OrcsError {
 
     #[error("Security error: {0}")]
     Security(String),
+
+    #[error("Task execution error: {0}")]
+    Execution(String),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 /// A type alias for `Result<T, OrcsError>`.

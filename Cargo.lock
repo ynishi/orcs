@@ -2879,7 +2879,13 @@ dependencies = [
 name = "orcs-execution"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "llm-toolkit",
  "orcs-core",
+ "orcs-interaction",
+ "serde_json",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 

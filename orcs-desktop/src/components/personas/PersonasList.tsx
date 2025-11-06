@@ -361,11 +361,29 @@ export function PersonasList({
                 onClick={async () => {
                   try {
                     await invoke('save_adhoc_persona', { personaId: persona.id });
+
+                    // Persist success message to session
+                    await invoke('append_system_messages', {
+                      messages: [{
+                        content: `💾 ${persona.name} saved as permanent persona`,
+                        messageType: 'info',
+                        severity: 'info',
+                      }]
+                    });
+
                     if (onRefresh) await onRefresh();
-                    handleSystemMessage?.(conversationMessage(`✅ ${persona.name} saved as permanent persona`), onMessage);
+                    if (onRefreshSessions) await onRefreshSessions();
                   } catch (error) {
                     console.error('Failed to save adhoc persona:', error);
-                    handleSystemMessage?.(conversationMessage(`❌ Failed to save persona: ${error}`, 'error'), onMessage);
+
+                    // Persist error message to session
+                    await invoke('append_system_messages', {
+                      messages: [{
+                        content: `❌ Failed to save persona: ${error}`,
+                        messageType: 'error',
+                        severity: 'error',
+                      }]
+                    });
                   }
                 }}
               >

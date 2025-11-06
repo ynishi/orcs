@@ -466,14 +466,43 @@ function App() {
               if (parsed.args && parsed.args.length > 0) {
                 const expertise = parsed.args.join(' ');
                 try {
-                  handleSystemMessage(conversationMessage(`🔶 Creating expert for: ${expertise}...`), addMessage);
+                  // Show progress in toast (not persisted)
+                  notifications.show({
+                    title: 'Creating Expert',
+                    message: `Generating expert for: ${expertise}...`,
+                    color: 'blue',
+                    autoClose: false,
+                    id: 'expert-creation',
+                  });
+
                   const persona = await invoke<import('./types/agent').PersonaConfig>('create_adhoc_persona', { expertise });
-                  handleSystemMessage(conversationMessage(`✅ Expert persona created: ${persona.name} ${persona.icon || '🔶'}\nRole: ${persona.role}`), addMessage);
+
+                  // Hide progress notification
+                  notifications.hide('expert-creation');
+
+                  // Persist success message to session
+                  await invoke('append_system_messages', {
+                    messages: [{
+                      content: `🔶 Expert persona created: ${persona.name} ${persona.icon || '🔶'}\nRole: ${persona.role}\nBackground: ${persona.background}`,
+                      messageType: 'info',
+                      severity: 'info',
+                    }]
+                  });
+
                   await refreshPersonas();
                   await refreshSessions();
                 } catch (error) {
                   console.error('Failed to create expert:', error);
-                  handleSystemMessage(conversationMessage(`❌ Failed to create expert: ${error}`, 'error'), addMessage);
+                  notifications.hide('expert-creation');
+
+                  // Persist error message to session
+                  await invoke('append_system_messages', {
+                    messages: [{
+                      content: `❌ Failed to create expert: ${error}`,
+                      messageType: 'error',
+                      severity: 'error',
+                    }]
+                  });
                 }
               } else {
                 handleSystemMessage(conversationMessage('Usage: /expert <expertise>\nExample: /expert 映画制作プロセス', 'error'), addMessage);

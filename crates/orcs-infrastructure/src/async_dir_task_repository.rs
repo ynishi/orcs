@@ -26,16 +26,19 @@ pub struct AsyncDirTaskRepository {
 }
 
 impl AsyncDirTaskRepository {
-    /// Creates an AsyncDirTaskRepository instance at the default location (~/.config/orcs).
+    /// Creates an AsyncDirTaskRepository instance at the default location.
+    ///
+    /// Uses centralized path management via `ServiceType::Task`.
     ///
     /// # Errors
     ///
     /// Returns an error if the configuration directory cannot be determined or if
     /// the directory structure cannot be created.
     pub async fn default_location() -> Result<Self> {
-        use crate::paths::OrcsPaths;
-        let base_dir = OrcsPaths::config_dir()
-            .map_err(|e| anyhow::anyhow!("Failed to get config directory: {}", e))?;
+        use crate::paths::{OrcsPaths, ServiceType};
+        let path_type = OrcsPaths::get_path(ServiceType::Task)
+            .map_err(|e| anyhow::anyhow!("Failed to get task directory: {}", e))?;
+        let base_dir = path_type.into_path_buf();
         Self::new(base_dir).await
     }
 

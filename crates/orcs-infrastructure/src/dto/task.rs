@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use version_migrate::{IntoDomain, MigratesTo, Versioned};
+use version_migrate::{IntoDomain, Versioned};
 
 use orcs_core::task::{ExecutionDetails, StepInfo, StepStatus, Task, TaskStatus};
 

@@ -37,16 +37,17 @@ pub struct AsyncDirWorkspaceMetadataRepository {
 impl AsyncDirWorkspaceMetadataRepository {
     /// Creates an AsyncDirWorkspaceMetadataRepository instance at the default location.
     ///
-    /// Uses `~/.config/orcs/workspaces` as the storage directory.
+    /// Uses centralized path management via `ServiceType::WorkspaceMetadata`.
     ///
     /// # Errors
     ///
     /// Returns an error if the configuration directory cannot be determined or if
     /// the directory structure cannot be created.
     pub async fn default_location() -> Result<Self> {
-        use crate::paths::OrcsPaths;
-        let base_dir = OrcsPaths::config_dir()
-            .map_err(|e| OrcsError::Io(format!("Failed to get config directory: {}", e)))?;
+        use crate::paths::{OrcsPaths, ServiceType};
+        let path_type = OrcsPaths::get_path(ServiceType::WorkspaceMetadata)
+            .map_err(|e| OrcsError::Io(format!("Failed to get workspace metadata directory: {}", e)))?;
+        let base_dir = path_type.into_path_buf();
         Self::new(base_dir).await
     }
 

@@ -4,7 +4,7 @@
 //! from the configuration file (~/.config/orcs/config.toml).
 
 use crate::dto::create_user_profile_migrator;
-use crate::paths::OrcsPaths;
+use crate::paths::{OrcsPaths, ServiceType};
 use orcs_core::user::{UserProfile, UserService};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -94,9 +94,11 @@ impl ConfigBasedUserService {
         Ok(profiles.into_iter().next().unwrap_or_default())
     }
 
-    /// Gets the default config path (~/.config/orcs/config.toml).
+    /// Gets the default config path via centralized path management.
     fn get_config_path() -> Result<PathBuf, String> {
-        OrcsPaths::config_file().map_err(|e| e.to_string())
+        let path_type = OrcsPaths::get_path(ServiceType::Config).map_err(|e| e.to_string())?;
+        let config_dir = path_type.into_path_buf();
+        Ok(config_dir.join("config.toml"))
     }
 }
 

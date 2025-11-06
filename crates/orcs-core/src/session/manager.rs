@@ -2,7 +2,6 @@ use super::app_mode::AppMode;
 use super::model::Session;
 use super::repository::SessionRepository;
 use anyhow::Result;
-use llm_toolkit::agent::dialogue::ExecutionModel;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -347,6 +346,8 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
 
 #[cfg(test)]
 mod tests {
+    use llm_toolkit::agent::dialogue::ExecutionModel;
+
     use super::*;
     use std::collections::HashMap;
     use std::sync::Mutex;
@@ -390,6 +391,7 @@ mod tests {
                 participant_icons: HashMap::new(),
                 conversation_mode: ConversationMode::Normal,
                 talk_style: None,
+                participant_colors: HashMap::new(),
             }
         }
 

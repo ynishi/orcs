@@ -10,7 +10,6 @@
 use crate::dto::create_session_migrator;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use llm_toolkit::agent::dialogue::ExecutionModel;
 use orcs_core::repository::{PersonaRepository, SessionRepository};
 use orcs_core::session::{ConversationMessage, Session};
 use std::collections::HashMap;
@@ -37,7 +36,9 @@ pub struct AsyncDirSessionRepository {
 }
 
 impl AsyncDirSessionRepository {
-    /// Creates an AsyncDirSessionRepository instance at the default location (~/.config/orcs).
+    /// Creates an AsyncDirSessionRepository instance at the default location.
+    ///
+    /// Uses centralized path management via `ServiceType::Session`.
     ///
     /// # Arguments
     ///
@@ -50,9 +51,10 @@ impl AsyncDirSessionRepository {
     pub async fn default_location(
         persona_repository: std::sync::Arc<dyn PersonaRepository>,
     ) -> Result<Self> {
-        use crate::paths::OrcsPaths;
-        let base_dir = OrcsPaths::config_dir()
-            .map_err(|e| anyhow::anyhow!("Failed to get config directory: {}", e))?;
+        use crate::paths::{OrcsPaths, ServiceType};
+        let path_type = OrcsPaths::get_path(ServiceType::Session)
+            .map_err(|e| anyhow::anyhow!("Failed to get session directory: {}", e))?;
+        let base_dir = path_type.into_path_buf();
         Self::new(base_dir, persona_repository).await
     }
 
@@ -273,6 +275,7 @@ impl SessionRepository for AsyncDirSessionRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llm_toolkit::agent::dialogue::ExecutionModel;
     use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
     use orcs_core::session::{AppMode, ConversationMessage, MessageMetadata, MessageRole};
     use std::collections::HashMap;

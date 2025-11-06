@@ -105,9 +105,12 @@ impl SecretStorage {
         Ok(config)
     }
 
-    /// Returns the default path to secret.json: ~/.config/orcs/secret.json
+    /// Returns the default path to secret.json via centralized path management.
     fn default_path() -> Result<PathBuf, SecretStorageError> {
-        OrcsPaths::secret_file().map_err(|_| SecretStorageError::ConfigDirNotFound)
+        use crate::paths::ServiceType;
+        let path_type = OrcsPaths::get_path(ServiceType::Secret)
+            .map_err(|_| SecretStorageError::ConfigDirNotFound)?;
+        Ok(path_type.into_path_buf())
     }
 
     /// Returns the path to the secret file.
@@ -163,7 +166,6 @@ mod tests {
         assert!(config.gemini.is_some());
         let gemini = config.gemini.unwrap();
         assert_eq!(gemini.api_key, "test-key-123");
-        assert_eq!(gemini.model_name, Some("gemini-pro".to_string()));
     }
 
     #[test]

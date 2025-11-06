@@ -34,16 +34,17 @@ pub struct AsyncDirWorkspaceRepository {
 impl AsyncDirWorkspaceRepository {
     /// Creates an AsyncDirWorkspaceRepository instance at the default location.
     ///
-    /// Uses `~/.config/orcs` as the base directory.
+    /// Uses centralized path management via `ServiceType::Workspace`.
     ///
     /// # Errors
     ///
     /// Returns an error if the configuration directory cannot be determined or if
     /// the directory structure cannot be created.
     pub async fn default_location() -> Result<Self> {
-        use crate::paths::OrcsPaths;
-        let base_dir = OrcsPaths::config_dir()
-            .map_err(|e| OrcsError::Io(format!("Failed to get config directory: {}", e)))?;
+        use crate::paths::{OrcsPaths, ServiceType};
+        let path_type = OrcsPaths::get_path(ServiceType::Workspace)
+            .map_err(|e| OrcsError::Io(format!("Failed to get workspace directory: {}", e)))?;
+        let base_dir = path_type.into_path_buf();
         Self::new(base_dir).await
     }
 

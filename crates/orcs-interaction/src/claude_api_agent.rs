@@ -52,9 +52,8 @@ impl ClaudeApiAgent {
         if let Ok(storage) = SecretStorage::new() {
             if let Ok(secret_config) = storage.load() {
                 if let Some(claude_config) = secret_config.claude {
-                    let model = claude_config
-                        .model_name
-                        .unwrap_or_else(|| DEFAULT_CLAUDE_MODEL.into());
+                    // Use default model (model settings now in config.toml)
+                    let model = DEFAULT_CLAUDE_MODEL.to_string();
                     return Ok(Self::new(claude_config.api_key, model));
                 }
             }

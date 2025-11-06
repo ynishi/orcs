@@ -49,9 +49,8 @@ impl OpenAIApiAgent {
         if let Ok(storage) = SecretStorage::new() {
             if let Ok(secret_config) = storage.load() {
                 if let Some(openai_config) = secret_config.openai {
-                    let model = openai_config
-                        .model_name
-                        .unwrap_or_else(|| DEFAULT_OPENAI_MODEL.into());
+                    // Use default model (model settings now in config.toml)
+                    let model = DEFAULT_OPENAI_MODEL.to_string();
                     return Ok(Self::new(openai_config.api_key, model));
                 }
             }

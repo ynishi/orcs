@@ -1,3 +1,26 @@
+//! Infrastructure layer for ORCS.
+//!
+//! This crate provides concrete implementations of repositories, services,
+//! and storage mechanisms for the ORCS application.
+//!
+//! # Path Management Architecture
+//!
+//! All services should use the centralized path management system via `ServiceType`:
+//!
+//! ```rust
+//! use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
+//!
+//! // In your service implementation
+//! let base_path = OrcsPaths::get_path(ServiceType::AppState)?;
+//! ```
+//!
+//! This approach ensures:
+//! - Centralized path configuration
+//! - Easy path changes without service modifications
+//! - Consistent directory structure across platforms
+//!
+//! See [`paths`] module for detailed documentation on the path management system.
+
 pub mod app_state_service;
 pub mod async_dir_persona_repository;
 pub mod async_dir_session_repository;
@@ -7,6 +30,7 @@ pub mod async_dir_workspace_metadata_repository;
 pub mod async_dir_workspace_repository;
 pub mod dto;
 pub mod paths;
+pub mod secret_service;
 pub mod storage;
 pub mod user_service;
 pub mod workspace_manager;
@@ -18,3 +42,5 @@ pub use crate::async_dir_slash_command_repository::AsyncDirSlashCommandRepositor
 pub use crate::async_dir_task_repository::AsyncDirTaskRepository;
 pub use crate::async_dir_workspace_metadata_repository::AsyncDirWorkspaceMetadataRepository;
 pub use crate::async_dir_workspace_repository::AsyncDirWorkspaceRepository;
+pub use crate::paths::{OrcsPaths, PathType, ServiceType};
+pub use crate::secret_service::SecretServiceImpl;

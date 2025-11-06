@@ -140,6 +140,8 @@ mod tests {
             role: "Attachment Checker".to_string(),
             background: "Validates payload handling.".to_string(),
             communication_style: "Direct and concise.".to_string(),
+            visual_identity: None,
+            capabilities: None,
         };
 
         let base_agent = RecordingAgent::new(String::from("ok"));
@@ -173,6 +175,8 @@ mod tests {
             role: "Structured Recorder".to_string(),
             background: "Ensures structured outputs are captured.".to_string(),
             communication_style: "Analytical.".to_string(),
+            visual_identity: None,
+            capabilities: None,
         };
 
         let response = StructuredResponse {

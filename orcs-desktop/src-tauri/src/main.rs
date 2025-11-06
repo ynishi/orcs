@@ -614,11 +614,14 @@ async fn get_talk_style(state: State<'_, AppState>) -> Result<Option<String>, St
     Ok(style_str)
 }
 
-/// Gets the path to the configuration file, creating it if it doesn't exist
+/// Gets the path to the configuration file
 #[tauri::command]
-async fn get_config_path(state: State<'_, AppState>) -> Result<String, String> {
-    // Get the actual config file path from the repository
-    let config_file = state.persona_repository_concrete.config_file_path();
+async fn get_config_path(_state: State<'_, AppState>) -> Result<String, String> {
+    use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
+
+    // Get config file path via centralized path management
+    let path_type = OrcsPaths::get_path(ServiceType::Config).map_err(|e| e.to_string())?;
+    let config_file = path_type.into_path_buf();
 
     // Convert PathBuf to String
     let path_str = config_file
@@ -714,9 +717,10 @@ async fn get_root_directory() -> Result<String, String> {
 /// Gets the logs directory path
 #[tauri::command]
 async fn get_logs_directory() -> Result<String, String> {
-    use orcs_infrastructure::paths::OrcsPaths;
+    use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
 
-    let logs_dir = OrcsPaths::logs_dir().map_err(|e| e.to_string())?;
+    let path_type = OrcsPaths::get_path(ServiceType::Logs).map_err(|e| e.to_string())?;
+    let logs_dir = path_type.into_path_buf();
 
     let path_str = logs_dir
         .to_str()
@@ -729,10 +733,11 @@ async fn get_logs_directory() -> Result<String, String> {
 /// Creates the file with a template if it doesn't exist
 #[tauri::command]
 async fn get_secret_path() -> Result<String, String> {
-    use orcs_infrastructure::paths::OrcsPaths;
+    use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
 
-    // Ensure the secret file exists (creates template if missing)
-    let secret_file = OrcsPaths::ensure_secret_file().map_err(|e| e.to_string())?;
+    // Get secret file path via centralized path management
+    let path_type = OrcsPaths::get_path(ServiceType::Secret).map_err(|e| e.to_string())?;
+    let secret_file = path_type.into_path_buf();
 
     let path_str = secret_file
         .to_str()
@@ -933,7 +938,7 @@ async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspace, 
     println!("[Backend] get_current_workspace called");
 
     // Priority 1: Use last selected workspace from AppStateService (user's explicit selection)
-    if let Some(workspace_id) = state.app_state_service.get_last_selected_workspace().await {
+    if let Some(workspace_id) = state.app_state_service.get_last_selected_workspace() {
         println!(
             "[Backend] AppStateService last selected workspace: {}",
             workspace_id
@@ -1428,9 +1433,10 @@ async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String> {
 
 fn main() {
     // Initialize logging to file
-    use orcs_infrastructure::paths::OrcsPaths;
+    use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
 
-    let log_dir = OrcsPaths::logs_dir().expect("Failed to get logs directory");
+    let path_type = OrcsPaths::get_path(ServiceType::Logs).expect("Failed to get logs directory");
+    let log_dir = path_type.into_path_buf();
 
     std::fs::create_dir_all(&log_dir).expect("Failed to create logs directory");
 
@@ -1496,8 +1502,9 @@ fn main() {
         let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
 
         // Initialize FileSystemWorkspaceManager with unified path
-        let workspace_root =
-            OrcsPaths::workspaces_dir().expect("Failed to get workspaces directory");
+        let path_type =
+            OrcsPaths::get_path(ServiceType::Workspace).expect("Failed to get workspaces directory");
+        let workspace_root = path_type.into_path_buf();
         let workspace_manager = Arc::new(
             FileSystemWorkspaceManager::new(workspace_root)
                 .await
@@ -1542,11 +1549,8 @@ fn main() {
             Arc::new(SessionManager::new(session_repository.clone()));
 
         // Initialize AppStateService
-        let app_state_service = Arc::new(
-            AppStateService::new()
-                .await
-                .expect("Failed to initialize AppStateService"),
-        );
+        let app_state_service =
+            Arc::new(AppStateService::new().expect("Failed to initialize AppStateService"));
 
         // Create SessionUseCase for coordinated session-workspace management
         let session_usecase = Arc::new(SessionUseCase::new(
@@ -1581,9 +1585,8 @@ fn main() {
 
         if restored.is_none() {
             // Try to restore workspace from last selected workspace ID
-            let workspace_selected = if let Some(last_workspace_id) =
-                app_state_service.get_last_selected_workspace().await
-            {
+            let workspace_selected =
+                if let Some(last_workspace_id) = app_state_service.get_last_selected_workspace() {
                 tracing::info!(
                     "[Startup] Found last selected workspace: {}",
                     last_workspace_id

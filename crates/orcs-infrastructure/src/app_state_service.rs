@@ -4,16 +4,14 @@
 //! across sessions, such as the last selected workspace ID.
 
 use crate::dto::create_app_state_migrator;
-use crate::paths::OrcsPaths;
+use crate::paths::{OrcsPaths, ServiceType};
 use orcs_core::app_state::AppState;
-use std::sync::{Arc, RwLock};
-use version_migrate::{
-    AppPaths, AsyncDirStorage, DirStorageStrategy, FilenameEncoding, FormatStrategy, PathStrategy,
-};
+use std::sync::{Arc, Mutex, RwLock};
+use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
 
 /// Service for managing application state.
 ///
-/// This implementation reads and writes application state using AsyncDirStorage
+/// This implementation reads and writes application state using FileStorage
 /// and caches it to avoid repeated file I/O operations.
 ///
 /// # Example
@@ -21,51 +19,52 @@ use version_migrate::{
 /// ```ignore
 /// use orcs_infrastructure::app_state_service::AppStateService;
 ///
-/// let service = AppStateService::new().await?;
-/// service.set_last_selected_workspace("ws-123".to_string()).await?;
-/// let workspace_id = service.get_last_selected_workspace().await;
+/// let service = AppStateService::new()?;
+/// service.set_last_selected_workspace("ws-123".to_string())?;
+/// let workspace_id = service.get_last_selected_workspace();
 /// ```
 #[derive(Clone)]
 pub struct AppStateService {
     /// Cached app state loaded from storage.
     /// Uses RwLock for thread-safe lazy loading.
     state: Arc<RwLock<Option<AppState>>>,
-    /// AsyncDirStorage instance for persistence.
-    storage: Arc<AsyncDirStorage>,
+    /// FileStorage instance for persistence.
+    /// Wrapped in Mutex for interior mutability.
+    storage: Arc<Mutex<FileStorage>>,
 }
 
 impl AppStateService {
     /// Creates a new AppStateService.
     ///
-    /// The state is loaded lazily on first access to avoid blocking
-    /// during initialization.
-    pub async fn new() -> Result<Self, String> {
-        let config_dir = OrcsPaths::config_dir().map_err(|e| e.to_string())?;
-
-        // Setup AppPaths with CustomBase strategy
-        let paths = AppPaths::new("orcs").data_strategy(PathStrategy::CustomBase(config_dir));
+    /// This method ensures that the app_state file exists. If it doesn't exist,
+    /// it creates the file with default values via LoadBehavior::CreateIfMissing.
+    ///
+    /// Uses the centralized path management via `ServiceType::AppState`.
+    pub fn new() -> Result<Self, String> {
+        // Get file path for AppState via centralized path management
+        let path_type = OrcsPaths::get_path(ServiceType::AppState).map_err(|e| e.to_string())?;
+        let file_path = path_type.into_path_buf(); // app_state.toml
 
         // Setup migrator
         let migrator = create_app_state_migrator();
 
-        // Setup storage strategy: TOML format, Direct filename encoding
-        let strategy = DirStorageStrategy::default()
+        // Setup storage strategy: TOML format, CreateIfMissing
+        let strategy = FileStorageStrategy::new()
             .with_format(FormatStrategy::Toml)
-            .with_filename_encoding(FilenameEncoding::Direct);
+            .with_load_behavior(LoadBehavior::CreateIfMissing);
 
-        // Create AsyncDirStorage for app_state (single file: app_state.toml)
-        let storage = AsyncDirStorage::new(paths, ".", migrator, strategy)
-            .await
-            .map_err(|e| format!("Failed to create AsyncDirStorage: {}", e))?;
+        // Create FileStorage (automatically loads or creates empty config)
+        let storage = FileStorage::new(file_path, migrator, strategy)
+            .map_err(|e| format!("Failed to create FileStorage: {}", e))?;
 
         Ok(Self {
             state: Arc::new(RwLock::new(None)),
-            storage: Arc::new(storage),
+            storage: Arc::new(Mutex::new(storage)),
         })
     }
 
     /// Loads the app state from storage if not already cached.
-    async fn load_state(&self) -> AppState {
+    fn load_state(&self) -> AppState {
         // Check if already cached
         {
             let read_lock = self.state.read().unwrap();
@@ -74,10 +73,8 @@ impl AppStateService {
             }
         }
 
-        // Load from AsyncDirStorage
-        let loaded = Self::load_from_storage(&self.storage)
-            .await
-            .unwrap_or_else(|_| AppState::default());
+        // Load from FileStorage
+        let loaded = Self::load_from_storage(&self.storage).unwrap_or_else(|_| AppState::default());
 
         // Cache it
         {
@@ -89,11 +86,12 @@ impl AppStateService {
     }
 
     /// Saves the app state to storage.
-    async fn save_state(&self, state: &AppState) -> Result<(), String> {
-        // Save via AsyncDirStorage using fixed entity_name "app_state" and id "state"
-        self.storage
-            .save("app_state", "state", state.clone())
-            .await
+    fn save_state(&self, state: &AppState) -> Result<(), String> {
+        let mut storage = self.storage.lock().unwrap();
+
+        // Update and save atomically
+        storage
+            .update_and_save("app_state", vec![state.clone()])
             .map_err(|e| format!("Failed to save app_state: {}", e))?;
 
         // Update cache
@@ -105,46 +103,37 @@ impl AppStateService {
         Ok(())
     }
 
-    /// Loads AppState from AsyncDirStorage.
-    async fn load_from_storage(storage: &AsyncDirStorage) -> Result<AppState, String> {
-        // Load from storage using fixed entity_name "app_state" and id "state"
-        match storage.load::<AppState>("app_state", "state").await {
-            Ok(state) => Ok(state),
-            Err(_) => {
-                // If not found, return default
-                Ok(AppState::default())
-            }
-        }
+    /// Loads AppState from FileStorage.
+    fn load_from_storage(storage: &Mutex<FileStorage>) -> Result<AppState, String> {
+        let storage = storage.lock().unwrap();
+
+        // Query from storage
+        let states: Vec<AppState> = storage
+            .query("app_state")
+            .map_err(|e| format!("Failed to query app_state: {}", e))?;
+
+        // app_state is a single object, take first or return default
+        Ok(states.into_iter().next().unwrap_or_default())
     }
 
     /// Gets the last selected workspace ID.
-    pub async fn get_last_selected_workspace(&self) -> Option<String> {
-        let state = self.load_state().await;
+    pub fn get_last_selected_workspace(&self) -> Option<String> {
+        let state = self.load_state();
         state.last_selected_workspace_id
     }
 
     /// Sets the last selected workspace ID.
-    pub async fn set_last_selected_workspace(&self, workspace_id: String) -> Result<(), String> {
-        let mut state = self.load_state().await;
+    pub fn set_last_selected_workspace(&self, workspace_id: String) -> Result<(), String> {
+        let mut state = self.load_state();
         state.set_last_selected_workspace(workspace_id);
-        self.save_state(&state).await
+        self.save_state(&state)
     }
 
     /// Clears the last selected workspace ID.
-    pub async fn clear_last_selected_workspace(&self) -> Result<(), String> {
-        let mut state = self.load_state().await;
+    pub fn clear_last_selected_workspace(&self) -> Result<(), String> {
+        let mut state = self.load_state();
         state.clear_last_selected_workspace();
-        self.save_state(&state).await
-    }
-
-    /// Synchronous wrapper for get_last_selected_workspace (for non-async contexts)
-    pub fn get_last_selected_workspace_sync(&self) -> Option<String> {
-        tokio::runtime::Handle::current().block_on(self.get_last_selected_workspace())
-    }
-
-    /// Synchronous wrapper for set_last_selected_workspace (for non-async contexts)
-    pub fn set_last_selected_workspace_sync(&self, workspace_id: String) -> Result<(), String> {
-        tokio::runtime::Handle::current().block_on(self.set_last_selected_workspace(workspace_id))
+        self.save_state(&state)
     }
 }
 
@@ -152,16 +141,16 @@ impl AppStateService {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_app_state_service_creation() {
-        let service = AppStateService::new().await;
+    #[test]
+    fn test_app_state_service_creation() {
+        let service = AppStateService::new();
         assert!(service.is_ok());
     }
 
-    #[tokio::test]
-    async fn test_get_last_selected_workspace_default() {
-        let service = AppStateService::new().await.unwrap();
-        let workspace_id = service.get_last_selected_workspace().await;
+    #[test]
+    fn test_get_last_selected_workspace_default() {
+        let service = AppStateService::new().unwrap();
+        let workspace_id = service.get_last_selected_workspace();
         // Default should be None
         assert!(workspace_id.is_none());
     }

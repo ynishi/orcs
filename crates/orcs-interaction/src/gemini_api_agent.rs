@@ -30,9 +30,8 @@ static GEMINI_CONFIG: Lazy<Result<(String, String), String>> = Lazy::new(|| {
         .gemini
         .ok_or_else(|| "Gemini configuration not found in secret.json".to_string())?;
 
-    let model = gemini_config
-        .model_name
-        .unwrap_or_else(|| DEFAULT_GEMINI_MODEL.into());
+    // Use default model (model settings now in config.toml)
+    let model = DEFAULT_GEMINI_MODEL.to_string();
 
     Ok((gemini_config.api_key, model))
 });

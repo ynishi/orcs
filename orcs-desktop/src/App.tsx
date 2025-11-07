@@ -30,11 +30,6 @@ import { Task } from "./types/task";
 import { Agent } from "./types/agent";
 import { Session, getMessageCount } from "./types/session";
 import { GitInfo } from "./types/git";
-import { MessageItem } from "./components/chat/MessageItem";
-import { StatusBar } from "./components/chat/StatusBar";
-import { CommandSuggestions } from "./components/chat/CommandSuggestions";
-import { AgentSuggestions } from "./components/chat/AgentSuggestions";
-import { ThinkingIndicator } from "./components/chat/ThinkingIndicator";
 import { Navbar } from "./components/navigation/Navbar";
 import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
 import { SettingsMenu } from "./components/settings/SettingsMenu";
@@ -1586,165 +1581,42 @@ Generate the BlueprintWorkflow now.`;
 
                 {tabs.map((tab) => (
                   <Tabs.Panel key={tab.id} value={tab.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                    {/* メッセージエリア */}
-                    <Box
-                      style={{ flex: 1, position: 'relative', minHeight: 0 }}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                    >
-                      <ScrollArea h="100%" viewportRef={viewport}>
-                        <Stack gap="sm" p="md">
-                          {tab.messages.map((message) => (
-                            <MessageItem
-                              key={message.id}
-                              message={message}
-                              onSaveToWorkspace={handleSaveMessageToWorkspace}
-                              onExecuteAsTask={handleExecuteAsTask}
-                              workspaceRootPath={workspace?.rootPath}
-                            />
-                          ))}
-                          {tab.isAiThinking && (
-                            <ThinkingIndicator personaName={tab.thinkingPersona} />
-                          )}
-                        </Stack>
-                      </ScrollArea>
-
-                      {tab.isDragging && (
-                        <Paper
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: 'rgba(30, 144, 255, 0.1)',
-                            border: '3px dashed #1e90ff',
-                            borderRadius: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            zIndex: 1000,
-                            pointerEvents: 'none',
-                          }}
-                        >
-                          <Text size="xl" fw={700} c="blue">
-                            📁 Drop files here
-                          </Text>
-                        </Paper>
-                      )}
-                    </Box>
-
-                    {/* 入力フォーム */}
-                    <form onSubmit={handleSubmit}>
-                      <Stack gap="xs">
-                        {tab.attachedFiles.length > 0 && (
-                          <Group gap="xs">
-                            {tab.attachedFiles.map((file, index) => (
-                              <Badge
-                                key={index}
-                                size="lg"
-                                variant="light"
-                                rightSection={
-                                  <CloseButton
-                                    size="xs"
-                                    onClick={() => removeAttachedFile(index)}
-                                  />
-                                }
-                              >
-                                📎 {file.name}
-                              </Badge>
-                            ))}
-                          </Group>
-                        )}
-
-                        <Box style={{ position: 'relative' }}>
-                          {showSuggestions && (
-                            <CommandSuggestions
-                              commands={filteredCommands}
-                              selectedIndex={selectedSuggestionIndex}
-                              onSelect={selectCommand}
-                              onHover={setSelectedSuggestionIndex}
-                            />
-                          )}
-
-                          {showAgentSuggestions && (
-                            <AgentSuggestions
-                              agents={filteredAgents}
-                              selectedIndex={selectedAgentIndex}
-                              onSelect={selectAgent}
-                            />
-                          )}
-
-                          <Textarea
-                            ref={textareaRef}
-                            value={tab.input}
-                            onChange={(e) => {
-                              if (activeTabId) {
-                                updateTabInput(activeTabId, e.currentTarget.value);
-                              }
-                            }}
-                            onKeyDown={handleKeyDown}
-                            placeholder={
-                              executionStrategy === 'mentioned'
-                                ? "Type @PersonaName to mention, or /help for commands... (⌘+Enter to send)"
-                                : "Type your message or /help for commands... (⌘+Enter to send)"
-                            }
-                            size="md"
-                            minRows={1}
-                            maxRows={4}
-                            autosize
-                          />
-                        </Box>
-
-                        <Group gap="xs">
-                          <Tooltip label="Attach files">
-                            <Button
-                              variant="light"
-                              size="sm"
-                              component="label"
-                              leftSection="📎"
-                            >
-                              Attach
-                              <input type="file" multiple hidden onChange={handleFileSelect} />
-                            </Button>
-                          </Tooltip>
-
-                          <Button type="submit" style={{ flex: 1 }}>Send</Button>
-
-                          <Tooltip label={autoMode ? 'Stop AUTO mode' : 'Start AUTO mode'}>
-                            <ActionIcon
-                              color={autoMode ? 'red' : 'green'}
-                              variant={autoMode ? 'filled' : 'light'}
-                              onClick={() => setAutoMode(!autoMode)}
-                              size="lg"
-                            >
-                              {autoMode ? '⏹️' : '▶️'}
-                            </ActionIcon>
-                          </Tooltip>
-
-                          <CopyButton value={getThreadAsText()}>
-                            {({ copied, copy }) => (
-                              <Tooltip label={copied ? 'Copied!' : 'Copy thread'}>
-                                <ActionIcon color={copied ? 'teal' : 'blue'} variant="light" onClick={copy} size="lg">
-                                  {copied ? '✓' : '📄'}
-                                </ActionIcon>
-                              </Tooltip>
-                            )}
-                          </CopyButton>
-                        </Group>
-                      </Stack>
-                    </form>
-
-                    <StatusBar
+                    <ChatPanel
+                      tab={tab}
                       status={status}
+                      userNickname={userNickname}
                       gitInfo={gitInfo}
-                      participatingAgentsCount={activeParticipantIds.length}
-                      totalPersonas={personas.length}
                       autoMode={autoMode}
                       conversationMode={conversationMode}
                       talkStyle={talkStyle}
                       executionStrategy={executionStrategy}
+                      personas={personas}
+                      activeParticipantIds={activeParticipantIds}
+                      workspace={workspace}
+                      showSuggestions={showSuggestions}
+                      filteredCommands={filteredCommands}
+                      selectedSuggestionIndex={selectedSuggestionIndex}
+                      showAgentSuggestions={showAgentSuggestions}
+                      filteredAgents={filteredAgents}
+                      selectedAgentIndex={selectedAgentIndex}
+                      onSubmit={handleSubmit}
+                      onInputChange={(value) => {
+                        if (activeTabId) {
+                          updateTabInput(activeTabId, value);
+                        }
+                      }}
+                      onKeyDown={handleKeyDown}
+                      onFileSelect={handleFileSelect}
+                      onRemoveFile={removeAttachedFile}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onSaveMessageToWorkspace={handleSaveMessageToWorkspace}
+                      onExecuteAsTask={handleExecuteAsTask}
+                      onAutoModeChange={setAutoMode}
+                      onSelectCommand={selectCommand}
+                      onSelectAgent={selectAgent}
+                      onHoverSuggestion={setSelectedSuggestionIndex}
                     />
                   </Tabs.Panel>
                 ))}

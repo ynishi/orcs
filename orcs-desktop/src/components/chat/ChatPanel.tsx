@@ -1,10 +1,8 @@
 /**
  * ChatPanel - 1つのタブ（セッション）のチャット画面を管理
+ * TabContextから状態を取得し、軽量なプレゼンテーション層として機能
  */
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { notifications } from '@mantine/notifications';
+import { useRef, useEffect } from 'react';
 import {
   Textarea,
   Button,
@@ -25,25 +23,19 @@ import { StatusBar } from './StatusBar';
 import { CommandSuggestions } from './CommandSuggestions';
 import { AgentSuggestions } from './AgentSuggestions';
 import { ThinkingIndicator } from './ThinkingIndicator';
-import type { Message } from '../../types/message';
+import type { SessionTab } from '../../context/TabContext';
 import type { StatusInfo } from '../../types/status';
-import type { Task } from '../../types/task';
-import type { Agent } from '../../types/agent';
 import type { GitInfo } from '../../types/git';
-import type { Workspace, UploadedFile } from '../../types/workspace';
+import type { Workspace } from '../../types/workspace';
 import type { CommandDefinition } from '../../types/command';
+import type { Agent } from '../../types/agent';
 import type { PersonaConfig } from '../../types/agent';
 
 interface ChatPanelProps {
-  sessionId: string;
-  messages: Message[];
-  onMessagesChange: (messages: Message[]) => void;
+  tab: SessionTab;
   status: StatusInfo;
-  onStatusChange: (status: StatusInfo) => void;
   userNickname: string;
   gitInfo: GitInfo;
-  isAiThinking: boolean;
-  thinkingPersona: string;
   autoMode: boolean;
   conversationMode: string;
   talkStyle: string | null;
@@ -51,21 +43,37 @@ interface ChatPanelProps {
   personas: PersonaConfig[];
   activeParticipantIds: string[];
   workspace: Workspace | null;
-  onSaveCurrentSession: () => Promise<void>;
+  
+  // サジェスト関連
+  showSuggestions: boolean;
+  filteredCommands: CommandDefinition[];
+  selectedSuggestionIndex: number;
+  showAgentSuggestions: boolean;
+  filteredAgents: Agent[];
+  selectedAgentIndex: number;
+  
+  // イベントハンドラー
+  onSubmit: (e: React.FormEvent) => void;
+  onInputChange: (value: string) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveFile: (index: number) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onSaveMessageToWorkspace: (content: string, filename: string, mimeType: string) => Promise<void>;
   onExecuteAsTask: (content: string) => void;
   onAutoModeChange: (autoMode: boolean) => void;
+  onSelectCommand: (command: CommandDefinition) => void;
+  onSelectAgent: (agent: Agent) => void;
+  onHoverSuggestion: (index: number) => void;
 }
 
 export function ChatPanel({
-  sessionId,
-  messages,
-  onMessagesChange,
+  tab,
   status,
-  onStatusChange,
   userNickname,
   gitInfo,
-  isAiThinking,
-  thinkingPersona,
   autoMode,
   conversationMode,
   talkStyle,
@@ -73,20 +81,27 @@ export function ChatPanel({
   personas,
   activeParticipantIds,
   workspace,
-  onSaveCurrentSession,
+  showSuggestions,
+  filteredCommands,
+  selectedSuggestionIndex,
+  showAgentSuggestions,
+  filteredAgents,
+  selectedAgentIndex,
+  onSubmit,
+  onInputChange,
+  onKeyDown,
+  onFileSelect,
+  onRemoveFile,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onSaveMessageToWorkspace,
   onExecuteAsTask,
   onAutoModeChange,
+  onSelectCommand,
+  onSelectAgent,
+  onHoverSuggestion,
 }: ChatPanelProps) {
-  const [input, setInput] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [filteredCommands, setFilteredCommands] = useState<CommandDefinition[]>([]);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
-  const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
-  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
-  const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -98,149 +113,42 @@ export function ChatPanel({
         behavior: 'smooth',
       });
     }
-  }, [messages]);
-
-  const addMessage = useCallback(
-    (type: Message['type'], author: string, text: string) => {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        type,
-        author,
-        text,
-        timestamp: new Date(),
-      };
-      onMessagesChange([...messages, newMessage]);
-    },
-    [messages, onMessagesChange]
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() && attachedFiles.length === 0) return;
-
-    const userMessage = input.trim();
-    setInput('');
-
-    // Add user message to UI
-    if (userMessage) {
-      addMessage('user', userNickname, userMessage);
-    }
-
-    // TODO: Implement file upload and message sending
-    // This needs to be integrated with the backend
-
-    setAttachedFiles([]);
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      setAttachedFiles((prev) => [...prev, ...Array.from(files)]);
-    }
-  };
-
-  const removeAttachedFile = (index: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    setAttachedFiles((prev) => [...prev, ...files]);
-  };
-
-  const handleSaveMessageToWorkspace = async (
-    content: string,
-    filename: string,
-    mimeType: string
-  ) => {
-    if (!workspace) {
-      notifications.show({
-        title: 'Error',
-        message: 'No workspace selected',
-        color: 'red',
-      });
-      return;
-    }
-
-    try {
-      await invoke('save_code_to_workspace', {
-        workspaceId: workspace.id,
-        content,
-        filename,
-        mimeType,
-      });
-
-      notifications.show({
-        title: 'Saved',
-        message: `File saved to workspace: ${filename}`,
-        color: 'green',
-      });
-
-      await onSaveCurrentSession();
-    } catch (err) {
-      notifications.show({
-        title: 'Error',
-        message: `Failed to save file: ${err}`,
-        color: 'red',
-      });
-    }
-  };
+  }, [tab.messages]);
 
   const getThreadAsText = (): string => {
-    return messages
-      .map((m) => `[${m.author}] ${m.text}`)
-      .join('\n\n');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // TODO: Implement command suggestions and keyboard shortcuts
-  };
-
-  const selectCommand = (command: CommandDefinition) => {
-    // TODO: Implement command selection
-  };
-
-  const selectAgent = (agent: Agent) => {
-    // TODO: Implement agent selection
+    return tab.messages
+      .map((msg) => {
+        const time = msg.timestamp.toLocaleString();
+        return `[${time}] ${msg.author} (${msg.type}):\n${msg.text}\n`;
+      })
+      .join('\n---\n\n');
   };
 
   return (
-    <Stack gap={0} style={{ height: '100%', maxHeight: '100vh', overflow: 'hidden' }}>
+    <Stack gap={0} style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* メッセージエリア */}
       <Box
         style={{ flex: 1, position: 'relative', minHeight: 0 }}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
       >
         <ScrollArea h="100%" viewportRef={viewport}>
           <Stack gap="sm" p="md">
-            {messages.map((message) => (
+            {tab.messages.map((message) => (
               <MessageItem
                 key={message.id}
                 message={message}
-                onSaveToWorkspace={handleSaveMessageToWorkspace}
+                onSaveToWorkspace={onSaveMessageToWorkspace}
                 onExecuteAsTask={onExecuteAsTask}
                 workspaceRootPath={workspace?.rootPath}
               />
             ))}
-            {isAiThinking && <ThinkingIndicator personaName={thinkingPersona} />}
+            {tab.isAiThinking && <ThinkingIndicator personaName={tab.thinkingPersona} />}
           </Stack>
         </ScrollArea>
 
-        {isDragging && (
+        {tab.isDragging && (
           <Paper
             style={{
               position: 'absolute',
@@ -266,17 +174,17 @@ export function ChatPanel({
       </Box>
 
       {/* 入力フォーム */}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={onSubmit}>
         <Stack gap="xs">
-          {attachedFiles.length > 0 && (
+          {tab.attachedFiles.length > 0 && (
             <Group gap="xs">
-              {attachedFiles.map((file, index) => (
+              {tab.attachedFiles.map((file, index) => (
                 <Badge
                   key={index}
                   size="lg"
                   variant="light"
                   rightSection={
-                    <CloseButton size="xs" onClick={() => removeAttachedFile(index)} />
+                    <CloseButton size="xs" onClick={() => onRemoveFile(index)} />
                   }
                 >
                   📎 {file.name}
@@ -290,8 +198,8 @@ export function ChatPanel({
               <CommandSuggestions
                 commands={filteredCommands}
                 selectedIndex={selectedSuggestionIndex}
-                onSelect={selectCommand}
-                onHover={setSelectedSuggestionIndex}
+                onSelect={onSelectCommand}
+                onHover={onHoverSuggestion}
               />
             )}
 
@@ -299,15 +207,15 @@ export function ChatPanel({
               <AgentSuggestions
                 agents={filteredAgents}
                 selectedIndex={selectedAgentIndex}
-                onSelect={selectAgent}
+                onSelect={onSelectAgent}
               />
             )}
 
             <Textarea
               ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.currentTarget.value)}
-              onKeyDown={handleKeyDown}
+              value={tab.input}
+              onChange={(e) => onInputChange(e.currentTarget.value)}
+              onKeyDown={onKeyDown}
               placeholder={
                 executionStrategy === 'mentioned'
                   ? 'Type @PersonaName to mention, or /help for commands... (⌘+Enter to send)'
@@ -324,7 +232,7 @@ export function ChatPanel({
             <Tooltip label="Attach files">
               <Button variant="light" size="sm" component="label" leftSection="📎">
                 Attach
-                <input type="file" multiple hidden onChange={handleFileSelect} />
+                <input type="file" multiple hidden onChange={onFileSelect} />
               </Button>
             </Tooltip>
 
@@ -374,4 +282,3 @@ export function ChatPanel({
     </Stack>
   );
 }
-

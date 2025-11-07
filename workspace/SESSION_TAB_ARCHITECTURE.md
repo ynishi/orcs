@@ -58,4 +58,9 @@
 - Provider 実装のブランチを切り、`App.tsx` / `Navbar` / `WorkspacePanel` / `SessionList` などで新 Context を利用するよう順次改修。
 - タブ UI は別 PR とし、段階的に QA しながら導入する。
 
+## 進捗メモ (2025-11-07)
+- `WorkspaceProvider` / `SessionProvider` を実装し、`main.tsx` からラップ済み。
+- 既存の `useWorkspace()` / `useSessions()` はコンテキストの薄いラッパー化。
+- 今後はタブ UI 実装と、Context を利用した画面間の状態同期を進める。
+
 

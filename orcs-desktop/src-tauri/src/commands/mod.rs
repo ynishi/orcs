@@ -7,8 +7,6 @@ pub mod tasks;
 pub mod user;
 pub mod workspaces;
 
-use tauri::InvokeHandler;
-
 pub use files::*;
 pub use git::*;
 pub use paths::*;
@@ -18,7 +16,7 @@ pub use tasks::*;
 pub use user::*;
 pub use workspaces::*;
 
-pub fn handlers() -> InvokeHandler<tauri::Wry> {
+pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
         session::create_session,
         session::create_config_session,

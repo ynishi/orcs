@@ -107,10 +107,11 @@ pub async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, S
         .await
         .map_err(|e| e.to_string())?;
 
-    let enriched_sessions = sessions
-        .into_iter()
-        .map(|session| state.session_usecase.enrich_session_participants(session))
-        .collect();
+    let mut enriched_sessions = Vec::new();
+    for session in sessions {
+        let enriched = state.session_usecase.enrich_session_participants(session).await;
+        enriched_sessions.push(enriched);
+    }
 
     Ok(enriched_sessions)
 }

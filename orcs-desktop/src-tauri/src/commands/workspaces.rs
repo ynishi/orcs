@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use orcs_core::state::repository::StateRepository;
 use orcs_core::workspace::{manager::WorkspaceManager, UploadedFile, Workspace};
 use tauri::{AppHandle, Emitter, State};
 

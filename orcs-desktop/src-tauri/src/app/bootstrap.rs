@@ -5,6 +5,7 @@ use orcs_core::{
     persona::{get_default_presets, PersonaRepository},
     session::{AppMode, SessionManager},
     slash_command::SlashCommandRepository,
+    state::repository::StateRepository,
     task::TaskRepository,
     user::UserService,
     workspace::manager::WorkspaceManager,
@@ -33,7 +34,7 @@ pub struct AppBootstrap {
 pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBootstrap {
     // Composition Root: Create the concrete repository instances
     let persona_repository_concrete = Arc::new(
-        AsyncDirPersonaRepository::default_location()
+        AsyncDirPersonaRepository::new(None)
             .await
             .expect("Failed to initialize persona repository"),
     );
@@ -57,7 +58,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
 
     // Initialize AsyncDirSlashCommandRepository
     let slash_command_repository_concrete = Arc::new(
-        AsyncDirSlashCommandRepository::new()
+        AsyncDirSlashCommandRepository::new(None)
             .await
             .expect("Failed to initialize slash command repository"),
     );
@@ -65,10 +66,10 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         slash_command_repository_concrete.clone();
 
     // Seed the personas directory with default personas if it's empty on first run.
-    if let Ok(personas) = persona_repository.get_all() {
+    if let Ok(personas) = persona_repository.get_all().await {
         if personas.is_empty() {
             let default_presets = get_default_presets();
-            if let Err(e) = persona_repository.save_all(&default_presets) {
+            if let Err(e) = persona_repository.save_all(&default_presets).await {
                 // This is a critical failure on startup, so we panic.
                 panic!("Failed to seed default personas: {}", e);
             }
@@ -77,7 +78,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
 
     // Create AsyncDirSessionRepository at default location
     let session_repository = Arc::new(
-        AsyncDirSessionRepository::default_location(persona_repository.clone())
+        AsyncDirSessionRepository::new(None)
             .await
             .expect("Failed to create session repository"),
     );
@@ -105,7 +106,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
 
     // Create Task Repository
     let task_repository_concrete = Arc::new(
-        AsyncDirTaskRepository::default_location()
+        AsyncDirTaskRepository::new(None)
             .await
             .expect("Failed to initialize Task Repository"),
     );

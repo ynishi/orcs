@@ -8,7 +8,7 @@ use chrono::Local;
 use orcs_core::session::AppMode;
 use orcs_execution::tracing_layer::OrchestratorEvent;
 use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
-use tauri::Manager;
+use tauri::Emitter;
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
 fn main() {

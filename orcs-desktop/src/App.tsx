@@ -75,6 +75,7 @@ function App() {
   const [executionStrategy, setExecutionStrategy] = useState<string>('sequential');
   const [personas, setPersonas] = useState<import('./types/agent').PersonaConfig[]>([]);
   const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
+  const [showWorkspaceTip, setShowWorkspaceTip] = useState<boolean>(true);
 
   // セッション管理をカスタムフックに切り替え
   const {
@@ -1225,7 +1226,11 @@ function App() {
               <Group gap="md">
                 {/* Workspace Switcher */}
                 <Group gap="xs">
-                  <WorkspaceSwitcher sessionId={currentSessionId} />
+                  <WorkspaceSwitcher 
+                    sessionId={currentSessionId}
+                    showTip={showWorkspaceTip && !workspace}
+                    onCloseTip={() => setShowWorkspaceTip(false)}
+                  />
                   {workspace && (
                     <>
                       <Text size="sm" c="dimmed">Workspace:</Text>

@@ -8,6 +8,8 @@ import {
   Stack,
   Tooltip,
   ScrollArea,
+  Popover,
+  CloseButton,
 } from '@mantine/core';
 import {
   IconFolder,
@@ -27,6 +29,10 @@ import type { Workspace } from '../../types/workspace';
 interface WorkspaceSwitcherProps {
   /** Current session ID for workspace switching */
   sessionId: string | null;
+  /** Show initial tip for workspace selection */
+  showTip?: boolean;
+  /** Callback when tip is closed */
+  onCloseTip?: () => void;
 }
 
 /**
@@ -39,7 +45,7 @@ interface WorkspaceSwitcherProps {
  * - Toggle favorite status
  * - Visual indication of current workspace
  */
-export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ sessionId, showTip = false, onCloseTip }: WorkspaceSwitcherProps) {
   const { workspace, allWorkspaces, switchWorkspace, toggleFavorite, refreshWorkspaces, refresh } = useWorkspace();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -243,25 +249,33 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
   const recent = allWorkspaces.filter(ws => !ws.isFavorite);
 
   return (
-    <Menu
-      opened={isOpen}
-      onChange={setIsOpen}
-      width={550}
-      position="bottom-end"
+    <Popover 
+      opened={showTip} 
+      position="bottom" 
+      withArrow 
       shadow="md"
-      withArrow
+      width={300}
     >
-      <Menu.Target>
-        <Tooltip label="Switch workspace" position="right">
-          <ActionIcon
-            variant={isOpen ? 'filled' : 'subtle'}
-            color={isOpen ? 'blue' : 'gray'}
-            size="lg"
-          >
-            {isOpen ? <IconFolderOpen size={20} /> : <IconFolder size={20} />}
-          </ActionIcon>
-        </Tooltip>
-      </Menu.Target>
+      <Popover.Target>
+        <Menu
+          opened={isOpen}
+          onChange={setIsOpen}
+          width={550}
+          position="bottom-end"
+          shadow="md"
+          withArrow
+        >
+          <Menu.Target>
+            <Tooltip label="Switch workspace" position="right" disabled={showTip}>
+              <ActionIcon
+                variant={isOpen ? 'filled' : 'subtle'}
+                color={isOpen ? 'blue' : 'gray'}
+                size="lg"
+              >
+                {isOpen ? <IconFolderOpen size={20} /> : <IconFolder size={20} />}
+              </ActionIcon>
+            </Tooltip>
+          </Menu.Target>
 
       <Menu.Dropdown>
         <Menu.Label>
@@ -318,6 +332,20 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
           )}
         </ScrollArea.Autosize>
       </Menu.Dropdown>
-    </Menu>
+        </Menu>
+      </Popover.Target>
+      
+      <Popover.Dropdown>
+        <Group justify="space-between" align="flex-start">
+          <Stack gap="xs" style={{ flex: 1 }}>
+            <Text size="sm" fw={600}>👋 ワークスペースを選択してください</Text>
+            <Text size="xs" c="dimmed">
+              このフォルダーアイコンをクリックして、作業ディレクトリを開いてください
+            </Text>
+          </Stack>
+          <CloseButton size="sm" onClick={onCloseTip} />
+        </Group>
+      </Popover.Dropdown>
+    </Popover>
   );
 }

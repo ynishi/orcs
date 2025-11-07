@@ -470,6 +470,9 @@ function App() {
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
   useEffect(() => {
+    const activeTab = getActiveTab();
+    const input = activeTab?.input || '';
+    
     const cursorPosition = textareaRef.current?.selectionStart || input.length;
     const spaceIndex = input.indexOf(' ');
     const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
@@ -505,7 +508,7 @@ function App() {
     } else {
       setShowAgentSuggestions(false);
     }
-  }, [input, customCommands, personas, activeParticipantIds]);
+  }, [tabs, activeTabId, getActiveTab, customCommands, personas, activeParticipantIds]);
 
   // SlashCommand処理（addMessage, refreshPersonasの定義後に配置）
   const { handleSlashCommand } = useSlashCommands({
@@ -767,13 +770,19 @@ function App() {
 
   // コマンドを選択
   const selectCommand = (command: CommandDefinition) => {
-    setInput(`/${command.name} `);
+    if (!activeTabId) return;
+    updateTabInput(activeTabId, `/${command.name} `);
     setShowSuggestions(false);
     textareaRef.current?.focus();
   };
 
   // エージェントを選択
   const selectAgent = (agent: Agent) => {
+    if (!activeTabId) return;
+    const activeTab = getActiveTab();
+    if (!activeTab) return;
+    
+    const input = activeTab.input;
     const cursorPosition = textareaRef.current?.selectionStart || input.length;
     const beforeCursor = input.slice(0, cursorPosition);
     const afterCursor = input.slice(cursorPosition);
@@ -781,7 +790,7 @@ function App() {
 
     if (lastAtIndex !== -1) {
       const newInput = beforeCursor.slice(0, lastAtIndex) + `@${agent.name} ` + afterCursor;
-      setInput(newInput);
+      updateTabInput(activeTabId, newInput);
     }
 
     setShowAgentSuggestions(false);

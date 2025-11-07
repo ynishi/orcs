@@ -185,6 +185,12 @@ function App() {
   // Listen for real-time dialogue turn events from backend
   // Use ref to ensure only one listener is registered
   const listenerRegistered = useRef(false);
+  const addMessageRef = useRef(addMessage);
+
+  // 最新のaddMessageをrefに保持（クロージャーの問題を回避）
+  useEffect(() => {
+    addMessageRef.current = addMessage;
+  }, [addMessage]);
 
   useEffect(() => {
     // Skip if listener already registered (prevents duplicate in React Strict Mode)
@@ -205,7 +211,8 @@ function App() {
 
         // If author is empty, it's an error message
         if (event.payload.author === '') {
-          addMessage('error', '', event.payload.content);
+          // 最新のaddMessageを使用
+          addMessageRef.current('error', '', event.payload.content);
 
           // Show error toast
           notifications.show({
@@ -216,7 +223,8 @@ function App() {
             autoClose: 10000,
           });
         } else {
-          addMessage('ai', event.payload.author, event.payload.content);
+          // 最新のaddMessageを使用
+          addMessageRef.current('ai', event.payload.author, event.payload.content);
         }
       });
       console.log('[EFFECT] Listener setup complete');
@@ -230,7 +238,7 @@ function App() {
         unlisten();
       }
     };
-  }, [addMessage]);
+  }, []); // 依存配列を空にして、一度だけ登録
 
   // Load user nickname from backend on startup
   useEffect(() => {

@@ -318,20 +318,6 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
           )}
         </ScrollArea.Autosize>
       </Menu.Dropdown>
-        </Menu>
-      </Popover.Target>
-      
-      <Popover.Dropdown>
-        <Group justify="space-between" align="flex-start">
-          <Stack gap="xs" style={{ flex: 1 }}>
-            <Text size="sm" fw={600}>📁 ワークスペースを開く</Text>
-            <Text size="xs" c="dimmed">
-              このアイコンをクリックして作業ディレクトリを選択してください
-            </Text>
-          </Stack>
-          <CloseButton size="sm" onClick={onCloseTip} />
-        </Group>
-      </Popover.Dropdown>
-    </Popover>
+    </Menu>
   );
 }

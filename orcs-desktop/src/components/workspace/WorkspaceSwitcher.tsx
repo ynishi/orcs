@@ -338,9 +338,9 @@ export function WorkspaceSwitcher({ sessionId, showTip = false, onCloseTip }: Wo
       <Popover.Dropdown>
         <Group justify="space-between" align="flex-start">
           <Stack gap="xs" style={{ flex: 1 }}>
-            <Text size="sm" fw={600}>👋 ワークスペースを選択してください</Text>
+            <Text size="sm" fw={600}>📁 ワークスペースを開く</Text>
             <Text size="xs" c="dimmed">
-              このフォルダーアイコンをクリックして、作業ディレクトリを開いてください
+              このアイコンをクリックして作業ディレクトリを選択してください
             </Text>
           </Stack>
           <CloseButton size="sm" onClick={onCloseTip} />

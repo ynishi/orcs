@@ -1267,33 +1267,21 @@ function App() {
                 {!workspace ? (
                   // Workspace がない場合
                   <Paper p="xl" withBorder shadow="sm" style={{ maxWidth: 500 }}>
-                    <Stack align="center" gap="lg">
+                    <Stack align="center" gap="md">
                       <Text size="xl" fw={700}>👋 Welcome to ORCS!</Text>
-                      <Stack gap="sm" align="center">
-                        <Text c="dimmed" ta="center" size="sm">
-                          作業を始めるには、まずワークスペース（作業ディレクトリ）を開いてください
-                        </Text>
-                        <Tooltip 
-                          label="ここをクリックしてワークスペースを選択" 
-                          position="top" 
-                          withArrow
-                          opened={!workspace}
-                        >
-                          <Badge size="lg" variant="light" color="blue" style={{ cursor: 'pointer' }}>
-                            ↑ 上の Workspace Switcher をクリック
-                          </Badge>
-                        </Tooltip>
-                      </Stack>
+                      <Text c="dimmed" ta="center" size="sm">
+                        右上のフォルダーアイコンからワークスペース（作業ディレクトリ）を開いてください
+                  </Text>
                     </Stack>
-                  </Paper>
+                </Paper>
                 ) : (
                   // Workspace はあるが Session がない場合
                   <Stack align="center" gap="md">
                     <Text size="xl" c="dimmed">No session opened</Text>
                     <Text size="sm" c="dimmed">左サイドバーからセッションを選択するか、新しいセッションを作成してください</Text>
                   </Stack>
-                )}
-              </Box>
+              )}
+            </Box>
             ) : (
               <Tabs
                 value={activeTabId}

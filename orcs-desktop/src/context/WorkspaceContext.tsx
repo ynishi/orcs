@@ -16,10 +16,6 @@ export interface WorkspaceContextValue {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
 
-// Module-level coordination to prevent duplicate fetches across components.
-let isFetchingAllWorkspaces = false;
-let pendingFetchPromise: Promise<RawWorkspace[]> | null = null;
-
 interface WorkspaceProviderProps {
   children: ReactNode;
 }
@@ -107,7 +103,8 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const workspaceIdRef = useRef<string | null>(null);
-  const eventListenerRegistered = useRef(false);
+  const isFetchingAllRef = useRef(false);
+  const pendingFetchRef = useRef<Promise<RawWorkspace[]> | null>(null);
 
   const fetchWorkspace = useCallback(async () => {
     setIsLoading(true);
@@ -154,28 +151,24 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
 
   const fetchAllWorkspaces = useCallback(async () => {
     try {
-      if (isFetchingAllWorkspaces && pendingFetchPromise) {
-        const rawWorkspaces = await pendingFetchPromise;
+      if (isFetchingAllRef.current && pendingFetchRef.current) {
+        const rawWorkspaces = await pendingFetchRef.current;
         const converted = rawWorkspaces.map(convertWorkspace);
         setAllWorkspaces(converted);
         return;
       }
 
-      isFetchingAllWorkspaces = true;
-      pendingFetchPromise = invoke<RawWorkspace[]>('list_workspaces');
+      isFetchingAllRef.current = true;
+      pendingFetchRef.current = invoke<RawWorkspace[]>('list_workspaces');
 
-      const rawWorkspaces = await pendingFetchPromise;
+      const rawWorkspaces = await pendingFetchRef.current;
       const converted = rawWorkspaces.map(convertWorkspace);
       setAllWorkspaces(converted);
-
-      setTimeout(() => {
-        isFetchingAllWorkspaces = false;
-        pendingFetchPromise = null;
-      }, 100);
     } catch (err) {
       console.error('[useWorkspace] Failed to fetch all workspaces:', err);
-      isFetchingAllWorkspaces = false;
-      pendingFetchPromise = null;
+    } finally {
+      isFetchingAllRef.current = false;
+      pendingFetchRef.current = null;
     }
   }, []);
 
@@ -211,31 +204,37 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
   }, [fetchWorkspace, fetchAllWorkspaces]);
 
   useEffect(() => {
-    if (eventListenerRegistered.current) {
-      return;
-    }
-
-    eventListenerRegistered.current = true;
-
-    let unlistenPromise: Promise<() => void> | null = null;
+    let unlistenFiles: (() => void) | undefined;
+    let unlistenSwitched: (() => void) | undefined;
+    let canceled = false;
 
     (async () => {
       const { listen } = await import('@tauri-apps/api/event');
-      unlistenPromise = listen<string>('workspace-files-changed', async (event) => {
+      if (canceled) return;
+
+      unlistenFiles = await listen<string>('workspace-files-changed', async (event) => {
         if (event.payload && workspaceIdRef.current && event.payload !== workspaceIdRef.current) {
           return;
         }
         await fetchWorkspace();
       });
+
+      unlistenSwitched = await listen<string>('workspace-switched', async () => {
+        await fetchWorkspace();
+        await fetchAllWorkspaces();
+      });
     })();
 
     return () => {
-      if (unlistenPromise) {
-        unlistenPromise.then((unlisten) => unlisten());
+      canceled = true;
+      if (unlistenFiles) {
+        unlistenFiles();
       }
-      eventListenerRegistered.current = false;
+      if (unlistenSwitched) {
+        unlistenSwitched();
+      }
     };
-  }, [fetchWorkspace]);
+  }, [fetchWorkspace, fetchAllWorkspaces]);
 
   const value = useMemo<WorkspaceContextValue>(
     () => ({

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { Session } from '../types/session';
@@ -27,7 +27,6 @@ export function SessionProvider({ children }: SessionProviderProps) {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const listenerRegistered = useRef(false);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -56,18 +55,23 @@ export function SessionProvider({ children }: SessionProviderProps) {
   }, [loadSessions]);
 
   useEffect(() => {
-    if (listenerRegistered.current) {
-      return;
-    }
+    let unlisten: (() => void) | undefined;
+    let canceled = false;
 
-    listenerRegistered.current = true;
-    const unlistenPromise = listen<string>('workspace-switched', async () => {
-      await loadSessions();
-    });
+    (async () => {
+      if (canceled) {
+        return;
+      }
+      unlisten = await listen<string>('workspace-switched', async () => {
+        await loadSessions();
+      });
+    })();
 
     return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-      listenerRegistered.current = false;
+      canceled = true;
+      if (unlisten) {
+        unlisten();
+      }
     };
   }, [loadSessions]);
 

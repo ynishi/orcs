@@ -659,7 +659,6 @@ function App() {
       addMessage,
       allWorkspaces,
       currentSessionId,
-      getCommandHelp,
       includeWorkspaceInPrompt,
       invoke,
       saveCurrentSession,

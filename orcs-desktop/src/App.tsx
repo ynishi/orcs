@@ -370,6 +370,12 @@ function App() {
 
   // Load personas and active participants
   const refreshPersonas = useCallback(async () => {
+    // セッションがない場合はスキップ（バックエンドが"No active session"エラーを返すため）
+    if (!currentSessionId) {
+      console.log('[refreshPersonas] No active session, skipping');
+      return;
+    }
+
     try {
       const personasList = await invoke<import('./types/agent').PersonaConfig[]>('get_personas');
       const activeIds = await invoke<string[]>('get_active_participants');
@@ -379,11 +385,35 @@ function App() {
     } catch (error) {
       console.error('Failed to load personas:', error);
     }
-  }, []);
+  }, [currentSessionId]);
 
+  // セッションが変わったら persona を再読み込み
   useEffect(() => {
+    if (currentSessionId) {
     refreshPersonas();
-  }, [refreshPersonas]);
+    }
+  }, [currentSessionId, refreshPersonas]);
+
+  // 初回セッション自動作成（Workspace がある場合のみ）
+  useEffect(() => {
+    const initializeSession = async () => {
+      // ローディング中はスキップ
+      if (sessionsLoading) return;
+      
+      // Workspace があるが Session がない場合に自動作成
+      if (workspace && sessions.length === 0) {
+        console.log('[App] No sessions found, creating initial session for workspace');
+        try {
+          await createSession();
+          console.log('[App] Initial session created');
+        } catch (error) {
+          console.error('[App] Failed to create initial session:', error);
+        }
+      }
+    };
+    
+    initializeSession();
+  }, [sessionsLoading, workspace, sessions.length, createSession]);
 
   // Load tasks
   const refreshTasks = useCallback(async () => {
@@ -1229,10 +1259,35 @@ function App() {
             {/* タブ領域 */}
             {tabs.length === 0 ? (
               <Box style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Stack align="center" gap="md">
-                  <Text size="xl" c="dimmed">No session opened</Text>
-                  <Text size="sm" c="dimmed">Select a session from the sidebar to start chatting</Text>
-                </Stack>
+                {!workspace ? (
+                  // Workspace がない場合
+                  <Paper p="xl" withBorder shadow="sm" style={{ maxWidth: 500 }}>
+                    <Stack align="center" gap="lg">
+                      <Text size="xl" fw={700}>👋 Welcome to ORCS!</Text>
+                      <Stack gap="sm" align="center">
+                        <Text c="dimmed" ta="center" size="sm">
+                          作業を始めるには、まずワークスペース（作業ディレクトリ）を開いてください
+                        </Text>
+                        <Tooltip 
+                          label="ここをクリックしてワークスペースを選択" 
+                          position="top" 
+                          withArrow
+                          opened={!workspace}
+                        >
+                          <Badge size="lg" variant="light" color="blue" style={{ cursor: 'pointer' }}>
+                            ↑ 上の Workspace Switcher をクリック
+                          </Badge>
+                        </Tooltip>
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                ) : (
+                  // Workspace はあるが Session がない場合
+                  <Stack align="center" gap="md">
+                    <Text size="xl" c="dimmed">No session opened</Text>
+                    <Text size="sm" c="dimmed">左サイドバーからセッションを選択するか、新しいセッションを作成してください</Text>
+                  </Stack>
+                )}
               </Box>
             ) : (
               <Tabs

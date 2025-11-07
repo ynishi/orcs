@@ -116,27 +116,6 @@ function App() {
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // SlashCommand処理
-  const { handleSlashCommand } = useSlashCommands({
-    addMessage,
-    saveCurrentSession,
-    status,
-    currentSessionId,
-    workspace,
-    allWorkspaces,
-    workspaceFiles,
-    switchWorkspace,
-    setConversationMode,
-    setTalkStyle,
-    setInput: (value) => {
-      if (activeTabId) {
-        updateTabInput(activeTabId, value);
-      }
-    },
-    refreshPersonas,
-    refreshSessions,
-  });
-
   // キーボードショートカット for タブ操作
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -527,6 +506,27 @@ function App() {
     
     addMessageToTab(activeTabId, newMessage);
   }, [personas, activeTabId, addMessageToTab]);
+
+  // SlashCommand処理（addMessage, refreshPersonasの定義後に配置）
+  const { handleSlashCommand } = useSlashCommands({
+    addMessage,
+    saveCurrentSession,
+    status,
+    currentSessionId,
+    workspace,
+    allWorkspaces,
+    workspaceFiles,
+    switchWorkspace,
+    setConversationMode,
+    setTalkStyle,
+    setInput: (value) => {
+      if (activeTabId) {
+        updateTabInput(activeTabId, value);
+      }
+    },
+    refreshPersonas,
+    refreshSessions,
+  });
 
   const processInput = useCallback(
     async (rawInput: string, attachedFiles: File[] = []) => {

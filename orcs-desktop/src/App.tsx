@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { notifications } from '@mantine/notifications';
-import { handleSystemMessage, conversationMessage, commandMessage, shellOutputMessage, MessageSeverity } from './utils/systemMessage';
+import { conversationMessage } from './utils/systemMessage';
 import {
   Textarea,
   Button,
@@ -33,7 +33,7 @@ import { GitInfo } from "./types/git";
 import { Navbar } from "./components/navigation/Navbar";
 import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
 import { SettingsMenu } from "./components/settings/SettingsMenu";
-import { parseCommand, isValidCommand, getCommandHelp } from "./utils/commandParser";
+import { parseCommand } from "./utils/commandParser";
 import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
 import { useSessions } from "./hooks/useSessions";
@@ -41,6 +41,7 @@ import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages, isIdleMode } from "./types/session";
 import { SlashCommand, ExpandedSlashCommand } from "./types/slash_command";
 import { useTabContext } from "./context/TabContext";
+import { useSlashCommands } from "./hooks/useSlashCommands";
 import { Tabs } from "@mantine/core";
 import { ChatPanel } from "./components/chat/ChatPanel";
 
@@ -114,6 +115,27 @@ function App() {
   const [autoMode, setAutoMode] = useState<boolean>(false);
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // SlashCommand処理
+  const { handleSlashCommand } = useSlashCommands({
+    addMessage,
+    saveCurrentSession,
+    status,
+    currentSessionId,
+    workspace,
+    allWorkspaces,
+    workspaceFiles,
+    switchWorkspace,
+    setConversationMode,
+    setTalkStyle,
+    setInput: (value) => {
+      if (activeTabId) {
+        updateTabInput(activeTabId, value);
+      }
+    },
+    refreshPersonas,
+    refreshSessions,
+  });
 
   // キーボードショートカット for タブ操作
   useEffect(() => {
@@ -519,340 +541,20 @@ function App() {
         console.log('[MENTION EVENT] Agents mentioned:', mentions.map(m => m.agentName));
       }
 
+      // SlashCommandの処理（分離済み）
       const parsed = parseCommand(rawInput);
       let backendInput = rawInput;
       let promptCommandExecuted = false;
 
       if (parsed.isCommand && parsed.command) {
-        handleSystemMessage(commandMessage(rawInput), addMessage);
-
-        const isBuiltinCommand = isValidCommand(parsed.command);
-
-        if (isBuiltinCommand) {
-          switch (parsed.command) {
-            case 'help':
-              handleSystemMessage(conversationMessage(getCommandHelp()), addMessage);
-              await saveCurrentSession();
+        promptCommandExecuted = await handleSlashCommand(rawInput);
+        
+        // SlashCommandの処理が完了
+        // promptCommandがない場合（組み込みコマンド）は戻ってこない（handleSlashCommand内でreturn済み）
+        // promptCommandがある場合のみ続行
+        if (!promptCommandExecuted) {
+          // 組み込みコマンドはhandleSlashCommand内で処理完了しているのでここには来ない
               return;
-            case 'status':
-              handleSystemMessage(conversationMessage(`Connection: ${status.connection}\nTasks: ${status.activeTasks}\nAgent: ${status.currentAgent}\nApp Status: ${status.mode}`), addMessage);
-              await saveCurrentSession();
-              return;
-            case 'task':
-              // /task command is deprecated - tasks are now created via 🚀 button
-              handleSystemMessage(conversationMessage('Use the 🚀 button on messages to execute them as tasks', 'info'), addMessage);
-              await saveCurrentSession();
-              return;
-            case 'expert':
-              // Create adhoc expert persona
-              if (parsed.args && parsed.args.length > 0) {
-                const expertise = parsed.args.join(' ');
-                try {
-                  // Show progress in toast (not persisted)
-                  notifications.show({
-                    title: 'Creating Expert',
-                    message: `Generating expert for: ${expertise}...`,
-                    color: 'blue',
-                    autoClose: false,
-                    id: 'expert-creation',
-                  });
-
-                  const persona = await invoke<import('./types/agent').PersonaConfig>('create_adhoc_persona', { expertise });
-
-                  // Hide progress notification
-                  notifications.hide('expert-creation');
-
-                  // Persist success message to session
-                  await invoke('append_system_messages', {
-                    messages: [{
-                      content: `🔶 Expert persona created: ${persona.name} ${persona.icon || '🔶'}\nRole: ${persona.role}\nBackground: ${persona.background}`,
-                      messageType: 'info',
-                      severity: 'info',
-                    }]
-                  });
-
-                  await refreshPersonas();
-                  await refreshSessions();
-                } catch (error) {
-                  console.error('Failed to create expert:', error);
-                  notifications.hide('expert-creation');
-
-                  // Persist error message to session
-                  await invoke('append_system_messages', {
-                    messages: [{
-                      content: `❌ Failed to create expert: ${error}`,
-                      messageType: 'error',
-                      severity: 'error',
-                    }]
-                  });
-                }
-              } else {
-                handleSystemMessage(conversationMessage('Usage: /expert <expertise>\nExample: /expert 映画制作プロセス', 'error'), addMessage);
-              }
-              await saveCurrentSession();
-              return;
-            case 'blueprint':
-              // Convert task/discussion into BlueprintWorkflow format
-              if (parsed.args && parsed.args.length > 0) {
-                const taskDescription = parsed.args.join(' ');
-                const blueprintPrompt = `# Task: Create BlueprintWorkflow for ORCS Task Execution
-
-Convert the following into a BlueprintWorkflow format:
-
-${taskDescription}
-
-## Output Format
-
-Provide a BlueprintWorkflow with:
-
-1. **Goal**: Clear, measurable goal statement
-2. **Workflow Steps**: Numbered steps with clear deliverables
-3. **Output Type**: Classify each step (📋 Clarification, 💡 Proposal, 📝 Documentation, 🔧 Implementation, ✅ Validation)
-4. **Dependencies**: Note which steps can run in parallel
-5. **Estimated Time**: Total execution time estimate
-
-Example format:
-\`\`\`
-Goal: [Goal statement]
-
-Workflow:
-1. **[Step Name]** (📋 Type): [Description]
-2. **[Step Name]** (💡 Type): [Description]
-...
-
-Dependencies: 1→2→3 (or note parallel opportunities)
-Estimated time: X minutes
-\`\`\`
-
-Generate the BlueprintWorkflow now.`;
-
-                // Add blueprint generation request as a user message
-                setInput(blueprintPrompt);
-                // Trigger send
-                setTimeout(() => {
-                  const textarea = document.querySelector('textarea');
-                  if (textarea) {
-                    const event = new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true });
-                    textarea.dispatchEvent(event);
-                  }
-                }, 100);
-              } else {
-                handleSystemMessage(conversationMessage('Usage: /blueprint <task description>\nExample: /blueprint Create technical article about Rust', 'error'), addMessage);
-              }
-              await saveCurrentSession();
-              return;
-            case 'workspace':
-              if (parsed.args && parsed.args.length > 0) {
-                const workspaceName = parsed.args.join(' ');
-                const targetWorkspace = allWorkspaces.find(ws =>
-                  ws.name.toLowerCase() === workspaceName.toLowerCase()
-                );
-                if (targetWorkspace && currentSessionId) {
-                  try {
-                    await switchWorkspace(currentSessionId, targetWorkspace.id);
-                    handleSystemMessage(conversationMessage(`✅ Switched to workspace: ${targetWorkspace.name}`), addMessage);
-                  } catch (err) {
-                    handleSystemMessage(conversationMessage(`Failed to switch workspace: ${err}`, 'error'), addMessage);
-                  }
-                } else if (!targetWorkspace) {
-                  handleSystemMessage(conversationMessage(`Workspace not found: ${workspaceName}\n\nAvailable workspaces:\n${allWorkspaces.map(ws => `- ${ws.name}`).join('\n')}`, 'error'), addMessage);
-                } else {
-                  handleSystemMessage(conversationMessage('No active session', 'error'), addMessage);
-                }
-              } else {
-                const workspaceList = allWorkspaces.map(ws =>
-                  `${ws.id === workspace?.id ? '📍' : '  '} ${ws.name}${ws.isFavorite ? ' ⭐' : ''}`
-                ).join('\n');
-                handleSystemMessage(conversationMessage(`Available workspaces:\n${workspaceList}\n\nUsage: /workspace <name>`), addMessage);
-              }
-              await saveCurrentSession();
-              return;
-            case 'files':
-              const fileList = workspaceFiles.length > 0
-                ? workspaceFiles.map(f => `📄 ${f.name} (${(f.size / 1024).toFixed(2)} KB)${f.author ? ` - by ${f.author}` : ''}`).join('\n')
-                : 'No files in current workspace';
-              handleSystemMessage(conversationMessage(`Files in workspace "${workspace?.name}":\n${fileList}`), addMessage);
-              await saveCurrentSession();
-              return;
-            case 'mode':
-              if (parsed.args && parsed.args.length > 0) {
-                const mode = parsed.args[0].toLowerCase();
-                const validModes = ['normal', 'concise', 'brief', 'discussion'];
-
-                if (!validModes.includes(mode)) {
-                  handleSystemMessage(conversationMessage(`Invalid mode: ${mode}\n\nAvailable modes:\n- normal (通常)\n- concise (簡潔・300文字)\n- brief (極簡潔・150文字)\n- discussion (議論)`, 'error'), addMessage);
-                  return;
-                }
-
-                try {
-                  await invoke('set_conversation_mode', { mode });
-                  setConversationMode(mode);
-                  const modeLabels: Record<string, string> = {
-                    normal: '通常 (Normal)',
-                    concise: '簡潔 (300文字)',
-                    brief: '極簡潔 (150文字)',
-                    discussion: '議論 (Discussion)',
-                  };
-                  handleSystemMessage(conversationMessage(`✅ Conversation mode changed to: ${modeLabels[mode]}`), addMessage);
-                } catch (error) {
-                  handleSystemMessage(conversationMessage(`Failed to set conversation mode: ${error}`, 'error'), addMessage);
-                }
-              } else {
-                try {
-                  const currentMode = await invoke<string>('get_conversation_mode');
-                  const modeLabels: Record<string, string> = {
-                    normal: '通常 (Normal)',
-                    concise: '簡潔 (300文字)',
-                    brief: '極簡潔 (150文字)',
-                    discussion: '議論 (Discussion)',
-                  };
-                  handleSystemMessage(conversationMessage(`Current mode: ${modeLabels[currentMode] || currentMode}\n\nUsage: /mode <normal|concise|brief|discussion>`), addMessage);
-                } catch (error) {
-                  handleSystemMessage(conversationMessage('Usage: /mode <normal|concise|brief|discussion>', 'error'), addMessage);
-                }
-              }
-              await saveCurrentSession();
-              return;
-            case 'talk':
-              if (parsed.args && parsed.args.length > 0) {
-                const style = parsed.args[0].toLowerCase();
-                const validStyles = ['brainstorm', 'casual', 'decision_making', 'debate', 'problem_solving', 'review', 'planning', 'none'];
-
-                if (!validStyles.includes(style)) {
-                  handleSystemMessage(conversationMessage(`Invalid style: ${style}\n\nAvailable styles:\n- brainstorm (ブレインストーミング)\n- casual (カジュアル)\n- decision_making (意思決定)\n- debate (議論)\n- problem_solving (問題解決)\n- review (レビュー)\n- planning (計画)\n- none (解除)`, 'error'), addMessage);
-                  await saveCurrentSession();
-                  return;
-                }
-
-                try {
-                  const styleValue = style === 'none' ? null : style;
-                  await invoke('set_talk_style', { style: styleValue });
-                  setTalkStyle(styleValue);
-                  const styleLabels: Record<string, string> = {
-                    brainstorm: 'ブレインストーミング (Brainstorm)',
-                    casual: 'カジュアル (Casual)',
-                    decision_making: '意思決定 (Decision Making)',
-                    debate: '議論 (Debate)',
-                    problem_solving: '問題解決 (Problem Solving)',
-                    review: 'レビュー (Review)',
-                    planning: '計画 (Planning)',
-                    none: '解除 (None)',
-                  };
-                  handleSystemMessage(conversationMessage(`✅ Talk style changed to: ${styleLabels[style]}`), addMessage);
-                } catch (error) {
-                  handleSystemMessage(conversationMessage(`Failed to set talk style: ${error}`, 'error'), addMessage);
-                }
-              } else {
-                try {
-                  const currentStyle = await invoke<string | null>('get_talk_style');
-                  const styleLabels: Record<string, string> = {
-                    brainstorm: 'ブレインストーミング (Brainstorm)',
-                    casual: 'カジュアル (Casual)',
-                    decision_making: '意思決定 (Decision Making)',
-                    debate: '議論 (Debate)',
-                    problem_solving: '問題解決 (Problem Solving)',
-                    review: 'レビュー (Review)',
-                    planning: '計画 (Planning)',
-                  };
-                  const currentLabel = currentStyle ? (styleLabels[currentStyle] || currentStyle) : 'Not set';
-                  handleSystemMessage(conversationMessage(`Current talk style: ${currentLabel}\n\nUsage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>`), addMessage);
-                } catch (error) {
-                  handleSystemMessage(conversationMessage('Usage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>', 'error'), addMessage);
-                }
-              }
-              await saveCurrentSession();
-              return;
-            default:
-              break;
-          }
-        } else {
-          const persistedSystemMessages: { content: string; messageType: MessageType; severity?: MessageSeverity }[] = [];
-          const persistMessages = async () => {
-            if (persistedSystemMessages.length === 0) {
-              return;
-            }
-            const messagesToPersist = [...persistedSystemMessages];
-            persistedSystemMessages.length = 0;
-            try {
-              await invoke('append_system_messages', { messages: messagesToPersist });
-            } catch (persistError) {
-              console.error('Failed to persist slash command messages:', persistError);
-              persistedSystemMessages.unshift(...messagesToPersist);
-            }
-          };
-          const queuePersistedMessage = (
-            content: string,
-            messageType: MessageType,
-            severity?: MessageSeverity
-          ) => {
-            persistedSystemMessages.push({ content, messageType, severity });
-          };
-
-          try {
-            const customCommand = await invoke<SlashCommand | null>('get_slash_command', { name: parsed.command });
-
-            if (!customCommand) {
-              const messageText = `Unknown command: /${parsed.command}\n\nType /help for available commands.`;
-              handleSystemMessage(conversationMessage(messageText, 'error'), addMessage);
-              queuePersistedMessage(messageText, 'error', 'error');
-              await persistMessages();
-              await saveCurrentSession();
-              return;
-            }
-
-            const argsText = parsed.args?.join(' ') ?? '';
-            const expanded = await invoke<ExpandedSlashCommand>('expand_command_template', {
-              commandName: customCommand.name,
-              args: argsText,
-            });
-
-            if (customCommand.type === 'prompt') {
-              const messageText = `✨ Executing custom command: /${customCommand.name}`;
-              handleSystemMessage(conversationMessage(messageText), addMessage);
-              queuePersistedMessage(messageText, 'system');
-              backendInput = expanded.content;
-              promptCommandExecuted = true;
-            } else {
-              const executingMessage = `⚡ Executing shell command: /${customCommand.name}`;
-              handleSystemMessage(conversationMessage(executingMessage), addMessage);
-              queuePersistedMessage(executingMessage, 'command');
-              if (expanded.workingDir) {
-                const cwdMessage = `(cwd: ${expanded.workingDir})`;
-                handleSystemMessage(shellOutputMessage(cwdMessage), addMessage);
-                queuePersistedMessage(cwdMessage, 'shell_output');
-              }
-              const commandLine = `$ ${expanded.content}`;
-              handleSystemMessage(shellOutputMessage(commandLine), addMessage);
-              queuePersistedMessage(commandLine, 'shell_output');
-
-              try {
-                const output = await invoke<string>('execute_shell_command', {
-                  command: expanded.content,
-                  workingDir: expanded.workingDir ?? null,
-                });
-                const outputText = output || '(no output)';
-                handleSystemMessage(shellOutputMessage(outputText), addMessage);
-                queuePersistedMessage(outputText, 'shell_output');
-              } catch (shellError) {
-                const errorMessage = `Shell command failed: ${shellError}`;
-                handleSystemMessage(conversationMessage(errorMessage, 'error'), addMessage);
-                queuePersistedMessage(errorMessage, 'error', 'error');
-              }
-              await persistMessages();
-              await saveCurrentSession();
-              return;
-            }
-          } catch (error) {
-            console.error('Failed to execute custom command:', error);
-            const errorMessage = `Failed to execute command: ${error}`;
-            handleSystemMessage(conversationMessage(errorMessage, 'error'), addMessage);
-            queuePersistedMessage(errorMessage, 'error', 'error');
-            await persistMessages();
-            await saveCurrentSession();
-            return;
-          }
-
-          await persistMessages();
         }
       }
 
@@ -1116,7 +818,7 @@ Generate the BlueprintWorkflow now.`;
       const activeTab = getActiveTab();
       if (activeTab) {
         updateTabAttachedFiles(activeTabId, [...activeTab.attachedFiles, ...files]);
-        addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
+      addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
       }
     }
   };
@@ -1134,7 +836,7 @@ Generate the BlueprintWorkflow now.`;
       const activeTab = getActiveTab();
       if (activeTab) {
         updateTabAttachedFiles(activeTabId, [...activeTab.attachedFiles, ...files]);
-        addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
+      addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
       }
     }
   };
@@ -1555,9 +1257,9 @@ Generate the BlueprintWorkflow now.`;
                         maxWidth: '200px',
                       }}
                       leftSection={tab.isDirty ? '●' : undefined}
-                      rightSection={
-                        <CloseButton
-                          size="xs"
+                        rightSection={
+                          <CloseButton
+                            size="xs"
                           onClick={(e) => {
                             e.stopPropagation();
                             // 未保存の場合は確認
@@ -1583,13 +1285,13 @@ Generate the BlueprintWorkflow now.`;
                   <Tabs.Panel key={tab.id} value={tab.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <ChatPanel
                       tab={tab}
-                      status={status}
+              status={status}
                       userNickname={userNickname}
-                      gitInfo={gitInfo}
-                      autoMode={autoMode}
-                      conversationMode={conversationMode}
-                      talkStyle={talkStyle}
-                      executionStrategy={executionStrategy}
+              gitInfo={gitInfo}
+              autoMode={autoMode}
+              conversationMode={conversationMode}
+              talkStyle={talkStyle}
+              executionStrategy={executionStrategy}
                       personas={personas}
                       activeParticipantIds={activeParticipantIds}
                       workspace={workspace}

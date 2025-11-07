@@ -48,10 +48,10 @@ impl ClaudeApiAgent {
     /// 2. Environment variables (ANTHROPIC_API_KEY, CLAUDE_MODEL_NAME)
     ///
     /// Model name defaults to `claude-sonnet-4-20250514` if not specified.
-    pub fn try_from_env() -> Result<Self, AgentError> {
+    pub async fn try_from_env() -> Result<Self, AgentError> {
         // Try loading from SecretService first
         if let Ok(service) = SecretServiceImpl::default() {
-            if let Ok(secret_config) = service.load_secrets() {
+            if let Ok(secret_config) = service.load_secrets().await {
                 if let Some(claude_config) = secret_config.claude {
                     // Use default model (model settings now in config.toml)
                     let model = DEFAULT_CLAUDE_MODEL.to_string();

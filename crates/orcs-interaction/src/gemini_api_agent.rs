@@ -8,7 +8,6 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
-use once_cell::sync::Lazy;
 use orcs_core::secret::SecretService;
 use orcs_infrastructure::SecretServiceImpl;
 use reqwest::{Client, StatusCode, header::HeaderValue};
@@ -18,25 +17,6 @@ use std::time::Duration;
 const DEFAULT_GEMINI_MODEL: &str = "gemini-2.5-flash";
 const BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
-/// Global Gemini configuration loaded from ~/.config/orcs/secret.json
-static GEMINI_CONFIG: Lazy<Result<(String, String), String>> = Lazy::new(|| {
-    let service = SecretServiceImpl::default()
-        .map_err(|e| format!("Failed to initialize SecretService: {}", e))?;
-
-    let secret_config = service
-        .load_secrets()
-        .map_err(|e| format!("Failed to load secret.json: {}", e))?;
-
-    let gemini_config = secret_config
-        .gemini
-        .ok_or_else(|| "Gemini configuration not found in secret.json".to_string())?;
-
-    // Use default model (model settings now in config.toml)
-    let model = DEFAULT_GEMINI_MODEL.to_string();
-
-    Ok((gemini_config.api_key, model))
-});
-
 /// Agent implementation that talks to the Gemini HTTP API.
 #[derive(Clone)]
 pub struct GeminiApiAgent {
@@ -44,15 +24,6 @@ pub struct GeminiApiAgent {
     api_key: String,
     model: String,
     system_instruction: Option<String>,
-}
-
-impl Default for GeminiApiAgent {
-    fn default() -> Self {
-        match GEMINI_CONFIG.as_ref() {
-            Ok((api_key, model)) => Self::new(api_key.clone(), model.clone()),
-            Err(e) => panic!("Failed to initialize GeminiApiAgent: {}", e),
-        }
-    }
 }
 
 impl GeminiApiAgent {
@@ -64,6 +35,27 @@ impl GeminiApiAgent {
             model: model.into(),
             system_instruction: None,
         }
+    }
+
+    /// Loads configuration from ~/.config/orcs/secret.json
+    ///
+    /// Model name defaults to `gemini-2.5-flash` if not specified.
+    pub async fn try_from_env() -> Result<Self, AgentError> {
+        let service = SecretServiceImpl::default()
+            .map_err(|e| AgentError::ExecutionFailed(format!("Failed to initialize SecretService: {}", e)))?;
+
+        let secret_config = service
+            .load_secrets().await
+            .map_err(|e| AgentError::ExecutionFailed(format!("Failed to load secret.json: {}", e)))?;
+
+        let gemini_config = secret_config
+            .gemini
+            .ok_or_else(|| AgentError::ExecutionFailed("Gemini configuration not found in secret.json".to_string()))?;
+
+        // Use default model (model settings now in config.toml)
+        let model = DEFAULT_GEMINI_MODEL.to_string();
+
+        Ok(Self::new(gemini_config.api_key, model))
     }
 
 

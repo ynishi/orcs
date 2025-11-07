@@ -7,7 +7,7 @@ use crate::paths::{OrcsPaths, ServiceType};
 use orcs_core::config::SecretConfig;
 use orcs_core::secret::SecretService;
 use anyhow::Result;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, RwLock};
 use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
 

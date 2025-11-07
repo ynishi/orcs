@@ -45,10 +45,10 @@ impl OpenAIApiAgent {
     /// 2. Environment variables (OPENAI_API_KEY, OPENAI_MODEL_NAME)
     ///
     /// Model name defaults to `gpt-4o` if not specified.
-    pub fn try_from_env() -> Result<Self, AgentError> {
+    pub async fn try_from_env() -> Result<Self, AgentError> {
         // Try loading from SecretService first
         if let Ok(service) = SecretServiceImpl::default() {
-            if let Ok(secret_config) = service.load_secrets() {
+            if let Ok(secret_config) = service.load_secrets().await {
                 if let Some(openai_config) = secret_config.openai {
                     // Use default model (model settings now in config.toml)
                     let model = DEFAULT_OPENAI_MODEL.to_string();

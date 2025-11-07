@@ -102,11 +102,11 @@ Generate a complete PersonaDefinition.",
         // Save adhoc persona to repository (temporary)
         let mut all_personas = self
             .persona_repository
-            .get_all()
+            .get_all().await
             .map_err(|e| anyhow::anyhow!(e))?;
         all_personas.push(persona.clone());
         self.persona_repository
-            .save_all(&all_personas)
+            .save_all(&all_personas).await
             .map_err(|e| anyhow::anyhow!(e))?;
 
         Ok(persona)
@@ -126,7 +126,7 @@ Generate a complete PersonaDefinition.",
         // Get all personas
         let mut personas = self
             .persona_repository
-            .get_all()
+            .get_all().await
             .map_err(|e| anyhow::anyhow!(e))?;
 
         // Find and update the adhoc persona
@@ -145,7 +145,7 @@ Generate a complete PersonaDefinition.",
 
         // Save all personas
         self.persona_repository
-            .save_all(&personas)
+            .save_all(&personas).await
             .map_err(|e| anyhow::anyhow!(e))?;
 
         // Get the updated persona

@@ -7,6 +7,7 @@
 use anyhow::{Result, anyhow};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{AppMode, Session, SessionManager};
+use orcs_core::state::repository::StateRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_interaction::InteractionManager;
@@ -101,10 +102,10 @@ impl SessionUseCase {
         tracing::info!("[SessionUseCase] Creating new session");
 
         // 1. Get selected workspace ID from AppStateService
-        let workspace_id_opt = self.app_state_service.get_last_selected_workspace().await;
+        let workspace_id_opt: Option<String> = self.app_state_service.get_last_selected_workspace().await;
 
         // 2. If no workspace is selected, try to auto-select one
-        let workspace_id_opt = if workspace_id_opt.is_none() {
+        let workspace_id_opt: Option<String> = if workspace_id_opt.is_none() {
             tracing::info!("[SessionUseCase] No workspace selected, attempting auto-selection");
 
             match self.workspace_manager.list_all_workspaces().await {
@@ -815,7 +816,7 @@ impl SessionUseCase {
     /// # Returns
     ///
     /// The enriched session with populated participants field.
-    pub fn enrich_session_participants(&self, mut session: Session) -> Session {
+    pub async fn enrich_session_participants(&self, mut session: Session) -> Session {
         use std::collections::HashMap;
 
         // If participants is already populated, return as-is
@@ -830,7 +831,7 @@ impl SessionUseCase {
         participants.insert(user_name.clone(), user_name);
 
         // Resolve persona IDs to names
-        if let Ok(all_personas) = self.persona_repository.get_all() {
+        if let Ok(all_personas) = self.persona_repository.get_all().await {
             for persona_id in session.persona_histories.keys() {
                 if let Some(persona) = all_personas.iter().find(|p| &p.id == persona_id) {
                     participants.insert(persona_id.clone(), persona.name.clone());

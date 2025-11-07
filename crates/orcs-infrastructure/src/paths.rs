@@ -78,7 +78,6 @@
 //! ```
 
 use std::path::{Path, PathBuf};
-use serde::{Serialize, ser};
 use version_migrate::{
     AppPaths, AsyncDirStorage, DirStorageStrategy, FilenameEncoding, FormatStrategy, Migrator,
     PathStrategy, PrefPath,

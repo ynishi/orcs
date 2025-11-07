@@ -8,7 +8,8 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
-use orcs_infrastructure::storage::SecretStorage;
+use orcs_core::secret::SecretService;
+use orcs_infrastructure::SecretServiceImpl;
 use reqwest::{Client, StatusCode, header::HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -45,9 +46,9 @@ impl OpenAIApiAgent {
     ///
     /// Model name defaults to `gpt-4o` if not specified.
     pub fn try_from_env() -> Result<Self, AgentError> {
-        // Try loading from SecretStorage first
-        if let Ok(storage) = SecretStorage::new() {
-            if let Ok(secret_config) = storage.load() {
+        // Try loading from SecretService first
+        if let Ok(service) = SecretServiceImpl::default() {
+            if let Ok(secret_config) = service.load_secrets() {
                 if let Some(openai_config) = secret_config.openai {
                     // Use default model (model settings now in config.toml)
                     let model = DEFAULT_OPENAI_MODEL.to_string();

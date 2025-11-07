@@ -9,10 +9,10 @@
 
 use crate::{dto::create_persona_migrator, storage_repository::StorageRepository};
 use crate::OrcsPaths;
-use anyhow::Result;
+use orcs_core::error::Result;
 use orcs_core::persona::Persona;
 use orcs_core::repository::PersonaRepository;
-use std::path::{Path};
+use std::path::Path;
 use version_migrate::AsyncDirStorage;
 
 /// AsyncDirStorage-based persona repository.
@@ -53,51 +53,45 @@ impl AsyncDirPersonaRepository {
         let orcs_paths = OrcsPaths::new(base_dir);
         let storage = orcs_paths
             .create_async_dir_storage(Self::SERVICE_TYPE, migrator)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create storage: {}", e))?;
+            .await?;
         Ok(Self { storage })
     }
 }
 
 #[async_trait::async_trait]
 impl PersonaRepository for AsyncDirPersonaRepository {
-    async fn get_all(&self) -> Result<Vec<Persona>, orcs_core::OrcsError> {
+    async fn get_all(&self) -> Result<Vec<Persona>> {
         let all_personas = self
             .storage
             .load_all::<Persona>(Self::ENTITY_NAME)
-            .await
-            .map_err(|e| orcs_core::OrcsError::DataAccess(format!("Failed to load all personas: {}", e)))?;
+            .await?;
 
         // Extract values from Vec<(String, Persona)>
         let personas: Vec<Persona> = all_personas.into_iter().map(|(_, p)| p).collect();
         Ok(personas)
     }
 
-    async fn save_all(&self, personas: &[Persona]) -> Result<(), orcs_core::OrcsError> {
+    async fn save_all(&self, personas: &[Persona]) -> Result<()> {
         let existing = self
             .storage
             .load_all::<Persona>(Self::ENTITY_NAME)
-            .await
-            .map_err(|e| orcs_core::OrcsError::DataAccess(format!("Failed to load existing personas: {}", e)))?;
+            .await?;
 
         let existing_ids: std::collections::HashSet<String> =
             existing.iter().map(|(id, _)| id.clone()).collect();
         let new_ids: std::collections::HashSet<String> =
             personas.iter().map(|p| p.id.clone()).collect();
 
-        // 2. Delete orphaned personas (exist in storage but not in new list)
+        // Delete orphaned personas (exist in storage but not in new list)
         for orphaned_id in existing_ids.difference(&new_ids) {
-            self.storage.delete(orphaned_id).await.map_err(|e| {
-                orcs_core::OrcsError::DataAccess(format!("Failed to delete orphaned persona {}: {}", orphaned_id, e))
-            })?;
+            self.storage.delete(orphaned_id).await?;
         }
 
-        // 3. Save each persona individually (1 persona = 1 file)
+        // Save each persona individually (1 persona = 1 file)
         for persona in personas {
             self.storage
                 .save(Self::ENTITY_NAME, &persona.id, persona)
-                .await
-                .map_err(|e| orcs_core::OrcsError::DataAccess(format!("Failed to save persona {}: {}", persona.id, e)))?;
+                .await?;
         }
         Ok(())
     }

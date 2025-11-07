@@ -48,8 +48,7 @@ impl StateRepositoryImpl {
     pub async fn new() -> Result<Self> {
         // Get file path for AppState via centralized path management
         let orcs_paths = OrcsPaths::new(None);
-        let path_type = orcs_paths.get_path(ServiceType::AppState)
-            .map_err(|e| OrcsError::Internal(e.to_string()))?;
+        let path_type = orcs_paths.get_path(ServiceType::AppState)?;
         let file_path = path_type.into_path_buf(); // app_state.toml
 
         // Setup migrator
@@ -61,17 +60,14 @@ impl StateRepositoryImpl {
             .with_load_behavior(LoadBehavior::CreateIfMissing);
 
         // Create FileStorage (automatically loads or creates empty config)
-        let storage = FileStorage::new(file_path, migrator, strategy)
-            .map_err(|e| OrcsError::Internal(format!("Failed to create FileStorage: {}", e)))?;
+        let storage = FileStorage::new(file_path, migrator, strategy)?;
 
         let storage = Arc::new(Mutex::new(storage));
 
         // Load initial state from storage
         let initial_state = {
             let storage_lock = storage.lock().await;
-            let states: Vec<AppState> = storage_lock
-                .query("app_state")
-                .map_err(|e| OrcsError::Internal(format!("Failed to query app_state: {}", e)))?;
+            let states: Vec<AppState> = storage_lock.query("app_state")?;
             states.into_iter().next().unwrap_or_default()
         };
 
@@ -101,10 +97,10 @@ impl StateRepository for StateRepositoryImpl {
             let mut storage = storage.blocking_lock();
             storage
                 .update_and_save("app_state", vec![state_for_save])
-                .map_err(|e| OrcsError::Internal(format!("Failed to save app_state: {}", e)))
+                .map_err(|e| OrcsError::internal(format!("Failed to save app_state: {}", e)))
         })
         .await
-        .map_err(|e| OrcsError::Internal(format!("Failed to join task: {}", e)))??;
+        .map_err(|e| OrcsError::internal(format!("Failed to join task: {}", e)))??;
 
         Ok(())
     }

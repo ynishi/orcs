@@ -101,7 +101,7 @@ impl SessionUseCase {
         tracing::info!("[SessionUseCase] Creating new session");
 
         // 1. Get selected workspace ID from AppStateService
-        let workspace_id_opt = self.app_state_service.get_last_selected_workspace();
+        let workspace_id_opt = self.app_state_service.get_last_selected_workspace().await;
 
         // 2. If no workspace is selected, try to auto-select one
         let workspace_id_opt = if workspace_id_opt.is_none() {
@@ -121,6 +121,7 @@ impl SessionUseCase {
                     if let Err(e) = self
                         .app_state_service
                         .set_last_selected_workspace(most_recent.id.clone())
+                        .await
                     {
                         tracing::warn!(
                             "[SessionUseCase] Failed to save auto-selected workspace: {}",
@@ -259,6 +260,7 @@ impl SessionUseCase {
         // 2. Update AppStateService to use this workspace
         self.app_state_service
             .set_last_selected_workspace(workspace.id.clone())
+            .await
             .map_err(|e| anyhow!("Failed to set workspace selection: {}", e))?;
 
         // 3. Create session
@@ -474,6 +476,7 @@ impl SessionUseCase {
         // 0. Save to AppStateService (user's explicit selection)
         self.app_state_service
             .set_last_selected_workspace(workspace_id.to_string())
+            .await
             .map_err(|e| anyhow!("Failed to save last selected workspace: {}", e))?;
         println!(
             "[SessionUseCase] Saved to AppStateService: {}",

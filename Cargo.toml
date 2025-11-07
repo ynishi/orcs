@@ -27,6 +27,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 semver = "1.0"
 thiserror = "1.0"
+toml = "0.8"
 # IMPORTANT: llm-toolkit version update procedure:
 # 1. Verify the target version exists on crates.io: https://crates.io/crates/llm-toolkit
 # 2. Update the version number below

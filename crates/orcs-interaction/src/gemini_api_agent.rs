@@ -9,7 +9,8 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
 use once_cell::sync::Lazy;
-use orcs_infrastructure::storage::SecretStorage;
+use orcs_core::secret::SecretService;
+use orcs_infrastructure::SecretServiceImpl;
 use reqwest::{Client, StatusCode, header::HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -19,11 +20,11 @@ const BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models"
 
 /// Global Gemini configuration loaded from ~/.config/orcs/secret.json
 static GEMINI_CONFIG: Lazy<Result<(String, String), String>> = Lazy::new(|| {
-    let storage = SecretStorage::new()
-        .map_err(|e| format!("Failed to initialize SecretStorage: {}", e))?;
+    let service = SecretServiceImpl::default()
+        .map_err(|e| format!("Failed to initialize SecretService: {}", e))?;
 
-    let secret_config = storage
-        .load()
+    let secret_config = service
+        .load_secrets()
         .map_err(|e| format!("Failed to load secret.json: {}", e))?;
 
     let gemini_config = secret_config

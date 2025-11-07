@@ -19,7 +19,7 @@ use orcs_core::slash_command::{SlashCommand, SlashCommandRepository};
 
 use crate::ServiceType;
 use crate::dto::create_slash_command_migrator;
-use crate::storage_repository::{StorageRepository, is_not_found};
+use crate::storage_repository::StorageRepository;
 
 /// AsyncDirStorage-based slash command repository.
 ///
@@ -58,15 +58,14 @@ impl AsyncDirSlashCommandRepository {
     ///
     /// Returns an error if the storage cannot be created.
     pub async fn new(base_dir: Option<&Path>) -> Result<Self> {
-        use crate::paths::{OrcsPaths, ServiceType};
+        use crate::paths::OrcsPaths;
 
         // Create AsyncDirStorage via centralized helper
         let migrator = create_slash_command_migrator();
         let orcs_paths = OrcsPaths::new(base_dir);
         let storage = orcs_paths
             .create_async_dir_storage(Self::SERVICE_TYPE, migrator)
-            .await
-            .map_err(|e| OrcsError::Io(format!("Failed to create slash command storage: {}", e)))?;
+            .await?;
         Ok(Self { storage })
     }
 }
@@ -77,8 +76,7 @@ impl SlashCommandRepository for AsyncDirSlashCommandRepository {
         let all_commands = self
             .storage
             .load_all::<SlashCommand>(Self::ENTITY_NAME)
-            .await
-            .map_err(|e| OrcsError::Io(format!("Failed to load all slash commands: {}", e)))?;
+            .await?;
 
         // Extract values from Vec<(String, SlashCommand)>
         let commands: Vec<SlashCommand> = all_commands.into_iter().map(|(_, cmd)| cmd).collect();
@@ -93,13 +91,11 @@ impl SlashCommandRepository for AsyncDirSlashCommandRepository {
         {
             Ok(command) => Ok(Some(command)),
             Err(e) => {
-                if is_not_found(&e) {
+                let orcs_err = e.into();
+                if orcs_core::OrcsError::is_not_found(&orcs_err) {
                     Ok(None)
                 } else {
-                    Err(OrcsError::Io(format!(
-                        "Failed to load slash command '{}': {}",
-                        name, e
-                    )))
+                    Err(orcs_err)
                 }
             }
         }
@@ -108,19 +104,14 @@ impl SlashCommandRepository for AsyncDirSlashCommandRepository {
     async fn save_command(&self, command: SlashCommand) -> Result<()> {
         self.storage
             .save(Self::ENTITY_NAME, &command.name, &command)
-            .await
-            .map_err(|e| {
-                OrcsError::Io(format!(
-                    "Failed to save slash command '{}': {}",
-                    command.name, e
-                ))
-            })
+            .await?;
+        Ok(())
     }
 
     async fn remove_command(&self, name: &str) -> Result<()> {
         self.storage
             .delete(name)
-            .await
-            .map_err(|e| OrcsError::Io(format!("Failed to delete slash command '{}': {}", name, e)))
+            .await?;
+        Ok(())
     }
 }

@@ -8,9 +8,9 @@
 //! - ~75% code reduction
 
 use crate::dto::create_session_migrator;
-use crate::storage_repository::{StorageRepository, is_not_found};
+use crate::storage_repository::StorageRepository;
 use async_trait::async_trait;
-use orcs_core::error::{OrcsError, Result};
+use orcs_core::error::Result;
 use orcs_core::repository::SessionRepository;
 use orcs_core::session::Session;
 use std::path::Path;
@@ -65,14 +65,13 @@ impl AsyncDirSessionRepository {
     pub async fn new(
         base_dir: Option<&Path>,
     ) -> Result<Self> {
-        use crate::paths::{OrcsPaths};
+        use crate::paths::OrcsPaths;
 
         let migrator = create_session_migrator();
         let orcs_paths = OrcsPaths::new(base_dir);
         let storage = orcs_paths
             .create_async_dir_storage(Self::SERVICE_TYPE, migrator)
-            .await
-            .map_err(|e| OrcsError::Internal(format!("Failed to create session storage: {}", e)))?;
+            .await?;
 
         Ok(Self {
             storage,
@@ -84,31 +83,29 @@ impl AsyncDirSessionRepository {
 impl SessionRepository for AsyncDirSessionRepository {
     async fn find_by_id(&self, session_id: &str) -> Result<Option<Session>> {
         match self.storage.load::<Session>(Self::ENTITY_NAME, session_id).await {
-            Ok(session) => {
-                Ok(Some(session))
-            }
+            Ok(session) => Ok(Some(session)),
             Err(e) => {
-                if is_not_found(&e) {
-                    return Ok(None)
+                let orcs_err = e.into();
+                if orcs_core::OrcsError::is_not_found(&orcs_err) {
+                    Ok(None)
                 } else {
-                    Err(OrcsError::DataAccess(e.to_string()))
+                    Err(orcs_err)
                 }
             }
         }
     }
 
     async fn save(&self, session: &Session) -> Result<()> {
-        let result = self.storage.save(Self::ENTITY_NAME, &session.id, session).await;
-        eprintln!("Save result: {:?}", result);
-        result.map_err(|e| OrcsError::DataAccess(format!("Failed to save session: {}", e)))?;
+        self.storage
+            .save(Self::ENTITY_NAME, &session.id, session)
+            .await?;
         Ok(())
     }
 
     async fn delete(&self, session_id: &str) -> Result<()> {
         self.storage
             .delete(session_id)
-            .await
-            .map_err(|e| OrcsError::DataAccess(format!("Failed to delete session: {}", e)))?;
+            .await?;
         Ok(())
     }
 
@@ -116,9 +113,9 @@ impl SessionRepository for AsyncDirSessionRepository {
         let mut sessions = self
             .storage
             .load_all::<Session>(Self::ENTITY_NAME)
-            .await
-            .map_err(|e| OrcsError::DataAccess(format!("Failed to load all sessions: {}", e)))?
-            .iter().map(|t|t.1.clone())
+            .await?
+            .into_iter()
+            .map(|(_id, session)| session)
             .collect::<Vec<Session>>();
 
         // Sort by updated_at descending (most recent first)

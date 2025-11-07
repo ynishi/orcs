@@ -170,6 +170,12 @@ impl std::fmt::Display for PathError {
 
 impl std::error::Error for PathError {}
 
+impl From<PathError> for orcs_core::OrcsError {
+    fn from(err: PathError) -> Self {
+        orcs_core::OrcsError::Config(err.to_string())
+    }
+}
+
 /// Unified path management for orcs.
 ///
 /// Supports both default paths and custom base paths for testing.

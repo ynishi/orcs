@@ -3,7 +3,7 @@
 //! This provides a repository for full Workspace data (including resources metadata)
 //! using AsyncDirStorage from version-migrate for ACID guarantees and async I/O.
 
-use crate::{ServiceType, dto::create_workspace_migrator, storage_repository::{StorageRepository, is_not_found}};
+use crate::{ServiceType, dto::create_workspace_migrator, storage_repository::StorageRepository};
 use async_trait::async_trait;
 use orcs_core::{
     error::{OrcsError, Result},
@@ -66,15 +66,14 @@ impl AsyncDirWorkspaceRepository {
     /// - Directory creation fails
     /// - AsyncDirStorage initialization fails
     pub async fn new(base_dir: Option<&Path>) -> Result<Self> {
-        use crate::paths::{OrcsPaths, ServiceType};
+        use crate::paths::OrcsPaths;
 
         // Create AsyncDirStorage via centralized helper
         let migrator = create_workspace_migrator();
-        let orcs_paths = OrcsPaths::new(None);
+        let orcs_paths = OrcsPaths::new(base_dir);
         let storage = orcs_paths
             .create_async_dir_storage(ServiceType::Workspace, migrator)
-            .await
-            .map_err(|e| OrcsError::Io(format!("Failed to create workspace storage: {}", e)))?;
+            .await?;
 
         Ok(Self { storage })
     }
@@ -90,10 +89,11 @@ impl WorkspaceRepository for AsyncDirWorkspaceRepository {
         {
             Ok(workspace) => Ok(Some(workspace)),
             Err(e) => {
-                if is_not_found(&e) {
+                let orcs_err = e.into();
+                if orcs_core::OrcsError::is_not_found(&orcs_err) {
                     Ok(None)
                 } else {
-                     Err(OrcsError::Io(e.to_string()))
+                    Err(orcs_err)
                 }
             }
         }
@@ -102,8 +102,7 @@ impl WorkspaceRepository for AsyncDirWorkspaceRepository {
     async fn save(&self, workspace: &Workspace) -> Result<()> {
         self.storage
             .save(Self::ENTITY_NAME, &workspace.id, workspace)
-            .await
-            .map_err(|e| OrcsError::Io(format!("Failed to save workspace: {}", e)))?;
+            .await?;
         Ok(())
     }
 
@@ -114,7 +113,7 @@ impl WorkspaceRepository for AsyncDirWorkspaceRepository {
         let mut workspace = self
             .find_by_id(workspace_id)
             .await?
-            .ok_or_else(|| OrcsError::Io(format!("Workspace '{}' not found", workspace_id)))?;
+            .ok_or_else(|| OrcsError::io(format!("Workspace '{}' not found", workspace_id)))?;
 
         f(&mut workspace);
 
@@ -126,8 +125,7 @@ impl WorkspaceRepository for AsyncDirWorkspaceRepository {
     async fn delete(&self, workspace_id: &str) -> Result<()> {
         self.storage
             .delete(workspace_id)
-            .await
-            .map_err(|e| OrcsError::Io(format!("Failed to delete workspace: {}", e)))?;
+            .await?;
         Ok(())
     }
 
@@ -135,8 +133,7 @@ impl WorkspaceRepository for AsyncDirWorkspaceRepository {
         let all_workspaces = self
             .storage
             .load_all::<Workspace>(Self::ENTITY_NAME)
-            .await
-            .map_err(|e| OrcsError::Io(format!("Failed to load all workspaces: {}", e)))?;
+            .await?;
 
         let mut workspaces: Vec<Workspace> =
             all_workspaces.into_iter().map(|(_id, ws)| ws).collect();

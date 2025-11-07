@@ -1,8 +1,8 @@
 //! AsyncDirStorage-based TaskRepository implementation
 
-use crate::{dto::create_task_migrator, storage_repository::{StorageRepository, is_not_found}, paths::{OrcsPaths, ServiceType}};
+use crate::{dto::create_task_migrator, storage_repository::StorageRepository, paths::{OrcsPaths, ServiceType}};
 use async_trait::async_trait;
-use orcs_core::{repository::TaskRepository, task::Task, error::{OrcsError, Result}};
+use orcs_core::{repository::TaskRepository, task::Task, error::Result};
 use std::path::Path;
 use version_migrate::AsyncDirStorage;
 
@@ -46,8 +46,7 @@ impl AsyncDirTaskRepository {
         let orcs_paths = OrcsPaths::new(base_dir);
         let storage = orcs_paths
             .create_async_dir_storage(Self::SERVICE_TYPE, migrator)
-            .await
-            .map_err(|e| OrcsError::Io(format!("Failed to create task storage: {}", e)))?;
+            .await?;
         Ok(Self { storage })
     }
 }
@@ -58,10 +57,11 @@ impl TaskRepository for AsyncDirTaskRepository {
         match self.storage.load::<Task>(Self::ENTITY_NAME, task_id).await {
             Ok(task) => Ok(Some(task)),
             Err(e) => {
-                if is_not_found(&e) {
+                let orcs_err = e.into();
+                if orcs_core::OrcsError::is_not_found(&orcs_err) {
                     Ok(None)
                 } else {
-                    Err(OrcsError::DataAccess(e.to_string()))
+                    Err(orcs_err)
                 }
             }
         }
@@ -70,23 +70,22 @@ impl TaskRepository for AsyncDirTaskRepository {
     async fn save(&self, task: &Task) -> Result<()> {
         self.storage
             .save(Self::ENTITY_NAME, &task.id, task)
-            .await
-            .map_err(|e| OrcsError::DataAccess(format!("Failed to save task: {}", e)))
+            .await?;
+        Ok(())
     }
 
     async fn delete(&self, task_id: &str) -> Result<()> {
         self.storage
             .delete(task_id)
-            .await
-            .map_err(|e| OrcsError::DataAccess(format!("Failed to delete task: {}", e)))
+            .await?;
+        Ok(())
     }
 
     async fn list_all(&self) -> Result<Vec<Task>> {
         let all_tasks = self
             .storage
             .load_all::<Task>(Self::ENTITY_NAME)
-            .await
-            .map_err(|e| OrcsError::DataAccess(format!("Failed to load all tasks: {}", e)))?;
+            .await?;
 
         // Extract tasks from (id, task) tuples
         let mut tasks: Vec<Task> = all_tasks.into_iter().map(|(_, task)| task).collect();

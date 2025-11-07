@@ -59,7 +59,7 @@ impl FileSystemWorkspaceManager {
     pub async fn new(root_dir: PathBuf) -> Result<Self> {
         // Ensure the root directory exists
         fs::create_dir_all(&root_dir).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to create workspace root directory '{}': {}",
                 root_dir.display(),
                 e
@@ -89,7 +89,7 @@ impl FileSystemWorkspaceManager {
     /// Returns a workspace ID string.
     fn get_workspace_id(repo_path: &Path) -> Result<String> {
         let canonical_path = repo_path.canonicalize().map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to canonicalize repository path '{}': {}",
                 repo_path.display(),
                 e
@@ -140,7 +140,7 @@ impl FileSystemWorkspaceManager {
             .workspace_repository
             .find_by_id(workspace_id)
             .await?
-            .ok_or_else(|| OrcsError::Io(format!("Workspace '{}' not found", workspace_id)))?;
+            .ok_or_else(|| OrcsError::io(format!("Workspace '{}' not found", workspace_id)))?;
 
         // Set workspace_dir (calculated from workspace_id, not stored in repository)
         workspace.workspace_dir = self.get_workspace_dir(workspace_id);
@@ -162,7 +162,7 @@ impl FileSystemWorkspaceManager {
 
         // Ensure workspace directory exists (for actual files)
         fs::create_dir_all(&workspace_dir).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to create workspace directory '{}': {}",
                 workspace_dir.display(),
                 e
@@ -200,14 +200,14 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
     async fn get_or_create_workspace(&self, repo_path: &Path) -> Result<Workspace> {
         // Validate root_path: must not be root directory
         let canonical_path = repo_path.canonicalize().map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to canonicalize path {:?}: {}",
                 repo_path, e
             ))
         })?;
 
         if canonical_path == Path::new("/") || canonical_path == Path::new("C:\\") {
-            return Err(OrcsError::Io(
+            return Err(OrcsError::io(
                 "Cannot create workspace at root directory '/'".to_string(),
             ));
         }
@@ -223,7 +223,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         let workspace_dir = self.get_workspace_dir(&workspace_id);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| OrcsError::Io(format!("Failed to get current timestamp: {}", e)))?
+            .map_err(|e| OrcsError::io(format!("Failed to get current timestamp: {}", e)))?
             .as_secs() as i64;
 
         let workspace = Workspace {
@@ -247,7 +247,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
     async fn get_workspace(&self, workspace_id: &str) -> Result<Option<Workspace>> {
         match self.load_workspace(workspace_id).await {
             Ok(workspace) => Ok(Some(workspace)),
-            Err(OrcsError::Io(msg)) if msg.contains("not found") => Ok(None),
+            Err(e) if e.is_not_found() => Ok(None),
             Err(e) => Err(e),
         }
     }
@@ -268,7 +268,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Ensure the destination directory exists
         fs::create_dir_all(&uploaded_dir).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to create uploaded directory '{}': {}",
                 uploaded_dir.display(),
                 e
@@ -282,7 +282,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         let file_name = source_path
             .file_name()
             .and_then(|name| name.to_str())
-            .ok_or_else(|| OrcsError::Io("Invalid source file path".to_string()))?
+            .ok_or_else(|| OrcsError::io("Invalid source file path".to_string()))?
             .to_string();
 
         // Construct the destination path
@@ -290,7 +290,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Copy the file
         fs::copy(source_path, &dest_path).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to copy file from '{}' to '{}': {}",
                 source_path.display(),
                 dest_path.display(),
@@ -300,7 +300,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Get file metadata for size
         let metadata = fs::metadata(&dest_path).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to read file metadata for '{}': {}",
                 dest_path.display(),
                 e
@@ -314,7 +314,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         // Get current timestamp
         let uploaded_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| OrcsError::Io(format!("Failed to get current timestamp: {}", e)))?
+            .map_err(|e| OrcsError::io(format!("Failed to get current timestamp: {}", e)))?
             .as_secs() as i64;
 
         // Create the UploadedFile domain model
@@ -362,7 +362,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Ensure the destination directory exists
         fs::create_dir_all(&uploaded_dir).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to create uploaded directory '{}': {}",
                 uploaded_dir.display(),
                 e
@@ -377,7 +377,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Write the byte data to the file
         fs::write(&dest_path, data).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to write file to '{}': {}",
                 dest_path.display(),
                 e
@@ -393,7 +393,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         // Get current timestamp
         let uploaded_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| OrcsError::Io(format!("Failed to get current timestamp: {}", e)))?
+            .map_err(|e| OrcsError::io(format!("Failed to get current timestamp: {}", e)))?
             .as_secs() as i64;
 
         // Create the UploadedFile domain model
@@ -432,7 +432,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             .iter()
             .position(|f| f.id == file_id)
             .ok_or_else(|| {
-                OrcsError::Io(format!("File with ID '{}' not found in workspace", file_id))
+                OrcsError::io(format!("File with ID '{}' not found in workspace", file_id))
             })?;
 
         // Get the file to delete
@@ -441,7 +441,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         // Delete the physical file
         if file.path.exists() {
             fs::remove_file(&file.path).await.map_err(|e| {
-                OrcsError::Io(format!(
+                OrcsError::io(format!(
                     "Failed to delete file '{}': {}",
                     file.path.display(),
                     e
@@ -474,7 +474,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
             .iter()
             .position(|f| f.id == file_id)
             .ok_or_else(|| {
-                OrcsError::Io(format!("File with ID '{}' not found in workspace", file_id))
+                OrcsError::io(format!("File with ID '{}' not found in workspace", file_id))
             })?;
 
         // Get the current file
@@ -484,12 +484,12 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         // Construct the new path
         let new_path = old_path
             .parent()
-            .ok_or_else(|| OrcsError::Io("Invalid file path".to_string()))?
+            .ok_or_else(|| OrcsError::io("Invalid file path".to_string()))?
             .join(new_name);
 
         // Check if a file with the new name already exists
         if new_path.exists() {
-            return Err(OrcsError::Io(format!(
+            return Err(OrcsError::io(format!(
                 "A file with name '{}' already exists",
                 new_name
             )));
@@ -497,7 +497,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Rename the physical file
         fs::rename(&old_path, &new_path).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to rename file from '{}' to '{}': {}",
                 old_path.display(),
                 new_path.display(),
@@ -540,7 +540,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Ensure the temp directory exists
         fs::create_dir_all(&session_temp_dir).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to create session temp directory '{}': {}",
                 session_temp_dir.display(),
                 e
@@ -555,7 +555,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Write the content to the file
         fs::write(&dest_path, content).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to write temp file to '{}': {}",
                 dest_path.display(),
                 e
@@ -565,7 +565,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         // Get current timestamp
         let created_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| OrcsError::Io(format!("Failed to get current timestamp: {}", e)))?
+            .map_err(|e| OrcsError::io(format!("Failed to get current timestamp: {}", e)))?
             .as_secs() as i64;
 
         // Create the TempFile domain model
@@ -592,7 +592,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Canonicalize the workspace directory to get the absolute path
         let canonical_workspace_dir = workspace_dir.canonicalize().map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to canonicalize workspace directory '{}': {}",
                 workspace_dir.display(),
                 e
@@ -604,7 +604,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Check if the file exists before attempting to canonicalize
         if !target_path.exists() {
-            return Err(OrcsError::Io(format!(
+            return Err(OrcsError::io(format!(
                 "File not found at '{}': No such file or directory",
                 relative_path
             )));
@@ -612,7 +612,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Canonicalize the target path to resolve any '..' or symlinks
         let canonical_target_path = target_path.canonicalize().map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to access file at '{}': {}",
                 relative_path, e
             ))
@@ -630,7 +630,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         let content = fs::read_to_string(&canonical_target_path)
             .await
             .map_err(|e| {
-                OrcsError::Io(format!("Failed to read file at '{}': {}", relative_path, e))
+                OrcsError::io(format!("Failed to read file at '{}': {}", relative_path, e))
             })?;
 
         Ok(content)
@@ -662,7 +662,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         let mut workspace = self.load_workspace(workspace_id).await?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| OrcsError::Io(format!("Failed to get current timestamp: {}", e)))?
+            .map_err(|e| OrcsError::io(format!("Failed to get current timestamp: {}", e)))?
             .as_secs() as i64;
         workspace.last_accessed = now;
         self.save_workspace(&workspace).await
@@ -673,7 +673,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
 
         // Ensure workspace directory exists (for actual files)
         fs::create_dir_all(&workspace_dir).await.map_err(|e| {
-            OrcsError::Io(format!(
+            OrcsError::io(format!(
                 "Failed to create workspace directory '{}': {}",
                 workspace_dir.display(),
                 e
@@ -694,7 +694,7 @@ impl WorkspaceManager for FileSystemWorkspaceManager {
         let workspace_dir = self.get_workspace_dir(workspace_id);
         if workspace_dir.exists() {
             fs::remove_dir_all(&workspace_dir).await.map_err(|e| {
-                OrcsError::Io(format!(
+                OrcsError::io(format!(
                     "Failed to delete workspace directory '{}': {}",
                     workspace_dir.display(),
                     e

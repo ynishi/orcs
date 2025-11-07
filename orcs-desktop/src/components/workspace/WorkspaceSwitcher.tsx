@@ -251,7 +251,7 @@ export function WorkspaceSwitcher({ sessionId, showTip = false, onCloseTip }: Wo
   return (
     <Popover 
       opened={showTip} 
-      position="bottom" 
+      position="bottom-end" 
       withArrow 
       shadow="md"
       width={300}

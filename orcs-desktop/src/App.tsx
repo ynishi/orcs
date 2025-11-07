@@ -171,15 +171,16 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [tabs, activeTabId, closeTab, switchToTab]);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when active tab's messages change
   useEffect(() => {
-    if (viewport.current) {
+    const activeTab = getActiveTab();
+    if (viewport.current && activeTab) {
       viewport.current.scrollTo({
         top: viewport.current.scrollHeight,
         behavior: "smooth",
       });
     }
-  }, [messages]);
+  }, [tabs, activeTabId, getActiveTab]);
 
   // Listen for real-time dialogue turn events from backend
   // Use ref to ensure only one listener is registered
@@ -303,8 +304,15 @@ function App() {
           }
           console.log('[App] Session participant_icons:', activeSession.participant_icons);
           const restoredMessages = convertSessionToMessages(activeSession, userNickname);
-          setMessages(restoredMessages);
-          console.log('[App] Loaded', restoredMessages.length, 'messages from session', currentSessionId);
+          
+          // 既にタブが開いていない場合のみ、タブとして開く
+          const existingTab = tabs.find(tab => tab.sessionId === currentSessionId);
+          if (!existingTab) {
+            openTab(activeSession, restoredMessages, true);
+            console.log('[App] Opened tab for active session with', restoredMessages.length, 'messages');
+          } else {
+            console.log('[App] Tab already exists for session', currentSessionId);
+          }
 
           // Restore execution strategy from session
           if (activeSession.execution_strategy) {
@@ -318,7 +326,7 @@ function App() {
     };
 
     loadActiveSessionMessages();
-  }, [currentSessionId, sessions, sessionsLoading, userNickname]);
+  }, [currentSessionId, sessions, sessionsLoading, userNickname, personas, tabs, openTab]);
 
   const refreshCustomCommands = useCallback(async () => {
     try {
@@ -407,11 +415,10 @@ function App() {
         const activeSession = await invoke<Session | null>('get_active_session');
         if (activeSession) {
           console.log('[App] Active session loaded:', activeSession.id);
-          // Switch to this session (this will update currentSessionId and messages)
+          // Switch to this session (this will update currentSessionId and open a tab)
           await switchSession(activeSession.id);
         } else {
-          console.log('[App] No active session, clearing messages');
-          setMessages([]);
+          console.log('[App] No active session');
           setTasks([]);
         }
       } catch (error) {
@@ -1332,8 +1339,8 @@ Generate the BlueprintWorkflow now.`;
 
   const handleNewSession = async () => {
     try {
-      await createSession();
-      setMessages([]);
+      const newSessionId = await createSession();
+      // 新しいセッションは自動的にタブとして開かれる（loadActiveSessionMessagesのuseEffectで）
       // Show toast notification
       notifications.show({
         title: 'New Session Created',

@@ -45,6 +45,9 @@ import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages, isIdleMode } from "./types/session";
 import { SlashCommand, ExpandedSlashCommand } from "./types/slash_command";
+import { useTabContext } from "./context/TabContext";
+import { Tabs } from "@mantine/core";
+import { ChatPanel } from "./components/chat/ChatPanel";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -54,8 +57,7 @@ type InteractionResult =
   | { type: 'NoOp' };
 
 function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  // グローバル状態（タブ非依存）
   const [status, setStatus] = useState<StatusInfo>(getDefaultStatus());
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredCommands, setFilteredCommands] = useState<CommandDefinition[]>([]);
@@ -64,8 +66,6 @@ function App() {
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userNickname, setUserNickname] = useState<string>('You');
   const [gitInfo, setGitInfo] = useState<GitInfo>({
@@ -73,8 +73,6 @@ function App() {
     branch: null,
     repo_name: null,
   });
-  const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
-  const [thinkingPersona, setThinkingPersona] = useState<string>('AI');
   const [customCommands, setCustomCommands] = useState<SlashCommand[]>([]);
   const [conversationMode, setConversationMode] = useState<string>('normal');
   const [talkStyle, setTalkStyle] = useState<string | null>(null);
@@ -99,9 +97,79 @@ function App() {
   const { workspace, allWorkspaces, files: workspaceFiles, refresh: refreshWorkspace, refreshWorkspaces, switchWorkspace } = useWorkspace();
   const [includeWorkspaceInPrompt, setIncludeWorkspaceInPrompt] = useState<boolean>(false);
 
+  // タブ管理
+  const {
+    tabs,
+    activeTabId,
+    openTab,
+    closeTab,
+    switchTab: switchToTab,
+    updateTabMessages,
+    updateTabTitle,
+    addMessageToTab,
+    updateTabInput,
+    updateTabAttachedFiles,
+    addAttachedFileToTab,
+    removeAttachedFileFromTab,
+    setTabDragging,
+    setTabThinking,
+    getActiveTab,
+  } = useTabContext();
+
   const [autoMode, setAutoMode] = useState<boolean>(false);
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // キーボードショートカット for タブ操作
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // Cmd/Ctrl + W: 現在のタブを閉じる
+      if (modKey && e.key === 'w' && activeTabId) {
+        e.preventDefault();
+        const activeTab = tabs.find(t => t.id === activeTabId);
+        if (activeTab) {
+          if (activeTab.isDirty) {
+            if (window.confirm(`"${activeTab.title}" has unsaved changes. Close anyway?`)) {
+              closeTab(activeTabId);
+            }
+          } else {
+            closeTab(activeTabId);
+          }
+        }
+      }
+
+      // Cmd/Ctrl + Tab: 次のタブ
+      if (modKey && e.key === 'Tab' && !e.shiftKey && tabs.length > 1) {
+        e.preventDefault();
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+        const nextIndex = (currentIndex + 1) % tabs.length;
+        switchToTab(tabs[nextIndex].id);
+      }
+
+      // Cmd/Ctrl + Shift + Tab: 前のタブ
+      if (modKey && e.key === 'Tab' && e.shiftKey && tabs.length > 1) {
+        e.preventDefault();
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+        const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        switchToTab(tabs[prevIndex].id);
+      }
+
+      // Cmd/Ctrl + 1-9: n番目のタブ
+      if (modKey && e.key >= '1' && e.key <= '9') {
+        e.preventDefault();
+        const index = parseInt(e.key) - 1;
+        if (index < tabs.length) {
+          switchToTab(tabs[index].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tabs, activeTabId, closeTab, switchToTab]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -161,7 +229,7 @@ function App() {
         unlisten();
       }
     };
-  }, []);
+  }, [addMessage]);
 
   // Load user nickname from backend on startup
   useEffect(() => {
@@ -409,6 +477,9 @@ function App() {
 
   // メッセージを追加するヘルパー関数
   const addMessage = useCallback((type: MessageType, author: string, text: string) => {
+    // アクティブなタブにメッセージを追加
+    if (!activeTabId) return;
+
     // Find persona by name to get icon and base_color
     const persona = personas.find(p => p.name === author);
 
@@ -421,8 +492,9 @@ function App() {
       icon: persona?.icon,
       baseColor: persona?.base_color,
     };
-    setMessages((prev) => [...prev, newMessage]);
-  }, [personas]);
+    
+    addMessageToTab(activeTabId, newMessage);
+  }, [personas, activeTabId, addMessageToTab]);
 
   const processInput = useCallback(
     async (rawInput: string, attachedFiles: File[] = []) => {
@@ -805,8 +877,10 @@ Generate the BlueprintWorkflow now.`;
 
       addMessage('user', userNickname, messageText);
 
-      setIsAiThinking(true);
-      setThinkingPersona('AI Assistant');
+      // アクティブなタブのAI思考状態を設定
+      if (activeTabId) {
+        setTabThinking(activeTabId, true, 'AI Assistant');
+      }
 
       try {
         // Upload files to workspace and get paths
@@ -860,7 +934,10 @@ Generate the BlueprintWorkflow now.`;
         console.error("Error calling backend:", error);
         addMessage('error', 'System', `Error: ${error}`);
       } finally {
-        setIsAiThinking(false);
+        // アクティブなタブのAI思考状態を解除
+        if (activeTabId) {
+          setTabThinking(activeTabId, false);
+        }
       }
     },
     [
@@ -871,10 +948,10 @@ Generate the BlueprintWorkflow now.`;
       includeWorkspaceInPrompt,
       invoke,
       saveCurrentSession,
-      setIsAiThinking,
+      setTabThinking,
+      activeTabId,
       setStatus,
       setTasks,
-      setThinkingPersona,
       status.activeTasks,
       status.connection,
       status.currentAgent,
@@ -888,7 +965,11 @@ Generate the BlueprintWorkflow now.`;
 
   // スレッド全体をテキストとして取得
   const getThreadAsText = () => {
-    return messages
+    // アクティブなタブのメッセージを取得
+    const activeTab = getActiveTab();
+    if (!activeTab) return '';
+    
+    return activeTab.messages
       .map((msg) => {
         const time = msg.timestamp.toLocaleString();
         return `[${time}] ${msg.author} (${msg.type}):\n${msg.text}\n`;
@@ -999,44 +1080,60 @@ Generate the BlueprintWorkflow now.`;
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(true);
+    if (activeTabId) {
+      setTabDragging(activeTabId, true);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    if (activeTabId) {
+      setTabDragging(activeTabId, false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    
+    if (!activeTabId) return;
+    setTabDragging(activeTabId, false);
 
     const files = Array.from(e.dataTransfer.files);
 
     if (files.length > 0) {
-      setAttachedFiles((prev) => [...prev, ...files]);
-      addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
+      const activeTab = getActiveTab();
+      if (activeTab) {
+        updateTabAttachedFiles(activeTabId, [...activeTab.attachedFiles, ...files]);
+        addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
+      }
     }
   };
 
   const removeAttachedFile = (index: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+    if (activeTabId) {
+      removeAttachedFileFromTab(activeTabId, index);
+    }
   };
 
   // ファイル選択ボタンのハンドラー
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length > 0) {
-      setAttachedFiles((prev) => [...prev, ...files]);
-      addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
+    if (files.length > 0 && activeTabId) {
+      const activeTab = getActiveTab();
+      if (activeTab) {
+        updateTabAttachedFiles(activeTabId, [...activeTab.attachedFiles, ...files]);
+        addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
+      }
     }
   };
 
   // Workspace からファイルをアタッチするハンドラー
   const handleAttachFileFromWorkspace = (file: File) => {
-    setAttachedFiles((prev) => [...prev, file]);
+    if (!activeTabId) return;
+    
+    addAttachedFileToTab(activeTabId, file);
 
     // Show toast notification instead of adding to chat history
     notifications.show({
@@ -1161,7 +1258,7 @@ Generate the BlueprintWorkflow now.`;
     }
   };
 
-  // セッション操作ハンドラー（Tauri統合版）
+  // セッション操作ハンドラー（タブ対応版）
   const handleSessionSelect = async (session: Session) => {
     try {
       // セッションを切り替え（バックエンドで履歴付きSessionDataを取得）
@@ -1169,42 +1266,36 @@ Generate the BlueprintWorkflow now.`;
 
       // メッセージ履歴を復元
       const restoredMessages = convertSessionToMessages(fullSession, userNickname);
-      setMessages(restoredMessages);
 
-      // AppModeをステータスに反映
-      if (isIdleMode(fullSession.app_mode)) {
-        setStatus(prev => ({ ...prev, mode: 'Idle' }));
-      } else {
-        // AwaitingConfirmation mode
-        setStatus(prev => ({ ...prev, mode: 'Awaiting' }));
-        console.log('Session has AwaitingConfirmation mode:', fullSession.app_mode);
-      }
+      // タブを開く（既に開いていればフォーカス）
+      const tabId = openTab(fullSession, restoredMessages);
 
-      // Show toast notification instead of adding to chat history
+      // Show toast notification
       notifications.show({
-        title: 'Session Switched',
-        message: `${session.title} (${restoredMessages.length} messages restored)`,
+        title: 'Session Opened',
+        message: `${session.title} (${restoredMessages.length} messages)`,
         color: 'blue',
-        icon: '✅',
+        icon: '📂',
       });
-
-      // Scroll to bottom after session switch
-      setTimeout(() => {
-        if (viewport.current) {
-          viewport.current.scrollTo({
-            top: viewport.current.scrollHeight,
-            behavior: "smooth",
-          });
-        }
-      }, 100);
     } catch (err) {
-      addMessage('error', 'System', `Failed to switch session: ${err}`);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to switch session: ${err}`,
+        color: 'red',
+      });
     }
   };
 
   const handleSessionDelete = async (sessionId: string) => {
     try {
       await deleteSession(sessionId);
+
+      // タブも閉じる
+      const tab = tabs.find(t => t.sessionId === sessionId);
+      if (tab) {
+        closeTab(tab.id);
+      }
+
       // Show toast notification
       notifications.show({
         title: 'Session Deleted',
@@ -1213,15 +1304,29 @@ Generate the BlueprintWorkflow now.`;
         icon: '🗑️',
       });
     } catch (err) {
-      addMessage('error', 'System', `Failed to delete session: ${err}`);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to delete session: ${err}`,
+        color: 'red',
+      });
     }
   };
 
   const handleSessionRename = async (sessionId: string, newTitle: string) => {
     try {
       await renameSession(sessionId, newTitle);
+
+      // タブのタイトルも更新
+      const tab = tabs.find(t => t.sessionId === sessionId);
+      if (tab) {
+        updateTabTitle(tab.id, newTitle);
+      }
     } catch (err) {
-      addMessage('error', 'System', `Failed to rename session: ${err}`);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to rename session: ${err}`,
+        color: 'red',
+      });
     }
   };
 
@@ -1256,12 +1361,16 @@ Generate the BlueprintWorkflow now.`;
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!input.trim() && attachedFiles.length === 0) {
+    // アクティブなタブの状態を取得
+    const activeTab = getActiveTab();
+    if (!activeTab) return;
+
+    if (!activeTab.input.trim() && activeTab.attachedFiles.length === 0) {
       return;
     }
 
-    const currentInput = input;
-    const currentFiles = [...attachedFiles];
+    const currentInput = activeTab.input;
+    const currentFiles = [...activeTab.attachedFiles];
 
     // Check for @mentions and auto-add inactive personas
     const mentions = extractMentions(currentInput);
@@ -1280,8 +1389,9 @@ Generate the BlueprintWorkflow now.`;
       }
     }
 
-    setInput("");
-    setAttachedFiles([]);
+    // アクティブなタブの入力状態をクリア
+    updateTabInput(activeTab.id, "");
+    updateTabAttachedFiles(activeTab.id, []);
     setShowSuggestions(false);
     setShowAgentSuggestions(false);
     await processInput(currentInput, currentFiles);
@@ -1396,162 +1506,235 @@ Generate the BlueprintWorkflow now.`;
               </Group>
             </Group>
 
-            {/* メッセージエリア */}
-            <Box
-              style={{ flex: 1, position: 'relative', minHeight: 0 }}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <ScrollArea h="100%" viewportRef={viewport}>
-                <Stack gap="sm" p="md">
-                  {messages.map((message) => (
-                    <MessageItem
-                      key={message.id}
-                      message={message}
-                      onSaveToWorkspace={handleSaveMessageToWorkspace}
-                      onExecuteAsTask={handleExecuteAsTask}
-                      workspaceRootPath={workspace?.rootPath}
-                    />
-                  ))}
-                  {isAiThinking && (
-                    <ThinkingIndicator personaName={thinkingPersona} />
-                  )}
+            {/* タブ領域 */}
+            {tabs.length === 0 ? (
+              <Box style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Stack align="center" gap="md">
+                  <Text size="xl" c="dimmed">No session opened</Text>
+                  <Text size="sm" c="dimmed">Select a session from the sidebar to start chatting</Text>
                 </Stack>
-              </ScrollArea>
-
-              {isDragging && (
-                <Paper
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(30, 144, 255, 0.1)',
-                    border: '3px dashed #1e90ff',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    pointerEvents: 'none',
-                  }}
-                >
-                  <Text size="xl" fw={700} c="blue">
-                    📁 Drop files here
-                  </Text>
-                </Paper>
-              )}
-            </Box>
-
-            {/* 入力フォーム */}
-            <form onSubmit={handleSubmit}>
-              <Stack gap="xs">
-                {attachedFiles.length > 0 && (
-                  <Group gap="xs">
-                    {attachedFiles.map((file, index) => (
-                      <Badge
-                        key={index}
-                        size="lg"
-                        variant="light"
-                        rightSection={
-                          <CloseButton
-                            size="xs"
-                            onClick={() => removeAttachedFile(index)}
-                          />
-                        }
-                      >
-                        📎 {file.name}
-                      </Badge>
-                    ))}
-                  </Group>
-                )}
-
-                <Box style={{ position: 'relative' }}>
-                  {showSuggestions && (
-                    <CommandSuggestions
-                      commands={filteredCommands}
-                      selectedIndex={selectedSuggestionIndex}
-                      onSelect={selectCommand}
-                      onHover={setSelectedSuggestionIndex}
-                    />
-                  )}
-
-                  {showAgentSuggestions && (
-                    <AgentSuggestions
-                      agents={filteredAgents}
-                      selectedIndex={selectedAgentIndex}
-                      onSelect={selectAgent}
-                    />
-                  )}
-
-                  <Textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.currentTarget.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={
-                      executionStrategy === 'mentioned'
-                        ? "Type @PersonaName to mention, or /help for commands... (⌘+Enter to send)"
-                        : "Type your message or /help for commands... (⌘+Enter to send)"
+              </Box>
+            ) : (
+              <Tabs
+                value={activeTabId}
+                onChange={async (value) => {
+                  if (!value) return;
+                  
+                  // タブを切り替え
+                  switchToTab(value);
+                  
+                  // バックエンドのセッションも切り替え
+                  const tab = tabs.find(t => t.id === value);
+                  if (tab) {
+                    try {
+                      await switchSession(tab.sessionId);
+                    } catch (err) {
+                      console.error('Failed to switch backend session:', err);
                     }
-                    size="md"
-                    minRows={1}
-                    maxRows={4}
-                    autosize
-                  />
-                </Box>
-
-                <Group gap="xs">
-                  <Tooltip label="Attach files">
-                    <Button
-                      variant="light"
-                      size="sm"
-                      component="label"
-                      leftSection="📎"
+                  }
+                }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
+              >
+                <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
+                  {tabs.map((tab) => (
+                    <Tabs.Tab
+                      key={tab.id}
+                      value={tab.id}
+                      style={{
+                        minWidth: '120px',
+                        maxWidth: '200px',
+                      }}
+                      leftSection={tab.isDirty ? '●' : undefined}
+                      rightSection={
+                        <CloseButton
+                          size="xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // 未保存の場合は確認
+                            if (tab.isDirty) {
+                              if (window.confirm(`"${tab.title}" has unsaved changes. Close anyway?`)) {
+                                closeTab(tab.id);
+                              }
+                            } else {
+                              closeTab(tab.id);
+                            }
+                          }}
+                        />
+                      }
                     >
-                      Attach
-                      <input type="file" multiple hidden onChange={handleFileSelect} />
-                    </Button>
-                  </Tooltip>
+                      <Text truncate style={{ maxWidth: '100%' }}>
+                        {tab.title}
+                      </Text>
+                    </Tabs.Tab>
+                  ))}
+                </Tabs.List>
 
-                  <Button type="submit" style={{ flex: 1 }}>Send</Button>
-
-                  <Tooltip label={autoMode ? 'Stop AUTO mode' : 'Start AUTO mode'}>
-                    <ActionIcon
-                      color={autoMode ? 'red' : 'green'}
-                      variant={autoMode ? 'filled' : 'light'}
-                      onClick={() => setAutoMode(!autoMode)}
-                      size="lg"
+                {tabs.map((tab) => (
+                  <Tabs.Panel key={tab.id} value={tab.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    {/* メッセージエリア */}
+                    <Box
+                      style={{ flex: 1, position: 'relative', minHeight: 0 }}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
                     >
-                      {autoMode ? '⏹️' : '▶️'}
-                    </ActionIcon>
-                  </Tooltip>
+                      <ScrollArea h="100%" viewportRef={viewport}>
+                        <Stack gap="sm" p="md">
+                          {tab.messages.map((message) => (
+                            <MessageItem
+                              key={message.id}
+                              message={message}
+                              onSaveToWorkspace={handleSaveMessageToWorkspace}
+                              onExecuteAsTask={handleExecuteAsTask}
+                              workspaceRootPath={workspace?.rootPath}
+                            />
+                          ))}
+                          {tab.isAiThinking && (
+                            <ThinkingIndicator personaName={tab.thinkingPersona} />
+                          )}
+                        </Stack>
+                      </ScrollArea>
 
-                  <CopyButton value={getThreadAsText()}>
-                    {({ copied, copy }) => (
-                      <Tooltip label={copied ? 'Copied!' : 'Copy thread'}>
-                        <ActionIcon color={copied ? 'teal' : 'blue'} variant="light" onClick={copy} size="lg">
-                          {copied ? '✓' : '📄'}
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </CopyButton>
-                </Group>
-              </Stack>
-            </form>
+                      {tab.isDragging && (
+                        <Paper
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(30, 144, 255, 0.1)',
+                            border: '3px dashed #1e90ff',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1000,
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          <Text size="xl" fw={700} c="blue">
+                            📁 Drop files here
+                          </Text>
+                        </Paper>
+                      )}
+                    </Box>
 
-            <StatusBar
-              status={status}
-              gitInfo={gitInfo}
-              participatingAgentsCount={activeParticipantIds.length}
-              totalPersonas={personas.length}
-              autoMode={autoMode}
-              conversationMode={conversationMode}
-              talkStyle={talkStyle}
-              executionStrategy={executionStrategy}
-            />
+                    {/* 入力フォーム */}
+                    <form onSubmit={handleSubmit}>
+                      <Stack gap="xs">
+                        {tab.attachedFiles.length > 0 && (
+                          <Group gap="xs">
+                            {tab.attachedFiles.map((file, index) => (
+                              <Badge
+                                key={index}
+                                size="lg"
+                                variant="light"
+                                rightSection={
+                                  <CloseButton
+                                    size="xs"
+                                    onClick={() => removeAttachedFile(index)}
+                                  />
+                                }
+                              >
+                                📎 {file.name}
+                              </Badge>
+                            ))}
+                          </Group>
+                        )}
+
+                        <Box style={{ position: 'relative' }}>
+                          {showSuggestions && (
+                            <CommandSuggestions
+                              commands={filteredCommands}
+                              selectedIndex={selectedSuggestionIndex}
+                              onSelect={selectCommand}
+                              onHover={setSelectedSuggestionIndex}
+                            />
+                          )}
+
+                          {showAgentSuggestions && (
+                            <AgentSuggestions
+                              agents={filteredAgents}
+                              selectedIndex={selectedAgentIndex}
+                              onSelect={selectAgent}
+                            />
+                          )}
+
+                          <Textarea
+                            ref={textareaRef}
+                            value={tab.input}
+                            onChange={(e) => {
+                              if (activeTabId) {
+                                updateTabInput(activeTabId, e.currentTarget.value);
+                              }
+                            }}
+                            onKeyDown={handleKeyDown}
+                            placeholder={
+                              executionStrategy === 'mentioned'
+                                ? "Type @PersonaName to mention, or /help for commands... (⌘+Enter to send)"
+                                : "Type your message or /help for commands... (⌘+Enter to send)"
+                            }
+                            size="md"
+                            minRows={1}
+                            maxRows={4}
+                            autosize
+                          />
+                        </Box>
+
+                        <Group gap="xs">
+                          <Tooltip label="Attach files">
+                            <Button
+                              variant="light"
+                              size="sm"
+                              component="label"
+                              leftSection="📎"
+                            >
+                              Attach
+                              <input type="file" multiple hidden onChange={handleFileSelect} />
+                            </Button>
+                          </Tooltip>
+
+                          <Button type="submit" style={{ flex: 1 }}>Send</Button>
+
+                          <Tooltip label={autoMode ? 'Stop AUTO mode' : 'Start AUTO mode'}>
+                            <ActionIcon
+                              color={autoMode ? 'red' : 'green'}
+                              variant={autoMode ? 'filled' : 'light'}
+                              onClick={() => setAutoMode(!autoMode)}
+                              size="lg"
+                            >
+                              {autoMode ? '⏹️' : '▶️'}
+                            </ActionIcon>
+                          </Tooltip>
+
+                          <CopyButton value={getThreadAsText()}>
+                            {({ copied, copy }) => (
+                              <Tooltip label={copied ? 'Copied!' : 'Copy thread'}>
+                                <ActionIcon color={copied ? 'teal' : 'blue'} variant="light" onClick={copy} size="lg">
+                                  {copied ? '✓' : '📄'}
+                                </ActionIcon>
+                              </Tooltip>
+                            )}
+                          </CopyButton>
+                        </Group>
+                      </Stack>
+                    </form>
+
+                    <StatusBar
+                      status={status}
+                      gitInfo={gitInfo}
+                      participatingAgentsCount={activeParticipantIds.length}
+                      totalPersonas={personas.length}
+                      autoMode={autoMode}
+                      conversationMode={conversationMode}
+                      talkStyle={talkStyle}
+                      executionStrategy={executionStrategy}
+                    />
+                  </Tabs.Panel>
+                ))}
+              </Tabs>
+            )}
           </Stack>
         </Container>
       </AppShell.Main>

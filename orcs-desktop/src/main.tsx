@@ -8,6 +8,7 @@ import { Notifications } from '@mantine/notifications';
 import { theme } from './theme';
 import { WorkspaceProvider } from './context/WorkspaceContext';
 import { SessionProvider } from './context/SessionContext';
+import { TabProvider } from './context/TabContext';
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <Notifications position="top-right" />
       <WorkspaceProvider>
         <SessionProvider>
-          <App />
+          <TabProvider>
+            <App />
+          </TabProvider>
         </SessionProvider>
       </WorkspaceProvider>
     </MantineProvider>

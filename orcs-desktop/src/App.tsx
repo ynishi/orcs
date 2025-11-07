@@ -116,6 +116,27 @@ function App() {
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // メッセージを追加するヘルパー関数（early definition for useRef/useSlashCommands）
+  const addMessage = useCallback((type: MessageType, author: string, text: string) => {
+    // アクティブなタブにメッセージを追加
+    if (!activeTabId) return;
+
+    // Find persona by name to get icon and base_color
+    const persona = personas.find(p => p.name === author);
+
+    const newMessage: Message = {
+      id: `${Date.now()}-${Math.random()}`,
+      type,
+      author,
+      text,
+      timestamp: new Date(),
+      icon: persona?.icon,
+      baseColor: persona?.base_color,
+    };
+    
+    addMessageToTab(activeTabId, newMessage);
+  }, [personas, activeTabId, addMessageToTab]);
+
   // キーボードショートカット for タブ操作
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -485,27 +506,6 @@ function App() {
       setShowAgentSuggestions(false);
     }
   }, [input, customCommands, personas, activeParticipantIds]);
-
-  // メッセージを追加するヘルパー関数
-  const addMessage = useCallback((type: MessageType, author: string, text: string) => {
-    // アクティブなタブにメッセージを追加
-    if (!activeTabId) return;
-
-    // Find persona by name to get icon and base_color
-    const persona = personas.find(p => p.name === author);
-
-    const newMessage: Message = {
-      id: `${Date.now()}-${Math.random()}`,
-      type,
-      author,
-      text,
-      timestamp: new Date(),
-      icon: persona?.icon,
-      baseColor: persona?.base_color,
-    };
-    
-    addMessageToTab(activeTabId, newMessage);
-  }, [personas, activeTabId, addMessageToTab]);
 
   // SlashCommand処理（addMessage, refreshPersonasの定義後に配置）
   const { handleSlashCommand } = useSlashCommands({

@@ -1,0 +1,193 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import type { Session } from '../types/session';
+
+export interface SessionContextValue {
+  sessions: Session[];
+  currentSessionId: string | null;
+  loading: boolean;
+  error: string | null;
+  createSession: () => Promise<string>;
+  switchSession: (sessionId: string) => Promise<Session>;
+  deleteSession: (sessionId: string) => Promise<void>;
+  renameSession: (sessionId: string, newTitle: string) => Promise<void>;
+  saveCurrentSession: () => Promise<void>;
+  refreshSessions: () => Promise<void>;
+}
+
+const SessionContext = createContext<SessionContextValue | undefined>(undefined);
+
+interface SessionProviderProps {
+  children: ReactNode;
+}
+
+export function SessionProvider({ children }: SessionProviderProps) {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const listenerRegistered = useRef(false);
+
+  const loadSessions = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const sessionList = await invoke<Session[]>('list_sessions');
+      setSessions(sessionList);
+
+      const activeSession = await invoke<Session | null>('get_active_session');
+      if (activeSession) {
+        setCurrentSessionId(activeSession.id);
+      } else {
+        setCurrentSessionId(null);
+      }
+    } catch (err) {
+      console.error('Failed to load sessions:', err);
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  useEffect(() => {
+    if (listenerRegistered.current) {
+      return;
+    }
+
+    listenerRegistered.current = true;
+    const unlistenPromise = listen<string>('workspace-switched', async () => {
+      await loadSessions();
+    });
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+      listenerRegistered.current = false;
+    };
+  }, [loadSessions]);
+
+  const createSession = useCallback(async (): Promise<string> => {
+    try {
+      const newSession = await invoke<Session>('create_session');
+      setCurrentSessionId(newSession.id);
+      await loadSessions();
+      return newSession.id;
+    } catch (err) {
+      console.error('Failed to create session:', err);
+      throw new Error(`Failed to create session: ${err}`);
+    }
+  }, [loadSessions]);
+
+  const switchSessionHandler = useCallback(
+    async (sessionId: string): Promise<Session> => {
+      try {
+        const session = await invoke<Session>('switch_session', { sessionId });
+        setCurrentSessionId(sessionId);
+        await loadSessions();
+        return session;
+      } catch (err) {
+        console.error('Failed to switch session:', err);
+        throw new Error(`Failed to switch session: ${err}`);
+      }
+    },
+    [loadSessions],
+  );
+
+  const deleteSession = useCallback(
+    async (sessionId: string) => {
+      try {
+        await invoke('delete_session', { sessionId });
+
+        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+
+        if (currentSessionId === sessionId) {
+          const currentIndex = sessions.findIndex((s) => s.id === sessionId);
+          const remainingSessions = sessions.filter((s) => s.id !== sessionId);
+
+          if (remainingSessions.length > 0) {
+            const nextIndex = Math.min(currentIndex, remainingSessions.length - 1);
+            const nextSession = remainingSessions[nextIndex];
+            await invoke('switch_session', { sessionId: nextSession.id });
+            setCurrentSessionId(nextSession.id);
+          } else {
+            await createSession();
+          }
+        }
+
+        await loadSessions();
+      } catch (err) {
+        console.error('Failed to delete session:', err);
+        throw new Error(`Failed to delete session: ${err}`);
+      }
+    },
+    [currentSessionId, sessions, createSession, loadSessions],
+  );
+
+  const renameSession = useCallback(async (sessionId: string, newTitle: string) => {
+    try {
+      await invoke('rename_session', { sessionId, newTitle });
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, title: newTitle } : s)),
+      );
+    } catch (err) {
+      console.error('Failed to rename session:', err);
+      throw new Error(`Failed to rename session: ${err}`);
+    }
+  }, []);
+
+  const saveCurrentSession = useCallback(async () => {
+    try {
+      await invoke('save_current_session');
+    } catch (err) {
+      console.error('Failed to save session:', err);
+    }
+  }, []);
+
+  const refreshSessions = useCallback(async () => {
+    await loadSessions();
+  }, [loadSessions]);
+
+  const value = useMemo<SessionContextValue>(
+    () => ({
+      sessions,
+      currentSessionId,
+      loading,
+      error,
+      createSession,
+      switchSession: switchSessionHandler,
+      deleteSession,
+      renameSession,
+      saveCurrentSession,
+      refreshSessions,
+    }),
+    [
+      sessions,
+      currentSessionId,
+      loading,
+      error,
+      createSession,
+      switchSessionHandler,
+      deleteSession,
+      renameSession,
+      saveCurrentSession,
+      refreshSessions,
+    ],
+  );
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+export function useSessionContext(): SessionContextValue {
+  const context = useContext(SessionContext);
+  if (!context) {
+    throw new Error('useSessionContext must be used within a SessionProvider');
+  }
+  return context;
+}
+
+

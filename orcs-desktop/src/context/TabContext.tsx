@@ -90,11 +90,8 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       const existingTab = prev.find((tab) => tab.sessionId === session.id);
 
       if (existingTab) {
-        // 既存タブを更新してフォーカス
+        // 既存タブを更新
         tabId = existingTab.id;
-        if (switchToTab) {
-          setActiveTabId(tabId);
-        }
         return prev.map((tab) =>
           tab.id === existingTab.id
             ? { ...tab, messages, title: session.title, lastAccessedAt: Date.now() }
@@ -110,30 +107,31 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
         sessionId: session.id,
         workspaceId: workspaceId,
         title: session.title,
-        
+
         // メッセージ関連
         messages,
-        
+
         // 入力フォーム状態
         input: '',
         attachedFiles: [],
-        
+
         // UI状態
         isDragging: false,
         isAiThinking: false,
         thinkingPersona: 'AI',
-        
+
         // メタデータ
         isDirty: false,
         lastAccessedAt: Date.now(),
       };
 
-      if (switchToTab) {
-        setActiveTabId(tabId);
-      }
-
       return [...prev, newTab];
     });
+
+    // setTabs()の外で setActiveTabId() を呼ぶことで、確実に更新を反映
+    if (switchToTab) {
+      setActiveTabId(tabId!);
+    }
 
     return tabId!;
   }, []);

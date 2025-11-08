@@ -336,9 +336,9 @@ function App() {
           }
           console.log('[App] Session participant_icons:', activeSession.participant_icons);
           const restoredMessages = convertSessionToMessages(activeSession, userNickname);
-          
+
           // 既にタブが開いていない場合のみ、タブとして開く
-          const existingTab = tabs.find(tab => tab.sessionId === currentSessionId);
+          const existingTab = getTabBySessionId(currentSessionId);
           if (!existingTab && workspace) {
             openTab(activeSession, restoredMessages, workspace.id, true);
             console.log('[App] Opened tab for active session with', restoredMessages.length, 'messages');
@@ -358,7 +358,7 @@ function App() {
     };
 
     loadActiveSessionMessages();
-  }, [currentSessionId, sessions, sessionsLoading, userNickname, personas, tabs, openTab]);
+  }, [currentSessionId, sessions, sessionsLoading, userNickname, personas, workspace, openTab, getTabBySessionId]);
 
   const refreshCustomCommands = useCallback(async () => {
     try {

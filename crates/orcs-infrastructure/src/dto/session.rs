@@ -576,7 +576,7 @@ pub struct SessionV3_2_0 {
     #[serde(default)]
     pub is_archived: bool,
     /// Manual sort order (optional, for custom ordering within favorites)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort_order: Option<i32>,
 }
 

@@ -234,14 +234,14 @@ export function SessionList({
                       <ActionIcon
                         className="action-btn"
                         size="sm"
-                        color="gray"
+                        color="blue"
                         variant="subtle"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onMoveSortOrder(session.id, 'up');
+                          console.log('[SessionList] UP clicked:', session.id, session.title);
+                          onMoveSortOrder?.(session.id, 'up');
                         }}
                         style={{
-                          opacity: 0,
                           transition: 'opacity 0.15s ease',
                           flexShrink: 0,
                         }}
@@ -251,14 +251,14 @@ export function SessionList({
                       <ActionIcon
                         className="action-btn"
                         size="sm"
-                        color="gray"
+                        color="blue"
                         variant="subtle"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onMoveSortOrder(session.id, 'down');
+                          console.log('[SessionList] DOWN clicked:', session.id, session.title);
+                          onMoveSortOrder?.(session.id, 'down');
                         }}
                         style={{
-                          opacity: 0,
                           transition: 'opacity 0.15s ease',
                           flexShrink: 0,
                         }}

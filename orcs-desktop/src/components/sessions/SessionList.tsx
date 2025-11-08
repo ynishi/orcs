@@ -88,8 +88,13 @@ export function SessionList({
     ? sortedSessions
     : sortedSessions.filter(s => !s.is_archived);
 
+  // Favorites/Recentに分離
+  const favoriteSessions = visibleSessions.filter(s => s.is_favorite && !s.is_archived);
+  const recentSessions = visibleSessions.filter(s => !s.is_favorite && !s.is_archived);
+  const archivedSessions = visibleSessions.filter(s => s.is_archived);
+
   // Favoriteセッションの数を数える（UP/DOWNボタンの表示判定用）
-  const favoriteSessionsCount = visibleSessions.filter(s => s.is_favorite).length;
+  const favoriteSessionsCount = favoriteSessions.length;
 
   const handleStartEdit = (session: Session, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -108,6 +113,172 @@ export function SessionList({
     setEditingSessionId(null);
     setEditingTitle('');
   };
+
+  // セッションレンダリング関数
+  const renderSession = (session: Session) => (
+    <Box
+      key={session.id}
+      style={{
+        borderRadius: '8px',
+        border: '1px solid var(--mantine-color-gray-3)',
+        backgroundColor: session.id === currentSessionId ? '#e7f5ff' : 'white',
+        transition: 'all 0.15s ease',
+        cursor: 'pointer',
+        overflow: 'hidden',
+      }}
+    >
+      {editingSessionId === session.id ? (
+        // 編集モード
+        <Box p="md">
+          <TextInput
+            size="xs"
+            value={editingTitle}
+            onChange={(e) => setEditingTitle(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSaveEdit(session.id);
+              } else if (e.key === 'Escape') {
+                handleCancelEdit();
+              }
+            }}
+            onBlur={() => handleSaveEdit(session.id)}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+          />
+        </Box>
+      ) : (
+        <>
+          {/* TOPメニュー行 */}
+          <Group
+            gap="xs"
+            px="md"
+            py="xs"
+            justify="flex-end"
+            style={{
+              backgroundColor: session.id === currentSessionId ? '#d0ebff' : '#f8f9fa',
+              borderBottom: '1px solid var(--mantine-color-gray-3)',
+            }}
+          >
+            {/* Favoriteボタン */}
+            <Tooltip label={session.is_favorite ? "Remove from favorites" : "Add to favorites"} withArrow>
+              <ActionIcon
+                size="sm"
+                color={session.is_favorite ? "yellow" : "gray"}
+                variant="subtle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite?.(session.id);
+                }}
+                style={{ flexShrink: 0 }}
+              >
+                {session.is_favorite ? "⭐" : "☆"}
+              </ActionIcon>
+            </Tooltip>
+
+            {/* メニュー */}
+            <Menu position="bottom-end" withinPortal>
+              <Menu.Target>
+                <ActionIcon
+                  size="sm"
+                  color="gray"
+                  variant="subtle"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ flexShrink: 0 }}
+                >
+                  <IconDotsVertical size={16} />
+                </ActionIcon>
+              </Menu.Target>
+
+              <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+                {/* UP/DOWN（Favoriteが2個以上ある場合のみ表示） */}
+                {session.is_favorite && onMoveSortOrder && favoriteSessionsCount >= 2 && (
+                  <>
+                    <Menu.Item
+                      leftSection={<IconArrowUp size={14} />}
+                      onClick={() => onMoveSortOrder(session.id, 'up')}
+                    >
+                      Move Up
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<IconArrowDown size={14} />}
+                      onClick={() => onMoveSortOrder(session.id, 'down')}
+                    >
+                      Move Down
+                    </Menu.Item>
+                    <Menu.Divider />
+                  </>
+                )}
+
+                {/* Rename */}
+                <Menu.Item
+                  leftSection={<IconPencil size={14} />}
+                  onClick={() => {
+                    setEditingSessionId(session.id);
+                    setEditingTitle(session.title);
+                  }}
+                >
+                  Rename
+                </Menu.Item>
+
+                {/* Archive/Unarchive */}
+                <Menu.Item
+                  leftSection={<IconArchive size={14} />}
+                  onClick={() => onToggleArchive?.(session.id)}
+                >
+                  {session.is_archived ? 'Unarchive' : 'Archive'}
+                </Menu.Item>
+
+                <Menu.Divider />
+
+                {/* Delete */}
+                <Menu.Item
+                  leftSection={<IconTrash size={14} />}
+                  color="red"
+                  onClick={() => onSessionDelete?.(session.id)}
+                >
+                  Delete
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
+
+          {/* コンテンツエリア */}
+          <UnstyledButton
+            onClick={() => onSessionSelect?.(session)}
+            onDoubleClick={(e) => handleStartEdit(session, e)}
+            style={{ width: '100%', textAlign: 'left' }}
+          >
+            <Box p="md">
+              <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
+                {session.title}
+              </Text>
+              <Group gap="xs" mt={4}>
+                {getWorkspaceName(session.workspace_id) && (
+                  <>
+                    <Badge size="xs" variant="light" color="blue" style={{ textTransform: 'none' }}>
+                      {getWorkspaceName(session.workspace_id)}
+                    </Badge>
+                    <Text size="xs" c="dimmed">
+                      •
+                    </Text>
+                  </>
+                )}
+                <Text size="xs" c="dimmed">
+                  {getMessageCount(session)} msgs
+                </Text>
+                <Text size="xs" c="dimmed">
+                  •
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {formatDate(getLastActive(session))}
+                </Text>
+              </Group>
+            </Box>
+          </UnstyledButton>
+        </>
+      )}
+    </Box>
+  );
 
   return (
     <Stack gap="xs" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -150,171 +321,42 @@ export function SessionList({
 
       {/* セッションリスト */}
       <ScrollArea style={{ flex: 1 }} px="md" type="auto">
-        <Stack gap={4}>
-          {visibleSessions.map((session) => (
-            <Box
-              key={session.id}
-              style={{
-                borderRadius: '8px',
-                border: '1px solid var(--mantine-color-gray-3)',
-                backgroundColor: session.id === currentSessionId ? '#e7f5ff' : 'white',
-                transition: 'all 0.15s ease',
-                cursor: 'pointer',
-                overflow: 'hidden',
-              }}
-            >
-              {editingSessionId === session.id ? (
-                // 編集モード
-                <Box p="md">
-                  <TextInput
-                    size="xs"
-                    value={editingTitle}
-                    onChange={(e) => setEditingTitle(e.currentTarget.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSaveEdit(session.id);
-                      } else if (e.key === 'Escape') {
-                        handleCancelEdit();
-                      }
-                    }}
-                    onBlur={() => handleSaveEdit(session.id)}
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </Box>
-              ) : (
-                <>
-                  {/* TOPメニュー行 */}
-                  <Group
-                    gap="xs"
-                    px="md"
-                    py="xs"
-                    justify="flex-end"
-                    style={{
-                      backgroundColor: session.id === currentSessionId ? '#d0ebff' : '#f8f9fa',
-                      borderBottom: '1px solid var(--mantine-color-gray-3)',
-                    }}
-                  >
-                    {/* Favoriteボタン */}
-                    <Tooltip label={session.is_favorite ? "Remove from favorites" : "Add to favorites"} withArrow>
-                      <ActionIcon
-                        size="sm"
-                        color={session.is_favorite ? "yellow" : "gray"}
-                        variant="subtle"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleFavorite?.(session.id);
-                        }}
-                        style={{ flexShrink: 0 }}
-                      >
-                        {session.is_favorite ? "⭐" : "☆"}
-                      </ActionIcon>
-                    </Tooltip>
-
-                    {/* メニュー */}
-                    <Menu position="bottom-end" withinPortal>
-                      <Menu.Target>
-                        <ActionIcon
-                          size="sm"
-                          color="gray"
-                          variant="subtle"
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ flexShrink: 0 }}
-                        >
-                          <IconDotsVertical size={16} />
-                        </ActionIcon>
-                      </Menu.Target>
-
-                      <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
-                        {/* UP/DOWN（Favoriteが2個以上ある場合のみ表示） */}
-                        {session.is_favorite && onMoveSortOrder && favoriteSessionsCount >= 2 && (
-                          <>
-                            <Menu.Item
-                              leftSection={<IconArrowUp size={14} />}
-                              onClick={() => onMoveSortOrder(session.id, 'up')}
-                            >
-                              Move Up
-                            </Menu.Item>
-                            <Menu.Item
-                              leftSection={<IconArrowDown size={14} />}
-                              onClick={() => onMoveSortOrder(session.id, 'down')}
-                            >
-                              Move Down
-                            </Menu.Item>
-                            <Menu.Divider />
-                          </>
-                        )}
-
-                        {/* Rename */}
-                        <Menu.Item
-                          leftSection={<IconPencil size={14} />}
-                          onClick={() => {
-                            setEditingSessionId(session.id);
-                            setEditingTitle(session.title);
-                          }}
-                        >
-                          Rename
-                        </Menu.Item>
-
-                        {/* Archive/Unarchive */}
-                        <Menu.Item
-                          leftSection={<IconArchive size={14} />}
-                          onClick={() => onToggleArchive?.(session.id)}
-                        >
-                          {session.is_archived ? 'Unarchive' : 'Archive'}
-                        </Menu.Item>
-
-                        <Menu.Divider />
-
-                        {/* Delete */}
-                        <Menu.Item
-                          leftSection={<IconTrash size={14} />}
-                          color="red"
-                          onClick={() => onSessionDelete?.(session.id)}
-                        >
-                          Delete
-                        </Menu.Item>
-                      </Menu.Dropdown>
-                    </Menu>
-                  </Group>
-
-                  {/* コンテンツエリア */}
-                  <UnstyledButton
-                    onClick={() => onSessionSelect?.(session)}
-                    onDoubleClick={(e) => handleStartEdit(session, e)}
-                    style={{ width: '100%', textAlign: 'left' }}
-                  >
-                    <Box p="md">
-                      <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
-                        {session.title}
-                      </Text>
-                      <Group gap="xs" mt={4}>
-                        {getWorkspaceName(session.workspace_id) && (
-                          <>
-                            <Badge size="xs" variant="light" color="blue" style={{ textTransform: 'none' }}>
-                              {getWorkspaceName(session.workspace_id)}
-                            </Badge>
-                            <Text size="xs" c="dimmed">
-                              •
-                            </Text>
-                          </>
-                        )}
-                        <Text size="xs" c="dimmed">
-                          {getMessageCount(session)} msgs
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          •
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {formatDate(getLastActive(session))}
-                        </Text>
-                      </Group>
-                    </Box>
-                  </UnstyledButton>
-                </>
-              )}
+        <Stack gap="md">
+          {/* Favoritesセクション */}
+          {favoriteSessions.length > 0 && (
+            <Box>
+              <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
+                FAVORITES
+              </Text>
+              <Stack gap={4}>
+                {favoriteSessions.map(renderSession)}
+              </Stack>
             </Box>
-          ))}
+          )}
+
+          {/* Recentセクション */}
+          {recentSessions.length > 0 && (
+            <Box>
+              <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
+                RECENT
+              </Text>
+              <Stack gap={4}>
+                {recentSessions.map(renderSession)}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Archivedセクション */}
+          {showArchived && archivedSessions.length > 0 && (
+            <Box>
+              <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
+                ARCHIVED
+              </Text>
+              <Stack gap={4}>
+                {archivedSessions.map(renderSession)}
+              </Stack>
+            </Box>
+          )}
 
           {/* 空の状態 */}
           {sessions.length === 0 && (

@@ -1048,27 +1048,37 @@ function App() {
   // セッション操作ハンドラー（タブ対応版）
   const handleSessionSelect = async (session: Session) => {
     try {
-      // セッションを切り替え（バックエンドで履歴付きSessionDataを取得）
+      console.log('[App] Session selected:', {
+        sessionId: session.id.substring(0, 8),
+        workspaceId: session.workspace_id.substring(0, 8),
+        currentWorkspace: workspace?.id.substring(0, 8),
+      });
+
+      // 1. Workspace切り替え（必要なら）
+      if (session.workspace_id !== workspace?.id) {
+        console.log('[App] Switching workspace for session...');
+        await switchWorkspaceBackend(session.id, session.workspace_id);
+        // ↑ 'workspace-switched' イベント発火 → 既存リスナーで全体同期
+      }
+
+      // 2. セッションを切り替え（バックエンドで履歴付きSessionDataを取得）
       const fullSession = await switchSession(session.id);
 
-      // メッセージ履歴を復元
+      // 3. メッセージ履歴を復元
       const restoredMessages = convertSessionToMessages(fullSession, userNickname);
 
-      // タブを開く（既に開いていればフォーカス）
-      if (workspace) {
-        openTab(fullSession, restoredMessages, workspace.id);
-        
-        // Show toast notification
-        notifications.show({
-          title: 'Session Opened',
-          message: `${session.title} (${restoredMessages.length} messages)`,
-          color: 'blue',
-          icon: '📂',
-        });
-      } else {
-        console.error('[App] Cannot open tab: No workspace selected');
-      }
+      // 4. タブを開く（session.workspace_idを使用）
+      openTab(fullSession, restoredMessages, session.workspace_id);
+
+      // Show toast notification
+      notifications.show({
+        title: 'Session Opened',
+        message: `${session.title} (${restoredMessages.length} messages)`,
+        color: 'blue',
+        icon: '📂',
+      });
     } catch (err) {
+      console.error('[App] Failed to select session:', err);
       notifications.show({
         title: 'Error',
         message: `Failed to switch session: ${err}`,
@@ -1339,18 +1349,56 @@ function App() {
                 value={activeTabId}
                 onChange={async (value) => {
                   if (!value) return;
-                  
-                  // タブを切り替え
-                  switchToTab(value);
-                  
-                  // バックエンドのセッションも切り替え
+
                   const tab = tabs.find(t => t.id === value);
-                  if (tab) {
+                  if (!tab) return;
+
+                  console.log('[App] Tab switched:', {
+                    tabId: value.substring(0, 8),
+                    sessionId: tab.sessionId.substring(0, 8),
+                    workspaceId: tab.workspaceId.substring(0, 8),
+                    currentWorkspace: workspace?.id.substring(0, 8),
+                  });
+
+                  // 1. タブを切り替え
+                  switchToTab(value);
+
+                  // 2. バックエンドのセッションも切り替え
+                  try {
+                    await switchSession(tab.sessionId);
+                    console.log('[App] Backend session switched');
+                  } catch (err) {
+                    console.error('[App] Failed to switch backend session:', err);
+                    notifications.show({
+                      title: 'Session Switch Failed',
+                      message: String(err),
+                      color: 'red',
+                    });
+                    return;
+                  }
+
+                  // 3. Workspace切り替え（必要な場合のみ）
+                  if (tab.workspaceId !== workspace?.id) {
+                    console.log('[App] Workspace differs, switching...', {
+                      from: workspace?.id.substring(0, 8),
+                      to: tab.workspaceId.substring(0, 8),
+                    });
+
                     try {
-                      await switchSession(tab.sessionId);
+                      await switchWorkspaceBackend(tab.sessionId, tab.workspaceId);
+                      console.log('[App] Workspace switched, workspace-switched event will fire');
+                      // ↑ 内部で 'workspace-switched' イベント発火
+                      // ↓ 既存リスナー（L461-536）で全体同期
                     } catch (err) {
-                      console.error('Failed to switch backend session:', err);
+                      console.error('[App] Failed to switch workspace:', err);
+                      notifications.show({
+                        title: 'Workspace Switch Failed',
+                        message: String(err),
+                        color: 'red',
+                      });
                     }
+                  } else {
+                    console.log('[App] Same workspace, no switch needed');
                   }
                 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}

@@ -13,7 +13,7 @@ export interface Session {
   current_persona_id: string;
   persona_histories: Record<string, ConversationMessage[]>;
   app_mode: AppMode;
-  workspace_id?: string; // Optional workspace ID for filtering
+  workspace_id: string; // All sessions must be associated with a workspace
   active_participant_ids: string[]; // Active participants
   execution_strategy: string; // "broadcast" or "sequential"
   system_messages: ConversationMessage[]; // System messages (join/leave events, etc.)

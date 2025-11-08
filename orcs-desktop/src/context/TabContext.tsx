@@ -72,9 +72,10 @@ const TabContext = createContext<TabContextValue | undefined>(undefined);
 
 interface TabProviderProps {
   children: ReactNode;
+  onTabSwitched?: (tabId: string, workspaceId: string) => void;
 }
 
-export function TabProvider({ children }: TabProviderProps) {
+export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   const [tabs, setTabs] = useState<SessionTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
@@ -180,13 +181,25 @@ export function TabProvider({ children }: TabProviderProps) {
    * タブを切り替える
    */
   const switchTab = useCallback((tabId: string) => {
+    let targetWorkspaceId: string | undefined;
+
     setTabs((prev) =>
-      prev.map((tab) =>
-        tab.id === tabId ? { ...tab, lastAccessedAt: Date.now() } : tab
-      )
+      prev.map((tab) => {
+        if (tab.id === tabId) {
+          targetWorkspaceId = tab.workspaceId;
+          return { ...tab, lastAccessedAt: Date.now() };
+        }
+        return tab;
+      })
     );
+
     setActiveTabId(tabId);
-  }, []);
+
+    // コールバック実行
+    if (targetWorkspaceId && onTabSwitched) {
+      onTabSwitched(tabId, targetWorkspaceId);
+    }
+  }, [onTabSwitched]);
 
   /**
    * タブのメッセージを更新

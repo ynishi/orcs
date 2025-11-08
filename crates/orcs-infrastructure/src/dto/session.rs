@@ -473,6 +473,58 @@ pub struct SessionV3_0_0 {
     pub talk_style: Option<TalkStyle>,
 }
 
+/// V3.1.0: Added is_favorite and is_archived for session organization
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Versioned)]
+#[versioned(version = "3.1.0")]
+pub struct SessionV3_1_0 {
+    /// Unique session identifier
+    pub id: String,
+    /// Human-readable session title
+    pub title: String,
+    /// Timestamp when the session was created (ISO 8601 format)
+    pub created_at: String,
+    /// Timestamp when the session was last updated (ISO 8601 format)
+    pub updated_at: String,
+    /// The currently active persona ID
+    pub current_persona_id: String,
+    /// Conversation history for each persona
+    pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
+    /// Current application mode
+    pub app_mode: AppMode,
+    /// Workspace ID - all sessions must be associated with a workspace
+    pub workspace_id: String,
+    /// Active participant persona IDs
+    #[serde(default)]
+    pub active_participant_ids: Vec<String>,
+    /// Execution strategy (now using ExecutionModel enum)
+    #[serde(default = "default_execution_model")]
+    pub execution_strategy: ExecutionModel,
+    /// System messages (join/leave notifications, etc.)
+    #[serde(default)]
+    pub system_messages: Vec<ConversationMessage>,
+    /// Participant persona ID to name mapping for display
+    #[serde(default)]
+    pub participants: HashMap<String, String>,
+    /// Participant persona ID to icon mapping for display
+    #[serde(default)]
+    pub participant_icons: HashMap<String, String>,
+    /// Participant persona ID to base color mapping for UI theming
+    #[serde(default)]
+    pub participant_colors: HashMap<String, String>,
+    /// Conversation mode (controls verbosity and style)
+    #[serde(default)]
+    pub conversation_mode: ConversationMode,
+    /// Talk style for dialogue context (Brainstorm, Debate, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub talk_style: Option<TalkStyle>,
+    /// Whether this session is marked as favorite (pinned to top)
+    #[serde(default)]
+    pub is_favorite: bool,
+    /// Whether this session is archived (hidden by default)
+    #[serde(default)]
+    pub is_archived: bool,
+}
+
 fn default_execution_strategy() -> String {
     "broadcast".to_string()
 }
@@ -770,14 +822,11 @@ impl MigratesTo<SessionV3_0_0> for SessionV2_9_0 {
     }
 }
 
-// ============================================================================
-// Domain model conversions
-// ============================================================================
-
-/// Convert SessionV2_9_0 DTO to domain model.
-impl IntoDomain<Session> for SessionV2_9_0 {
-    fn into_domain(self) -> Session {
-        Session {
+/// Migration from V3.0.0 to V3.1.0
+/// Adds is_favorite and is_archived fields (default to false)
+impl MigratesTo<SessionV3_1_0> for SessionV3_0_0 {
+    fn migrate(self) -> SessionV3_1_0 {
+        SessionV3_1_0 {
             id: self.id,
             title: self.title,
             created_at: self.created_at,
@@ -785,9 +834,7 @@ impl IntoDomain<Session> for SessionV2_9_0 {
             current_persona_id: self.current_persona_id,
             persona_histories: self.persona_histories,
             app_mode: self.app_mode,
-            workspace_id: self
-                .workspace_id
-                .unwrap_or_else(|| PLACEHOLDER_WORKSPACE_ID.to_string()),
+            workspace_id: self.workspace_id,
             active_participant_ids: self.active_participant_ids,
             execution_strategy: self.execution_strategy,
             system_messages: self.system_messages,
@@ -796,55 +843,18 @@ impl IntoDomain<Session> for SessionV2_9_0 {
             participant_colors: self.participant_colors,
             conversation_mode: self.conversation_mode,
             talk_style: self.talk_style,
+            is_favorite: false, // Existing sessions are not favorited by default
+            is_archived: false, // Existing sessions are not archived by default
         }
     }
 }
 
-/// Convert domain model to SessionV2_9_0 DTO for persistence.
-impl version_migrate::FromDomain<Session> for SessionV2_9_0 {
-    fn from_domain(session: Session) -> Self {
-        let Session {
-            id,
-            title,
-            created_at,
-            updated_at,
-            current_persona_id,
-            persona_histories,
-            app_mode,
-            workspace_id,
-            active_participant_ids,
-            execution_strategy,
-            system_messages,
-            participants,
-            participant_icons,
-            participant_colors,
-            conversation_mode,
-            talk_style,
-        } = session;
+// ============================================================================
+// Domain model conversions
+// ============================================================================
 
-        SessionV2_9_0 {
-            id,
-            title,
-            created_at,
-            updated_at,
-            current_persona_id,
-            persona_histories,
-            app_mode,
-            workspace_id: Some(workspace_id),
-            active_participant_ids,
-            execution_strategy,
-            system_messages,
-            participants,
-            participant_icons,
-            participant_colors,
-            conversation_mode,
-            talk_style,
-        }
-    }
-}
-
-/// Convert SessionV3_0_0 DTO to domain model.
-impl IntoDomain<Session> for SessionV3_0_0 {
+/// Convert SessionV3_1_0 DTO to domain model.
+impl IntoDomain<Session> for SessionV3_1_0 {
     fn into_domain(self) -> Session {
         Session {
             id: self.id,
@@ -863,12 +873,14 @@ impl IntoDomain<Session> for SessionV3_0_0 {
             participant_colors: self.participant_colors,
             conversation_mode: self.conversation_mode,
             talk_style: self.talk_style,
+            is_favorite: self.is_favorite,
+            is_archived: self.is_archived,
         }
     }
 }
 
-/// Convert domain model to SessionV3_0_0 DTO for persistence.
-impl version_migrate::FromDomain<Session> for SessionV3_0_0 {
+/// Convert domain model to SessionV3_1_0 DTO for persistence.
+impl version_migrate::FromDomain<Session> for SessionV3_1_0 {
     fn from_domain(session: Session) -> Self {
         let Session {
             id,
@@ -887,9 +899,11 @@ impl version_migrate::FromDomain<Session> for SessionV3_0_0 {
             participant_colors,
             conversation_mode,
             talk_style,
+            is_favorite,
+            is_archived,
         } = session;
 
-        SessionV3_0_0 {
+        SessionV3_1_0 {
             id,
             title,
             created_at,
@@ -906,6 +920,8 @@ impl version_migrate::FromDomain<Session> for SessionV3_0_0 {
             participant_colors,
             conversation_mode,
             talk_style,
+            is_favorite,
+            is_archived,
         }
     }
 }
@@ -916,7 +932,7 @@ impl version_migrate::FromDomain<Session> for SessionV3_0_0 {
 
 /// Creates and configures a Migrator instance for Session entities.
 ///
-/// The migrator handles automatic schema migration from V1.0.0 to V2.6.0
+/// The migrator handles automatic schema migration from V1.0.0 to V3.1.0
 /// and conversion to the domain model.
 ///
 /// # Migration Path
@@ -929,7 +945,12 @@ impl version_migrate::FromDomain<Session> for SessionV3_0_0 {
 /// - V2.3.0 → V2.4.0: Adds `conversation_mode` field for controlling dialogue verbosity
 /// - V2.4.0 → V2.5.0: Adds `talk_style` field for dialogue context
 /// - V2.5.0 → V2.6.0: Normalizes conversation metadata for system message types
-/// - V2.6.0 → Session: Converts DTO to domain model
+/// - V2.6.0 → V2.7.0: Changes execution_strategy from String to ExecutionModel enum
+/// - V2.7.0 → V2.8.0: Adds `participant_icons` field for persona icons
+/// - V2.8.0 → V2.9.0: Adds `participant_colors` field for UI theming
+/// - V2.9.0 → V3.0.0: Makes `workspace_id` required
+/// - V3.0.0 → V3.1.0: Adds `is_favorite` and `is_archived` fields for session organization
+/// - V3.1.0 → Session: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -940,7 +961,7 @@ impl version_migrate::FromDomain<Session> for SessionV3_0_0 {
 pub fn create_session_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> ... -> V2.9.0 -> V3.0.0 -> Session
+    // Register migration path: V1.0.0 -> ... -> V3.0.0 -> V3.1.0 -> Session
     let session_path = version_migrate::Migrator::define("session")
         .from::<SessionV1_0_0>()
         .step::<SessionV1_1_0>()
@@ -955,6 +976,7 @@ pub fn create_session_migrator() -> version_migrate::Migrator {
         .step::<SessionV2_8_0>()
         .step::<SessionV2_9_0>()
         .step::<SessionV3_0_0>()
+        .step::<SessionV3_1_0>()
         .into_with_save::<Session>();
 
     migrator

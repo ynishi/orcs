@@ -157,6 +157,32 @@ pub async fn rename_session(
         .map_err(|e| e.to_string())
 }
 
+/// Toggles the favorite status of a session
+#[tauri::command]
+pub async fn toggle_session_favorite(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .session_manager
+        .toggle_favorite(&session_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Toggles the archive status of a session
+#[tauri::command]
+pub async fn toggle_session_archive(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .session_manager
+        .toggle_archive(&session_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Saves the current session
 #[tauri::command]
 pub async fn save_current_session(state: State<'_, AppState>) -> Result<(), String> {

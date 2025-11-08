@@ -69,6 +69,12 @@ pub struct Session {
     /// Talk style for dialogue context (Brainstorm, Debate, etc.)
     #[serde(default)]
     pub talk_style: Option<TalkStyle>,
+    /// Whether this session is marked as favorite (pinned to top)
+    #[serde(default)]
+    pub is_favorite: bool,
+    /// Whether this session is archived (hidden by default)
+    #[serde(default)]
+    pub is_archived: bool,
 }
 
 fn default_execution_strategy() -> ExecutionModel {

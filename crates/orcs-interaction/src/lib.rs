@@ -625,6 +625,8 @@ impl InteractionManager {
             participant_colors,
             conversation_mode,
             talk_style,
+            is_favorite: false,
+            is_archived: false,
         }
     }
 

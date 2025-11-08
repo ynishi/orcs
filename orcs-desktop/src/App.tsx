@@ -1131,6 +1131,32 @@ function App() {
     }
   };
 
+  const handleToggleFavorite = async (sessionId: string) => {
+    try {
+      await invoke('toggle_session_favorite', { sessionId });
+      await refreshSessions();
+    } catch (err) {
+      notifications.show({
+        title: 'Error',
+        message: `Failed to toggle favorite: ${err}`,
+        color: 'red',
+      });
+    }
+  };
+
+  const handleToggleArchive = async (sessionId: string) => {
+    try {
+      await invoke('toggle_session_archive', { sessionId });
+      await refreshSessions();
+    } catch (err) {
+      notifications.show({
+        title: 'Error',
+        message: `Failed to toggle archive: ${err}`,
+        color: 'red',
+      });
+    }
+  };
+
   const handleNewSession = async () => {
     try {
       await createSession();
@@ -1239,9 +1265,12 @@ function App() {
           sessions={sessions}
           currentSessionId={currentSessionId}
           currentWorkspaceId={workspace?.id}
+          workspaces={allWorkspaces}
           onSessionSelect={handleSessionSelect}
           onSessionDelete={handleSessionDelete}
           onSessionRename={handleSessionRename}
+          onToggleFavorite={handleToggleFavorite}
+          onToggleArchive={handleToggleArchive}
           onNewSession={handleNewSession}
           tasks={tasks}
           onTaskToggle={handleTaskToggle}

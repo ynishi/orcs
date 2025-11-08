@@ -1,29 +1,44 @@
-import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput, Switch } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput, Switch, Badge } from '@mantine/core';
 import { Session, getMessageCount, getLastActive } from '../../types/session';
+import { Workspace } from '../../types/workspace';
 import { useState } from 'react';
 
 interface SessionListProps {
   sessions: Session[];
   currentSessionId?: string;
   currentWorkspaceId?: string;
+  workspaces?: Workspace[];
   onSessionSelect?: (session: Session) => void;
   onSessionDelete?: (sessionId: string) => void;
   onSessionRename?: (sessionId: string, newTitle: string) => void;
   onNewSession?: () => void;
+  onToggleFavorite?: (sessionId: string) => void;
+  onToggleArchive?: (sessionId: string) => void;
 }
 
 export function SessionList({
   sessions,
   currentSessionId,
   currentWorkspaceId,
+  workspaces = [],
   onSessionSelect,
   onSessionDelete,
   onSessionRename,
   onNewSession,
+  onToggleFavorite,
+  onToggleArchive,
 }: SessionListProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [filterByWorkspace, setFilterByWorkspace] = useState<boolean>(true); // デフォルトON
+  const [showArchived, setShowArchived] = useState<boolean>(false); // デフォルトOFF（非表示）
+
+  // workspace_idからWorkspace名を取得するヘルパー関数
+  const getWorkspaceName = (workspaceId?: string): string | null => {
+    if (!workspaceId) return null;
+    const workspace = workspaces.find(w => w.id === workspaceId);
+    return workspace?.name || null;
+  };
 
   // フィルタリングされたセッション
   const filteredSessions = filterByWorkspace && currentWorkspaceId
@@ -41,9 +56,25 @@ export function SessionList({
 
   console.log('[SessionList] Filter active:', filterByWorkspace, 'currentWorkspaceId:', currentWorkspaceId?.substring(0, 8), 'total sessions:', sessions.length, 'filtered:', filteredSessions.length);
 
-  const sortedSessions = [...filteredSessions].sort(
-    (a, b) => getLastActive(b).getTime() - getLastActive(a).getTime()
-  );
+  const sortedSessions = [...filteredSessions].sort((a, b) => {
+    // 1. Archivedは常に最後
+    if (a.is_archived !== b.is_archived) {
+      return a.is_archived ? 1 : -1;
+    }
+
+    // 2. Favoriteは常に上
+    if (a.is_favorite !== b.is_favorite) {
+      return a.is_favorite ? -1 : 1;
+    }
+
+    // 3. それ以外はupdated_atで降順
+    return getLastActive(b).getTime() - getLastActive(a).getTime();
+  });
+
+  // Show Archivedがfalseの場合は、Archivedセッションを除外
+  const visibleSessions = showArchived
+    ? sortedSessions
+    : sortedSessions.filter(s => !s.is_archived);
 
   const handleStartEdit = (session: Session, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -92,12 +123,20 @@ export function SessionList({
             onChange={(e) => setFilterByWorkspace(e.currentTarget.checked)}
           />
         )}
+
+        {/* Show Archivedトグル */}
+        <Switch
+          size="xs"
+          label="Show Archived"
+          checked={showArchived}
+          onChange={(e) => setShowArchived(e.currentTarget.checked)}
+        />
       </Stack>
 
       {/* セッションリスト */}
       <ScrollArea style={{ flex: 1 }} px="sm" type="auto">
         <Stack gap={4}>
-          {sortedSessions.map((session) => (
+          {visibleSessions.map((session) => (
             <Group
               key={session.id}
               gap="sm"
@@ -151,10 +190,20 @@ export function SessionList({
                     style={{ flex: 1, minWidth: 0 }}
                   >
                     <Box>
-                      <Text size="sm" fw={600} truncate>
+                      <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
                         {session.title}
                       </Text>
                       <Group gap="xs" mt={2}>
+                        {getWorkspaceName(session.workspace_id) && (
+                          <>
+                            <Badge size="xs" variant="light" color="blue" style={{ textTransform: 'none' }}>
+                              {getWorkspaceName(session.workspace_id)}
+                            </Badge>
+                            <Text size="xs" c="dimmed">
+                              •
+                            </Text>
+                          </>
+                        )}
                         <Text size="xs" c="dimmed">
                           {getMessageCount(session)} msgs
                         </Text>
@@ -167,6 +216,44 @@ export function SessionList({
                       </Group>
                     </Box>
                   </UnstyledButton>
+
+                  {/* Favoriteボタン */}
+                  <ActionIcon
+                    className="action-btn"
+                    size="sm"
+                    color={session.is_favorite ? "yellow" : "gray"}
+                    variant="subtle"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleFavorite?.(session.id);
+                    }}
+                    style={{
+                      opacity: 0,
+                      transition: 'opacity 0.15s ease',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {session.is_favorite ? "⭐" : "☆"}
+                  </ActionIcon>
+
+                  {/* Archiveボタン */}
+                  <ActionIcon
+                    className="action-btn"
+                    size="sm"
+                    color="gray"
+                    variant="subtle"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleArchive?.(session.id);
+                    }}
+                    style={{
+                      opacity: 0,
+                      transition: 'opacity 0.15s ease',
+                      flexShrink: 0,
+                    }}
+                  >
+                    📦
+                  </ActionIcon>
 
                   {/* 編集ボタン */}
                   <ActionIcon
@@ -225,8 +312,10 @@ export function SessionList({
       <Box px="md" pb="md">
         <Text size="xs" c="dimmed">
           {filterByWorkspace && currentWorkspaceId
-            ? `${sortedSessions.length} / ${sessions.length} sessions (filtered by workspace)`
-            : `${sessions.length} total sessions`}
+            ? `${visibleSessions.length} / ${sessions.length} sessions (filtered)`
+            : showArchived
+            ? `${visibleSessions.length} total sessions`
+            : `${visibleSessions.length} / ${sessions.length} sessions (archived hidden)`}
         </Text>
       </Box>
     </Stack>

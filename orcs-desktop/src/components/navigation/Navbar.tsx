@@ -3,6 +3,7 @@ import { ScrollArea, Box, Stack, Text } from '@mantine/core';
 import { Session } from '../../types/session';
 import { Task } from '../../types/task';
 import { MessageType } from '../../types/message';
+import { Workspace } from '../../types/workspace';
 import { SessionList } from '../sessions/SessionList';
 import { WorkspacePanel } from '../workspace/WorkspacePanel';
 import { TaskList } from '../tasks/TaskList';
@@ -16,9 +17,12 @@ interface NavbarProps {
   sessions: Session[];
   currentSessionId: string | null;
   currentWorkspaceId?: string;
+  workspaces?: Workspace[];
   onSessionSelect: (session: Session) => void;
   onSessionDelete: (sessionId: string) => void;
   onSessionRename: (sessionId: string, newTitle: string) => void;
+  onToggleFavorite?: (sessionId: string) => void;
+  onToggleArchive?: (sessionId: string) => void;
   onNewSession: () => void;
 
   // Tasks
@@ -54,9 +58,12 @@ export function Navbar({
   sessions,
   currentSessionId,
   currentWorkspaceId,
+  workspaces,
   onSessionSelect,
   onSessionDelete,
   onSessionRename,
+  onToggleFavorite,
+  onToggleArchive,
   onNewSession,
   tasks,
   onTaskToggle,
@@ -146,9 +153,12 @@ export function Navbar({
               sessions={sessions}
               currentSessionId={currentSessionId || undefined}
               currentWorkspaceId={currentWorkspaceId}
+              workspaces={workspaces}
               onSessionSelect={onSessionSelect}
               onSessionDelete={onSessionDelete}
               onSessionRename={onSessionRename}
+              onToggleFavorite={onToggleFavorite}
+              onToggleArchive={onToggleArchive}
               onNewSession={onNewSession}
             />
           )}

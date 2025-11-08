@@ -353,6 +353,48 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
 
         Ok(())
     }
+
+    /// Toggles the favorite status of a session
+    pub async fn toggle_favorite(&self, session_id: &str) -> Result<()> {
+        // Load the session from storage
+        let mut session = self
+            .session_repository
+            .find_by_id(session_id)
+            .await?
+            .ok_or_else(|| OrcsError::Internal(format!("Session not found: {}", session_id)))?;
+
+        // Toggle favorite status
+        session.is_favorite = !session.is_favorite;
+
+        // Update timestamp
+        session.updated_at = chrono::Utc::now().to_rfc3339();
+
+        // Save back to storage
+        self.session_repository.save(&session).await?;
+
+        Ok(())
+    }
+
+    /// Toggles the archive status of a session
+    pub async fn toggle_archive(&self, session_id: &str) -> Result<()> {
+        // Load the session from storage
+        let mut session = self
+            .session_repository
+            .find_by_id(session_id)
+            .await?
+            .ok_or_else(|| OrcsError::Internal(format!("Session not found: {}", session_id)))?;
+
+        // Toggle archive status
+        session.is_archived = !session.is_archived;
+
+        // Update timestamp
+        session.updated_at = chrono::Utc::now().to_rfc3339();
+
+        // Save back to storage
+        self.session_repository.save(&session).await?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -403,6 +445,8 @@ mod tests {
                 conversation_mode: ConversationMode::Normal,
                 talk_style: None,
                 participant_colors: HashMap::new(),
+                is_favorite: false,
+                is_archived: false,
             }
         }
 

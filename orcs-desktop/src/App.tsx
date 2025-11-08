@@ -1417,7 +1417,7 @@ function App() {
                           visibleTabs.length > 1 ? (
                             <CloseButton
                               size="xs"
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 console.log('[App] CloseButton clicked:', {
                                   tabId: tab.id,
                                   title: tab.title,
@@ -1425,16 +1425,74 @@ function App() {
                                   visibleTabsCount: visibleTabs.length,
                                 });
                                 e.stopPropagation();
+
                                 // 未保存の場合は確認
                                 if (tab.isDirty) {
-                                  if (window.confirm(`"${tab.title}" has unsaved changes. Close anyway?`)) {
-                                    console.log('[App] Calling closeTab for', tab.id);
-                                    closeTab(tab.id);
-                                  } else {
+                                  if (!window.confirm(`"${tab.title}" has unsaved changes. Close anyway?`)) {
                                     console.log('[App] User cancelled close');
+                                    return;
+                                  }
+                                }
+
+                                // 1. 閉じるタブの情報を取得
+                                const closingTab = tabs.find(t => t.id === tab.id);
+                                if (!closingTab) return;
+
+                                // 2. ActiveSessionのタブを閉じる場合
+                                const isClosingActiveSession = closingTab.sessionId === currentSessionId;
+
+                                console.log('[App] Calling closeTab for', tab.id, {
+                                  isClosingActiveSession,
+                                  currentSessionId: currentSessionId?.substring(0, 8),
+                                  closingSessionId: closingTab.sessionId.substring(0, 8),
+                                });
+
+                                // 3. ActiveSessionだった場合、次のSessionを選択
+                                if (isClosingActiveSession && workspace) {
+                                  // 4a. 現在のWorkspace内の残りSession取得
+                                  const remainingSessions = sessions.filter(
+                                    s => s.workspace_id === workspace.id && s.id !== closingTab.sessionId
+                                  );
+
+                                  console.log('[App] Remaining sessions in workspace:', remainingSessions.length);
+
+                                  if (remainingSessions.length > 0) {
+                                    // 4b. 更新日時が直近のSessionを選択
+                                    const sortedSessions = [...remainingSessions].sort(
+                                      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                                    );
+                                    const nextSession = sortedSessions[0];
+
+                                    console.log('[App] Switching to next session:', nextSession.id.substring(0, 8), nextSession.title);
+
+                                    try {
+                                      // 4c. Backend Session切り替え
+                                      await switchSession(nextSession.id);
+
+                                      // 4d. 次のSessionのTabを開く（既に開いていればフォーカス）
+                                      // openTab()は既存タブがあれば更新してフォーカス、なければ新規作成
+                                      const messages = convertSessionToMessages(nextSession, userNickname);
+                                      const newTabId = openTab(nextSession, messages, workspace.id, true);
+
+                                      console.log('[App] Successfully switched to next session, tab:', newTabId.substring(0, 8));
+
+                                      // 4e. 古いタブを閉じる（次のSessionに切り替え後）
+                                      closeTab(tab.id);
+                                    } catch (err) {
+                                      console.error('[App] Failed to switch to next session:', err);
+                                    }
+                                  } else {
+                                    // 4e. Workspace内にSessionがない場合、新規作成
+                                    console.log('[App] No remaining sessions, creating new session');
+                                    try {
+                                      await createSession();
+                                      console.log('[App] New session created');
+                                    } catch (err) {
+                                      console.error('[App] Failed to create new session:', err);
+                                    }
                                   }
                                 } else {
-                                  console.log('[App] Calling closeTab for', tab.id);
+                                  // 非ActiveSessionのTab Closeの場合、単純に閉じる
                                   closeTab(tab.id);
                                 }
                               }}

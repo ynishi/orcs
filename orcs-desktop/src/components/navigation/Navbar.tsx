@@ -23,6 +23,7 @@ interface NavbarProps {
   onSessionRename: (sessionId: string, newTitle: string) => void;
   onToggleFavorite?: (sessionId: string) => void;
   onToggleArchive?: (sessionId: string) => void;
+  onMoveSortOrder?: (sessionId: string, direction: 'up' | 'down') => void;
   onNewSession: () => void;
 
   // Tasks
@@ -64,6 +65,7 @@ export function Navbar({
   onSessionRename,
   onToggleFavorite,
   onToggleArchive,
+  onMoveSortOrder,
   onNewSession,
   tasks,
   onTaskToggle,
@@ -159,6 +161,7 @@ export function Navbar({
               onSessionRename={onSessionRename}
               onToggleFavorite={onToggleFavorite}
               onToggleArchive={onToggleArchive}
+              onMoveSortOrder={onMoveSortOrder}
               onNewSession={onNewSession}
             />
           )}

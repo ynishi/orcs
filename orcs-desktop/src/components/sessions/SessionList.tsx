@@ -14,6 +14,7 @@ interface SessionListProps {
   onNewSession?: () => void;
   onToggleFavorite?: (sessionId: string) => void;
   onToggleArchive?: (sessionId: string) => void;
+  onMoveSortOrder?: (sessionId: string, direction: 'up' | 'down') => void;
 }
 
 export function SessionList({
@@ -27,6 +28,7 @@ export function SessionList({
   onNewSession,
   onToggleFavorite,
   onToggleArchive,
+  onMoveSortOrder,
 }: SessionListProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
@@ -225,6 +227,46 @@ export function SessionList({
                       </Group>
                     </Box>
                   </UnstyledButton>
+
+                  {/* UP/DOWNボタン（Favoriteセッションのみ） */}
+                  {session.is_favorite && onMoveSortOrder && (
+                    <>
+                      <ActionIcon
+                        className="action-btn"
+                        size="sm"
+                        color="gray"
+                        variant="subtle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMoveSortOrder(session.id, 'up');
+                        }}
+                        style={{
+                          opacity: 0,
+                          transition: 'opacity 0.15s ease',
+                          flexShrink: 0,
+                        }}
+                      >
+                        ↑
+                      </ActionIcon>
+                      <ActionIcon
+                        className="action-btn"
+                        size="sm"
+                        color="gray"
+                        variant="subtle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMoveSortOrder(session.id, 'down');
+                        }}
+                        style={{
+                          opacity: 0,
+                          transition: 'opacity 0.15s ease',
+                          flexShrink: 0,
+                        }}
+                      >
+                        ↓
+                      </ActionIcon>
+                    </>
+                  )}
 
                   {/* Favoriteボタン */}
                   <ActionIcon

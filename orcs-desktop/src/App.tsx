@@ -1157,6 +1157,53 @@ function App() {
     }
   };
 
+  const handleMoveSortOrder = async (sessionId: string, direction: 'up' | 'down') => {
+    try {
+      // Get current session list (filtered to favorites only)
+      const favoriteSessions = sessions
+        .filter(s => s.is_favorite && !s.is_archived)
+        .sort((a, b) => {
+          if (a.sort_order !== undefined && b.sort_order !== undefined) {
+            return a.sort_order - b.sort_order;
+          }
+          if (a.sort_order !== undefined) return -1;
+          if (b.sort_order !== undefined) return 1;
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+        });
+
+      const currentIndex = favoriteSessions.findIndex(s => s.id === sessionId);
+      if (currentIndex === -1) return;
+
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= favoriteSessions.length) return;
+
+      // Reassign sort_order values
+      const updates: Promise<void>[] = [];
+      favoriteSessions.forEach((session, index) => {
+        let newSortOrder: number;
+        if (index === currentIndex) {
+          newSortOrder = targetIndex;
+        } else if (index === targetIndex) {
+          newSortOrder = currentIndex;
+        } else {
+          newSortOrder = index;
+        }
+        updates.push(
+          invoke('update_session_sort_order', { sessionId: session.id, sortOrder: newSortOrder })
+        );
+      });
+
+      await Promise.all(updates);
+      await refreshSessions();
+    } catch (err) {
+      notifications.show({
+        title: 'Error',
+        message: `Failed to update sort order: ${err}`,
+        color: 'red',
+      });
+    }
+  };
+
   const handleNewSession = async () => {
     try {
       await createSession();
@@ -1271,6 +1318,7 @@ function App() {
           onSessionRename={handleSessionRename}
           onToggleFavorite={handleToggleFavorite}
           onToggleArchive={handleToggleArchive}
+          onMoveSortOrder={handleMoveSortOrder}
           onNewSession={handleNewSession}
           tasks={tasks}
           onTaskToggle={handleTaskToggle}

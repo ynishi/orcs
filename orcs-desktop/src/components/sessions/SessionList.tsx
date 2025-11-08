@@ -87,6 +87,9 @@ export function SessionList({
     ? sortedSessions
     : sortedSessions.filter(s => !s.is_archived);
 
+  // Favoriteセッションの数を数える（UP/DOWNボタンの表示判定用）
+  const favoriteSessionsCount = visibleSessions.filter(s => s.is_favorite).length;
+
   const handleStartEdit = (session: Session, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingSessionId(session.id);
@@ -228,20 +231,20 @@ export function SessionList({
                     </Box>
                   </UnstyledButton>
 
-                  {/* UP/DOWNボタン（Favoriteセッションのみ） */}
-                  {session.is_favorite && onMoveSortOrder && (
+                  {/* UP/DOWNボタン（Favoriteが2個以上ある場合のみ表示） */}
+                  {session.is_favorite && onMoveSortOrder && favoriteSessionsCount >= 2 && (
                     <>
                       <ActionIcon
                         className="action-btn"
                         size="sm"
-                        color="blue"
+                        color="gray"
                         variant="subtle"
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log('[SessionList] UP clicked:', session.id, session.title);
                           onMoveSortOrder?.(session.id, 'up');
                         }}
                         style={{
+                          opacity: 0,
                           transition: 'opacity 0.15s ease',
                           flexShrink: 0,
                         }}
@@ -251,14 +254,14 @@ export function SessionList({
                       <ActionIcon
                         className="action-btn"
                         size="sm"
-                        color="blue"
+                        color="gray"
                         variant="subtle"
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log('[SessionList] DOWN clicked:', session.id, session.title);
                           onMoveSortOrder?.(session.id, 'down');
                         }}
                         style={{
+                          opacity: 0,
                           transition: 'opacity 0.15s ease',
                           flexShrink: 0,
                         }}

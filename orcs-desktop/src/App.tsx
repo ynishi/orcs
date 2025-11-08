@@ -1158,7 +1158,6 @@ function App() {
   };
 
   const handleMoveSortOrder = async (sessionId: string, direction: 'up' | 'down') => {
-    console.log('[App] handleMoveSortOrder called:', sessionId, direction);
     try {
       // Get current session list (filtered to favorites only)
       const favoriteSessions = sessions
@@ -1172,22 +1171,11 @@ function App() {
           return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
         });
 
-      console.log('[App] Favorite sessions:', favoriteSessions.length, favoriteSessions.map(s => s.title));
       const currentIndex = favoriteSessions.findIndex(s => s.id === sessionId);
-      console.log('[App] Current index:', currentIndex);
-      if (currentIndex === -1) {
-        console.log('[App] Session not found in favorites');
-        return;
-      }
+      if (currentIndex === -1) return;
 
       const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-      console.log('[App] Target index:', targetIndex, 'favoriteSessions.length:', favoriteSessions.length);
-      if (targetIndex < 0 || targetIndex >= favoriteSessions.length) {
-        console.log('[App] Target index out of bounds, returning');
-        return;
-      }
-
-      console.log('[App] Swapping:', currentIndex, '<->', targetIndex);
+      if (targetIndex < 0 || targetIndex >= favoriteSessions.length) return;
       // Reassign sort_order values
       const updates: Promise<void>[] = [];
       favoriteSessions.forEach((session, index) => {

@@ -1,5 +1,5 @@
 import { Stack, Text, Loader, Center, Alert, ActionIcon, Group, Tooltip, Switch, ScrollArea, Box } from '@mantine/core';
-import { IconPlus, IconRefresh, IconFolder, IconTerminal } from '@tabler/icons-react';
+import { IconPlus, IconFolder, IconTerminal } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { useCallback } from 'react';
@@ -189,7 +189,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
   // No files state
   if (files.length === 0) {
     return (
-      <Stack gap="xs" style={{ maxHeight: '400px' }}>
+      <Stack gap="xs" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {/* ヘッダー */}
         <Group justify="space-between" wrap="nowrap" px="sm">
           <Text size="sm" fw={500}>
@@ -221,16 +221,6 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
               </ActionIcon>
             </Tooltip>
             <ActionIcon
-              onClick={() => {
-                void refreshWorkspaceState();
-              }}
-              variant="subtle"
-              color="gray"
-              aria-label="Refresh"
-            >
-              <IconRefresh size={18} />
-            </ActionIcon>
-            <ActionIcon
               component="label"
               variant="subtle"
               color="blue"
@@ -255,7 +245,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
         </Box>
 
         {/* スクロールエリア */}
-        <ScrollArea h={280} px="sm">
+        <ScrollArea style={{ flex: 1 }} px="sm">
           <Center p="xl">
             <Text size="sm" c="dimmed">
               No files in workspace
@@ -268,7 +258,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
 
   // Render the file list with real data
   return (
-    <Stack gap="xs" style={{ maxHeight: '400px' }}>
+    <Stack gap="xs" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* ヘッダー */}
       <Group justify="space-between" wrap="nowrap" px="sm">
         <Text size="sm" fw={500}>
@@ -300,16 +290,6 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
             </ActionIcon>
           </Tooltip>
           <ActionIcon
-            onClick={() => {
-              void refreshWorkspaceState();
-            }}
-            variant="subtle"
-            color="gray"
-            aria-label="Refresh"
-          >
-            <IconRefresh size={18} />
-          </ActionIcon>
-          <ActionIcon
             component="label"
             variant="subtle"
             color="blue"
@@ -334,7 +314,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
       </Box>
 
       {/* スクロールエリア */}
-      <ScrollArea h={280} px="sm">
+      <ScrollArea style={{ flex: 1 }} px="sm">
         <FileList
           files={files}
           onAttachToChat={handleAttachToChat}

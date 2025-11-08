@@ -1,5 +1,5 @@
-import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, TextInput } from '@mantine/core';
-import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle } from '@tabler/icons-react';
+import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton } from '@mantine/core';
+import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical } from '@tabler/icons-react';
 import { useState } from 'react';
 import { UploadedFile } from '../../types/workspace';
 
@@ -13,7 +13,7 @@ interface FileListProps {
 }
 
 export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession }: FileListProps) {
-  const [hoveredFile, setHoveredFile] = useState<string | null>(null);
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
 
@@ -57,142 +57,179 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
     }
   };
 
+  // ファイルレンダリング関数（SessionListパターン）
+  const renderFile = (file: UploadedFile) => (
+    <Box
+      key={file.id}
+      style={{
+        borderRadius: '8px',
+        border: '1px solid var(--mantine-color-gray-3)',
+        backgroundColor: file.id === selectedFileId ? '#e7f5ff' : 'white',
+        transition: 'all 0.15s ease',
+        cursor: 'pointer',
+        overflow: 'hidden',
+      }}
+    >
+      {editingFileId === file.id ? (
+        // 編集モード
+        <Box p="md">
+          <Group gap="sm" wrap="nowrap">
+            <Text size="lg">{getFileIcon(file)}</Text>
+            <Box style={{ flex: 1, minWidth: 0 }}>
+              <TextInput
+                size="xs"
+                value={editingFileName}
+                onChange={(e) => setEditingFileName(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveEdit(file);
+                  } else if (e.key === 'Escape') {
+                    handleCancelEdit();
+                  }
+                }}
+                onBlur={() => handleSaveEdit(file)}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            </Box>
+          </Group>
+        </Box>
+      ) : (
+        <>
+          {/* TOPメニュー行（SessionListパターン） */}
+          <Group
+            gap="xs"
+            px="md"
+            py="xs"
+            justify="space-between"
+            style={{
+              backgroundColor: file.id === selectedFileId ? '#d0ebff' : '#f8f9fa',
+              borderBottom: '1px solid var(--mantine-color-gray-3)',
+            }}
+          >
+            {/* ファイルアイコン（左寄せ） */}
+            <Text size="lg">{getFileIcon(file)}</Text>
+
+            {/* コンテキストメニュー */}
+            <Menu position="bottom-end" withinPortal>
+              <Menu.Target>
+                <ActionIcon
+                  size="sm"
+                  color="gray"
+                  variant="subtle"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ flexShrink: 0 }}
+                >
+                  <IconDotsVertical size={16} />
+                </ActionIcon>
+              </Menu.Target>
+
+              <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+                {/* Go to conversation（sessionIdがある場合のみ） */}
+                {file.sessionId && (
+                  <>
+                    <Menu.Item
+                      leftSection={<IconMessageCircle size={14} />}
+                      color="violet"
+                      onClick={() => onGoToSession?.(file)}
+                    >
+                      Go to conversation
+                    </Menu.Item>
+                    <Menu.Divider />
+                  </>
+                )}
+
+                {/* Attach to chat */}
+                <Menu.Item
+                  leftSection={<IconMessage size={14} />}
+                  onClick={() => onAttachToChat?.(file)}
+                >
+                  Attach to chat
+                </Menu.Item>
+
+                {/* Open file */}
+                <Menu.Item
+                  leftSection={<IconExternalLink size={14} />}
+                  onClick={() => onOpenFile?.(file)}
+                >
+                  Open file
+                </Menu.Item>
+
+                {/* Rename */}
+                <Menu.Item
+                  leftSection={<IconPencil size={14} />}
+                  onClick={() => {
+                    setEditingFileId(file.id);
+                    setEditingFileName(file.name);
+                  }}
+                >
+                  Rename
+                </Menu.Item>
+
+                <Menu.Divider />
+
+                {/* Delete */}
+                <Menu.Item
+                  leftSection={<IconTrash size={14} />}
+                  color="red"
+                  onClick={() => onDeleteFile?.(file)}
+                >
+                  Delete
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
+
+          {/* コンテンツエリア */}
+          <UnstyledButton
+            onClick={() => setSelectedFileId(file.id)}
+            onDoubleClick={(e) => handleStartEdit(file, e)}
+            style={{ width: '100%', textAlign: 'left' }}
+          >
+            <Box p="md">
+              <Box style={{ flex: 1, minWidth: 0 }}>
+                {/* Primary: ファイル名 */}
+                <Text size="sm" fw={600} truncate>
+                  {file.name}
+                </Text>
+
+                {/* Secondary: サイズ + タイプ + From chat Badge */}
+                <Group gap="xs" mt={4}>
+                  <Text size="xs" c="dimmed">
+                    {formatFileSize(file.size)}
+                  </Text>
+                  <Text size="xs" c="dimmed">•</Text>
+                  <Text size="xs" c="dimmed">
+                    {getFileTypeCategory(file.mimeType)}
+                  </Text>
+                  {file.sessionId && (
+                    <>
+                      <Text size="xs" c="dimmed">•</Text>
+                      <Badge size="xs" variant="light" color="violet" style={{ textTransform: 'none' }}>
+                        From chat
+                      </Badge>
+                    </>
+                  )}
+                </Group>
+
+                {/* Tertiary: 相対時間 */}
+                <Text size="xs" c="dimmed" mt={2}>
+                  {formatRelativeTime(file.uploadedAt)}
+                </Text>
+              </Box>
+            </Box>
+          </UnstyledButton>
+        </>
+      )}
+    </Box>
+  );
+
   return (
     <Stack gap="md" h="100%">
       {/* ファイルリスト */}
       <ScrollArea style={{ flex: 1 }} px="sm">
-        <Stack gap="xs">
-          {files.map((file) => (
-            <Box
-              key={file.id}
-              onMouseEnter={() => setHoveredFile(file.id)}
-              onMouseLeave={() => setHoveredFile(null)}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '8px',
-                transition: 'background-color 0.15s ease',
-                backgroundColor: hoveredFile === file.id ? '#f1f3f5' : 'transparent',
-              }}
-            >
-              <Group gap="sm" wrap="nowrap" justify="space-between">
-                {editingFileId === file.id ? (
-                  // 編集モード
-                  <>
-                    <Text size="lg">{getFileIcon(file)}</Text>
-                    <Box style={{ flex: 1, minWidth: 0 }}>
-                      <TextInput
-                        size="xs"
-                        value={editingFileName}
-                        onChange={(e) => setEditingFileName(e.currentTarget.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleSaveEdit(file);
-                          } else if (e.key === 'Escape') {
-                            handleCancelEdit();
-                          }
-                        }}
-                        onBlur={() => handleSaveEdit(file)}
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <Text size="xs" c="dimmed" mt={4}>
-                        {formatFileSize(file.size)}
-                      </Text>
-                    </Box>
-                  </>
-                ) : (
-                  // 表示モード
-                  <>
-                    <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-                      <Text size="lg">{getFileIcon(file)}</Text>
-                      <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text size="sm" fw={500} truncate>
-                          {file.name}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {formatFileSize(file.size)}
-                        </Text>
-                      </Box>
-                    </Group>
-
-                    {/* Action buttons - show on hover */}
-                    {hoveredFile === file.id && (
-                      <Group gap={4}>
-                        {file.sessionId && (
-                          <Tooltip label="Go to conversation">
-                            <ActionIcon
-                              variant="subtle"
-                              color="violet"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onGoToSession?.(file);
-                              }}
-                            >
-                              <IconMessageCircle size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                        )}
-
-                        <Tooltip label="Attach to chat">
-                          <ActionIcon
-                            variant="subtle"
-                            color="blue"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onAttachToChat?.(file);
-                            }}
-                          >
-                            <IconMessage size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-
-                        <Tooltip label="Open file">
-                          <ActionIcon
-                            variant="subtle"
-                            color="gray"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenFile?.(file);
-                            }}
-                          >
-                            <IconExternalLink size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-
-                        <Tooltip label="Rename">
-                          <ActionIcon
-                            variant="subtle"
-                            color="gray"
-                            size="sm"
-                            onClick={(e) => handleStartEdit(file, e)}
-                          >
-                            <IconPencil size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-
-                        <Tooltip label="Delete">
-                          <ActionIcon
-                            variant="subtle"
-                            color="red"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteFile?.(file);
-                            }}
-                          >
-                            <IconTrash size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-                      </Group>
-                    )}
-                  </>
-                )}
-              </Group>
-            </Box>
-          ))}
+        <Stack gap={4}>
+          {files.map(renderFile)}
         </Stack>
       </ScrollArea>
 
@@ -204,4 +241,32 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
       </Box>
     </Stack>
   );
+}
+
+// ファイルタイプカテゴリ取得（MIMEタイプから人間が読める形式に変換）
+function getFileTypeCategory(mimeType: string): string {
+  if (mimeType.startsWith('text/')) return 'Text';
+  if (mimeType.startsWith('image/')) return 'Image';
+  if (mimeType.startsWith('video/')) return 'Video';
+  if (mimeType.startsWith('audio/')) return 'Audio';
+  if (mimeType.includes('pdf')) return 'PDF';
+  if (mimeType.includes('json')) return 'JSON';
+  if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('gz')) return 'Archive';
+  if (mimeType.includes('javascript') || mimeType.includes('typescript')) return 'Code';
+  return 'File';
+}
+
+// 相対時間フォーマット（SessionListのformatDateと同じロジック）
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now() / 1000; // Convert to seconds
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60);
+  const hours = Math.floor(diff / 3600);
+  const days = Math.floor(diff / 86400);
+
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return new Date(timestamp * 1000).toLocaleDateString();
 }

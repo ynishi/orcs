@@ -1,4 +1,5 @@
-import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput, Switch, Badge } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput, Switch, Badge, Menu } from '@mantine/core';
+import { IconDotsVertical, IconArrowUp, IconArrowDown, IconPencil, IconArchive, IconTrash } from '@tabler/icons-react';
 import { Session, getMessageCount, getLastActive } from '../../types/session';
 import { Workspace } from '../../types/workspace';
 import { useState } from 'react';
@@ -148,37 +149,23 @@ export function SessionList({
       </Stack>
 
       {/* セッションリスト */}
-      <ScrollArea style={{ flex: 1 }} px="sm" type="auto">
+      <ScrollArea style={{ flex: 1 }} px="md" type="auto">
         <Stack gap={4}>
           {visibleSessions.map((session) => (
-            <Group
+            <Box
               key={session.id}
-              gap="sm"
-              wrap="nowrap"
-              p="xs"
               style={{
                 borderRadius: '8px',
-                backgroundColor: session.id === currentSessionId ? '#e7f5ff' : 'transparent',
-                transition: 'background-color 0.15s ease',
+                border: '1px solid var(--mantine-color-gray-3)',
+                backgroundColor: session.id === currentSessionId ? '#e7f5ff' : 'white',
+                transition: 'all 0.15s ease',
                 cursor: 'pointer',
-                position: 'relative',
-              }}
-              onMouseEnter={(e) => {
-                const actionBtns = e.currentTarget.querySelectorAll('.action-btn');
-                actionBtns.forEach((btn) => {
-                  (btn as HTMLElement).style.opacity = '1';
-                });
-              }}
-              onMouseLeave={(e) => {
-                const actionBtns = e.currentTarget.querySelectorAll('.action-btn');
-                actionBtns.forEach((btn) => {
-                  (btn as HTMLElement).style.opacity = '0';
-                });
+                overflow: 'hidden',
               }}
             >
               {editingSessionId === session.id ? (
                 // 編集モード
-                <Box style={{ flex: 1, minWidth: 0 }}>
+                <Box p="md">
                   <TextInput
                     size="xs"
                     value={editingTitle}
@@ -196,18 +183,112 @@ export function SessionList({
                   />
                 </Box>
               ) : (
-                // 表示モード
                 <>
+                  {/* TOPメニュー行 */}
+                  <Group
+                    gap="xs"
+                    px="md"
+                    py="xs"
+                    justify="flex-end"
+                    style={{
+                      backgroundColor: session.id === currentSessionId ? '#d0ebff' : '#f8f9fa',
+                      borderBottom: '1px solid var(--mantine-color-gray-3)',
+                    }}
+                  >
+                    {/* Favoriteボタン */}
+                    <Tooltip label={session.is_favorite ? "Remove from favorites" : "Add to favorites"} withArrow>
+                      <ActionIcon
+                        size="sm"
+                        color={session.is_favorite ? "yellow" : "gray"}
+                        variant="subtle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleFavorite?.(session.id);
+                        }}
+                        style={{ flexShrink: 0 }}
+                      >
+                        {session.is_favorite ? "⭐" : "☆"}
+                      </ActionIcon>
+                    </Tooltip>
+
+                    {/* メニュー */}
+                    <Menu position="bottom-end" withinPortal>
+                      <Menu.Target>
+                        <ActionIcon
+                          size="sm"
+                          color="gray"
+                          variant="subtle"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ flexShrink: 0 }}
+                        >
+                          <IconDotsVertical size={16} />
+                        </ActionIcon>
+                      </Menu.Target>
+
+                      <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+                        {/* UP/DOWN（Favoriteが2個以上ある場合のみ表示） */}
+                        {session.is_favorite && onMoveSortOrder && favoriteSessionsCount >= 2 && (
+                          <>
+                            <Menu.Item
+                              leftSection={<IconArrowUp size={14} />}
+                              onClick={() => onMoveSortOrder(session.id, 'up')}
+                            >
+                              Move Up
+                            </Menu.Item>
+                            <Menu.Item
+                              leftSection={<IconArrowDown size={14} />}
+                              onClick={() => onMoveSortOrder(session.id, 'down')}
+                            >
+                              Move Down
+                            </Menu.Item>
+                            <Menu.Divider />
+                          </>
+                        )}
+
+                        {/* Rename */}
+                        <Menu.Item
+                          leftSection={<IconPencil size={14} />}
+                          onClick={() => {
+                            setEditingSessionId(session.id);
+                            setEditingTitle(session.title);
+                          }}
+                        >
+                          Rename
+                        </Menu.Item>
+
+                        {/* Archive/Unarchive */}
+                        <Menu.Item
+                          leftSection={<IconArchive size={14} />}
+                          onClick={() => onToggleArchive?.(session.id)}
+                        >
+                          {session.is_archived ? 'Unarchive' : 'Archive'}
+                        </Menu.Item>
+
+                        <Menu.Divider />
+
+                        {/* Delete */}
+                        <Menu.Item
+                          leftSection={<IconTrash size={14} />}
+                          color="red"
+                          onClick={() => onSessionDelete?.(session.id)}
+                        >
+                          Delete
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </Group>
+
+                  {/* コンテンツエリア */}
                   <UnstyledButton
                     onClick={() => onSessionSelect?.(session)}
                     onDoubleClick={(e) => handleStartEdit(session, e)}
-                    style={{ flex: 1, minWidth: 0 }}
+                    style={{ width: '100%', textAlign: 'left' }}
                   >
-                    <Box>
+                    <Box p="md">
                       <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
                         {session.title}
                       </Text>
-                      <Group gap="xs" mt={2}>
+                      <Group gap="xs" mt={4}>
                         {getWorkspaceName(session.workspace_id) && (
                           <>
                             <Badge size="xs" variant="light" color="blue" style={{ textTransform: 'none' }}>
@@ -230,122 +311,9 @@ export function SessionList({
                       </Group>
                     </Box>
                   </UnstyledButton>
-
-                  {/* UP/DOWNボタン（Favoriteが2個以上ある場合のみ表示） */}
-                  {session.is_favorite && onMoveSortOrder && favoriteSessionsCount >= 2 && (
-                    <>
-                      <ActionIcon
-                        className="action-btn"
-                        size="sm"
-                        color="gray"
-                        variant="subtle"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onMoveSortOrder?.(session.id, 'up');
-                        }}
-                        style={{
-                          opacity: 0,
-                          transition: 'opacity 0.15s ease',
-                          flexShrink: 0,
-                        }}
-                      >
-                        ↑
-                      </ActionIcon>
-                      <ActionIcon
-                        className="action-btn"
-                        size="sm"
-                        color="gray"
-                        variant="subtle"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onMoveSortOrder?.(session.id, 'down');
-                        }}
-                        style={{
-                          opacity: 0,
-                          transition: 'opacity 0.15s ease',
-                          flexShrink: 0,
-                        }}
-                      >
-                        ↓
-                      </ActionIcon>
-                    </>
-                  )}
-
-                  {/* Favoriteボタン */}
-                  <ActionIcon
-                    className="action-btn"
-                    size="sm"
-                    color={session.is_favorite ? "yellow" : "gray"}
-                    variant="subtle"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleFavorite?.(session.id);
-                    }}
-                    style={{
-                      opacity: 0,
-                      transition: 'opacity 0.15s ease',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {session.is_favorite ? "⭐" : "☆"}
-                  </ActionIcon>
-
-                  {/* Archiveボタン */}
-                  <ActionIcon
-                    className="action-btn"
-                    size="sm"
-                    color="gray"
-                    variant="subtle"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleArchive?.(session.id);
-                    }}
-                    style={{
-                      opacity: 0,
-                      transition: 'opacity 0.15s ease',
-                      flexShrink: 0,
-                    }}
-                  >
-                    📦
-                  </ActionIcon>
-
-                  {/* 編集ボタン */}
-                  <ActionIcon
-                    className="action-btn"
-                    size="sm"
-                    color="blue"
-                    variant="subtle"
-                    onClick={(e) => handleStartEdit(session, e)}
-                    style={{
-                      opacity: 0,
-                      transition: 'opacity 0.15s ease',
-                      flexShrink: 0,
-                    }}
-                  >
-                    ✏️
-                  </ActionIcon>
-
-                  {/* 削除ボタン */}
-                  <ActionIcon
-                    className="action-btn"
-                    size="sm"
-                    color="red"
-                    variant="subtle"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSessionDelete?.(session.id);
-                    }}
-                    style={{
-                      opacity: 0,
-                      transition: 'opacity 0.15s ease',
-                      flexShrink: 0,
-                    }}
-                  >
-                    🗑️
-                  </ActionIcon>
                 </>
               )}
-            </Group>
+            </Box>
           ))}
 
           {/* 空の状態 */}

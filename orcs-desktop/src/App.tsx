@@ -21,7 +21,7 @@ import { Message, MessageType } from "./types/message";
 import { StatusInfo, getDefaultStatus } from "./types/status";
 import { Task } from "./types/task";
 import { Agent } from "./types/agent";
-import { Session, getMessageCount } from "./types/session";
+import { Session } from "./types/session";
 import { GitInfo } from "./types/git";
 import { Navbar } from "./components/navigation/Navbar";
 import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
@@ -1375,18 +1375,7 @@ function App() {
                   )}
                 </Group>
 
-                {/* Session Info */}
-                {currentSessionId && (
-                  <Group gap="xs">
-                    <Text size="sm" c="dimmed">Session:</Text>
-                    <Badge size="lg" variant="light">
-                      {sessions.find(s => s.id === currentSessionId)?.title || 'Untitled'}
-                    </Badge>
-                    <Badge size="sm" color="gray" variant="outline">
-                      {getMessageCount(sessions.find(s => s.id === currentSessionId)!) || 0} msgs
-                    </Badge>
-                  </Group>
-                )}
+                {/* Session Info: Removed - redundant with TabName */}
 
                 {/* Settings Menu */}
                 <SettingsMenu

@@ -249,12 +249,12 @@ impl SessionUseCase {
             self.switch_session(&latest_session.id).await?;
             latest_session.clone()
         } else {
-            // Create new session (will automatically use the workspace from AppStateService)
+            // Create new session for this workspace
             tracing::info!(
                 "[SessionUseCase] No existing sessions found, creating new session for workspace {}",
                 workspace.id
             );
-            self.create_session().await?
+            self.create_session(&workspace.id).await?
         };
 
         tracing::info!(

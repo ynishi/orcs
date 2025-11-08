@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { Session } from '../types/session';
 import type { Message } from '../types/message';
 
@@ -11,6 +11,7 @@ export interface SessionTab {
   // セッション情報
   id: string; // タブのユニークID (タブ作成時に生成)
   sessionId: string; // 対応するセッションID
+  workspaceId: string; // このタブが属するWorkspace ID
   title: string; // タブタイトル
   
   // メッセージ関連
@@ -35,9 +36,10 @@ export interface TabContextValue {
   activeTabId: string | null;
   
   // タブ操作
-  openTab: (session: Session, messages: Message[], switchToTab?: boolean) => string; // 新規タブを開く。既に開いている場合はフォーカス
+  openTab: (session: Session, messages: Message[], workspaceId: string, switchToTab?: boolean) => string; // 新規タブを開く。既に開いている場合はフォーカス
   closeTab: (tabId: string) => void; // タブを閉じる
   switchTab: (tabId: string) => void; // タブを切り替える
+  switchWorkspace: (workspaceId: string) => void; // Workspace切り替え時にタブを切り替える
   
   // メッセージ関連
   updateTabMessages: (tabId: string, messages: Message[]) => void; // タブのメッセージを更新
@@ -61,6 +63,7 @@ export interface TabContextValue {
   getTab: (tabId: string) => SessionTab | undefined; // タブを取得
   getTabBySessionId: (sessionId: string) => SessionTab | undefined; // セッションIDからタブを取得
   getActiveTab: () => SessionTab | undefined; // アクティブなタブを取得
+  getVisibleTabs: (workspaceId: string) => SessionTab[]; // 指定されたWorkspaceのタブのみを取得
   reorderTabs: (fromIndex: number, toIndex: number) => void; // タブの順序を変更
   closeAllTabs: () => void; // 全タブを閉じる
 }
@@ -78,7 +81,7 @@ export function TabProvider({ children }: TabProviderProps) {
   /**
    * 新規タブを開く（既に開いている場合はフォーカス）
    */
-  const openTab = useCallback((session: Session, messages: Message[], switchToTab: boolean = true): string => {
+  const openTab = useCallback((session: Session, messages: Message[], workspaceId: string, switchToTab: boolean = true): string => {
     let tabId: string;
 
     setTabs((prev) => {
@@ -104,6 +107,7 @@ export function TabProvider({ children }: TabProviderProps) {
         // セッション情報
         id: tabId,
         sessionId: session.id,
+        workspaceId: workspaceId,
         title: session.title,
         
         // メッセージ関連
@@ -137,27 +141,40 @@ export function TabProvider({ children }: TabProviderProps) {
    * タブを閉じる
    */
   const closeTab = useCallback((tabId: string) => {
+    console.log('[TabContext] closeTab called:', { tabId });
+
+    // 削除前にタブ情報を取得
+    const currentTabs = tabs;
+    const targetIndex = currentTabs.findIndex((tab) => tab.id === tabId);
+
+    if (targetIndex === -1) {
+      console.log('[TabContext] closeTab: tab not found');
+      return;
+    }
+
+    console.log('[TabContext] closeTab: targetIndex =', targetIndex, 'total tabs:', currentTabs.length);
+
+    // タブを削除
     setTabs((prev) => {
-      const targetIndex = prev.findIndex((tab) => tab.id === tabId);
-      if (targetIndex === -1) {
-        return prev;
-      }
-
       const newTabs = prev.filter((tab) => tab.id !== tabId);
-
-      // アクティブタブを閉じた場合、次のタブにフォーカス
-      if (activeTabId === tabId) {
-        if (newTabs.length > 0) {
-          const nextIndex = Math.min(targetIndex, newTabs.length - 1);
-          setActiveTabId(newTabs[nextIndex].id);
-        } else {
-          setActiveTabId(null);
-        }
-      }
-
+      console.log('[TabContext] closeTab: newTabs count =', newTabs.length);
       return newTabs;
     });
-  }, [activeTabId]);
+
+    // アクティブタブを閉じた場合、次のタブにフォーカス
+    if (activeTabId === tabId) {
+      const newTabs = currentTabs.filter((tab) => tab.id !== tabId);
+      if (newTabs.length > 0) {
+        const nextIndex = Math.min(targetIndex, newTabs.length - 1);
+        const nextActiveId = newTabs[nextIndex].id;
+        console.log('[TabContext] closeTab: updating activeTabId to', nextActiveId.substring(0, 8), 'at index', nextIndex);
+        setActiveTabId(nextActiveId);
+      } else {
+        console.log('[TabContext] closeTab: no tabs left, setting activeTabId to null');
+        setActiveTabId(null);
+      }
+    }
+  }, [tabs, activeTabId]);
 
   /**
    * タブを切り替える
@@ -317,6 +334,31 @@ export function TabProvider({ children }: TabProviderProps) {
     setActiveTabId(null);
   }, []);
 
+  /**
+   * Workspace切り替え時にタブを切り替える
+   * - 新しいWorkspaceのタブがあれば、最後にアクセスしたタブにフォーカス
+   * - なければアクティブタブをnullにする（Appで新しいセッションを開く）
+   */
+  const switchWorkspace = useCallback((workspaceId: string) => {
+    const workspaceTabs = tabs.filter((tab) => tab.workspaceId === workspaceId);
+    
+    if (workspaceTabs.length > 0) {
+      // 最後にアクセスしたタブを探す
+      const sortedTabs = [...workspaceTabs].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
+      setActiveTabId(sortedTabs[0].id);
+    } else {
+      // このWorkspaceのタブがない場合はnullにする
+      setActiveTabId(null);
+    }
+  }, [tabs]);
+
+  /**
+   * 指定されたWorkspaceのタブのみを取得
+   */
+  const getVisibleTabs = useCallback((workspaceId: string): SessionTab[] => {
+    return tabs.filter((tab) => tab.workspaceId === workspaceId);
+  }, [tabs]);
+
   const value = useMemo<TabContextValue>(
     () => ({
       tabs,
@@ -326,6 +368,7 @@ export function TabProvider({ children }: TabProviderProps) {
       openTab,
       closeTab,
       switchTab,
+      switchWorkspace,
       
       // メッセージ関連
       updateTabMessages,
@@ -349,6 +392,7 @@ export function TabProvider({ children }: TabProviderProps) {
       getTab,
       getTabBySessionId,
       getActiveTab,
+      getVisibleTabs,
       reorderTabs,
       closeAllTabs,
     }),
@@ -358,6 +402,7 @@ export function TabProvider({ children }: TabProviderProps) {
       openTab,
       closeTab,
       switchTab,
+      switchWorkspace,
       updateTabMessages,
       addMessageToTab,
       updateTabTitle,
@@ -371,6 +416,7 @@ export function TabProvider({ children }: TabProviderProps) {
       getTab,
       getTabBySessionId,
       getActiveTab,
+      getVisibleTabs,
       reorderTabs,
       closeAllTabs,
     ]

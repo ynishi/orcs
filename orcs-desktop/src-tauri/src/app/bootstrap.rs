@@ -2,24 +2,14 @@ use std::sync::Arc;
 
 use orcs_application::{AdhocPersonaService, SessionUseCase, UtilityAgentService};
 use orcs_core::{
-    persona::{get_default_presets, PersonaRepository},
-    session::{AppMode, SessionManager},
-    slash_command::SlashCommandRepository,
-    state::repository::StateRepository,
-    task::TaskRepository,
-    user::UserService,
-    workspace::manager::WorkspaceManager,
+    persona::{PersonaRepository, get_default_presets}, secret::SecretService, session::{AppMode, SessionManager}, slash_command::SlashCommandRepository, state::repository::StateRepository, task::TaskRepository, user::UserService, workspace::manager::WorkspaceManager
 };
 use orcs_execution::{
     tracing_layer::OrchestratorEvent,
     TaskExecutor,
 };
 use orcs_infrastructure::{
-    paths::{OrcsPaths, ServiceType},
-    user_service::ConfigBasedUserService,
-    workspace_manager::FileSystemWorkspaceManager,
-    AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
-    AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
+    AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository, SecretServiceImpl, secret_service, user_service::ConfigBasedUserService, workspace_manager::FileSystemWorkspaceManager
 };
 use tokio::sync::{mpsc::UnboundedSender, Mutex};
 
@@ -43,15 +33,17 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
     // Create AdhocPersonaService
     let adhoc_persona_service = Arc::new(AdhocPersonaService::new(persona_repository.clone()));
 
-    let user_service: Arc<dyn UserService> = Arc::new(ConfigBasedUserService::new());
+    // Initialize UserService and ensure config.toml exists by loading profile
+    let user_service_impl = ConfigBasedUserService::new();
+    let user_service: Arc<dyn UserService> = Arc::new(user_service_impl);
 
-    // Initialize FileSystemWorkspaceManager with unified path
-    let path_type = OrcsPaths::new(None)
-        .get_path(ServiceType::Workspace)
-        .expect("Failed to get workspaces directory");
-    let workspace_root = path_type.into_path_buf();
+    // Initialize SecretService and ensure secret.json exists by loading secrets
+    let secret_service_impl = SecretServiceImpl::default().expect("Failed to initialize secret service");
+    let _ = secret_service_impl.load_secrets().await; // Trigger file creation if missing
+    let secret_service: Arc<dyn SecretService> = Arc::new(secret_service_impl);
+
     let workspace_manager = Arc::new(
-        FileSystemWorkspaceManager::new(workspace_root)
+        FileSystemWorkspaceManager::default()
             .await
             .expect("Failed to initialize workspace manager"),
     );
@@ -205,6 +197,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         persona_repository_concrete,
         adhoc_persona_service,
         user_service,
+        secret_service,
         workspace_manager: workspace_manager.clone(),
         slash_command_repository,
         slash_command_repository_concrete,

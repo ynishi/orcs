@@ -54,12 +54,16 @@ impl StateRepositoryImpl {
         // Setup migrator
         let migrator = create_app_state_migrator();
 
-        // Setup storage strategy: TOML format, CreateIfMissing
-        let strategy = FileStorageStrategy::new()
-            .with_format(FormatStrategy::Toml)
-            .with_load_behavior(LoadBehavior::CreateIfMissing);
+        // Setup storage strategy: TOML format, SaveIfMissing with default value
+        let default_state = serde_json::to_value(AppState::default())
+            .map_err(|e| OrcsError::Config(format!("Failed to serialize default AppState: {}", e)))?;
 
-        // Create FileStorage (automatically loads or creates empty config)
+        let strategy = FileStorageStrategy::new()
+            .with_format(FormatStrategy::Json)
+            .with_load_behavior(LoadBehavior::SaveIfMissing)
+            .with_default_value(default_state);
+
+        // Create FileStorage (automatically loads or creates with default)
         let storage = FileStorage::new(file_path, migrator, strategy)?;
 
         let storage = Arc::new(Mutex::new(storage));

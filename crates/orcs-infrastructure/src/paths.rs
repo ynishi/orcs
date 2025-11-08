@@ -52,11 +52,12 @@
 //!   - macOS: ~/Library/Application Support/orcs/
 //!   - Linux: ~/.local/share/orcs/
 //!   - Windows: %LOCALAPPDATA%\orcs\
-//! ├── personas/                # Persona definitions
-//! └── content/                 # Application content
-//!     ├── workspaces/          # Workspace data
-//!     ├── sessions/            # Session data
-//!     └── tasks/               # Task data
+//! ├── sessions/                # Session metadata (.toml)
+//! ├── workspaces/              # Workspace metadata (.toml)
+//! ├── tasks/                   # Task metadata (.toml)
+//! ├── personas/                # Persona definitions (.toml)
+//! └── files/                   # Storage (actual files)
+//!     └── workspaces/          # Workspace resources (uploaded files, etc.)
 //! ```
 //!
 //! # Usage Guidelines for Services
@@ -142,6 +143,8 @@ pub enum ServiceType {
     Session,
     /// Workspace service (workspaces/)
     Workspace,
+    /// Workspace storage(storage/workspaces/)
+    WorkspaceStorage,
     /// Task service (tasks/)
     Task,
     /// Persona service (personas/)
@@ -186,6 +189,9 @@ pub struct OrcsPaths {
 }
 
 impl OrcsPaths {
+    const APP_PATH: &str = "orcs";
+    const DATA_PATH: &str = "data";
+
     /// Creates a new OrcsPaths instance.
     ///
     /// # Arguments
@@ -202,9 +208,9 @@ impl OrcsPaths {
     /// Returns a configured AppPaths instance for orcs.
     fn app_paths(&self) -> AppPaths {
         if let Some(ref base) = self.base_path {
-            AppPaths::new("orcs").data_strategy(PathStrategy::CustomBase(base.clone()))
+            AppPaths::new(Self::APP_PATH).data_strategy(PathStrategy::CustomBase(base.clone()))
         } else {
-            AppPaths::new("orcs")
+            AppPaths::new(Self::APP_PATH)
         }
     }
 
@@ -224,10 +230,16 @@ impl OrcsPaths {
         }
     }
 
+    /// Returns the orcs secret directory.
+    fn secret_dir(&self) -> Result<PathBuf, PathError> {
+        // TODO: Migrate to platform-specific secure storage
+        self.config_dir()
+    }
+
     /// Returns the orcs data directory.
     fn data_dir(&self) -> Result<PathBuf, PathError> {
         if let Some(ref base) = self.base_path {
-            Ok(base.join("data"))
+            Ok(base.join(Self::DATA_PATH))
         } else {
             self.app_paths()
                 .data_dir()
@@ -235,10 +247,10 @@ impl OrcsPaths {
         }
     }
 
-    /// Returns the orcs secret directory.
-    fn secret_dir(&self) -> Result<PathBuf, PathError> {
-        // TODO: Migrate to platform-specific secure storage
-        self.config_dir()
+    /// Returns the path to the files storage directory.
+    /// **PRIVATE**: Used internally by get_path() for file-based services.
+    fn storage_dir(&self) -> Result<PathBuf, PathError> {
+        Ok(self.data_dir()?.join("storage"))
     }
 
     // ============================================
@@ -290,19 +302,22 @@ impl OrcsPaths {
         match service_type {
             // Single-file services (return File path)
             ServiceType::AppState => {
-                Ok(PathType::File(self.config_dir()?.join("app_state.toml")))
+                Ok(PathType::File(self.config_dir()?.join("app_state.json")))
             }
             ServiceType::Config => Ok(PathType::File(self.config_dir()?.join("config.toml"))),
             ServiceType::Secret => Ok(PathType::File(self.secret_dir()?.join("secret.json"))),
 
-            // Multi-file services (return Dir for storage management)
+            // Multi-file services - Data (metadata/records)
             ServiceType::Session => {
-                Ok(PathType::Dir(self.content_dir()?.join("sessions")))
+                Ok(PathType::Dir(self.data_dir()?.join("sessions")))
             }
             ServiceType::Workspace => {
-                Ok(PathType::Dir(self.content_dir()?.join("workspaces")))
+                Ok(PathType::Dir(self.data_dir()?.join("workspaces")))
             }
-            ServiceType::Task => Ok(PathType::Dir(self.content_dir()?.join("tasks"))),
+            ServiceType::WorkspaceStorage => {
+                Ok(PathType::Dir(self.storage_dir()?.join("workspaces")))
+            }
+            ServiceType::Task => Ok(PathType::Dir(self.data_dir()?.join("tasks"))),
             ServiceType::Persona => Ok(PathType::Dir(self.data_dir()?.join("personas"))),
             ServiceType::SlashCommand => {
                 Ok(PathType::Dir(self.config_dir()?.join("slash_commands")))
@@ -365,8 +380,9 @@ impl OrcsPaths {
             .await
             .map_err(|e| format!("Failed to create directory: {}", e))?;
 
-        // Setup AppPaths with CustomBase strategy
-        let paths = AppPaths::new("orcs").data_strategy(PathStrategy::CustomBase(parent_dir));
+        // Setup AppPaths with CustomBase strategy pointing to parent_dir
+        // Use empty string as app_name to avoid creating an additional "orcs" directory
+        let paths = AppPaths::new("").data_strategy(PathStrategy::CustomBase(parent_dir));
 
         // Setup default storage strategy: TOML format, Direct filename encoding
         let strategy = DirStorageStrategy::default()
@@ -377,20 +393,6 @@ impl OrcsPaths {
         AsyncDirStorage::new(paths, &entity_name, migrator, strategy)
             .await
             .map_err(|e| format!("Failed to create AsyncDirStorage: {}", e))
-    }
-
-    // ============================================
-    // Logical Layer (Private helpers)
-    // ============================================
-
-    /// Returns the path to the content directory.
-    ///
-    /// This is the base directory for all application content
-    /// (workspaces, sessions, tasks, etc.).
-    ///
-    /// **PRIVATE**: Used internally by get_path() for content-based services.
-    fn content_dir(&self) -> Result<PathBuf, PathError> {
-        Ok(self.data_dir()?.join("content"))
     }
 }
 
@@ -404,7 +406,8 @@ mod tests {
 
     #[test]
     fn test_config_dir() {
-        let config_dir = OrcsPaths::config_dir().unwrap();
+        let orcs_paths = OrcsPaths::new(None);
+        let config_dir = orcs_paths.config_dir().unwrap();
         // PrefPath returns platform-specific preference directory
         assert!(config_dir.to_string_lossy().contains("com.orcs-app"));
 
@@ -423,24 +426,28 @@ mod tests {
 
     #[test]
     fn test_data_dir() {
-        let data_dir = OrcsPaths::data_dir().unwrap();
-        assert!(data_dir.ends_with("orcs"));
+        let orcs_paths = OrcsPaths::new(None);
+        let data_dir = orcs_paths.data_dir().unwrap();
+        assert!(data_dir.ends_with(OrcsPaths::APP_PATH));
     }
 
     #[test]
     fn test_secret_dir() {
-        let secret_dir = OrcsPaths::secret_dir().unwrap();
+        let orcs_paths = OrcsPaths::new(None);
+        let secret_dir = orcs_paths.secret_dir().unwrap();
         // Currently same as config_dir
-        let config_dir = OrcsPaths::config_dir().unwrap();
+        let config_dir = orcs_paths.config_dir().unwrap();
         assert_eq!(secret_dir, config_dir);
     }
 
     #[test]
-    fn test_content_dir() {
-        let content_dir = OrcsPaths::content_dir().unwrap();
-        assert!(content_dir.ends_with("content"));
+    fn test_storage_dir() {
+        let orcs_paths = OrcsPaths::new(None);
+        let storage_dir = orcs_paths.storage_dir().unwrap();
+        assert!(storage_dir.ends_with("files"));
         // Verify it's under data_dir
-        let data_dir = OrcsPaths::data_dir().unwrap();
-        assert!(content_dir.starts_with(&data_dir));
+        let orcs_paths2 = OrcsPaths::new(None);
+        let data_dir = orcs_paths2.data_dir().unwrap();
+        assert!(storage_dir.starts_with(&data_dir));
     }
 }

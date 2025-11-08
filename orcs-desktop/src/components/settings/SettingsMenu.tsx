@@ -48,7 +48,7 @@ export function SettingsMenu({
   useEffect(() => {
     const loadRootDir = async () => {
       try {
-        const dir = await invoke<string>('get_root_directory');
+        const dir = await invoke<string>('get_root_pathectory');
         setRootDir(dir);
       } catch (error) {
         console.error('[Settings] Failed to load root directory:', error);
@@ -103,6 +103,21 @@ export function SettingsMenu({
     try {
       const workspacesDir = await invoke<string>('get_workspaces_directory');
       console.log('[Settings] Opening workspaces directory:', workspacesDir);
+      await openPath(workspacesDir);
+    } catch (error) {
+      console.error('[Settings] Failed to open workspaces directory:', error);
+      notifications.show({
+        title: 'Failed to Open Directory',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  const handleOpenWorkspacesRepositoryDir = async () => {
+    try {
+      const workspacesDir = await invoke<string>('get_workspaces_repository_directory');
+      console.log('[Settings] Opening workspaces repository directory:', workspacesDir);
       await openPath(workspacesDir);
     } catch (error) {
       console.error('[Settings] Failed to open workspaces directory:', error);
@@ -434,10 +449,16 @@ export function SettingsMenu({
           <Text size="sm">Sessions Directory</Text>
         </Menu.Item>
         <Menu.Item
+          leftSection={<IconFolder size={16} />}
+          onClick={handleOpenWorkspacesRepositoryDir}
+        >
+          <Text size="sm">Workspaces Setting Directory</Text>
+        </Menu.Item>
+        <Menu.Item
           leftSection={<IconFolderOpen size={16} />}
           onClick={handleOpenWorkspacesDir}
         >
-          <Text size="sm">Workspaces Directory</Text>
+          <Text size="sm">Workspaces Data Directory</Text>
         </Menu.Item>
         <Menu.Item
           leftSection={<IconFolder size={16} />}

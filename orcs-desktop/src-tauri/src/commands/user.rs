@@ -16,3 +16,4 @@ pub async fn get_user_profile(
     Ok(state.user_service.get_user_profile())
 }
 
+

@@ -86,6 +86,12 @@ impl SessionRepository for AsyncDirSessionRepository {
             Ok(session) => Ok(Some(session)),
             Err(e) => {
                 let orcs_err = e.into();
+                tracing::debug!(
+                    "find_by_id error for session_id={}: {:?}, is_not_found={}",
+                    session_id,
+                    orcs_err,
+                    orcs_core::OrcsError::is_not_found(&orcs_err)
+                );
                 if orcs_core::OrcsError::is_not_found(&orcs_err) {
                     Ok(None)
                 } else {
@@ -129,7 +135,7 @@ impl SessionRepository for AsyncDirSessionRepository {
 mod tests {
     use super::*;
     use llm_toolkit::agent::dialogue::ExecutionModel;
-    use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
+    use orcs_core::persona::{Persona, PersonaBackend, PersonaRepository, PersonaSource};
     use orcs_core::session::{AppMode, ConversationMessage, MessageMetadata, MessageRole};
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
@@ -160,12 +166,13 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl PersonaRepository for MockPersonaRepository {
-        fn get_all(&self) -> Result<Vec<Persona>, String> {
+        async fn get_all(&self) -> Result<Vec<Persona>> {
             Ok(self.personas.lock().unwrap().clone())
         }
 
-        fn save_all(&self, _configs: &[Persona]) -> Result<(), String> {
+        async fn save_all(&self, _configs: &[Persona]) -> Result<()> {
             Ok(())
         }
     }

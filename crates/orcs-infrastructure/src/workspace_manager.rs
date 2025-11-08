@@ -3,7 +3,9 @@
 //! This module provides a file system-based implementation of the `WorkspaceManager` trait,
 //! storing workspace metadata and files in the `~/.orcs/workspaces` directory.
 
+use crate::ServiceType;
 use crate::async_dir_workspace_repository::AsyncDirWorkspaceRepository;
+use crate::storage_repository::StorageRepository;
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -35,19 +37,24 @@ fn infer_mime_type(filename: &str) -> String {
 /// - `temp/` - Temporary session files
 pub struct FileSystemWorkspaceManager {
     /// Root directory for all workspaces (typically `~/.orcs/workspaces`)
-    root_dir: PathBuf,
+    root_path: PathBuf,
     /// Repository for workspace data persistence
     workspace_repository: Arc<AsyncDirWorkspaceRepository>,
 }
 
 impl FileSystemWorkspaceManager {
+
+    pub async fn default() -> Result<Self> {
+        Self::new(None).await
+    }
+
     /// Creates a new `FileSystemWorkspaceManager` instance.
     ///
     /// Initializes the root directory and ensures it exists on the file system.
     ///
     /// # Arguments
     ///
-    /// * `root_dir` - The root directory for workspaces (typically `~/.orcs/workspaces`)
+    /// * `root_path` - The root directory for workspaces (typically `~/.orcs/workspaces`)
     ///
     /// # Returns
     ///
@@ -56,21 +63,27 @@ impl FileSystemWorkspaceManager {
     /// # Errors
     ///
     /// Returns an error if the directory cannot be created or accessed.
-    pub async fn new(root_dir: PathBuf) -> Result<Self> {
-        // Ensure the root directory exists
-        fs::create_dir_all(&root_dir).await.map_err(|e| {
+    pub async fn new(root_path: Option<&Path>) -> Result<Self> {
+        use crate::paths::OrcsPaths;
+
+        let orcs_paths = OrcsPaths::new(root_path);
+        let path_type = orcs_paths.get_path(ServiceType::WorkspaceStorage)?;
+        let path = path_type.as_path_buf();
+
+        // Ensure the root directory exists    
+        fs::create_dir_all(&path).await.map_err(|e| {
             OrcsError::io(format!(
-                "Failed to create workspace root directory '{}': {}",
-                root_dir.display(),
+                "Failed to create workspace root directory '{:?}': {}",
+                root_path,
                 e
             ))
         })?;
-
+        
         // Initialize AsyncDirWorkspaceRepository
         let workspace_repository = Arc::new(AsyncDirWorkspaceRepository::default().await?);
 
         Ok(Self {
-            root_dir,
+            root_path: path.clone(),
             workspace_repository,
         })
     }
@@ -105,8 +118,12 @@ impl FileSystemWorkspaceManager {
     /// Returns the actual workspaces root directory path.
     ///
     /// This returns the real path where workspace directories are stored.
-    pub fn workspaces_root_dir(&self) -> &Path {
-        &self.root_dir
+    pub fn workspaces_root_path(&self) -> &Path {
+        &self.root_path
+    }
+
+    pub fn workspace_data_path(&self) -> &Path {
+        &self.workspace_repository.base_dir()
     }
 
     /// Gets the workspace directory path for a given workspace ID.
@@ -119,7 +136,7 @@ impl FileSystemWorkspaceManager {
     ///
     /// Returns the path to the workspace directory.
     fn get_workspace_dir(&self, workspace_id: &str) -> PathBuf {
-        self.root_dir.join(workspace_id)
+        self.root_path.join(workspace_id)
     }
 
     /// Loads workspace metadata via AsyncDirWorkspaceRepository.
@@ -712,7 +729,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[tokio::test]
-    async fn test_new_creates_root_directory() {
+    async fn test_new_creates_root_pathectory() {
         let temp_dir = TempDir::new().unwrap();
         let root_path = temp_dir.path().join("workspaces");
 

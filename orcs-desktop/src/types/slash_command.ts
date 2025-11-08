@@ -26,6 +26,14 @@ export interface SlashCommand {
 export interface ExpandedSlashCommand {
   content: string;
   workingDir?: string;
+  has_prompt_template?: boolean;
+  immediate_messages?: Array<{
+    content: string;
+    message_type: string;
+    severity: string;
+    persist_to_session?: boolean;
+  }>;
+  prompt_to_send?: string;
 }
 
 /**

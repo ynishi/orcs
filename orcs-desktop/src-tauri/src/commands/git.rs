@@ -120,3 +120,4 @@ pub async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String>
     })
 }
 
+

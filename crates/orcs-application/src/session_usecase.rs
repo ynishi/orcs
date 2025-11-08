@@ -221,6 +221,114 @@ impl SessionUseCase {
         Ok(session)
     }
 
+    /// Creates a new workspace and immediately creates a session associated with it.
+    ///
+    /// This is the recommended way to create workspaces, as a workspace without
+    /// a session doesn't make sense - why create a workspace if you're not going
+    /// to work in it?
+    ///
+    /// This method ensures atomicity: both workspace and session are created together,
+    /// and the workspace is set as the currently selected workspace in AppStateService.
+    ///
+    /// # Arguments
+    ///
+    /// * `root_path` - The root directory path for the new workspace
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple of (Workspace, Session) representing the newly created workspace
+    /// and its associated session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace cannot be created or retrieved
+    /// - The workspace selection cannot be saved to AppStateService
+    /// - The session creation fails
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// let (workspace, session) = session_usecase
+    ///     .create_workspace_with_session(Path::new("/path/to/project"))
+    ///     .await?;
+    /// ```
+    pub async fn create_workspace_with_session(
+        &self,
+        root_path: &std::path::Path,
+    ) -> Result<(orcs_core::workspace::Workspace, Session)> {
+        tracing::info!(
+            "[SessionUseCase] Creating workspace with session at: {}",
+            root_path.display()
+        );
+
+        // 1. Get or create the workspace
+        let workspace = self
+            .workspace_manager
+            .get_or_create_workspace(root_path)
+            .await
+            .map_err(|e| anyhow!("Failed to get/create workspace: {}", e))?;
+
+        tracing::info!(
+            "[SessionUseCase] Workspace created/retrieved: {} ({})",
+            workspace.name,
+            workspace.id
+        );
+
+        // 2. Update AppStateService to use this workspace
+        self.app_state_service
+            .set_last_selected_workspace(workspace.id.clone())
+            .await
+            .map_err(|e| anyhow!("Failed to set workspace selection: {}", e))?;
+
+        tracing::debug!(
+            "[SessionUseCase] Set last_selected_workspace to {}",
+            workspace.id
+        );
+
+        // 3. Check if there are existing sessions for this workspace
+        let existing_sessions = self
+            .session_manager
+            .list_sessions()
+            .await
+            .map_err(|e| anyhow!("Failed to list sessions: {}", e))?;
+
+        let workspace_sessions: Vec<_> = existing_sessions
+            .into_iter()
+            .filter(|s| s.workspace_id.as_ref() == Some(&workspace.id))
+            .collect();
+
+        let session = if !workspace_sessions.is_empty() {
+            // Restore the most recent session for this workspace
+            let latest_session = workspace_sessions.first().unwrap();
+            tracing::info!(
+                "[SessionUseCase] Found {} existing session(s) for workspace {}, restoring latest: {}",
+                workspace_sessions.len(),
+                workspace.id,
+                latest_session.id
+            );
+
+            // Switch to the existing session
+            self.switch_session(&latest_session.id).await?;
+            latest_session.clone()
+        } else {
+            // Create new session (will automatically use the workspace from AppStateService)
+            tracing::info!(
+                "[SessionUseCase] No existing sessions found, creating new session for workspace {}",
+                workspace.id
+            );
+            self.create_session().await?
+        };
+
+        tracing::info!(
+            "[SessionUseCase] Session {} associated with workspace {}",
+            session.id,
+            workspace.id
+        );
+
+        Ok((workspace, session))
+    }
+
     /// Creates a new config session with system prompt in a specific workspace.
     ///
     /// This is a specialized version of `create_session` for configuration assistance.

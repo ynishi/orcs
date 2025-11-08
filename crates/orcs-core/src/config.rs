@@ -40,9 +40,9 @@ pub struct SecretConfig {
 impl Default for SecretConfig {
     fn default() -> Self {
         Self {
-            claude: None,
-            gemini: None,
-            openai: None,
+            claude: Some(Default::default()),
+            gemini: Some(Default::default()),
+            openai: Some(Default::default()),
         }
     }
 }
@@ -55,7 +55,7 @@ impl Queryable for SecretConfig {
 ///
 /// Contains only sensitive data (API key).
 /// Model settings are stored separately in ModelSettings (config.toml).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ClaudeConfig {
     /// API key for Claude API
     pub api_key: String,
@@ -65,7 +65,7 @@ pub struct ClaudeConfig {
 ///
 /// Contains only sensitive data (API key).
 /// Model settings are stored separately in ModelSettings (config.toml).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GeminiConfig {
     /// API key for Gemini API
     pub api_key: String,
@@ -75,7 +75,7 @@ pub struct GeminiConfig {
 ///
 /// Contains only sensitive data (API key).
 /// Model settings are stored separately in ModelSettings (config.toml).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OpenAIConfig {
     /// API key for OpenAI API
     pub api_key: String,
@@ -209,4 +209,8 @@ impl Default for RootConfig {
             model_settings: ModelSettings::default(),
         }
     }
+}
+
+impl Queryable for RootConfig {
+    const ENTITY_NAME: &'static str = "config_root";
 }

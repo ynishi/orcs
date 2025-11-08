@@ -460,9 +460,9 @@ Generate the BlueprintWorkflow now.`;
             if (result.immediate_messages && result.immediate_messages.length > 0) {
               for (const msg of result.immediate_messages) {
                 if (msg.persist_to_session) {
-                  queuePersistedMessage(msg.content, msg.message_type, msg.severity);
+                  queuePersistedMessage(msg.content, msg.message_type as import('../types/message').MessageType, msg.severity as any);
                 }
-                addMessage(msg.message_type, 'System', msg.content);
+                addMessage(msg.message_type as import('../types/message').MessageType, 'System', msg.content);
               }
             }
 
@@ -509,4 +509,5 @@ Generate the BlueprintWorkflow now.`;
 
   return { handleSlashCommand };
 }
+
 

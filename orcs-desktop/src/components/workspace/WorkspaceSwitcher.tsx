@@ -22,6 +22,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { notifications } from '@mantine/notifications';
 import { useWorkspace } from '../../hooks/useWorkspace';
+import { useSession } from '../../hooks/useSession';
 import type { Workspace } from '../../types/workspace';
 
 interface WorkspaceSwitcherProps {
@@ -41,6 +42,7 @@ interface WorkspaceSwitcherProps {
  */
 export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
   const { workspace, allWorkspaces, switchWorkspace, toggleFavorite, refreshWorkspaces, refresh } = useWorkspace();
+  const { refreshSessions } = useSession();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSwitch = async (targetWorkspaceId: string) => {
@@ -92,18 +94,22 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
         return; // User cancelled
       }
 
-      console.log('[Workspace] Creating workspace for:', selected);
+      console.log('[Workspace] Creating workspace with session for:', selected);
       console.log('[Workspace] Current workspace count before:', allWorkspaces.length);
 
-      // Create workspace for selected directory
-      const newWorkspace = await invoke('create_workspace', { rootPath: selected });
-      console.log('[Workspace] Created workspace:', newWorkspace);
+      // Create workspace and session atomically
+      const result = await invoke('create_workspace_with_session', { rootPath: selected });
+      console.log('[Workspace] Created workspace and session:', result);
 
       // Refresh all workspaces list
       console.log('[Workspace] Refreshing workspace list...');
       await refreshWorkspaces();
 
-      // Also refresh current workspace if needed
+      // Refresh sessions list to show the new/restored session in the sidebar
+      console.log('[Workspace] Refreshing sessions list...');
+      await refreshSessions();
+
+      // Also refresh current workspace
       await refresh();
 
       // Wait a bit for React state to update and log the result

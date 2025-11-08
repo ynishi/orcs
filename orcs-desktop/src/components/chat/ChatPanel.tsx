@@ -61,8 +61,8 @@ interface ChatPanelProps {
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
-  onSaveMessageToWorkspace: (content: string, filename: string, mimeType: string) => Promise<void>;
-  onExecuteAsTask: (content: string) => void;
+  onSaveMessageToWorkspace: (message: import('../../types/message').Message) => Promise<void>;
+  onExecuteAsTask: (message: import('../../types/message').Message) => Promise<void>;
   onAutoModeChange: (autoMode: boolean) => void;
   onSelectCommand: (command: CommandDefinition) => void;
   onSelectAgent: (agent: Agent) => void;
@@ -72,6 +72,8 @@ interface ChatPanelProps {
 export function ChatPanel({
   tab,
   status,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-ignore - userNickname may be used in future features
   userNickname,
   gitInfo,
   autoMode,

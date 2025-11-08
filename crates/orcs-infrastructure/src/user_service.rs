@@ -3,9 +3,10 @@
 //! This module provides a UserService implementation that loads user information
 //! from the configuration file (~/.config/orcs/config.toml).
 
-use crate::dto::create_user_profile_migrator;
+use crate::dto::create_config_root_migrator;
 use crate::paths::{OrcsPaths, ServiceType};
 use orcs_core::user::{UserProfile, UserService};
+use orcs_core::config::RootConfig;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
@@ -75,23 +76,35 @@ impl ConfigBasedUserService {
         // Get config path
         let config_path = Self::get_config_path()?;
 
-        // Create FileStorage with migrator
-        let migrator = create_user_profile_migrator();
+        // Create FileStorage with migrator for ConfigRoot
+        let migrator = create_config_root_migrator();
         let strategy = FileStorageStrategy::new()
             .with_format(FormatStrategy::Toml)
             .with_load_behavior(LoadBehavior::CreateIfMissing);
 
-        let storage = FileStorage::new(config_path, migrator, strategy)
+        let mut storage = FileStorage::new(config_path.clone(), migrator, strategy)
             .map_err(|e| format!("Failed to create FileStorage: {}", e))?;
 
-        // Query user_profile
-        let profiles: Vec<UserProfile> = storage
-            .query("user_profile")
-            .map_err(|e| format!("Failed to query user_profile: {}", e))?;
+        // Query config_root (not user_profile directly)
+        let configs: Vec<RootConfig> = storage
+            .query("config_root")
+            .map_err(|e| format!("Failed to query config_root: {}", e))?;
 
-        // user_profile is a single object, but query returns Vec
-        // If empty or error, fall back to default
-        Ok(profiles.into_iter().next().unwrap_or_default())
+        // If no config exists, create default and save it
+        if configs.is_empty() {
+            let default_config = RootConfig::default();
+            storage
+                .update_and_save("config_root", vec![default_config.clone()])
+                .map_err(|e| format!("Failed to save default config: {}", e))?;
+            Ok(default_config.user_profile)
+        } else {
+            // Extract user_profile from RootConfig
+            Ok(configs
+                .into_iter()
+                .next()
+                .map(|config| config.user_profile)
+                .unwrap_or_default())
+        }
     }
 
     /// Gets the default config path via centralized path management.

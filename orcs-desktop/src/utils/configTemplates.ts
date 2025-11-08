@@ -188,7 +188,7 @@ export const CONFIG_TOML_TEMPLATE = `# ORCS Configuration Template
 
 \`\`\`toml
 # Root directory for ORCS data
-root_directory = "~/.orcs"
+root_pathectory = "~/.orcs"
 
 # Default workspace
 [workspace]

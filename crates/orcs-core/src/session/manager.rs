@@ -177,11 +177,14 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
             .ok_or_else(|| OrcsError::Internal("No active session".to_string()))?;
 
         // Load existing session to preserve workspace_id
+        // If the session doesn't exist yet (newly created), use None
         let session_id = manager.session_id();
         let existing_workspace_id = self
             .session_repository
             .find_by_id(session_id)
-            .await?
+            .await
+            .ok()
+            .flatten()
             .and_then(|s| s.workspace_id);
 
         let session = manager.to_session(app_mode, existing_workspace_id).await;

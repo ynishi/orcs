@@ -7,6 +7,7 @@ use crate::paths::{OrcsPaths, ServiceType};
 use orcs_core::config::SecretConfig;
 use orcs_core::secret::SecretService;
 use anyhow::Result;
+use serde::Serialize;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
@@ -54,10 +55,14 @@ impl SecretServiceImpl {
         // Setup migrator (no versioning for secrets, just load/save)
         let migrator = version_migrate::Migrator::builder().build();
 
-        // Setup storage strategy: JSON format, CreateIfMissing
+        // Setup storage strategy: JSON format, SaveIfMissing with default value
+        let default_secret = serde_json::to_value(SecretConfig::default())
+            .map_err(|e| anyhow::anyhow!("Failed to serialize default SecretConfig: {}", e))?;
+
         let strategy = FileStorageStrategy::new()
             .with_format(FormatStrategy::Json)
-            .with_load_behavior(LoadBehavior::CreateIfMissing);
+            .with_load_behavior(LoadBehavior::SaveIfMissing)
+            .with_default_value(default_secret);
 
         // Create FileStorage (automatically loads or creates empty config)
         let storage = FileStorage::new(file_path.clone(), migrator, strategy)
@@ -80,13 +85,21 @@ impl SecretServiceImpl {
         }
 
         // Load from FileStorage
-        let storage = self.storage.read().unwrap();
+        let mut storage = self.storage.write().unwrap();
         let secrets: Vec<SecretConfig> = storage
             .query("secret")
             .map_err(|e| format!("Failed to query secret: {}", e))?;
 
-        // secret is a single object, take first or return default
-        let loaded = secrets.into_iter().next().unwrap_or_default();
+        // If no secrets exist, create default and save it
+        let loaded = if secrets.is_empty() {
+            let default_config = SecretConfig::default();
+            storage
+                .update_and_save("secret", vec![default_config.clone()])
+                .map_err(|e| format!("Failed to save default secret config: {}", e))?;
+            default_config
+        } else {
+            secrets.into_iter().next().unwrap()
+        };
 
         // Cache it
         {

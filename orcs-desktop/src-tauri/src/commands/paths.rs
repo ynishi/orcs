@@ -36,7 +36,19 @@ pub async fn get_sessions_directory(state: State<'_, AppState>) -> Result<String
 /// Gets the workspaces directory path
 #[tauri::command]
 pub async fn get_workspaces_directory(state: State<'_, AppState>) -> Result<String, String> {
-    let workspaces_dir = state.workspace_manager.workspaces_root_dir();
+    let workspaces_dir = state.workspace_manager.workspaces_root_path();
+
+    let path_str = workspaces_dir
+        .to_str()
+        .ok_or("Workspaces directory path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+
+/// Gets the workspaces directory path
+#[tauri::command]
+pub async fn get_workspaces_repository_directory(state: State<'_, AppState>) -> Result<String, String> {
+    let workspaces_dir = state.workspace_manager.workspace_data_path();
 
     let path_str = workspaces_dir
         .to_str()
@@ -71,7 +83,7 @@ pub async fn get_slash_commands_directory(state: State<'_, AppState>) -> Result<
 
 /// Gets the root directory where the application is running from
 #[tauri::command]
-pub async fn get_root_directory() -> Result<String, String> {
+pub async fn get_root_pathectory() -> Result<String, String> {
     let current_dir =
         env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
 

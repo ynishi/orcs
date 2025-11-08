@@ -205,7 +205,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
 
   useEffect(() => {
     let unlistenFiles: (() => void) | undefined;
-    let unlistenSwitched: (() => void) | undefined;
     let canceled = false;
 
     (async () => {
@@ -218,11 +217,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         }
         await fetchWorkspace();
       });
-
-      unlistenSwitched = await listen<string>('workspace-switched', async () => {
-        await fetchWorkspace();
-        await fetchAllWorkspaces();
-      });
     })();
 
     return () => {
@@ -230,11 +224,8 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       if (unlistenFiles) {
         unlistenFiles();
       }
-      if (unlistenSwitched) {
-        unlistenSwitched();
-      }
     };
-  }, [fetchWorkspace, fetchAllWorkspaces]);
+  }, [fetchWorkspace]);
 
   const value = useMemo<WorkspaceContextValue>(
     () => ({
@@ -261,5 +252,4 @@ export function useWorkspaceContext(): WorkspaceContextValue {
   }
   return context;
 }
-
 

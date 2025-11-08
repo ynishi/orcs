@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import type { Session } from '../types/session';
 
 export interface SessionContextValue {
@@ -54,27 +53,6 @@ export function SessionProvider({ children }: SessionProviderProps) {
     loadSessions();
   }, [loadSessions]);
 
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let canceled = false;
-
-    (async () => {
-      if (canceled) {
-        return;
-      }
-      unlisten = await listen<string>('workspace-switched', async () => {
-        await loadSessions();
-      });
-    })();
-
-    return () => {
-      canceled = true;
-      if (unlisten) {
-        unlisten();
-      }
-    };
-  }, [loadSessions]);
-
   const createSession = useCallback(async (): Promise<string> => {
     try {
       const newSession = await invoke<Session>('create_session');
@@ -107,29 +85,28 @@ export function SessionProvider({ children }: SessionProviderProps) {
       try {
         await invoke('delete_session', { sessionId });
 
-        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        const remainingSessions = sessions.filter((s) => s.id !== sessionId);
+        setSessions(remainingSessions);
 
         if (currentSessionId === sessionId) {
           const currentIndex = sessions.findIndex((s) => s.id === sessionId);
-          const remainingSessions = sessions.filter((s) => s.id !== sessionId);
 
           if (remainingSessions.length > 0) {
-            const nextIndex = Math.min(currentIndex, remainingSessions.length - 1);
+            const nextIndex = Math.min(Math.max(currentIndex, 0), remainingSessions.length - 1);
             const nextSession = remainingSessions[nextIndex];
             await invoke('switch_session', { sessionId: nextSession.id });
             setCurrentSessionId(nextSession.id);
           } else {
+            setCurrentSessionId(null);
             await createSession();
           }
         }
-
-        await loadSessions();
       } catch (err) {
         console.error('Failed to delete session:', err);
         throw new Error(`Failed to delete session: ${err}`);
       }
     },
-    [currentSessionId, sessions, createSession, loadSessions],
+    [currentSessionId, sessions, createSession],
   );
 
   const renameSession = useCallback(async (sessionId: string, newTitle: string) => {
@@ -193,5 +170,3 @@ export function useSessionContext(): SessionContextValue {
   }
   return context;
 }
-
-

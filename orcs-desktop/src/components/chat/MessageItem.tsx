@@ -7,8 +7,8 @@ import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
 
 interface MessageItemProps {
   message: Message;
-  onSaveToWorkspace?: (message: Message) => void;
-  onExecuteAsTask?: (message: Message) => void;
+  onSaveToWorkspace?: (message: Message) => Promise<void>;
+  onExecuteAsTask?: (message: Message) => Promise<void>;
   workspaceRootPath?: string;
 }
 

@@ -2,19 +2,12 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { notifications } from '@mantine/notifications';
-import { conversationMessage } from './utils/systemMessage';
 import {
-  Textarea,
-  Button,
-  ScrollArea,
   Stack,
   Text,
   Container,
   Box,
   Group,
-  CopyButton,
-  ActionIcon,
-  Tooltip,
   AppShell,
   Burger,
   Badge,
@@ -38,8 +31,8 @@ import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
-import { convertSessionToMessages, isIdleMode } from "./types/session";
-import { SlashCommand, ExpandedSlashCommand } from "./types/slash_command";
+import { convertSessionToMessages } from "./types/session";
+import { SlashCommand } from "./types/slash_command";
 import { useTabContext } from "./context/TabContext";
 import { useSlashCommands } from "./hooks/useSlashCommands";
 import { Tabs } from "@mantine/core";
@@ -64,6 +57,7 @@ function App() {
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userNickname, setUserNickname] = useState<string>('You');
+  const [userProfile, setUserProfile] = useState<{ nickname: string; background: string } | null>(null);
   const [gitInfo, setGitInfo] = useState<GitInfo>({
     is_repo: false,
     branch: null,
@@ -90,7 +84,8 @@ function App() {
   } = useSessions();
 
   // ワークスペース管理
-  const { workspace, allWorkspaces, files: workspaceFiles, refresh: refreshWorkspace, refreshWorkspaces, switchWorkspace } = useWorkspace();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { workspace, allWorkspaces, files: workspaceFiles, refresh: refreshWorkspace, refreshWorkspaces, switchWorkspace: switchWorkspaceBackend } = useWorkspace();
   const [includeWorkspaceInPrompt, setIncludeWorkspaceInPrompt] = useState<boolean>(false);
 
   // タブ管理
@@ -100,7 +95,7 @@ function App() {
     openTab,
     closeTab,
     switchTab: switchToTab,
-    updateTabMessages,
+    switchWorkspace: switchWorkspaceTabs,
     updateTabTitle,
     addMessageToTab,
     updateTabInput,
@@ -110,11 +105,14 @@ function App() {
     setTabDragging,
     setTabThinking,
     getActiveTab,
+    getVisibleTabs,
+    getTabBySessionId,
   } = useTabContext();
 
   const [autoMode, setAutoMode] = useState<boolean>(false);
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const workspaceSwitchingRef = useRef(false);
 
   // メッセージを追加するヘルパー関数（early definition for useRef/useSlashCommands）
   const addMessage = useCallback((type: MessageType, author: string, text: string) => {
@@ -257,17 +255,26 @@ function App() {
     };
   }, []); // 依存配列を空にして、一度だけ登録
 
-  // Load user nickname from backend on startup
+  // Load user profile from backend on startup
   useEffect(() => {
-    const loadNickname = async () => {
+    const loadUserProfile = async () => {
       try {
-        const nickname = await invoke<string>('get_user_nickname');
-        setUserNickname(nickname);
+        const profile = await invoke<{ nickname: string; background: string }>('get_user_profile');
+        setUserProfile(profile);
+        setUserNickname(profile.nickname);
       } catch (error) {
-        console.error('Failed to load user nickname:', error);
+        console.error('Failed to load user profile:', error);
+        // Fallback to nickname-only API
+        try {
+          const nickname = await invoke<string>('get_user_nickname');
+          setUserNickname(nickname);
+          setUserProfile({ nickname, background: '' });
+        } catch (nicknameError) {
+          console.error('Failed to load user nickname:', nicknameError);
+        }
       }
     };
-    loadNickname();
+    loadUserProfile();
   }, []);
 
   // Load Git repository information on startup
@@ -332,8 +339,8 @@ function App() {
           
           // 既にタブが開いていない場合のみ、タブとして開く
           const existingTab = tabs.find(tab => tab.sessionId === currentSessionId);
-          if (!existingTab) {
-            openTab(activeSession, restoredMessages, true);
+          if (!existingTab && workspace) {
+            openTab(activeSession, restoredMessages, workspace.id, true);
             console.log('[App] Opened tab for active session with', restoredMessages.length, 'messages');
           } else {
             console.log('[App] Tab already exists for session', currentSessionId);
@@ -453,50 +460,80 @@ function App() {
 
   // Listen for workspace-switched events to refresh workspace data and Git info
   useEffect(() => {
-    const unlisten = listen<string>('workspace-switched', async () => {
-      console.log('[App] workspace-switched event received, refreshing workspace and Git info');
-      console.log('[App] Calling refreshWorkspace...');
-      await refreshWorkspace();
-      console.log('[App] Calling refreshWorkspaces...');
-      await refreshWorkspaces();
+    const unlistenPromise = listen<string>('workspace-switched', async () => {
+      if (workspaceSwitchingRef.current) {
+        console.log('[App] workspace-switched event ignored (refresh already in progress)');
+        return;
+      }
+      workspaceSwitchingRef.current = true;
 
-      // Refresh session list (workspace-specific sessions)
-      console.log('[App] Refreshing sessions...');
-      await refreshSessions();
-
-      // Load active session (which should have been switched by the backend)
       try {
-        console.log('[App] Loading active session...');
-        const activeSession = await invoke<Session | null>('get_active_session');
-        if (activeSession) {
-          console.log('[App] Active session loaded:', activeSession.id);
-          // Switch to this session (this will update currentSessionId and open a tab)
-          await switchSession(activeSession.id);
-        } else {
-          console.log('[App] No active session');
-          setTasks([]);
+        console.log('[App] workspace-switched event received, refreshing workspace and Git info');
+        console.log('[App] Calling refreshWorkspace...');
+        await refreshWorkspace();
+        console.log('[App] Calling refreshWorkspaces...');
+        await refreshWorkspaces();
+
+        // Refresh session list (workspace-specific sessions)
+        console.log('[App] Refreshing sessions...');
+        await refreshSessions();
+
+        // Get the updated workspace
+        const updatedWorkspace = await invoke<any>('get_current_workspace');
+        
+        if (updatedWorkspace) {
+          console.log('[App] Switching to workspace tabs:', updatedWorkspace.id);
+          // Workspace切り替え：既存タブがあればフォーカス、なければnull
+          switchWorkspaceTabs(updatedWorkspace.id);
         }
-      } catch (error) {
-        console.error('[App] Failed to load active session:', error);
-      }
 
-      // Reload Git info for the new workspace
-      try {
-        console.log('[App] Reloading Git info...');
-        const info = await invoke<GitInfo>('get_git_info');
-        setGitInfo(info);
-        console.log('[App] Git info reloaded:', info);
-      } catch (error) {
-        console.error('[App] Failed to reload Git info:', error);
-      }
+        // Load active session (which should have been switched by the backend)
+        try {
+          console.log('[App] Loading active session...');
+          const activeSession = await invoke<Session | null>('get_active_session');
+          if (activeSession && updatedWorkspace) {
+            console.log('[App] Active session loaded:', activeSession.id);
+            
+            // 既にタブが開いているかチェック
+            const existingTab = getTabBySessionId(activeSession.id);
+            if (!existingTab) {
+              // タブがなければ開く
+              const restoredMessages = convertSessionToMessages(activeSession, userNickname);
+              openTab(activeSession, restoredMessages, updatedWorkspace.id, true);
+              console.log('[App] Opened tab for active session after workspace switch');
+            } else {
+              // 既にタブがあればフォーカス
+              switchToTab(existingTab.id);
+              console.log('[App] Focused existing tab for active session');
+            }
+          } else {
+            console.log('[App] No active session');
+            setTasks([]);
+          }
+        } catch (error) {
+          console.error('[App] Failed to load active session:', error);
+        }
 
-      console.log('[App] Workspace refresh complete');
+        // Reload Git info for the new workspace
+        try {
+          console.log('[App] Reloading Git info...');
+          const info = await invoke<GitInfo>('get_git_info');
+          setGitInfo(info);
+          console.log('[App] Git info reloaded:', info);
+        } catch (error) {
+          console.error('[App] Failed to reload Git info:', error);
+        }
+
+        console.log('[App] Workspace refresh complete');
+      } finally {
+        workspaceSwitchingRef.current = false;
+      }
     });
 
     return () => {
-      unlisten.then(fn => fn());
+      unlistenPromise.then(fn => fn());
     };
-  }, [refreshWorkspace, refreshWorkspaces, refreshSessions]);
+  }, [refreshWorkspace, refreshWorkspaces, refreshSessions, switchWorkspaceTabs, openTab, switchToTab, getTabBySessionId, userNickname]);
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
   useEffect(() => {
@@ -549,7 +586,7 @@ function App() {
     workspace,
     allWorkspaces,
     workspaceFiles,
-    switchWorkspace,
+    switchWorkspace: switchWorkspaceBackend,
     setConversationMode,
     setTalkStyle,
     setInput: (value) => {
@@ -592,7 +629,7 @@ function App() {
       }
 
       if (promptCommandExecuted && !backendInput.trim()) {
-        handleSystemMessage(conversationMessage(`Command ${rawInput} produced empty content.`, 'error'), addMessage);
+        addMessage('error', 'System', `Command ${rawInput} produced empty content.`);
         await saveCurrentSession();
         return;
       }
@@ -700,26 +737,26 @@ function App() {
       status.connection,
       status.currentAgent,
       status.mode,
-      switchWorkspace,
+      switchWorkspaceBackend,
       userNickname,
       workspace,
       workspaceFiles,
     ]
   );
 
-  // スレッド全体をテキストとして取得
-  const getThreadAsText = () => {
-    // アクティブなタブのメッセージを取得
-    const activeTab = getActiveTab();
-    if (!activeTab) return '';
-    
-    return activeTab.messages
-      .map((msg) => {
-        const time = msg.timestamp.toLocaleString();
-        return `[${time}] ${msg.author} (${msg.type}):\n${msg.text}\n`;
-      })
-      .join('\n---\n\n');
-  };
+  // スレッド全体をテキストとして取得（将来の機能用に保持）
+  // const getThreadAsText = () => {
+  //   // アクティブなタブのメッセージを取得
+  //   const activeTab = getActiveTab();
+  //   if (!activeTab) return '';
+  //   
+  //   return activeTab.messages
+  //     .map((msg) => {
+  //       const time = msg.timestamp.toLocaleString();
+  //       return `[${time}] ${msg.author} (${msg.type}):\n${msg.text}\n`;
+  //     })
+  //     .join('\n---\n\n');
+  // };
 
   // キーボードイベントハンドラー
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1018,15 +1055,19 @@ function App() {
       const restoredMessages = convertSessionToMessages(fullSession, userNickname);
 
       // タブを開く（既に開いていればフォーカス）
-      const tabId = openTab(fullSession, restoredMessages);
-
-      // Show toast notification
-      notifications.show({
-        title: 'Session Opened',
-        message: `${session.title} (${restoredMessages.length} messages)`,
-        color: 'blue',
-        icon: '📂',
-      });
+      if (workspace) {
+        openTab(fullSession, restoredMessages, workspace.id);
+        
+        // Show toast notification
+        notifications.show({
+          title: 'Session Opened',
+          message: `${session.title} (${restoredMessages.length} messages)`,
+          color: 'blue',
+          icon: '📂',
+        });
+      } else {
+        console.error('[App] Cannot open tab: No workspace selected');
+      }
     } catch (err) {
       notifications.show({
         title: 'Error',
@@ -1082,7 +1123,7 @@ function App() {
 
   const handleNewSession = async () => {
     try {
-      const newSessionId = await createSession();
+      await createSession();
       // 新しいセッションは自動的にタブとして開かれる（loadActiveSessionMessagesのuseEffectで）
       // Show toast notification
       notifications.show({
@@ -1151,7 +1192,9 @@ function App() {
     async (command: SlashCommand, args: string) => {
       setShowSuggestions(false);
       setShowAgentSuggestions(false);
-      setInput('');
+      if (activeTabId) {
+        updateTabInput(activeTabId, '');
+      }
       const trimmedArgs = args.trim();
       const commandInput = trimmedArgs ? `/${command.name} ${trimmedArgs}` : `/${command.name}`;
       await processInput(commandInput);
@@ -1223,6 +1266,16 @@ function App() {
                 <Text size="xl" fw={700}>ORCS</Text>
               </Group>
               <Group gap="md">
+                {/* User Profile */}
+                {userProfile && (
+                  <Group gap="xs">
+                    <Text size="sm" c="dimmed">User:</Text>
+                    <Badge size="sm" variant="light" color="blue">
+                      {userProfile.nickname}
+                    </Badge>
+                  </Group>
+                )}
+
                 {/* Workspace Switcher */}
                 <Group gap="xs">
                   <WorkspaceSwitcher sessionId={currentSessionId} />
@@ -1275,9 +1328,13 @@ function App() {
                     <Text size="xl" c="dimmed">No session opened</Text>
                     <Text size="sm" c="dimmed">左サイドバーからセッションを選択するか、新しいセッションを作成してください</Text>
                   </Stack>
-              )}
-            </Box>
-            ) : (
+            )}
+          </Box>
+          ) : (() => {
+            // 現在のWorkspaceのタブのみを表示
+            const visibleTabs = workspace ? getVisibleTabs(workspace.id) : [];
+            
+            return (
               <Tabs
                 value={activeTabId}
                 onChange={async (value) => {
@@ -1299,7 +1356,7 @@ function App() {
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
               >
                 <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
-                  {tabs.map((tab) => (
+                  {visibleTabs.map((tab) => (
                     <Tabs.Tab
                       key={tab.id}
                       value={tab.id}
@@ -1309,21 +1366,33 @@ function App() {
                       }}
                       leftSection={tab.isDirty ? '●' : undefined}
                         rightSection={
-                          <CloseButton
-                            size="xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // 未保存の場合は確認
-                            if (tab.isDirty) {
-                              if (window.confirm(`"${tab.title}" has unsaved changes. Close anyway?`)) {
-                                closeTab(tab.id);
-                              }
-                            } else {
-                              closeTab(tab.id);
-                            }
-                          }}
-                        />
-                      }
+                          visibleTabs.length > 1 ? (
+                            <CloseButton
+                              size="xs"
+                              onClick={(e) => {
+                                console.log('[App] CloseButton clicked:', {
+                                  tabId: tab.id,
+                                  title: tab.title,
+                                  isDirty: tab.isDirty,
+                                  visibleTabsCount: visibleTabs.length,
+                                });
+                                e.stopPropagation();
+                                // 未保存の場合は確認
+                                if (tab.isDirty) {
+                                  if (window.confirm(`"${tab.title}" has unsaved changes. Close anyway?`)) {
+                                    console.log('[App] Calling closeTab for', tab.id);
+                                    closeTab(tab.id);
+                                  } else {
+                                    console.log('[App] User cancelled close');
+                                  }
+                                } else {
+                                  console.log('[App] Calling closeTab for', tab.id);
+                                  closeTab(tab.id);
+                                }
+                              }}
+                            />
+                          ) : undefined
+                        }
                     >
                       <Text truncate style={{ maxWidth: '100%' }}>
                         {tab.title}
@@ -1332,7 +1401,7 @@ function App() {
                   ))}
                 </Tabs.List>
 
-                {tabs.map((tab) => (
+                {visibleTabs.map((tab) => (
                   <Tabs.Panel key={tab.id} value={tab.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <ChatPanel
                       tab={tab}
@@ -1374,7 +1443,8 @@ function App() {
                   </Tabs.Panel>
                 ))}
               </Tabs>
-            )}
+            );
+          })()}
           </Stack>
         </Container>
       </AppShell.Main>

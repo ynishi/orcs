@@ -96,3 +96,4 @@ pub async fn open_terminal(directory: String) -> Result<(), String> {
     Ok(())
 }
 
+

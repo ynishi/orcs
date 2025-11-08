@@ -78,6 +78,45 @@ pub async fn create_workspace(
         .map_err(|e| e.to_string())
 }
 
+/// Creates a new workspace and immediately creates a session associated with it.
+///
+/// This is the recommended way to create workspaces, as a workspace without
+/// a session doesn't make sense. This ensures both workspace and session are
+/// created atomically, and the workspace is set as the currently selected workspace.
+///
+/// Returns: { workspace: Workspace, session: Session }
+#[tauri::command]
+pub async fn create_workspace_with_session(
+    root_path: String,
+    state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    println!(
+        "[Backend] create_workspace_with_session called: path={}",
+        root_path
+    );
+
+    let path = PathBuf::from(root_path);
+    let (workspace, session) = state
+        .session_usecase
+        .create_workspace_with_session(&path)
+        .await
+        .map_err(|e| {
+            println!("[Backend] Failed to create workspace with session: {}", e);
+            e.to_string()
+        })?;
+
+    println!(
+        "[Backend] Successfully created workspace {} and session {}",
+        workspace.id, session.id
+    );
+
+    // Return both workspace and session as JSON
+    Ok(serde_json::json!({
+        "workspace": workspace,
+        "session": session,
+    }))
+}
+
 /// Lists all registered workspaces
 #[tauri::command]
 pub async fn list_workspaces(state: State<'_, AppState>) -> Result<Vec<Workspace>, String> {

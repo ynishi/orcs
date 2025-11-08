@@ -67,7 +67,16 @@ export function SessionList({
       return a.is_favorite ? -1 : 1;
     }
 
-    // 3. それ以外はupdated_atで降順
+    // 3. Favorite内では、sort_orderがあればそれを優先
+    if (a.is_favorite && b.is_favorite) {
+      if (a.sort_order !== undefined && b.sort_order !== undefined) {
+        return a.sort_order - b.sort_order;
+      }
+      if (a.sort_order !== undefined) return -1;
+      if (b.sort_order !== undefined) return 1;
+    }
+
+    // 4. それ以外はupdated_atで降順
     return getLastActive(b).getTime() - getLastActive(a).getTime();
   });
 

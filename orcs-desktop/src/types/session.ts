@@ -22,6 +22,7 @@ export interface Session {
   participant_colors: Record<string, string>; // Persona ID -> base color mapping for UI theming
   is_favorite?: boolean; // Whether this session is marked as favorite (pinned to top)
   is_archived?: boolean; // Whether this session is archived (hidden by default)
+  sort_order?: number; // Manual sort order (optional, for custom ordering within favorites)
 }
 
 /**

@@ -75,6 +75,9 @@ pub struct Session {
     /// Whether this session is archived (hidden by default)
     #[serde(default)]
     pub is_archived: bool,
+    /// Manual sort order (optional, for custom ordering within favorites)
+    #[serde(default)]
+    pub sort_order: Option<i32>,
 }
 
 fn default_execution_strategy() -> ExecutionModel {

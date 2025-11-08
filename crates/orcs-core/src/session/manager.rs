@@ -447,6 +447,7 @@ mod tests {
                 participant_colors: HashMap::new(),
                 is_favorite: false,
                 is_archived: false,
+                sort_order: None,
             }
         }
 

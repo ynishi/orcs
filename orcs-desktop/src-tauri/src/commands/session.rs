@@ -67,11 +67,18 @@ impl From<InteractionResult> for SerializableInteractionResult {
 }
 
 /// Creates a new session
+///
+/// # Arguments
+///
+/// * `workspace_id` - The workspace ID to associate with the new session (required)
 #[tauri::command]
-pub async fn create_session(state: State<'_, AppState>) -> Result<Session, String> {
+pub async fn create_session(
+    workspace_id: String,
+    state: State<'_, AppState>,
+) -> Result<Session, String> {
     let session = state
         .session_usecase
-        .create_session()
+        .create_session(&workspace_id)
         .await
         .map_err(|e| e.to_string())?;
 

@@ -140,3 +140,10 @@ pub async fn get_default_workspace_path() -> Result<String, String> {
     Ok(path_str.to_string())
 }
 
+/// Gets the default workspace ID from AppState
+#[tauri::command]
+pub async fn get_default_workspace_id(state: tauri::State<'_, crate::app::AppState>) -> Result<String, String> {
+    let workspace_id = state.app_state_service.get_default_workspace().await;
+    Ok(workspace_id)
+}
+

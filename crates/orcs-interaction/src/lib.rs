@@ -565,8 +565,9 @@ impl InteractionManager {
             })
             .unwrap_or_else(|| "unknown".to_string());
 
-        // Use provided workspace_id directly
-        let final_workspace_id = workspace_id;
+        // Use internal workspace_id if set, otherwise use provided workspace_id as fallback
+        let internal_workspace_id = self.workspace_id.read().await.clone();
+        let final_workspace_id = internal_workspace_id.unwrap_or(workspace_id);
 
         // Get active participants if dialogue is initialized
         let active_participant_ids = self.get_active_participants().await.unwrap_or_default();

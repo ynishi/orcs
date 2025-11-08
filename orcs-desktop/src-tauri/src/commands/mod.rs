@@ -60,6 +60,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         paths::get_logs_directory,
         paths::get_secret_path,
         paths::get_default_workspace_path,
+        paths::get_default_workspace_id,
         git::get_git_info,
         workspaces::get_current_workspace,
         workspaces::create_workspace,

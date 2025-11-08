@@ -7,7 +7,7 @@ export interface SessionContextValue {
   currentSessionId: string | null;
   loading: boolean;
   error: string | null;
-  createSession: () => Promise<string>;
+  createSession: (workspaceId?: string) => Promise<string>;
   switchSession: (sessionId: string) => Promise<Session>;
   deleteSession: (sessionId: string) => Promise<void>;
   renameSession: (sessionId: string, newTitle: string) => Promise<void>;
@@ -53,9 +53,12 @@ export function SessionProvider({ children }: SessionProviderProps) {
     loadSessions();
   }, [loadSessions]);
 
-  const createSession = useCallback(async (): Promise<string> => {
+  const createSession = useCallback(async (workspaceId?: string): Promise<string> => {
     try {
-      const newSession = await invoke<Session>('create_session');
+      // If workspace_id not provided, get default workspace_id
+      const finalWorkspaceId = workspaceId || await invoke<string>('get_default_workspace_id');
+
+      const newSession = await invoke<Session>('create_session', { workspaceId: finalWorkspaceId });
       setCurrentSessionId(newSession.id);
       await loadSessions();
       return newSession.id;

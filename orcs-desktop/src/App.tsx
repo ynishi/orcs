@@ -411,7 +411,7 @@ function App() {
       if (workspace && sessions.length === 0) {
         console.log('[App] No sessions found, creating initial session for workspace');
         try {
-          await createSession();
+          await createSession(workspace.id);
           console.log('[App] Initial session created');
         } catch (error) {
           console.error('[App] Failed to create initial session:', error);
@@ -1205,7 +1205,8 @@ function App() {
 
   const handleNewSession = async () => {
     try {
-      await createSession();
+      // Use current workspace ID if available, otherwise fallback to default (handled by SessionContext)
+      await createSession(workspace?.id);
       // 新しいセッションは自動的にタブとして開かれる（loadActiveSessionMessagesのuseEffectで）
       // Show toast notification
       notifications.show({
@@ -1550,7 +1551,7 @@ function App() {
                                     // 4e. Workspace内にSessionがない場合、新規作成
                                     console.log('[App] No remaining sessions, creating new session');
                                     try {
-                                      await createSession();
+                                      await createSession(workspace?.id);
                                       console.log('[App] New session created');
                                     } catch (err) {
                                       console.error('[App] Failed to create new session:', err);

@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
-use orcs_core::session::{AppMode, ConversationMode, ErrorSeverity, Session};
+use orcs_core::session::{AppMode, ConversationMode, ErrorSeverity, Session, PLACEHOLDER_WORKSPACE_ID};
 use orcs_interaction::InteractionResult;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
@@ -215,7 +215,7 @@ pub async fn append_system_messages(
 pub async fn get_active_session(state: State<'_, AppState>) -> Result<Option<Session>, String> {
     if let Some(manager) = state.session_manager.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();
-        let session = manager.to_session(app_mode, None).await;
+        let session = manager.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
         Ok(Some(session))
     } else {
         Ok(None)
@@ -235,7 +235,7 @@ pub async fn execute_message_as_task(
         .ok_or("No active session")?;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let session = manager.to_session(app_mode, None).await;
+    let session = manager.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
     let session_id = session.id;
 
     state

@@ -43,6 +43,7 @@ export function SettingsMenu({
   onSelectSession,
 }: SettingsMenuProps = {}) {
   const [rootDir, setRootDir] = useState<string>('');
+  const [defaultWorkspace, setDefaultWorkspace] = useState<string>('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -55,6 +56,18 @@ export function SettingsMenu({
       }
     };
     loadRootDir();
+  }, []);
+
+  useEffect(() => {
+    const loadDefaultWorkspace = async () => {
+      try {
+        const workspace = await invoke<string>('get_default_workspace_path');
+        setDefaultWorkspace(workspace);
+      } catch (error) {
+        console.error('[Settings] Failed to load default workspace:', error);
+      }
+    };
+    loadDefaultWorkspace();
   }, []);
 
   useEffect(() => {
@@ -191,6 +204,29 @@ export function SettingsMenu({
       console.error('[Settings] Failed to open root directory:', error);
       notifications.show({
         title: 'Failed to Open Directory',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  const handleOpenDefaultWorkspace = async () => {
+    if (!defaultWorkspace) {
+      notifications.show({
+        title: 'Default Workspace Not Loaded',
+        message: 'Please wait for the default workspace to load',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    try {
+      console.log('[Settings] Opening default workspace:', defaultWorkspace);
+      await openPath(defaultWorkspace);
+    } catch (error) {
+      console.error('[Settings] Failed to open default workspace:', error);
+      notifications.show({
+        title: 'Failed to Open Default Workspace',
         message: String(error),
         color: 'red',
       });
@@ -381,6 +417,17 @@ export function SettingsMenu({
             <Text size="xs" c="dimmed">Root Directory:</Text>
             <Text size="xs" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
               {rootDir || 'Loading...'}
+            </Text>
+          </Stack>
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<IconFolderOpen size={16} />}
+          onClick={handleOpenDefaultWorkspace}
+        >
+          <Stack gap={4}>
+            <Text size="xs" c="dimmed">Default Workspace:</Text>
+            <Text size="xs" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              {defaultWorkspace || 'Loading...'}
             </Text>
           </Stack>
         </Menu.Item>

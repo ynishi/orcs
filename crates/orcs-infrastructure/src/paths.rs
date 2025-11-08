@@ -326,6 +326,43 @@ impl OrcsPaths {
         }
     }
 
+    /// Returns the default user workspace path.
+    ///
+    /// This is a fallback workspace used when no user workspace is selected.
+    /// Unlike other service paths (which are for app metadata), this path
+    /// represents an actual user workspace directory.
+    ///
+    /// # Platform Paths
+    ///
+    /// - macOS: `~/orcs`
+    /// - Linux: `~/orcs`
+    /// - Windows: `%USERPROFILE%\orcs`
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(PathBuf)`: Default user workspace path
+    /// * `Err(PathError)`: Could not determine home directory
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use orcs_infrastructure::paths::OrcsPaths;
+    ///
+    /// let orcs_paths = OrcsPaths::new(None);
+    /// let default_workspace_path = orcs_paths.default_user_workspace_path()?;
+    /// // Returns: ~/orcs
+    /// ```
+    pub fn default_user_workspace_path(&self) -> Result<PathBuf, PathError> {
+        if let Some(ref base) = self.base_path {
+            // For testing: use custom base path
+            return Ok(base.join("user_workspace"));
+        }
+
+        // Production: use home directory
+        let home = dirs::home_dir().ok_or(PathError::HomeDirNotFound)?;
+        Ok(home.join("orcs"))
+    }
+
     /// Creates an AsyncDirStorage instance for a given service type.
     ///
     /// This is a helper method for repositories to create storage with proper configuration.
@@ -449,5 +486,36 @@ mod tests {
         let orcs_paths2 = OrcsPaths::new(None);
         let data_dir = orcs_paths2.data_dir().unwrap();
         assert!(storage_dir.starts_with(&data_dir));
+    }
+
+    // ============================================
+    // Default User Workspace Path Tests
+    // ============================================
+
+    #[test]
+    fn test_default_user_workspace_path_production() {
+        let orcs_paths = OrcsPaths::new(None);
+        let workspace_path = orcs_paths.default_user_workspace_path().unwrap();
+
+        // Should end with "orcs"
+        assert!(workspace_path.ends_with("orcs"));
+
+        // Should be under home directory
+        if let Some(home) = dirs::home_dir() {
+            assert!(workspace_path.starts_with(&home));
+            assert_eq!(workspace_path, home.join("orcs"));
+        }
+    }
+
+    #[test]
+    fn test_default_user_workspace_path_custom_base() {
+        use std::path::PathBuf;
+
+        let custom_base = PathBuf::from("/tmp/test_orcs");
+        let orcs_paths = OrcsPaths::new(Some(&custom_base));
+        let workspace_path = orcs_paths.default_user_workspace_path().unwrap();
+
+        // Should use custom base path for testing
+        assert_eq!(workspace_path, custom_base.join("user_workspace"));
     }
 }

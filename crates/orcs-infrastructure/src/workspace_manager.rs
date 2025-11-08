@@ -735,7 +735,7 @@ mod tests {
 
         assert!(!root_path.exists());
 
-        let _manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let _manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 
@@ -760,7 +760,7 @@ mod tests {
         let repo_path = temp_dir.path().join("test-repo");
         fs::create_dir_all(&repo_path).await.unwrap();
 
-        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 
@@ -779,7 +779,7 @@ mod tests {
         let repo_path = temp_dir.path().join("test-repo");
         fs::create_dir_all(&repo_path).await.unwrap();
 
-        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 
@@ -798,7 +798,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let root_path = temp_dir.path().join("workspaces");
 
-        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 
@@ -813,7 +813,7 @@ mod tests {
         let repo_path = temp_dir.path().join("test-repo");
         fs::create_dir_all(&repo_path).await.unwrap();
 
-        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 
@@ -836,7 +836,7 @@ mod tests {
         let test_content = b"Hello, workspace!";
         fs::write(&test_file_path, test_content).await.unwrap();
 
-        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 
@@ -879,7 +879,7 @@ mod tests {
         let repo_path = temp_dir.path().join("test-repo");
         fs::create_dir_all(&repo_path).await.unwrap();
 
-        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 
@@ -932,7 +932,7 @@ mod tests {
         let repo_path = temp_dir.path().join("test-repo");
         fs::create_dir_all(&repo_path).await.unwrap();
 
-        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 
@@ -979,7 +979,7 @@ mod tests {
         let repo_path = temp_dir.path().join("test-repo");
         fs::create_dir_all(&repo_path).await.unwrap();
 
-        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 
@@ -1009,7 +1009,7 @@ mod tests {
         let repo_path = temp_dir.path().join("test-repo");
         fs::create_dir_all(&repo_path).await.unwrap();
 
-        let manager = FileSystemWorkspaceManager::new(root_path.clone())
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
             .await
             .unwrap();
 

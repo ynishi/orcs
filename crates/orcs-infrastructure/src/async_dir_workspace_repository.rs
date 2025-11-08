@@ -152,7 +152,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_and_find_by_id() {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirWorkspaceRepository::new(temp_dir.path())
+        let repo = AsyncDirWorkspaceRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
@@ -185,7 +185,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete() {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirWorkspaceRepository::new(temp_dir.path())
+        let repo = AsyncDirWorkspaceRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
@@ -211,7 +211,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_all() {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirWorkspaceRepository::new(temp_dir.path())
+        let repo = AsyncDirWorkspaceRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
@@ -253,7 +253,7 @@ mod tests {
     #[tokio::test]
     async fn test_find_nonexistent() {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirWorkspaceRepository::new(temp_dir.path())
+        let repo = AsyncDirWorkspaceRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
@@ -264,7 +264,7 @@ mod tests {
     #[tokio::test]
     async fn test_exists() {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirWorkspaceRepository::new(temp_dir.path())
+        let repo = AsyncDirWorkspaceRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 

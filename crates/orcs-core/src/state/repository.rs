@@ -19,12 +19,10 @@ pub trait StateRepository: Send + Sync {
 
     async fn clear_last_selected_workspace(&self) -> Result<()>;
 
-    async fn get_default_workspace(&self) -> Option<String>;
+    async fn get_default_workspace(&self) -> String;
 
     async fn set_default_workspace(&self, workspace_id: String) -> Result<()>;
 
-    async fn clear_default_workspace(&self) -> Result<()>;
-    
     async fn get_active_session(&self) -> Option<String>;
 
     async fn set_active_session(&self, session_id: String) -> Result<()>;

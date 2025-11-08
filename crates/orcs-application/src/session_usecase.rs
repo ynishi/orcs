@@ -6,7 +6,7 @@
 
 use anyhow::{Result, anyhow};
 use orcs_core::repository::PersonaRepository;
-use orcs_core::session::{AppMode, Session, SessionManager};
+use orcs_core::session::{AppMode, Session, SessionManager, PLACEHOLDER_WORKSPACE_ID};
 use orcs_core::state::repository::StateRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::manager::WorkspaceManager;
@@ -163,8 +163,8 @@ impl SessionUseCase {
             .await?;
 
         // 4. Associate with workspace if available
-        if let Some(workspace_id) = workspace_id_opt {
-            match self.workspace_manager.get_workspace(&workspace_id).await {
+        if let Some(ref workspace_id) = workspace_id_opt {
+            match self.workspace_manager.get_workspace(workspace_id).await {
                 Ok(Some(workspace)) => {
                     tracing::info!(
                         "[SessionUseCase] Found workspace: {} ({})",
@@ -217,7 +217,8 @@ impl SessionUseCase {
             .await?;
 
         // 6. Return session
-        let session = manager.to_session(AppMode::Idle, None).await;
+        let workspace_id = workspace_id_opt.unwrap_or_else(|| PLACEHOLDER_WORKSPACE_ID.to_string());
+        let session = manager.to_session(AppMode::Idle, workspace_id).await;
         Ok(session)
     }
 
@@ -295,7 +296,7 @@ impl SessionUseCase {
 
         let workspace_sessions: Vec<_> = existing_sessions
             .into_iter()
-            .filter(|s| s.workspace_id.as_ref() == Some(&workspace.id))
+            .filter(|s| &s.workspace_id == &workspace.id)
             .collect();
 
         let session = if !workspace_sessions.is_empty() {
@@ -418,7 +419,7 @@ impl SessionUseCase {
             .await?;
 
         // 7. Return session
-        let session = manager.to_session(AppMode::Idle, None).await;
+        let session = manager.to_session(AppMode::Idle, workspace.id.clone()).await;
         Ok(session)
     }
 
@@ -473,11 +474,12 @@ impl SessionUseCase {
             })
             .await?;
 
-        // 2. Get session data to check workspace_id
-        let session = manager.to_session(AppMode::Idle, None).await;
+        // 2. Get session data to check workspace_id - use placeholder for now, will be updated
+        let session = manager.to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+        let workspace_id = &session.workspace_id;
 
         // 3. Validate and restore workspace context if workspace_id exists
-        if let Some(ref workspace_id) = session.workspace_id {
+        if workspace_id != PLACEHOLDER_WORKSPACE_ID {
             tracing::debug!(
                 "[SessionUseCase] Session references workspace: {}",
                 workspace_id
@@ -526,7 +528,7 @@ impl SessionUseCase {
 
                     // Clear the invalid workspace_id
                     self.session_manager
-                        .update_workspace_id(session_id, None, None)
+                        .update_workspace_id(session_id, PLACEHOLDER_WORKSPACE_ID.to_string(), None)
                         .await?;
 
                     tracing::info!(
@@ -548,7 +550,7 @@ impl SessionUseCase {
         }
 
         // Return the session (potentially with cleared workspace_id)
-        let final_session = manager.to_session(AppMode::Idle, None).await;
+        let final_session = manager.to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
         tracing::info!("[SessionUseCase] Switched to session: {}", session_id);
 
         Ok(final_session)
@@ -626,7 +628,7 @@ impl SessionUseCase {
 
         let workspace_sessions: Vec<_> = all_sessions
             .into_iter()
-            .filter(|s| s.workspace_id.as_ref() == Some(&workspace.id))
+            .filter(|s| &s.workspace_id == &workspace.id)
             .collect();
 
         println!(
@@ -824,12 +826,13 @@ impl SessionUseCase {
             return Ok(None);
         };
 
-        // 2. Get session data
-        let session = manager.to_session(AppMode::Idle, None).await;
+        // 2. Get session data - use placeholder for now, will be updated
+        let session = manager.to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
         tracing::info!("[SessionUseCase] Restored session: {}", session.id);
+        let workspace_id = &session.workspace_id;
 
         // 3. Validate and restore workspace context
-        if let Some(ref workspace_id) = session.workspace_id {
+        if workspace_id != PLACEHOLDER_WORKSPACE_ID {
             tracing::debug!(
                 "[SessionUseCase] Session references workspace: {}",
                 workspace_id
@@ -869,7 +872,7 @@ impl SessionUseCase {
 
                     // Clear the invalid workspace_id
                     self.session_manager
-                        .update_workspace_id(&session.id, None, None)
+                        .update_workspace_id(&session.id, PLACEHOLDER_WORKSPACE_ID.to_string(), None)
                         .await?;
 
                     tracing::info!(
@@ -890,7 +893,7 @@ impl SessionUseCase {
         }
 
         // Return the final session state
-        let final_session = manager.to_session(AppMode::Idle, None).await;
+        let final_session = manager.to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
         Ok(Some(final_session))
     }
 

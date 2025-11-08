@@ -7,7 +7,6 @@ use crate::paths::{OrcsPaths, ServiceType};
 use orcs_core::config::SecretConfig;
 use orcs_core::secret::SecretService;
 use anyhow::Result;
-use serde::Serialize;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
@@ -130,15 +129,15 @@ mod tests {
     #[test]
     fn test_secret_service_creation() {
         let secret_temp_file = tempfile::NamedTempFile::new().expect("secret_temp_file should be created");
-        let service = SecretServiceImpl::new(secret_temp_file);
+        let service = SecretServiceImpl::new(Some(secret_temp_file.path()));
         assert!(service.is_ok());
     }
 
-    #[test]
-    fn test_secret_file_exists() {
+    #[tokio::test]
+    async fn test_secret_file_exists() {
         let secret_temp_file = tempfile::NamedTempFile::new().expect("secret_temp_file should be created");
-        let service = SecretServiceImpl::new(Some(secret_temp_file.into_temp_path())).unwrap();
+        let service = SecretServiceImpl::new(Some(secret_temp_file.path())).unwrap();
         // File may or may not exist depending on test environment
-        assert!(service.secret_file_exists());
+        assert!(service.secret_file_exists().await);
     }
 }

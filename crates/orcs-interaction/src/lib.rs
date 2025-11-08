@@ -362,7 +362,7 @@ impl InteractionManager {
             session_id: data.id,
             title: Arc::new(RwLock::new(data.title)),
             created_at: data.created_at,
-            workspace_id: Arc::new(RwLock::new(data.workspace_id)),
+            workspace_id: Arc::new(RwLock::new(Some(data.workspace_id))),
             agent_workspace_root: Arc::new(RwLock::new(None)), // Will be resolved and set by the caller
             dialogue: Arc::new(Mutex::new(None)),
             persona_histories: Arc::new(RwLock::new(data.persona_histories)),
@@ -545,11 +545,10 @@ impl InteractionManager {
     /// # Arguments
     ///
     /// * `app_mode` - The current application mode
-    /// * `workspace_id` - Optional workspace ID to associate with this session (overrides instance workspace_id if provided)
-    pub async fn to_session(&self, app_mode: AppMode, workspace_id: Option<String>) -> Session {
+    /// * `workspace_id` - Workspace ID to associate with this session
+    pub async fn to_session(&self, app_mode: AppMode, workspace_id: String) -> Session {
         let persona_histories = self.persona_histories.read().await.clone();
         let title = self.title.read().await.clone();
-        let instance_workspace_id = self.workspace_id.read().await.clone();
         let execution_strategy = *self.execution_strategy.read().await;
         let system_messages = self.system_messages.read().await.clone();
 
@@ -566,8 +565,8 @@ impl InteractionManager {
             })
             .unwrap_or_else(|| "unknown".to_string());
 
-        // Use provided workspace_id, fallback to instance workspace_id
-        let final_workspace_id = workspace_id.or(instance_workspace_id);
+        // Use provided workspace_id directly
+        let final_workspace_id = workspace_id;
 
         // Get active participants if dialogue is initialized
         let active_participant_ids = self.get_active_participants().await.unwrap_or_default();
@@ -1219,7 +1218,7 @@ impl orcs_core::session::InteractionManagerTrait for InteractionManager {
         &self.session_id
     }
 
-    async fn to_session(&self, app_mode: AppMode, workspace_id: Option<String>) -> Session {
+    async fn to_session(&self, app_mode: AppMode, workspace_id: String) -> Session {
         self.to_session(app_mode, workspace_id).await
     }
 

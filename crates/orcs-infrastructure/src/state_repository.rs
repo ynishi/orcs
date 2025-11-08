@@ -135,7 +135,7 @@ impl StateRepository for StateRepositoryImpl {
     }
 
     /// Gets the default workspace ID.
-    async fn get_default_workspace(&self) -> Option<String> {
+    async fn get_default_workspace(&self) -> String {
         let state = self.state.lock().await;
         state.default_workspace_id.clone()
     }
@@ -143,7 +143,7 @@ impl StateRepository for StateRepositoryImpl {
     /// Sets the default workspace ID.
     async fn set_default_workspace(&self, workspace_id: String) -> Result<()> {
         let mut state = self.state.lock().await.clone();
-        state.default_workspace_id = Some(workspace_id);
+        state.default_workspace_id = workspace_id;
         let cloned_state = state.clone();
         drop(state);
         self.save_state(cloned_state).await
@@ -175,14 +175,6 @@ impl StateRepository for StateRepositoryImpl {
 
     async fn get_state(&self) -> Result<AppState> {
         Ok(self.state.lock().await.clone())
-    }
-
-    async fn clear_default_workspace(&self) -> Result<()> {
-        let mut state = self.state.lock().await.clone();
-        state.default_workspace_id = None;
-        let cloned_state = state.clone();
-        drop(state);
-        self.save_state(cloned_state).await
     }
 }
 

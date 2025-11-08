@@ -1,5 +1,6 @@
 //! Tauri commands for slash command management
 
+use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::slash_command::{CommandType, SlashCommand};
 use orcs_core::workspace::manager::WorkspaceManager;
 use serde::Serialize;
@@ -54,15 +55,16 @@ async fn expand_slash_command(
     // Get workspace info from active session
     let workspace = if let Some(session_mgr) = state.session_manager.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();
-        let session = session_mgr.to_session(app_mode, None).await;
-        if let Some(workspace_id) = session.workspace_id {
+        let session = session_mgr.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+        if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
+            let workspace_id = &session.workspace_id;
             tracing::info!(
                 "expand_slash_command: Active session workspace_id: {}",
                 workspace_id
             );
             let ws = state
                 .workspace_manager
-                .get_workspace(&workspace_id)
+                .get_workspace(workspace_id)
                 .await
                 .map_err(|e| e.to_string())?
                 .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
@@ -234,11 +236,12 @@ pub async fn execute_shell_command(
         // Default to workspace directory from active session
         let workspace = if let Some(session_mgr) = state.session_manager.active_session().await {
             let app_mode = state.app_mode.lock().await.clone();
-            let session = session_mgr.to_session(app_mode, None).await;
-            if let Some(workspace_id) = session.workspace_id {
+            let session = session_mgr.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+            if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
+                let workspace_id = &session.workspace_id;
                 state
                     .workspace_manager
-                    .get_workspace(&workspace_id)
+                    .get_workspace(workspace_id)
                     .await
                     .map_err(|e| format!("Failed to get workspace: {}", e))?
                     .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?

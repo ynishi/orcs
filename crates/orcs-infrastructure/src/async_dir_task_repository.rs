@@ -113,7 +113,7 @@ mod tests {
 
     async fn create_test_repository() -> (AsyncDirTaskRepository, TempDir) {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirTaskRepository::new(temp_dir.path()).await.unwrap();
+        let repo = AsyncDirTaskRepository::new(Some(temp_dir.path())).await.unwrap();
         (repo, temp_dir)
     }
 

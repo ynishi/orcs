@@ -5,7 +5,7 @@ mod commands;
 mod slash_commands;
 
 use chrono::Local;
-use orcs_core::session::AppMode;
+use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID};
 use orcs_execution::tracing_layer::OrchestratorEvent;
 use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
 use tauri::Emitter;
@@ -87,13 +87,14 @@ fn main() {
 
                     if let Some(session_mgr) = session_manager_for_setup.active_session().await {
                         let app_mode_locked = AppMode::Idle;
-                        let session = session_mgr.to_session(app_mode_locked, None).await;
-                        if let Some(workspace_id) = session.workspace_id {
+                        let session = session_mgr.to_session(app_mode_locked, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+                        if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
+                            let workspace_id = &session.workspace_id;
                             tracing::info!(
                                 "[Startup] Emitting workspace-switched event for: {}",
                                 workspace_id
                             );
-                            let _ = handle.emit("workspace-switched", &workspace_id);
+                            let _ = handle.emit("workspace-switched", workspace_id);
                         }
                     }
                 });

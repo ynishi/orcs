@@ -138,7 +138,7 @@ mod tests {
     use orcs_core::persona::{Persona, PersonaBackend, PersonaRepository, PersonaSource};
     use orcs_core::session::{AppMode, ConversationMessage, MessageMetadata, MessageRole};
     use std::collections::HashMap;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Mutex;
     use tempfile::TempDir;
 
     // Mock PersonaRepository for testing
@@ -205,7 +205,7 @@ mod tests {
             current_persona_id: "mai".to_string(),
             persona_histories,
             app_mode: AppMode::Idle,
-            workspace_id: None,
+            workspace_id: String::new(),
             active_participant_ids: vec![],
             execution_strategy: ExecutionModel::Broadcast,
             system_messages: vec![],
@@ -220,7 +220,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_and_find_by_id() {
         let temp_dir = TempDir::new().unwrap();
-        let repository = AsyncDirSessionRepository::new(temp_dir.path())
+        let repository = AsyncDirSessionRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
@@ -246,7 +246,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_all() {
         let temp_dir = TempDir::new().unwrap();
-        let repository = AsyncDirSessionRepository::new(temp_dir.path())
+        let repository = AsyncDirSessionRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
@@ -273,7 +273,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete() {
         let temp_dir = TempDir::new().unwrap();
-        let repository = AsyncDirSessionRepository::new(temp_dir.path())
+        let repository = AsyncDirSessionRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 
@@ -305,7 +305,7 @@ mod tests {
     #[tokio::test]
     async fn test_find_nonexistent() {
         let temp_dir = TempDir::new().unwrap();
-        let repository = AsyncDirSessionRepository::new(temp_dir.path())
+        let repository = AsyncDirSessionRepository::new(Some(temp_dir.path()))
             .await
             .unwrap();
 

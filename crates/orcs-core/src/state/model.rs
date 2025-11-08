@@ -5,6 +5,10 @@
 use serde::{Deserialize, Serialize};
 use version_migrate::DeriveQueryable as Queryable;
 
+/// Placeholder for default workspace ID before it's initialized.
+/// This will be replaced with the actual workspace ID during bootstrap.
+pub const PLACEHOLDER_DEFAULT_WORKSPACE_ID: &str = "___default_workspace_placeholder___";
+
 /// Application state that persists across restarts.
 ///
 /// This struct contains application-level state information that should be
@@ -20,20 +24,31 @@ use version_migrate::DeriveQueryable as Queryable;
 ///
 /// * `last_selected_workspace_id` - The ID of the last workspace the user selected.
 ///   This is used to restore the workspace on application startup.
-/// * `default_workspace_id` - The ID of the system's default workspace (ConfigDir as workspace).
-///   This represents the ConfigDir itself as a workspace for system-wide operations.
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Queryable)]
+/// * `default_workspace_id` - The ID of the system's default workspace (~/orcs).
+///   This is a fallback workspace that is always available.
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
 #[queryable(entity = "app_state")]
 pub struct AppState {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.
     pub last_selected_workspace_id: Option<String>,
 
-    /// ID of the default system workspace (ConfigDir as workspace).
-    /// This workspace represents the application's configuration directory itself.
-    pub default_workspace_id: Option<String>,
+    /// ID of the default system workspace (~/orcs).
+    /// This is a fallback workspace that is always available.
+    /// Must be initialized during bootstrap.
+    pub default_workspace_id: String,
 
     pub active_session_id: Option<String>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            last_selected_workspace_id: None,
+            default_workspace_id: PLACEHOLDER_DEFAULT_WORKSPACE_ID.to_string(),
+            active_session_id: None,
+        }
+    }
 }
 
 impl AppState {
@@ -51,7 +66,7 @@ mod tests {
     fn test_new() {
         let state = AppState::new();
         assert!(state.last_selected_workspace_id.is_none());
-        assert!(state.default_workspace_id.is_none());
+        assert_eq!(state.default_workspace_id, PLACEHOLDER_DEFAULT_WORKSPACE_ID);
         assert!(state.active_session_id.is_none());
     }
 
@@ -59,7 +74,7 @@ mod tests {
     fn test_default() {
         let state = AppState::default();
         assert!(state.last_selected_workspace_id.is_none());
-        assert!(state.default_workspace_id.is_none());
+        assert_eq!(state.default_workspace_id, PLACEHOLDER_DEFAULT_WORKSPACE_ID);
         assert!(state.active_session_id.is_none());
     }
 }

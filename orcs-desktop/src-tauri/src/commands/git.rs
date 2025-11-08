@@ -1,5 +1,6 @@
 use std::process::Command as ProcessCommand;
 
+use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use serde::Serialize;
 use tauri::State;
 
@@ -24,12 +25,12 @@ pub async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String>
     let workspace = match state.session_manager.active_session().await {
         Some(manager) => {
             let app_mode = state.app_mode.lock().await.clone();
-            let session = manager.to_session(app_mode, None).await;
+            let session = manager.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
 
-            if let Some(workspace_id) = &session.workspace_id {
+            if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
                 state
                     .workspace_manager
-                    .get_workspace(workspace_id)
+                    .get_workspace(&session.workspace_id)
                     .await
                     .map_err(|e| e.to_string())?
             } else {

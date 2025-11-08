@@ -125,3 +125,18 @@ pub async fn get_secret_path() -> Result<String, String> {
     Ok(path_str.to_string())
 }
 
+/// Gets the default workspace path (~/orcs)
+#[tauri::command]
+pub async fn get_default_workspace_path() -> Result<String, String> {
+    let orcs_paths = OrcsPaths::new(None);
+    let default_path = orcs_paths
+        .default_user_workspace_path()
+        .map_err(|e| e.to_string())?;
+
+    let path_str = default_path
+        .to_str()
+        .ok_or("Default workspace path is not valid UTF-8")?;
+
+    Ok(path_str.to_string())
+}
+

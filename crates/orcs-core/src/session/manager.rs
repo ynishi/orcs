@@ -17,7 +17,7 @@ pub trait InteractionManagerTrait: Send + Sync {
     fn to_session(
         &self,
         app_mode: AppMode,
-        workspace_id: Option<String>,
+        workspace_id: String,
     ) -> impl std::future::Future<Output = Session> + Send;
     fn set_workspace_id(
         &self,
@@ -177,7 +177,7 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
             .ok_or_else(|| OrcsError::Internal("No active session".to_string()))?;
 
         // Load existing session to preserve workspace_id
-        // If the session doesn't exist yet (newly created), use None
+        // If the session doesn't exist yet (newly created), use placeholder
         let session_id = manager.session_id();
         let existing_workspace_id = self
             .session_repository
@@ -185,7 +185,8 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
             .await
             .ok()
             .flatten()
-            .and_then(|s| s.workspace_id);
+            .map(|s| s.workspace_id)
+            .unwrap_or_else(|| crate::session::model::PLACEHOLDER_WORKSPACE_ID.to_string());
 
         let session = manager.to_session(app_mode, existing_workspace_id).await;
         self.session_repository.save(&session).await?;
@@ -290,14 +291,14 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
     pub async fn update_workspace_id(
         &self,
         session_id: &str,
-        workspace_id: Option<String>,
+        workspace_id: String,
         workspace_root: Option<std::path::PathBuf>,
     ) -> Result<()> {
         // Update the in-memory InteractionManager's workspace_id and workspace_root
         let sessions = self.sessions.read().await;
         if let Some(manager) = sessions.get(session_id) {
             manager
-                .set_workspace_id(workspace_id.clone(), workspace_root)
+                .set_workspace_id(Some(workspace_id.clone()), workspace_root)
                 .await;
         }
         drop(sessions);
@@ -384,7 +385,7 @@ mod tests {
             &self.session_id
         }
 
-        async fn to_session(&self, app_mode: AppMode, workspace_id: Option<String>) -> Session {
+        async fn to_session(&self, app_mode: AppMode, workspace_id: String) -> Session {
             Session {
                 id: self.session_id.clone(),
                 title: format!("Session {}", self.session_id),
@@ -467,11 +468,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl StateRepository for MockStateRepository {
-        async fn save_state(&self, _state: crate::state::model::AppState) -> Result<(), String> {
+        async fn save_state(&self, _state: crate::state::model::AppState) -> Result<()> {
             Ok(())
         }
 
-        async fn get_state(&self) -> Result<crate::state::model::AppState, String> {
+        async fn get_state(&self) -> Result<crate::state::model::AppState> {
             Ok(crate::state::model::AppState::default())
         }
 
@@ -479,23 +480,19 @@ mod tests {
             None
         }
 
-        async fn set_last_selected_workspace(&self, _workspace_id: String) -> Result<(), String> {
+        async fn set_last_selected_workspace(&self, _workspace_id: String) -> Result<()> {
             Ok(())
         }
 
-        async fn clear_last_selected_workspace(&self) -> Result<(), String> {
+        async fn clear_last_selected_workspace(&self) -> Result<()> {
             Ok(())
         }
 
-        async fn get_default_workspace(&self) -> Option<String> {
-            None
+        async fn get_default_workspace(&self) -> String {
+            crate::state::model::PLACEHOLDER_DEFAULT_WORKSPACE_ID.to_string()
         }
 
-        async fn set_default_workspace(&self, _workspace_id: String) -> Result<(), String> {
-            Ok(())
-        }
-
-        async fn clear_default_workspace(&self) -> Result<(), String> {
+        async fn set_default_workspace(&self, _workspace_id: String) -> Result<()> {
             Ok(())
         }
 
@@ -503,12 +500,12 @@ mod tests {
             self.active_session_id.lock().unwrap().clone()
         }
 
-        async fn set_active_session(&self, session_id: String) -> Result<(), String> {
+        async fn set_active_session(&self, session_id: String) -> Result<()> {
             *self.active_session_id.lock().unwrap() = Some(session_id);
             Ok(())
         }
 
-        async fn clear_active_session(&self) -> Result<(), String> {
+        async fn clear_active_session(&self) -> Result<()> {
             *self.active_session_id.lock().unwrap() = None;
             Ok(())
         }

@@ -1,15 +1,24 @@
 use std::sync::Arc;
 
+use anyhow::{anyhow, Result};
 use orcs_application::{AdhocPersonaService, SessionUseCase, UtilityAgentService};
 use orcs_core::{
-    persona::{PersonaRepository, get_default_presets}, secret::SecretService, session::{AppMode, SessionManager}, slash_command::SlashCommandRepository, state::repository::StateRepository, task::TaskRepository, user::UserService, workspace::manager::WorkspaceManager
+    persona::{PersonaRepository, get_default_presets},
+    repository::SessionRepository,
+    secret::SecretService,
+    session::{AppMode, SessionManager, PLACEHOLDER_WORKSPACE_ID},
+    slash_command::SlashCommandRepository,
+    state::{model::PLACEHOLDER_DEFAULT_WORKSPACE_ID, repository::StateRepository},
+    task::TaskRepository,
+    user::UserService,
+    workspace::manager::WorkspaceManager
 };
 use orcs_execution::{
     tracing_layer::OrchestratorEvent,
     TaskExecutor,
 };
 use orcs_infrastructure::{
-    AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository, SecretServiceImpl, secret_service, user_service::ConfigBasedUserService, workspace_manager::FileSystemWorkspaceManager
+    AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository, SecretServiceImpl, user_service::ConfigBasedUserService, workspace_manager::FileSystemWorkspaceManager, paths::OrcsPaths
 };
 use tokio::sync::{mpsc::UnboundedSender, Mutex};
 
@@ -19,6 +28,98 @@ pub struct AppBootstrap {
     pub app_state: AppState,
     pub session_manager: Arc<SessionManager<orcs_interaction::InteractionManager>>,
     pub app_state_service: Arc<AppStateService>,
+}
+
+/// Ensures a default workspace exists and returns its ID.
+///
+/// This function:
+/// 1. Checks if a default workspace is already set in AppState
+/// 2. If yes and it exists, returns the ID
+/// 3. If no or it doesn't exist, creates ~/orcs as the default workspace
+/// 4. Saves the ID to AppState
+///
+/// # Returns
+///
+/// The workspace ID of the default workspace
+async fn ensure_default_workspace(
+    workspace_manager: &Arc<FileSystemWorkspaceManager>,
+    app_state_service: &Arc<AppStateService>,
+) -> Result<String> {
+    // 1. Check existing default_workspace_id
+    let current_default_id = app_state_service.get_default_workspace().await;
+
+    // Skip if it's not a placeholder and the workspace exists
+    if current_default_id != PLACEHOLDER_DEFAULT_WORKSPACE_ID {
+        if let Ok(Some(_)) = workspace_manager.get_workspace(&current_default_id).await {
+            tracing::info!("[Bootstrap] Using existing default workspace: {}", current_default_id);
+            return Ok(current_default_id);
+        }
+    }
+
+    // 2. Get default user workspace path from Infrastructure
+    let orcs_paths = OrcsPaths::new(None);
+    let default_path = orcs_paths
+        .default_user_workspace_path()
+        .map_err(|e| anyhow!("Failed to get default workspace path: {}", e))?;
+
+    tracing::info!("[Bootstrap] Creating default workspace at: {:?}", default_path);
+
+    // 2.5. Ensure the directory exists before creating workspace
+    tokio::fs::create_dir_all(&default_path)
+        .await
+        .map_err(|e| anyhow!("Failed to create default workspace directory: {}", e))?;
+
+    // 3. Create workspace (ID will be deterministically generated from path)
+    let workspace = workspace_manager
+        .get_or_create_workspace(&default_path)
+        .await
+        .map_err(|e| anyhow!("Failed to create default workspace: {}", e))?;
+
+    tracing::info!("[Bootstrap] Default workspace created with ID: {}", workspace.id);
+
+    // 4. Save to AppState
+    app_state_service
+        .set_default_workspace(workspace.id.clone())
+        .await
+        .map_err(|e| anyhow!("Failed to save default workspace ID: {}", e))?;
+
+    Ok(workspace.id)
+}
+
+/// Replaces placeholder workspace IDs in existing sessions with the actual default workspace ID.
+///
+/// This is necessary after migration from v2.9.0 to v3.0.0 where workspace_id became required.
+async fn replace_placeholder_sessions(
+    session_repository: &Arc<AsyncDirSessionRepository>,
+    default_workspace_id: &str,
+) -> Result<()> {
+    // Cast to trait to use list_all method
+    let repo: &dyn SessionRepository = session_repository.as_ref();
+    let sessions = repo.list_all().await
+        .map_err(|e| anyhow!("Failed to list sessions: {}", e))?;
+
+    let mut updated_count = 0;
+    for mut session in sessions {
+        if session.workspace_id == PLACEHOLDER_WORKSPACE_ID {
+            tracing::info!(
+                "[Bootstrap] Replacing placeholder workspace_id in session: {}",
+                session.id
+            );
+            session.workspace_id = default_workspace_id.to_string();
+            repo.save(&session).await
+                .map_err(|e| anyhow!("Failed to save session: {}", e))?;
+            updated_count += 1;
+        }
+    }
+
+    if updated_count > 0 {
+        tracing::info!(
+            "[Bootstrap] Replaced placeholder workspace_id in {} session(s)",
+            updated_count
+        );
+    }
+
+    Ok(())
 }
 
 pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBootstrap {
@@ -81,6 +182,18 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
             .await
             .expect("Failed to initialize AppStateService"),
     );
+
+    // Ensure default workspace exists (before session restoration)
+    let default_workspace_id = ensure_default_workspace(&workspace_manager, &app_state_service)
+        .await
+        .expect("Failed to ensure default workspace");
+
+    tracing::info!("[Bootstrap] Default workspace ID: {}", default_workspace_id);
+
+    // Replace placeholder workspace IDs in existing sessions
+    replace_placeholder_sessions(&session_repository, &default_workspace_id)
+        .await
+        .expect("Failed to replace placeholder sessions");
 
     // Initialize SessionManager with both repositories
     let session_manager: Arc<SessionManager<orcs_interaction::InteractionManager>> = Arc::new(

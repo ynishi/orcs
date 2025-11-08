@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::state::repository::StateRepository;
 use orcs_core::workspace::{manager::WorkspaceManager, UploadedFile, Workspace};
 use tauri::{AppHandle, Emitter, State};
@@ -41,11 +42,12 @@ pub async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspa
         .ok_or("No active session")?;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let session = manager.to_session(app_mode, None).await;
+    let session = manager.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
 
     println!("[Backend] Session workspace_id: {:?}", session.workspace_id);
 
-    if let Some(workspace_id) = &session.workspace_id {
+    if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
+        let workspace_id = &session.workspace_id;
         println!("[Backend] Looking up workspace: {}", workspace_id);
         let workspace = state
             .workspace_manager

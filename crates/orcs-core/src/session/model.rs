@@ -9,6 +9,10 @@ use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Placeholder for workspace ID before it's initialized.
+/// This will be replaced with the actual default workspace ID during bootstrap.
+pub const PLACEHOLDER_WORKSPACE_ID: &str = "___workspace_placeholder___";
+
 /// Represents a user session in the application's domain layer.
 ///
 /// A session contains:
@@ -39,8 +43,8 @@ pub struct Session {
     pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
     /// Current application mode
     pub app_mode: AppMode,
-    /// Workspace ID if this session is associated with a workspace
-    pub workspace_id: Option<String>,
+    /// Workspace ID - all sessions must be associated with a workspace
+    pub workspace_id: String,
     /// Active participant persona IDs
     #[serde(default)]
     pub active_participant_ids: Vec<String>,

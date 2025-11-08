@@ -30,6 +30,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         session::rename_session,
         session::toggle_session_favorite,
         session::toggle_session_archive,
+        session::update_session_sort_order,
         session::save_current_session,
         session::append_system_messages,
         session::get_active_session,

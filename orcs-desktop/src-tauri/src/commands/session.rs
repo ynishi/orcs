@@ -183,6 +183,20 @@ pub async fn toggle_session_archive(
         .map_err(|e| e.to_string())
 }
 
+/// Updates the manual sort order of a session
+#[tauri::command]
+pub async fn update_session_sort_order(
+    session_id: String,
+    sort_order: Option<i32>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .session_manager
+        .update_sort_order(&session_id, sort_order)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Saves the current session
 #[tauri::command]
 pub async fn save_current_session(state: State<'_, AppState>) -> Result<(), String> {

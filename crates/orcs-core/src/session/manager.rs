@@ -395,6 +395,27 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
 
         Ok(())
     }
+
+    /// Updates the manual sort order of a session
+    pub async fn update_sort_order(&self, session_id: &str, sort_order: Option<i32>) -> Result<()> {
+        // Load the session from storage
+        let mut session = self
+            .session_repository
+            .find_by_id(session_id)
+            .await?
+            .ok_or_else(|| OrcsError::Internal(format!("Session not found: {}", session_id)))?;
+
+        // Update sort order
+        session.sort_order = sort_order;
+
+        // Update timestamp
+        session.updated_at = chrono::Utc::now().to_rfc3339();
+
+        // Save back to storage
+        self.session_repository.save(&session).await?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

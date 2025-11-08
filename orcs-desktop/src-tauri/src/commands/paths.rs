@@ -1,5 +1,6 @@
 use std::env;
 
+use orcs_core::state::repository::StateRepository;
 use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
 use orcs_infrastructure::storage_repository::StorageRepository;
 use tauri::State;

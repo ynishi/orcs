@@ -614,21 +614,27 @@ function App() {
       // SlashCommandの処理（分離済み）
       const parsed = parseCommand(rawInput);
       let backendInput = rawInput;
-      let promptCommandExecuted = false;
+      let suppressUserEcho = false;
+      let shouldSendToAgent = true;
 
       if (parsed.isCommand && parsed.command) {
-        promptCommandExecuted = await handleSlashCommand(rawInput);
-        
-        // SlashCommandの処理が完了
-        // promptCommandがない場合（組み込みコマンド）は戻ってこない（handleSlashCommand内でreturn済み）
-        // promptCommandがある場合のみ続行
-        if (!promptCommandExecuted) {
-          // 組み込みコマンドはhandleSlashCommand内で処理完了しているのでここには来ない
-              return;
+        const commandResult = await handleSlashCommand(rawInput);
+
+        // SlashCommandの処理が完了（フロントエンドでのみ処理）
+        if (commandResult.nextInput === null) {
+          return;
+        }
+
+        backendInput = commandResult.nextInput;
+        suppressUserEcho = commandResult.suppressUserMessage ?? false;
+        shouldSendToAgent = commandResult.shouldSendToAgent;
+
+        if (!shouldSendToAgent) {
+          return;
         }
       }
 
-      if (promptCommandExecuted && !backendInput.trim()) {
+      if (parsed.isCommand && parsed.command && !backendInput.trim()) {
         addMessage('error', 'System', `Command ${rawInput} produced empty content.`);
         await saveCurrentSession();
         return;
@@ -657,7 +663,9 @@ function App() {
         messageText = messageText + workspaceInfo;
       }
 
-      addMessage('user', userNickname, messageText);
+      if (!suppressUserEcho) {
+        addMessage('user', userNickname, messageText);
+      }
 
       // アクティブなタブのAI思考状態を設定
       if (activeTabId) {

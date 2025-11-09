@@ -6,12 +6,24 @@ import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { notifications } from '@mantine/notifications';
 import { parseCommand, isValidCommand, getCommandHelp } from '../utils/commandParser';
-import { handleSystemMessage, conversationMessage, commandMessage, MessageSeverity } from '../utils/systemMessage';
+import {
+  handleSystemMessage,
+  conversationMessage,
+  commandMessage,
+  shellOutputMessage,
+  MessageSeverity,
+} from '../utils/systemMessage';
 import type { MessageType } from '../types/message';
 import type { StatusInfo } from '../types/status';
 import type { Workspace } from '../types/workspace';
 import type { UploadedFile } from '../types/workspace';
-import type { SlashCommand } from '../types/slash_command';
+import type { SlashCommand, ExpandedSlashCommand } from '../types/slash_command';
+
+interface SlashCommandResult {
+  nextInput: string | null;
+  suppressUserMessage?: boolean;
+  shouldSendToAgent: boolean;
+}
 
 interface UseSlashCommandsProps {
   addMessage: (type: MessageType, author: string, text: string) => void;
@@ -24,7 +36,6 @@ interface UseSlashCommandsProps {
   switchWorkspace: (sessionId: string, workspaceId: string) => Promise<void>;
   setConversationMode: (mode: string) => void;
   setTalkStyle: (style: string | null) => void;
-  setInput: (value: string) => void;
   refreshPersonas: () => Promise<void>;
   refreshSessions: () => Promise<void>;
 }
@@ -40,22 +51,25 @@ export function useSlashCommands({
   switchWorkspace,
   setConversationMode,
   setTalkStyle,
-  setInput,
   refreshPersonas,
   refreshSessions,
 }: UseSlashCommandsProps) {
   /**
    * SlashCommandを処理する
-   * @returns {boolean} promptCommandExecuted - プロンプトコマンドが実行されたか
+   * @returns {Promise<SlashCommandResult>} - backendに送るテキストと表示制御
    */
   const handleSlashCommand = useCallback(
-    async (rawInput: string): Promise<boolean> => {
+    async (rawInput: string): Promise<SlashCommandResult> => {
       const parsed = parseCommand(rawInput);
-      let promptCommandExecuted = false;
 
       if (!parsed.isCommand || !parsed.command) {
-        return promptCommandExecuted;
+        return { nextInput: rawInput, suppressUserMessage: false, shouldSendToAgent: true };
       }
+
+      let nextInput: string | null = null;
+      let suppressUserMessage = false;
+      let shouldSendToAgent = false;
+      const commandProvenance = `\n\n(Generated via /${parsed.command} command.)`;
 
       handleSystemMessage(commandMessage(rawInput), addMessage);
 
@@ -173,14 +187,7 @@ Estimated time: X minutes
 
 Generate the BlueprintWorkflow now.`;
 
-              setInput(blueprintPrompt);
-              setTimeout(() => {
-                const textarea = document.querySelector('textarea');
-                if (textarea) {
-                  const event = new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true });
-                  textarea.dispatchEvent(event);
-                }
-              }, 100);
+              nextInput = blueprintPrompt;
             } else {
               handleSystemMessage(
                 conversationMessage(
@@ -268,7 +275,7 @@ Generate the BlueprintWorkflow now.`;
                   ),
                   addMessage
                 );
-                return promptCommandExecuted;
+                return { nextInput: null, suppressUserMessage: true, shouldSendToAgent: false };
               }
 
               try {
@@ -338,7 +345,7 @@ Generate the BlueprintWorkflow now.`;
                   addMessage
                 );
                 await saveCurrentSession();
-                return promptCommandExecuted;
+                return { nextInput: null, suppressUserMessage: true, shouldSendToAgent: false };
               }
 
               try {
@@ -402,34 +409,6 @@ Generate the BlueprintWorkflow now.`;
         }
       } else {
         // カスタムコマンドの処理
-        const persistedSystemMessages: {
-          content: string;
-          messageType: MessageType;
-          severity?: MessageSeverity;
-        }[] = [];
-
-        const persistMessages = async () => {
-          if (persistedSystemMessages.length === 0) {
-            return;
-          }
-          const messagesToPersist = [...persistedSystemMessages];
-          persistedSystemMessages.length = 0;
-          try {
-            await invoke('append_system_messages', { messages: messagesToPersist });
-          } catch (persistError) {
-            console.error('Failed to persist slash command messages:', persistError);
-            persistedSystemMessages.unshift(...messagesToPersist);
-          }
-        };
-
-        const queuePersistedMessage = (
-          content: string,
-          messageType: MessageType,
-          severity?: MessageSeverity
-        ) => {
-          persistedSystemMessages.push({ content, messageType, severity });
-        };
-
         try {
           const customCommand = await invoke<SlashCommand | null>('get_slash_command', {
             name: parsed.command,
@@ -441,41 +420,66 @@ Generate the BlueprintWorkflow now.`;
               addMessage
             );
             await saveCurrentSession();
-            return promptCommandExecuted;
+            return { nextInput, suppressUserMessage, shouldSendToAgent };
           }
 
           // カスタムコマンド実行
           const argsStr = parsed.args ? parsed.args.join(' ') : '';
 
           try {
-            const result = await invoke<import('../types/slash_command').ExpandedSlashCommand>('run_slash_command', {
-              name: parsed.command,
-              args: argsStr,
+            const expanded = await invoke<ExpandedSlashCommand>('expand_command_template', {
+              commandName: parsed.command,
+              args: argsStr || null,
             });
 
-            if (result.has_prompt_template) {
-              promptCommandExecuted = true;
-            }
+            if (customCommand.type === 'prompt') {
+              const expandedPrompt = expanded.content.trim();
+              nextInput = expandedPrompt ? `${expandedPrompt}${commandProvenance}` : '';
+              shouldSendToAgent = !!nextInput?.trim();
+              if (!nextInput.trim()) {
+                handleSystemMessage(
+                  conversationMessage(`Command /${parsed.command} produced empty content.`, 'error'),
+                  addMessage
+                );
+                nextInput = null;
+                suppressUserMessage = true;
+                shouldSendToAgent = false;
+              }
+            } else {
+              try {
+                const executionOutput = await invoke<string>('execute_shell_command', {
+                  command: expanded.content,
+                  working_dir: expanded.workingDir ?? null,
+                });
+                const trimmedOutput = executionOutput.trim();
+                const shellHeader = `/${parsed.command} ($ ${expanded.content.trim()})`;
+                const shellBody = trimmedOutput
+                  ? `\`\`\`\n${trimmedOutput}\n\`\`\``
+                  : '_No output_';
+                const shellMessage = `${shellHeader}\n${shellBody}`;
 
-            if (result.immediate_messages && result.immediate_messages.length > 0) {
-              for (const msg of result.immediate_messages) {
-                if (msg.persist_to_session) {
-                  queuePersistedMessage(msg.content, msg.message_type as import('../types/message').MessageType, msg.severity as any);
-                }
-                addMessage(msg.message_type as import('../types/message').MessageType, 'System', msg.content);
+                handleSystemMessage(shellOutputMessage(shellMessage), addMessage);
+
+                nextInput = `${shellHeader}\n${shellBody}${commandProvenance}`;
+                suppressUserMessage = true;
+              } catch (error) {
+                console.error(`Failed to run slash command /${parsed.command}:`, error);
+                handleSystemMessage(
+                  conversationMessage(`Failed to run slash command: ${error}`, 'error'),
+                  addMessage
+                );
+                nextInput = null;
+                suppressUserMessage = true;
               }
             }
 
-            if (result.prompt_to_send) {
-              addMessage('user', 'User', result.prompt_to_send);
-            }
-
-            await persistMessages();
             await saveCurrentSession();
           } catch (error) {
-            console.error(`Failed to run slash command /${parsed.command}:`, error);
-            queuePersistedMessage(`Failed to run slash command: ${error}`, 'error', 'error');
-            await persistMessages();
+            console.error('Failed to expand slash command:', error);
+            handleSystemMessage(
+              conversationMessage(`Failed to expand command: ${error}`, 'error'),
+              addMessage
+            );
             await saveCurrentSession();
           }
         } catch (error) {
@@ -488,7 +492,7 @@ Generate the BlueprintWorkflow now.`;
         }
       }
 
-      return promptCommandExecuted;
+      return { nextInput, suppressUserMessage, shouldSendToAgent };
     },
     [
       addMessage,
@@ -501,7 +505,6 @@ Generate the BlueprintWorkflow now.`;
       switchWorkspace,
       setConversationMode,
       setTalkStyle,
-      setInput,
       refreshPersonas,
       refreshSessions,
     ]
@@ -509,5 +512,3 @@ Generate the BlueprintWorkflow now.`;
 
   return { handleSlashCommand };
 }
-
-

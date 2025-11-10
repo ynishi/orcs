@@ -5,6 +5,7 @@ use orcs_core::session::{
     AppMode, ConversationMode, ErrorSeverity, ModeratorAction, Session, SessionEvent,
     PLACEHOLDER_WORKSPACE_ID,
 };
+use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_interaction::InteractionResult;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};

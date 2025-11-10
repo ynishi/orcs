@@ -31,6 +31,7 @@ interface NavbarProps {
   onTaskToggle: (taskId: string) => void;
   onTaskDelete: (taskId: string) => void;
   onRefreshTasks: () => void;
+  onSaveTaskToWorkspace?: (task: Task) => Promise<void>;
 
   // Workspace
   onAttachFile?: (file: File) => void;
@@ -71,6 +72,7 @@ export function Navbar({
   onTaskToggle,
   onTaskDelete,
   onRefreshTasks,
+  onSaveTaskToWorkspace,
   onAttachFile,
   includeWorkspaceInPrompt,
   onToggleIncludeWorkspaceInPrompt,
@@ -185,6 +187,7 @@ export function Navbar({
               onTaskToggle={onTaskToggle}
               onTaskDelete={onTaskDelete}
               onRefresh={onRefreshTasks}
+              onSaveToWorkspace={onSaveTaskToWorkspace}
             />
           )}
 

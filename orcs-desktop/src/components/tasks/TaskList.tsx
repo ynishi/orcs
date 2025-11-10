@@ -1,4 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, Badge, Switch } from '@mantine/core';
+import { IconDeviceFloppy } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { Task, getTaskIcon } from '../../types/task';
 import { Session } from '../../types/session';
@@ -13,9 +14,10 @@ interface TaskListProps {
   onTaskToggle?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
   onRefresh?: () => void;
+  onSaveToWorkspace?: (task: Task) => Promise<void>;
 }
 
-export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTaskDelete, onRefresh }: TaskListProps) {
+export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTaskDelete, onRefresh, onSaveToWorkspace }: TaskListProps) {
   const [filterCurrentWorkspace, setFilterCurrentWorkspace] = useState(false);
 
   // Get workspace info for a task
@@ -131,6 +133,20 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
                 }}
               >
                 📋
+              </ActionIcon>
+            </Tooltip>
+          )}
+
+          {/* Workspaceに保存ボタン */}
+          {onSaveToWorkspace && (
+            <Tooltip label="Save to Workspace" withArrow>
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="blue"
+                onClick={() => onSaveToWorkspace(task)}
+              >
+                <IconDeviceFloppy size={16} />
               </ActionIcon>
             </Tooltip>
           )}

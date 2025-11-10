@@ -1091,6 +1091,84 @@ function App() {
     }
   };
 
+  // タスクをワークスペースに保存するハンドラー
+  const handleSaveTaskToWorkspace = async (task: Task) => {
+    try {
+      // ファイル名を生成（タイムスタンプ + タスクタイトル）
+      const timestamp = new Date(task.created_at).toISOString().replace(/[:.]/g, '-');
+      const sanitizedTitle = task.title.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
+      const filename = `task_${timestamp}_${sanitizedTitle}.md`;
+
+      // タスク内容をMarkdown形式で整形
+      let content = `# Task: ${task.title}\n\n`;
+      content += `**Status:** ${task.status}\n`;
+      content += `**Created:** ${new Date(task.created_at).toLocaleString()}\n`;
+      content += `**Updated:** ${new Date(task.updated_at).toLocaleString()}\n`;
+      if (task.completed_at) {
+        content += `**Completed:** ${new Date(task.completed_at).toLocaleString()}\n`;
+      }
+      content += `**Steps Executed:** ${task.steps_executed}\n`;
+      content += `**Steps Skipped:** ${task.steps_skipped}\n\n`;
+
+      content += `## Description\n\n${task.description}\n\n`;
+
+      if (task.result) {
+        content += `## Result\n\n${task.result}\n\n`;
+      }
+
+      if (task.error) {
+        content += `## Error\n\n${task.error}\n\n`;
+      }
+
+      if (task.execution_details?.context) {
+        content += `## Execution Context\n\n`;
+        for (const [key, value] of Object.entries(task.execution_details.context)) {
+          content += `### ${key}\n\n`;
+          if (typeof value === 'string') {
+            content += `\`\`\`\n${value}\n\`\`\`\n\n`;
+          } else {
+            content += `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\`\n\n`;
+          }
+        }
+      }
+
+      // メッセージテキストをバイト配列に変換
+      const encoder = new TextEncoder();
+      const data = encoder.encode(content);
+      const fileData = Array.from(data);
+
+      // ワークスペースIDを取得
+      const workspace = await invoke<{ id: string }>('get_current_workspace');
+
+      // ワークスペースに保存
+      await invoke('upload_file_from_bytes', {
+        workspaceId: workspace.id,
+        filename: filename,
+        fileData: fileData,
+        sessionId: task.session_id,
+        messageTimestamp: task.created_at,
+      });
+
+      // ワークスペースのファイルリストを更新
+      await refreshWorkspace();
+
+      // Toast notification
+      notifications.show({
+        title: 'Task saved',
+        message: `${filename}`,
+        color: 'green',
+        icon: '💾',
+      });
+    } catch (err) {
+      console.error('Failed to save task to workspace:', err);
+      notifications.show({
+        title: 'Failed to save task',
+        message: String(err),
+        color: 'red',
+      });
+    }
+  };
+
   // タスク操作ハンドラー
   const handleTaskToggle = async (taskId: string) => {
     // Tasks are managed by backend - toggle is not supported for execution tasks
@@ -1398,6 +1476,7 @@ function App() {
           onTaskToggle={handleTaskToggle}
           onTaskDelete={handleTaskDelete}
           onRefreshTasks={refreshTasks}
+          onSaveTaskToWorkspace={handleSaveTaskToWorkspace}
           onAttachFile={handleAttachFileFromWorkspace}
           includeWorkspaceInPrompt={includeWorkspaceInPrompt}
           onToggleIncludeWorkspaceInPrompt={setIncludeWorkspaceInPrompt}

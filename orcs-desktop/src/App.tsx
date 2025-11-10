@@ -17,7 +17,7 @@ import {
 } from "@mantine/core";
 import { useDisclosure } from '@mantine/hooks';
 import "./App.css";
-import { Message, MessageType } from "./types/message";
+import { Message, MessageType, StreamingDialogueTurn } from "./types/message";
 import { StatusInfo, getDefaultStatus } from "./types/status";
 import { Task } from "./types/task";
 import { Agent } from "./types/agent";
@@ -202,11 +202,17 @@ function App() {
   // Use ref to ensure only one listener is registered
   const listenerRegistered = useRef(false);
   const addMessageRef = useRef(addMessage);
+  const currentSessionIdRef = useRef(currentSessionId);
 
   // 最新のaddMessageをrefに保持（クロージャーの問題を回避）
   useEffect(() => {
     addMessageRef.current = addMessage;
   }, [addMessage]);
+
+  // 最新のcurrentSessionIdをrefに保持
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   useEffect(() => {
     // Skip if listener already registered (prevents duplicate in React Strict Mode)
@@ -221,26 +227,47 @@ function App() {
     console.log('[EFFECT] Setting up dialogue-turn listener');
 
     const setupListener = async () => {
-      unlisten = await listen<{ author: string; content: string }>('dialogue-turn', (event) => {
-        console.log('[STREAM] Event received:', event.payload.author);
-        console.log('[STREAM] Adding message:', event.payload.author);
+      unlisten = await listen<StreamingDialogueTurn>('dialogue-turn', (event) => {
+        const turn = event.payload;
 
-        // If author is empty, it's an error message
-        if (event.payload.author === '') {
-          // 最新のaddMessageを使用
-          addMessageRef.current('error', '', event.payload.content);
+        // Filter by session_id - only process messages for the active session
+        if (turn.session_id !== currentSessionIdRef.current) {
+          console.log(`[STREAM] Ignoring message for session ${turn.session_id}, current session is ${currentSessionIdRef.current}`);
+          return;
+        }
 
-          // Show error toast
-          notifications.show({
-            title: 'Agent Error',
-            message: event.payload.content,
-            color: 'red',
-            icon: '❌',
-            autoClose: 10000,
-          });
-        } else {
-          // 最新のaddMessageを使用
-          addMessageRef.current('ai', event.payload.author, event.payload.content);
+        console.log('[STREAM] Event received for current session:', turn.type);
+
+        // Handle different turn types
+        switch (turn.type) {
+          case 'Chunk':
+            console.log('[STREAM] Adding message chunk:', turn.author);
+            // 最新のaddMessageを使用
+            addMessageRef.current('ai', turn.author, turn.content);
+            break;
+
+          case 'Error':
+            console.log('[STREAM] Error received:', turn.message);
+            // 最新のaddMessageを使用
+            addMessageRef.current('error', '', turn.message);
+
+            // Show error toast
+            notifications.show({
+              title: 'Agent Error',
+              message: turn.message,
+              color: 'red',
+              icon: '❌',
+              autoClose: 10000,
+            });
+            break;
+
+          case 'Final':
+            console.log('[STREAM] Streaming completed for session:', turn.session_id);
+            // Final turn just indicates completion, no action needed
+            break;
+
+          default:
+            console.warn('[STREAM] Unknown turn type:', (turn as any).type);
         }
       });
       console.log('[EFFECT] Listener setup complete');

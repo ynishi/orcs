@@ -4,6 +4,28 @@
 export type MessageType = 'user' | 'ai' | 'system' | 'error' | 'command' | 'task' | 'thinking' | 'shell_output';
 
 /**
+ * Streaming dialogue turn from Rust backend
+ */
+export type StreamingDialogueTurn = {
+  session_id: string;
+  timestamp: string;
+} & StreamingDialogueTurnKind;
+
+export type StreamingDialogueTurnKind =
+  | {
+      type: 'Chunk';
+      author: string;
+      content: string;
+    }
+  | {
+      type: 'Final';
+    }
+  | {
+      type: 'Error';
+      message: string;
+    };
+
+/**
  * メッセージインターフェース
  */
 export interface Message {

@@ -9,7 +9,7 @@ use crate::gemini_api_agent::GeminiApiAgent;
 use crate::openai_api_agent::OpenAIApiAgent;
 use llm_toolkit::agent::dialogue::{
     Dialogue, DialogueTurn, ExecutionModel, ReactionStrategy, Speaker, TalkStyle,
-    message::{MessageMetadata as LlmMessageMetadata, MessageType as LlmMessageType},
+    message::MessageType as LlmMessageType,
 };
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, CodexAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
@@ -22,7 +22,7 @@ use orcs_core::session::{
     Plan, Session, SystemEventType,
 };
 use orcs_core::user::UserService;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -63,6 +63,64 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
         visual_identity,
         capabilities,
     }
+}
+
+/// A single streaming dialogue turn event for frontend consumption.
+///
+/// This structure represents a unit of communication from the backend to frontend
+/// during a dialogue interaction. It uses an enum-based design for type safety and
+/// clear semantics.
+///
+/// # Design
+///
+/// Uses `#[serde(flatten)]` to flatten the `kind` field into the parent JSON structure,
+/// avoiding nested "kind" fields. The `StreamingDialogueTurnKind` enum uses `#[serde(tag = "type")]`
+/// to generate a "type" discriminator field.
+///
+/// # JSON Representation
+///
+/// ```json
+/// // Chunk
+/// { "type": "Chunk", "session_id": "...", "timestamp": "...", "author": "...", "content": "..." }
+///
+/// // Final
+/// { "type": "Final", "session_id": "...", "timestamp": "..." }
+///
+/// // Error
+/// { "type": "Error", "session_id": "...", "timestamp": "...", "message": "..." }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamingDialogueTurn {
+    /// The session ID this turn belongs to (for multi-tab support)
+    pub session_id: String,
+    /// Timestamp when this turn was created
+    pub timestamp: String,
+    /// The kind of turn (Chunk, Final, or Error)
+    #[serde(flatten)]
+    pub kind: StreamingDialogueTurnKind,
+}
+
+/// The specific kind of streaming dialogue turn.
+///
+/// Uses `#[serde(tag = "type")]` to generate a "type" field in JSON for discriminated unions.
+/// This enables type-safe handling of different turn types in both Rust and TypeScript.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum StreamingDialogueTurnKind {
+    /// A streaming data chunk from an agent
+    Chunk {
+        /// The author of this chunk (agent name or "USER")
+        author: String,
+        /// The content of this chunk
+        content: String,
+    },
+    /// Stream completion marker (no more chunks)
+    Final,
+    /// Error occurred during streaming
+    Error {
+        /// Error message to display
+        message: String,
+    },
 }
 
 /// Converts ORCS system_message_type string to llm-toolkit MessageType.
@@ -253,6 +311,8 @@ fn agent_for_persona(
 /// Each message has an author (participant name) and the content of the message.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct DialogueMessage {
+    /// The session ID this message belongs to (for multi-tab support).
+    pub session_id: String,
     /// The name of the participant who authored this message.
     pub author: String,
     /// The content of the message.
@@ -1151,6 +1211,7 @@ impl InteractionManager {
 
                     // Create DialogueMessage for UI display
                     let message = DialogueMessage {
+                        session_id: self.session_id.clone(),
                         author: speaker_name.to_string(),
                         content: turn.content.clone(),
                     };
@@ -1172,6 +1233,7 @@ impl InteractionManager {
                     // Emit error as a system message via callback if provided
                     if let Some(ref callback) = on_turn {
                         let error_turn = DialogueMessage {
+                            session_id: self.session_id.clone(),
                             author: String::new(), // Empty author for error messages
                             content: error_msg.clone(),
                         };

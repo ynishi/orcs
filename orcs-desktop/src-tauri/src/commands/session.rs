@@ -655,6 +655,8 @@ pub async fn handle_input(
     let app_clone = app.clone();
     let result = manager
         .handle_input_with_streaming(&current_mode, &processed_input, file_paths, move |turn| {
+            use orcs_interaction::{StreamingDialogueTurn, StreamingDialogueTurnKind};
+
             let now = SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap();
@@ -667,7 +669,17 @@ pub async fn handle_input(
                 preview
             );
 
-            if let Err(e) = app_clone.emit("dialogue-turn", turn) {
+            // Convert DialogueMessage to StreamingDialogueTurn for frontend
+            let streaming_turn = StreamingDialogueTurn {
+                session_id: turn.session_id.clone(),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                kind: StreamingDialogueTurnKind::Chunk {
+                    author: turn.author.clone(),
+                    content: turn.content.clone(),
+                },
+            };
+
+            if let Err(e) = app_clone.emit("dialogue-turn", streaming_turn) {
                 eprintln!("[TAURI] Failed to emit dialogue-turn event: {}", e);
             }
         })

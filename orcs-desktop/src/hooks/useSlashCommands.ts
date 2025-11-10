@@ -11,7 +11,6 @@ import {
   conversationMessage,
   commandMessage,
   shellOutputMessage,
-  MessageSeverity,
 } from '../utils/systemMessage';
 import type { MessageType } from '../types/message';
 import type { StatusInfo } from '../types/status';
@@ -22,7 +21,6 @@ import type { SlashCommand, ExpandedSlashCommand } from '../types/slash_command'
 interface SlashCommandResult {
   nextInput: string | null;
   suppressUserMessage?: boolean;
-  shouldSendToAgent: boolean;
 }
 
 interface UseSlashCommandsProps {
@@ -36,6 +34,7 @@ interface UseSlashCommandsProps {
   switchWorkspace: (sessionId: string, workspaceId: string) => Promise<void>;
   setConversationMode: (mode: string) => void;
   setTalkStyle: (style: string | null) => void;
+  setInput: (value: string) => void;
   refreshPersonas: () => Promise<void>;
   refreshSessions: () => Promise<void>;
 }
@@ -51,6 +50,7 @@ export function useSlashCommands({
   switchWorkspace,
   setConversationMode,
   setTalkStyle,
+  setInput,
   refreshPersonas,
   refreshSessions,
 }: UseSlashCommandsProps) {
@@ -63,12 +63,11 @@ export function useSlashCommands({
       const parsed = parseCommand(rawInput);
 
       if (!parsed.isCommand || !parsed.command) {
-        return { nextInput: rawInput, suppressUserMessage: false, shouldSendToAgent: true };
+        return { nextInput: rawInput, suppressUserMessage: false };
       }
 
       let nextInput: string | null = null;
       let suppressUserMessage = false;
-      let shouldSendToAgent = false;
       const commandProvenance = `\n\n(Generated via /${parsed.command} command.)`;
 
       handleSystemMessage(commandMessage(rawInput), addMessage);
@@ -275,7 +274,7 @@ Generate the BlueprintWorkflow now.`;
                   ),
                   addMessage
                 );
-                return { nextInput: null, suppressUserMessage: true, shouldSendToAgent: false };
+                return { nextInput: null, suppressUserMessage: true };
               }
 
               try {
@@ -345,7 +344,7 @@ Generate the BlueprintWorkflow now.`;
                   addMessage
                 );
                 await saveCurrentSession();
-                return { nextInput: null, suppressUserMessage: true, shouldSendToAgent: false };
+                return { nextInput: null, suppressUserMessage: true };
               }
 
               try {
@@ -420,7 +419,7 @@ Generate the BlueprintWorkflow now.`;
               addMessage
             );
             await saveCurrentSession();
-            return { nextInput, suppressUserMessage, shouldSendToAgent };
+            return { nextInput, suppressUserMessage };
           }
 
           // カスタムコマンド実行
@@ -435,7 +434,6 @@ Generate the BlueprintWorkflow now.`;
             if (customCommand.type === 'prompt') {
               const expandedPrompt = expanded.content.trim();
               nextInput = expandedPrompt ? `${expandedPrompt}${commandProvenance}` : '';
-              shouldSendToAgent = !!nextInput?.trim();
               if (!nextInput.trim()) {
                 handleSystemMessage(
                   conversationMessage(`Command /${parsed.command} produced empty content.`, 'error'),
@@ -443,7 +441,6 @@ Generate the BlueprintWorkflow now.`;
                 );
                 nextInput = null;
                 suppressUserMessage = true;
-                shouldSendToAgent = false;
               }
             } else {
               try {
@@ -458,9 +455,22 @@ Generate the BlueprintWorkflow now.`;
                   : '_No output_';
                 const shellMessage = `${shellHeader}\n${shellBody}`;
 
+                // 1. Display immediately in UI
                 handleSystemMessage(shellOutputMessage(shellMessage), addMessage);
 
-                nextInput = `${shellHeader}\n${shellBody}${commandProvenance}`;
+                // 2. Persist to Backend as ContextInfo (survives session switches, no agent reaction)
+                await invoke('append_system_messages', {
+                  messages: [
+                    {
+                      content: shellMessage,
+                      messageType: 'context_info',
+                      severity: 'info',
+                    },
+                  ],
+                });
+
+                // Don't send to agent (ContextInfo is stored but doesn't trigger reactions)
+                nextInput = null;
                 suppressUserMessage = true;
               } catch (error) {
                 console.error(`Failed to run slash command /${parsed.command}:`, error);
@@ -492,7 +502,7 @@ Generate the BlueprintWorkflow now.`;
         }
       }
 
-      return { nextInput, suppressUserMessage, shouldSendToAgent };
+      return { nextInput, suppressUserMessage };
     },
     [
       addMessage,
@@ -505,6 +515,7 @@ Generate the BlueprintWorkflow now.`;
       switchWorkspace,
       setConversationMode,
       setTalkStyle,
+      setInput,
       refreshPersonas,
       refreshSessions,
     ]

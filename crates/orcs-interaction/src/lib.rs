@@ -7,7 +7,10 @@ pub mod persona_agent;
 use crate::claude_api_agent::ClaudeApiAgent;
 use crate::gemini_api_agent::GeminiApiAgent;
 use crate::openai_api_agent::OpenAIApiAgent;
-use llm_toolkit::agent::dialogue::{Dialogue, DialogueTurn, ExecutionModel, Speaker, TalkStyle};
+use llm_toolkit::agent::dialogue::{
+    Dialogue, DialogueTurn, ExecutionModel, ReactionStrategy, Speaker, TalkStyle,
+    message::{MessageMetadata as LlmMessageMetadata, MessageType as LlmMessageType},
+};
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, CodexAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
@@ -62,6 +65,27 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
     }
 }
 
+/// Converts ORCS system_message_type string to llm-toolkit MessageType.
+///
+/// This bridges the gap between ORCS's string-based message types and
+/// llm-toolkit's typed MessageType enum, enabling proper ContextInfo handling.
+///
+/// # Arguments
+///
+/// * `type_str` - Optional message type string from ORCS (e.g., "context_info", "notification")
+///
+/// # Returns
+///
+/// Returns the corresponding LlmMessageType, or None for default (Conversational).
+fn convert_to_llm_message_type(type_str: Option<&str>) -> Option<LlmMessageType> {
+    match type_str {
+        Some("context_info") => Some(LlmMessageType::ContextInfo),
+        Some("notification") => Some(LlmMessageType::Notification),
+        Some("system") => Some(LlmMessageType::System),
+        Some("conversational") => Some(LlmMessageType::Conversational),
+        None | Some(_) => None,  // Default to Conversational (llm-toolkit default)
+    }
+}
 
 /// Agent wrapper that delegates to the configured backend.
 #[derive(Clone, Debug)]
@@ -492,7 +516,8 @@ impl InteractionManager {
                  - 他の参加者の意見を尊重し、重複を避けて新しい視点を提供してください\n\
                  - ユーザーのワークスペース環境で実行されています\n\
                  - 建設的で協調的なコミュニケーションを心がけてください".to_string()
-            );
+            )
+            .with_reaction_strategy(ReactionStrategy::ExceptContextInfo);
 
         // Apply talk style if set
         if let Some(style) = talk_style {

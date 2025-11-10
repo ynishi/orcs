@@ -616,7 +616,6 @@ function App() {
       const parsed = parseCommand(rawInput);
       let backendInput = rawInput;
       let suppressUserEcho = false;
-      let shouldSendToAgent = true;
 
       if (parsed.isCommand && parsed.command) {
         const commandResult = await handleSlashCommand(rawInput);
@@ -628,11 +627,6 @@ function App() {
 
         backendInput = commandResult.nextInput;
         suppressUserEcho = commandResult.suppressUserMessage ?? false;
-        shouldSendToAgent = commandResult.shouldSendToAgent;
-
-        if (!shouldSendToAgent) {
-          return;
-        }
       }
 
       if (parsed.isCommand && parsed.command && !backendInput.trim()) {

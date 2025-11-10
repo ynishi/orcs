@@ -115,16 +115,19 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
       return;
     }
 
-    setIsRunning(true);
+    // Close modal immediately after starting execution
+    const commandToRun = runningCommand;
+    const argsToRun = runArgs;
+    setRunningCommand(null);
+    setRunArgs('');
+    setIsRunning(false);
+
+    // Execute command in background (tab will show progress)
     try {
-      await onRunCommand(runningCommand, runArgs);
-      setRunningCommand(null);
-      setRunArgs('');
+      await onRunCommand(commandToRun, argsToRun);
     } catch (error) {
       console.error('Failed to run slash command:', error);
       onMessage?.('error', 'SYSTEM', `Failed to run command: ${error}`);
-    } finally {
-      setIsRunning(false);
     }
   };
 

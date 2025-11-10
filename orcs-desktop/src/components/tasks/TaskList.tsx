@@ -88,86 +88,105 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
     const workspace = getTaskWorkspace(task);
 
     return (
-      <Tooltip
-        label={workspace ? `Working Dir: ${workspace.rootPath}` : 'Workspace not found'}
-        withArrow
-        position="top"
+      <Box
+        key={task.id}
+        style={{
+          borderRadius: '8px',
+          border: '1px solid var(--mantine-color-gray-3)',
+          backgroundColor: 'white',
+          transition: 'all 0.15s ease',
+          overflow: 'hidden',
+        }}
       >
+        {/* ヘッダー（アクションボタン） */}
         <Group
-          key={task.id}
-          gap="sm"
-          wrap="nowrap"
-          p="xs"
+          gap="xs"
+          px="md"
+          py="xs"
+          justify="flex-end"
           style={{
-            borderRadius: '8px',
-            backgroundColor: task.status === 'Completed' ? '#f1f3f5' : 'transparent',
-            transition: 'background-color 0.15s ease',
-            cursor: 'default',
+            backgroundColor: task.status === 'Completed' ? '#f8f9fa' : task.status === 'Failed' ? '#fff5f5' : '#f8f9fa',
+            borderBottom: '1px solid var(--mantine-color-gray-3)',
           }}
         >
-          {/* ステータスアイコン */}
-          <Text size="lg">{getTaskIcon(task.status)}</Text>
-
-          {/* タスク内容 */}
-          <Box style={{ flex: 1, minWidth: 0 }}>
-            <Text
-              size="sm"
-              truncate
-              fw={task.status === 'Running' ? 600 : 400}
-              style={{
-                textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
-                color: task.status === 'Completed' ? '#868e96' : task.status === 'Failed' ? '#fa5252' : undefined,
-              }}
-            >
-              {task.title}
-            </Text>
-            <Group gap="xs" mt={2}>
-              {workspace && (
-                <>
-                  <Badge size="xs" variant="light" color="blue">
-                    {workspace.name}
-                  </Badge>
-                  <Text size="xs" c="dimmed">•</Text>
-                </>
-              )}
-              <Text size="xs" c="dimmed">
-                {task.steps_executed} steps
+          {/* Working Dir Tooltip */}
+          {workspace && (
+            <Tooltip label={`Working Dir: ${workspace.rootPath}`} withArrow>
+              <Text size="xs" c="dimmed" style={{ marginRight: 'auto' }}>
+                📁
               </Text>
-              <Text size="xs" c="dimmed">•</Text>
-              <Text size="xs" c="dimmed">
-                {formatDate(task.updated_at)}
-              </Text>
-            </Group>
-          </Box>
+            </Tooltip>
+          )}
 
-      {/* コピーボタン */}
-      {(task.status === 'Completed' || task.status === 'Failed') && (
-        <Tooltip label="Copy output" withArrow>
-          <ActionIcon
-            size="sm"
-            variant="subtle"
-            color="blue"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCopyTaskOutput(task);
-            }}
-          >
-            📋
-          </ActionIcon>
-        </Tooltip>
-      )}
+          {/* コピーボタン */}
+          {(task.status === 'Completed' || task.status === 'Failed') && (
+            <Tooltip label="Copy output" withArrow>
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="blue"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyTaskOutput(task);
+                }}
+              >
+                📋
+              </ActionIcon>
+            </Tooltip>
+          )}
 
           {/* 削除ボタン */}
-          <ActionIcon
-            size="sm"
-            variant="subtle"
-            color="red"
-            onClick={() => onTaskDelete?.(task.id)}
-          >
-            🗑️
-          </ActionIcon>
+          <Tooltip label="Delete" withArrow>
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              color="red"
+              onClick={() => onTaskDelete?.(task.id)}
+            >
+              🗑️
+            </ActionIcon>
+          </Tooltip>
         </Group>
-      </Tooltip>
+
+        {/* コンテンツエリア */}
+        <Box p="md">
+          <Group gap="sm" wrap="nowrap">
+            {/* ステータスアイコン */}
+            <Text size="lg">{getTaskIcon(task.status)}</Text>
+
+            {/* タスク内容 */}
+            <Box style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                size="sm"
+                fw={task.status === 'Running' ? 600 : 400}
+                style={{
+                  textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
+                  color: task.status === 'Completed' ? '#868e96' : task.status === 'Failed' ? '#fa5252' : undefined,
+                }}
+              >
+                {task.title}
+              </Text>
+              <Group gap="xs" mt={4}>
+                {workspace && (
+                  <>
+                    <Badge size="xs" variant="light" color="blue">
+                      {workspace.name}
+                    </Badge>
+                    <Text size="xs" c="dimmed">•</Text>
+                  </>
+                )}
+                <Text size="xs" c="dimmed">
+                  {task.steps_executed} steps
+                </Text>
+                <Text size="xs" c="dimmed">•</Text>
+                <Text size="xs" c="dimmed">
+                  {formatDate(task.updated_at)}
+                </Text>
+              </Group>
+            </Box>
+          </Group>
+        </Box>
+      </Box>
     );
   };
 
@@ -216,7 +235,7 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
               <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
                 ACTIVE
               </Text>
-              <Stack gap={4}>
+              <Stack gap="xs">
                 {activeTasks.map(renderTask)}
               </Stack>
             </Box>
@@ -228,7 +247,7 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
               <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
                 FAILED
               </Text>
-              <Stack gap={4}>
+              <Stack gap="xs">
                 {failedTasks.map(renderTask)}
               </Stack>
             </Box>
@@ -240,7 +259,7 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
               <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
                 COMPLETED
               </Text>
-              <Stack gap={4}>
+              <Stack gap="xs">
                 {completedTasks.map(renderTask)}
               </Stack>
             </Box>

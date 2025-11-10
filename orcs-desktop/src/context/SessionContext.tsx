@@ -73,14 +73,16 @@ export function SessionProvider({ children }: SessionProviderProps) {
       try {
         const session = await invoke<Session>('switch_session', { sessionId });
         setCurrentSessionId(sessionId);
-        await loadSessions();
+        // Note: loadSessions() removed here to avoid unnecessary re-fetching
+        // Tab switching should use cached session data
+        // Updated session data (e.g., updated_at) will be reflected on next refresh
         return session;
       } catch (err) {
         console.error('Failed to switch session:', err);
         throw new Error(`Failed to switch session: ${err}`);
       }
     },
-    [loadSessions],
+    [],
   );
 
   const deleteSession = useCallback(

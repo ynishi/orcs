@@ -387,6 +387,13 @@ function App() {
         return;
       }
 
+      // Skip if tab already exists (tab switching case)
+      const existingTab = getTabBySessionId(currentSessionId);
+      if (existingTab) {
+        console.log('[App] Tab already exists for session', currentSessionId, '- skipping reload');
+        return;
+      }
+
       try {
         console.log('[App] Loading messages for active session:', currentSessionId);
         const activeSession = sessions.find(s => s.id === currentSessionId);
@@ -403,13 +410,10 @@ function App() {
           console.log('[App] Session participant_icons:', activeSession.participant_icons);
           const restoredMessages = convertSessionToMessages(activeSession, userNickname);
 
-          // 既にタブが開いていない場合のみ、タブとして開く
-          const existingTab = getTabBySessionId(currentSessionId);
-          if (!existingTab && workspace) {
+          // タブが開いていない場合のみ、タブとして開く
+          if (workspace) {
             openTab(activeSession, restoredMessages, workspace.id, true);
             console.log('[App] Opened tab for active session with', restoredMessages.length, 'messages');
-          } else {
-            console.log('[App] Tab already exists for session', currentSessionId);
           }
 
           // Restore execution strategy from session

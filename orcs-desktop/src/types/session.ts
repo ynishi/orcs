@@ -23,7 +23,24 @@ export interface Session {
   is_favorite?: boolean; // Whether this session is marked as favorite (pinned to top)
   is_archived?: boolean; // Whether this session is archived (hidden by default)
   sort_order?: number; // Manual sort order (optional, for custom ordering within favorites)
+  auto_chat_config?: AutoChatConfig; // AutoChat configuration (None means disabled)
 }
+
+/**
+ * AutoChat configuration
+ * Matches Rust's AutoChatConfig
+ */
+export interface AutoChatConfig {
+  max_iterations: number; // Maximum number of dialogue iterations
+  stop_condition: StopCondition; // Stop condition strategy
+  web_search_enabled: boolean; // Enable WebSearch during auto-chat
+}
+
+/**
+ * Stop condition for AutoChat mode
+ * Matches Rust's StopCondition enum
+ */
+export type StopCondition = 'iteration_count' | 'user_interrupt';
 
 /**
  * 会話履歴メタデータ

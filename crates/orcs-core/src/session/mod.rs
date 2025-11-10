@@ -35,6 +35,6 @@ pub use manager::{InteractionManagerTrait, SessionManager};
 pub use message::{
     ConversationMessage, ErrorSeverity, MessageMetadata, MessageRole, SystemEventType,
 };
-pub use model::{Session, PLACEHOLDER_WORKSPACE_ID};
+pub use model::{AutoChatConfig, Session, StopCondition, PLACEHOLDER_WORKSPACE_ID};
 pub use repository::SessionRepository;
 pub use user_input::UserInput;

@@ -13,6 +13,41 @@ use std::collections::HashMap;
 /// This will be replaced with the actual default workspace ID during bootstrap.
 pub const PLACEHOLDER_WORKSPACE_ID: &str = "___workspace_placeholder___";
 
+/// Configuration for AutoChat mode.
+///
+/// AutoChat enables automatic multi-round dialogue where agents continue
+/// discussing until a stop condition is met.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AutoChatConfig {
+    /// Maximum number of dialogue iterations
+    pub max_iterations: u32,
+    /// Stop condition strategy
+    pub stop_condition: StopCondition,
+    /// Enable WebSearch during auto-chat
+    pub web_search_enabled: bool,
+}
+
+impl Default for AutoChatConfig {
+    fn default() -> Self {
+        Self {
+            max_iterations: 5,
+            stop_condition: StopCondition::IterationCount,
+            web_search_enabled: true,
+        }
+    }
+}
+
+/// Stop condition for AutoChat mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StopCondition {
+    /// Stop after reaching max_iterations
+    IterationCount,
+    /// Continue until user manually stops
+    UserInterrupt,
+    // Future: ConsensusReached - detect when agents reach consensus
+}
+
 /// Represents a user session in the application's domain layer.
 ///
 /// A session contains:
@@ -78,6 +113,9 @@ pub struct Session {
     /// Manual sort order (optional, for custom ordering within favorites)
     #[serde(default)]
     pub sort_order: Option<i32>,
+    /// AutoChat configuration (None means AutoChat is disabled)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_chat_config: Option<AutoChatConfig>,
 }
 
 fn default_execution_strategy() -> ExecutionModel {

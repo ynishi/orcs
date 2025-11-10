@@ -714,6 +714,7 @@ impl InteractionManager {
             is_favorite: false,
             is_archived: false,
             sort_order: None,
+            auto_chat_config: None, // AutoChat config will be set via dedicated methods
         }
     }
 

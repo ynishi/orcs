@@ -53,6 +53,11 @@ function renderTextWithMentions(text: string) {
   return parts.length > 0 ? parts : text;
 }
 
+// メッセージタイプを表示用ラベルに変換
+function formatMessageTypeLabel(type: string): string {
+  return type.replace(/_/g, ' ').toUpperCase();
+}
+
 export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, workspaceRootPath }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
@@ -105,9 +110,8 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, works
               color={style.iconColor || style.textColor}
               variant="filled"
               size="sm"
-              style={{ textTransform: 'uppercase' }}
             >
-              {message.type}
+              {formatMessageTypeLabel(message.type)}
             </Badge>
             <Box style={{ flex: 1 }}>
               <Text

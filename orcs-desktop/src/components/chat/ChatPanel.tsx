@@ -107,19 +107,31 @@ export function ChatPanel({
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previousMessageCount = useRef<number>(0);
-  const previousTabId = useRef<string>(tab.id);
+  const previousTabId = useRef<string>(''); // Empty string to detect first render
+  const hasScrolledForTab = useRef<Set<string>>(new Set()); // Track which tabs have been scrolled
 
-  // Auto-scroll to bottom when new messages are added or tab is newly opened
+  // Auto-scroll to bottom when new messages are added or tab is first opened
   useEffect(() => {
     const currentMessageCount = tab.messages.length;
     const isNewTab = tab.id !== previousTabId.current;
+    const isFirstTimeOpeningThisTab = !hasScrolledForTab.current.has(tab.id);
 
-    // Scroll if: (1) message count increased, OR (2) tab changed (new tab opened)
-    if ((currentMessageCount > previousMessageCount.current || isNewTab) && viewport.current) {
-      viewport.current.scrollTo({
-        top: viewport.current.scrollHeight,
-        behavior: 'smooth',
-      });
+    // Scroll if: (1) message count increased, OR (2) tab opened for first time
+    if ((currentMessageCount > previousMessageCount.current || (isNewTab && isFirstTimeOpeningThisTab)) && viewport.current) {
+      // Use setTimeout to ensure DOM is fully rendered
+      setTimeout(() => {
+        if (viewport.current) {
+          viewport.current.scrollTo({
+            top: viewport.current.scrollHeight,
+            behavior: 'smooth',
+          });
+        }
+      }, 0);
+
+      // Mark this tab as scrolled
+      if (isFirstTimeOpeningThisTab) {
+        hasScrolledForTab.current.add(tab.id);
+      }
     }
 
     previousMessageCount.current = currentMessageCount;

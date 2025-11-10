@@ -390,12 +390,10 @@ function App() {
       // Skip if tab already exists (tab switching case)
       const existingTab = getTabBySessionId(currentSessionId);
       if (existingTab) {
-        console.log('[App] Tab already exists for session', currentSessionId, '- skipping reload');
         return;
       }
 
       try {
-        console.log('[App] Loading messages for active session:', currentSessionId);
         const activeSession = sessions.find(s => s.id === currentSessionId);
         if (activeSession) {
           // Enrich participant_icons from current personas if missing
@@ -407,19 +405,16 @@ function App() {
               }
             });
           }
-          console.log('[App] Session participant_icons:', activeSession.participant_icons);
           const restoredMessages = convertSessionToMessages(activeSession, userNickname);
 
           // タブが開いていない場合のみ、タブとして開く
           if (workspace) {
             openTab(activeSession, restoredMessages, workspace.id, true);
-            console.log('[App] Opened tab for active session with', restoredMessages.length, 'messages');
           }
 
           // Restore execution strategy from session
           if (activeSession.execution_strategy) {
             setExecutionStrategy(activeSession.execution_strategy);
-            console.log('[App] Restored execution strategy:', activeSession.execution_strategy);
           }
         }
       } catch (error) {
@@ -428,7 +423,9 @@ function App() {
     };
 
     loadActiveSessionMessages();
-  }, [currentSessionId, sessions, sessionsLoading, userNickname, personas, workspace, openTab, getTabBySessionId]);
+  }, [currentSessionId, sessionsLoading, userNickname, personas, workspace, openTab, getTabBySessionId]);
+  // Note: `sessions` removed from deps to avoid unnecessary re-renders
+  // We only use sessions.find() inside, which is called on-demand
 
   const refreshCustomCommands = useCallback(async () => {
     try {

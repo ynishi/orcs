@@ -12,9 +12,11 @@ interface StatusBarProps {
   conversationMode?: string;
   talkStyle?: string | null;
   executionStrategy?: string;
+  autoChatIteration?: number; // Current iteration in AutoChat mode
+  autoChatMaxIterations?: number; // Max iterations configured
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential' }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', autoChatIteration, autoChatMaxIterations }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -116,11 +118,19 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
 
         {/* AUTOモード */}
         <Divider orientation="vertical" />
-        <Tooltip label={autoMode ? 'AUTO: ON' : 'AUTO: OFF'} withArrow>
-          <Text size="lg" c={autoMode ? 'green' : 'red'} fw={700} style={{ cursor: 'default' }}>
-            ●
-          </Text>
-        </Tooltip>
+        {autoMode && autoChatIteration !== undefined && autoChatMaxIterations !== undefined ? (
+          <Tooltip label={`AUTO: Running (${autoChatIteration}/${autoChatMaxIterations})`} withArrow>
+            <Badge color="green" size="sm" variant="filled">
+              ▶️ {autoChatIteration}/{autoChatMaxIterations}
+            </Badge>
+          </Tooltip>
+        ) : (
+          <Tooltip label={autoMode ? 'AUTO: ON' : 'AUTO: OFF'} withArrow>
+            <Text size="lg" c={autoMode ? 'green' : 'red'} fw={700} style={{ cursor: 'default' }}>
+              ●
+            </Text>
+          </Tooltip>
+        )}
 
         {/* Talk Style */}
         {talkStyle && (

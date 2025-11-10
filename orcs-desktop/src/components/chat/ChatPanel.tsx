@@ -2,7 +2,7 @@
  * ChatPanel - 1つのタブ（セッション）のチャット画面を管理
  * TabContextから状態を取得し、軽量なプレゼンテーション層として機能
  */
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import {
   Textarea,
   Button,
@@ -18,11 +18,13 @@ import {
   Paper,
   Text,
 } from '@mantine/core';
+import { IconSettings } from '@tabler/icons-react';
 import { MessageItem } from './MessageItem';
 import { StatusBar } from './StatusBar';
 import { CommandSuggestions } from './CommandSuggestions';
 import { AgentSuggestions } from './AgentSuggestions';
 import { ThinkingIndicator } from './ThinkingIndicator';
+import { AutoChatSettingsModal } from './AutoChatSettingsModal';
 import type { SessionTab } from '../../context/TabContext';
 import type { StatusInfo } from '../../types/status';
 import type { GitInfo } from '../../types/git';
@@ -30,6 +32,7 @@ import type { Workspace } from '../../types/workspace';
 import type { CommandDefinition } from '../../types/command';
 import type { Agent } from '../../types/agent';
 import type { PersonaConfig } from '../../types/agent';
+import type { AutoChatConfig } from '../../types/session';
 
 interface ChatPanelProps {
   tab: SessionTab;
@@ -109,6 +112,28 @@ export function ChatPanel({
   const previousMessageCount = useRef<number>(0);
   const previousTabId = useRef<string>(''); // Empty string to detect first render
   const hasScrolledForTab = useRef<Set<string>>(new Set()); // Track which tabs have been scrolled
+
+  // AutoChat settings state
+  const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
+  const [autoChatConfig, setAutoChatConfig] = useState<AutoChatConfig | null>(null);
+
+  // TODO: Load autoChatConfig from session when backend is ready
+  // For now, use default config
+  useEffect(() => {
+    if (!autoChatConfig) {
+      setAutoChatConfig({
+        max_iterations: 5,
+        stop_condition: 'iteration_count',
+        web_search_enabled: true,
+      });
+    }
+  }, [autoChatConfig]);
+
+  const handleSaveAutoChatConfig = (config: AutoChatConfig) => {
+    setAutoChatConfig(config);
+    // TODO: Save to backend via invoke('update_auto_chat_config', { sessionId: tab.id, config })
+    console.log('[ChatPanel] AutoChat config saved:', config);
+  };
 
   // Auto-scroll to bottom when new messages are added or tab is first opened
   useEffect(() => {
@@ -263,6 +288,16 @@ export function ChatPanel({
               Send
             </Button>
 
+            <Tooltip label="AutoChat settings">
+              <ActionIcon
+                variant="light"
+                onClick={() => setAutoChatSettingsOpened(true)}
+                size="lg"
+              >
+                <IconSettings size={18} />
+              </ActionIcon>
+            </Tooltip>
+
             <Tooltip label={autoMode ? 'Stop AUTO mode' : 'Start AUTO mode'}>
               <ActionIcon
                 color={autoMode ? 'red' : 'green'}
@@ -301,6 +336,13 @@ export function ChatPanel({
         conversationMode={conversationMode}
         talkStyle={talkStyle}
         executionStrategy={executionStrategy}
+      />
+
+      <AutoChatSettingsModal
+        opened={autoChatSettingsOpened}
+        onClose={() => setAutoChatSettingsOpened(false)}
+        config={autoChatConfig}
+        onSave={handleSaveAutoChatConfig}
       />
     </Stack>
   );

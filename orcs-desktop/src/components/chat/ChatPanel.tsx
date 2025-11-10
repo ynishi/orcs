@@ -148,7 +148,7 @@ export function ChatPanel({
   };
 
   return (
-    <Stack gap={0} style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <Stack gap="xs" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* メッセージエリア */}
       <Box
         style={{ flex: 1, position: 'relative', minHeight: 0 }}

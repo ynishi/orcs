@@ -191,11 +191,8 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
     return (
       <Stack gap="xs" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {/* ヘッダー */}
-        <Group justify="space-between" wrap="nowrap" px="sm">
-          <Text size="sm" fw={500}>
-            Workspace Files
-          </Text>
-          <Group gap={4}>
+        <Stack gap={4} px="sm">
+          <Group gap={4} justify="flex-start">
             <Tooltip label="Open workspace folder" withArrow>
               <ActionIcon
                 onClick={() => {
@@ -230,7 +227,10 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
               <input type="file" multiple hidden onChange={handleFileSelect} />
             </ActionIcon>
           </Group>
-        </Group>
+          <Text size="sm" fw={500}>
+            Workspace Files
+          </Text>
+        </Stack>
 
         {/* Include in prompt toggle */}
         <Box px="sm">
@@ -260,11 +260,8 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
   return (
     <Stack gap="xs" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* ヘッダー */}
-      <Group justify="space-between" wrap="nowrap" px="sm">
-        <Text size="sm" fw={500}>
-          Workspace Files
-        </Text>
-        <Group gap={4}>
+      <Stack gap={4} px="sm">
+        <Group gap={4} justify="flex-start">
           <Tooltip label="Open workspace folder" withArrow>
             <ActionIcon
               onClick={() => {
@@ -299,7 +296,10 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
             <input type="file" multiple hidden onChange={handleFileSelect} />
           </ActionIcon>
         </Group>
-      </Group>
+        <Text size="sm" fw={500}>
+          Workspace Files
+        </Text>
+      </Stack>
 
       {/* Include in prompt toggle */}
       <Box px="sm">

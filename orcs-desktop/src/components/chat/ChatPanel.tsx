@@ -106,15 +106,21 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previousMessageCount = useRef<number>(0);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when new messages are added (not on tab switch)
   useEffect(() => {
-    if (viewport.current) {
+    const currentMessageCount = tab.messages.length;
+
+    // Only scroll if message count increased (new message added or tab first opened)
+    if (currentMessageCount > previousMessageCount.current && viewport.current) {
       viewport.current.scrollTo({
         top: viewport.current.scrollHeight,
         behavior: 'smooth',
       });
     }
+
+    previousMessageCount.current = currentMessageCount;
   }, [tab.messages]);
 
   const getThreadAsText = (): string => {

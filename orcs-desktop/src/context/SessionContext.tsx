@@ -60,13 +60,14 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
       const newSession = await invoke<Session>('create_session', { workspaceId: finalWorkspaceId });
       setCurrentSessionId(newSession.id);
-      await loadSessions();
+      // Add new session to local sessions array instead of reloading all sessions
+      setSessions((prev) => [...prev, newSession]);
       return newSession.id;
     } catch (err) {
       console.error('Failed to create session:', err);
       throw new Error(`Failed to create session: ${err}`);
     }
-  }, [loadSessions]);
+  }, []);
 
   const switchSessionHandler = useCallback(
     async (sessionId: string): Promise<Session> => {

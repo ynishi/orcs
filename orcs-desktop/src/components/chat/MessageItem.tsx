@@ -254,7 +254,7 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, works
                   </Tooltip>
                 )}
 
-                {onExecuteAsTask && message.type === 'ai' && (
+                {onExecuteAsTask && (message.type === 'ai' || message.type === 'user') && (
                   <Tooltip label="Execute as Task" withArrow>
                     <ActionIcon
                       color="violet"

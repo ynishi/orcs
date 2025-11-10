@@ -1456,7 +1456,7 @@ function App() {
         breakpoint: 'sm',
         collapsed: { mobile: !navbarOpened, desktop: !navbarOpened },
       }}
-      padding="md"
+      padding={0}
     >
       {/* 左ペイン */}
       <AppShell.Navbar>

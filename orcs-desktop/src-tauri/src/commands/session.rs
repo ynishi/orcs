@@ -1,7 +1,10 @@
 use std::time::SystemTime;
 
 use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
-use orcs_core::session::{AppMode, ConversationMode, ErrorSeverity, Session, PLACEHOLDER_WORKSPACE_ID};
+use orcs_core::session::{
+    AppMode, ConversationMode, ErrorSeverity, ModeratorAction, Session, SessionEvent,
+    PLACEHOLDER_WORKSPACE_ID,
+};
 use orcs_interaction::InteractionResult;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
@@ -247,6 +250,86 @@ pub async fn append_system_messages(
         manager
             .add_system_conversation_message(content, message_type, severity_enum)
             .await;
+    }
+
+    let app_mode = state.app_mode.lock().await.clone();
+    state
+        .session_manager
+        .save_active_session(app_mode)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Publishes a structured session event (user/system/moderator).
+#[tauri::command]
+pub async fn publish_session_event(
+    event: SessionEvent,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SerializableInteractionResult, String> {
+    match event {
+        SessionEvent::UserInput { content, attachments } => {
+            let paths = if attachments.is_empty() {
+                None
+            } else {
+                Some(attachments)
+            };
+            handle_input(content, paths, app, state).await
+        }
+        SessionEvent::SystemEvent {
+            content,
+            message_type,
+            severity,
+        } => {
+            let manager = state
+                .session_manager
+                .active_session()
+                .await
+                .ok_or_else(|| "No active session".to_string())?;
+
+            manager
+                .add_system_conversation_message(content, message_type, severity)
+                .await;
+
+            let app_mode = state.app_mode.lock().await.clone();
+            state
+                .session_manager
+                .save_active_session(app_mode)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            Ok(InteractionResult::NoOp.into())
+        }
+        SessionEvent::ModeratorAction { action } => {
+            handle_moderator_action(action, state).await?;
+            Ok(InteractionResult::NoOp.into())
+        }
+    }
+}
+
+async fn handle_moderator_action(
+    action: ModeratorAction,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or_else(|| "No active session".to_string())?;
+
+    match action {
+        ModeratorAction::SetConversationMode { mode } => {
+            manager.set_conversation_mode(mode).await;
+        }
+        ModeratorAction::AppendSystemMessage {
+            content,
+            message_type,
+            severity,
+        } => {
+            manager
+                .add_system_conversation_message(content, message_type, severity)
+                .await;
+        }
     }
 
     let app_mode = state.app_mode.lock().await.clone();
@@ -644,4 +727,3 @@ async fn execute_shell_command(command: &str, working_dir: Option<&str>) -> Resu
         ))
     }
 }
-

@@ -37,6 +37,7 @@ import { useTabContext } from "./context/TabContext";
 import { useSlashCommands } from "./hooks/useSlashCommands";
 import { Tabs } from "@mantine/core";
 import { ChatPanel } from "./components/chat/ChatPanel";
+import type { SessionEvent } from "./types/session_event";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -697,9 +698,14 @@ function App() {
           }
         }
 
-        const result = await invoke<InteractionResult>("handle_input", {
-          input: backendInput,
-          filePaths: filePaths.length > 0 ? filePaths : null,
+        const sessionEvent: SessionEvent = {
+          type: 'user_input',
+          content: backendInput,
+          attachments: filePaths.length > 0 ? filePaths : undefined,
+        };
+
+        const result = await invoke<InteractionResult>('publish_session_event', {
+          event: sessionEvent,
         });
 
         if (result.type === 'NewDialogueMessages') {

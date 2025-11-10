@@ -21,6 +21,7 @@
 //! ```
 
 mod app_mode;
+mod event;
 mod manager;
 mod message;
 mod model;
@@ -29,6 +30,7 @@ mod user_input;
 
 // Re-export public API
 pub use app_mode::{AppMode, ConversationMode, Plan};
+pub use event::{ModeratorAction, SessionEvent};
 pub use manager::{InteractionManagerTrait, SessionManager};
 pub use message::{
     ConversationMessage, ErrorSeverity, MessageMetadata, MessageRole, SystemEventType,

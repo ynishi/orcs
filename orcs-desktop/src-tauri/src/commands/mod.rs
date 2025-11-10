@@ -77,6 +77,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         files::read_workspace_file,
         files::save_code_snippet,
         files::open_terminal,
+        session::publish_session_event,
         session::handle_input,
         crate::slash_commands::list_slash_commands,
         crate::slash_commands::get_slash_command,
@@ -86,4 +87,3 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         crate::slash_commands::execute_shell_command,
     ]
 }
-

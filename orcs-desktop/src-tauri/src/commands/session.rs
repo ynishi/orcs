@@ -281,16 +281,14 @@ pub async fn publish_session_event(
             message_type,
             severity,
         } => {
-            let manager = state
-                .session_manager
-                .active_session()
+            // Delegate to SessionUseCase (business logic layer)
+            state
+                .session_usecase
+                .add_system_message(content, message_type, severity)
                 .await
-                .ok_or_else(|| "No active session".to_string())?;
+                .map_err(|e| e.to_string())?;
 
-            manager
-                .add_system_conversation_message(content, message_type, severity)
-                .await;
-
+            // Save the session (Tauri layer responsibility for now)
             let app_mode = state.app_mode.lock().await.clone();
             state
                 .session_manager

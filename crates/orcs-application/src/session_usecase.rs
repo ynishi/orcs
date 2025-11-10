@@ -889,4 +889,59 @@ impl SessionUseCase {
         session.participants = participants;
         session
     }
+
+    /// Adds a system message to the active session.
+    ///
+    /// This method is part of the refactored message handling architecture where
+    /// business logic is centralized in SessionUseCase. It delegates to the
+    /// InteractionManager to actually add the message.
+    ///
+    /// # Arguments
+    ///
+    /// * `content` - The message content
+    /// * `message_type` - Optional message type (e.g., "context_info", "notification")
+    /// * `severity` - Optional error severity
+    ///
+    /// # Returns
+    ///
+    /// Returns Ok(()) on success, or an error if no active session exists.
+    ///
+    /// # Note
+    ///
+    /// This method does NOT save the session. The caller (Tauri layer) is responsible
+    /// for calling `session_manager.save_active_session(app_mode)` after this method
+    /// returns. This separation allows the Tauri layer to manage app_mode.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // In Tauri layer
+    /// session_usecase.add_system_message(
+    ///     "Command executed successfully".to_string(),
+    ///     Some("context_info".to_string()),
+    ///     None,
+    /// ).await?;
+    ///
+    /// // Then save the session
+    /// let app_mode = state.app_mode.lock().await.clone();
+    /// state.session_manager.save_active_session(app_mode).await?;
+    /// ```
+    pub async fn add_system_message(
+        &self,
+        content: String,
+        message_type: Option<String>,
+        severity: Option<orcs_core::session::ErrorSeverity>,
+    ) -> Result<()> {
+        let manager = self
+            .session_manager
+            .active_session()
+            .await
+            .ok_or_else(|| anyhow!("No active session"))?;
+
+        manager
+            .add_system_conversation_message(content, message_type, severity)
+            .await;
+
+        Ok(())
+    }
 }

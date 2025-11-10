@@ -85,5 +85,8 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         crate::slash_commands::remove_slash_command,
         crate::slash_commands::expand_command_template,
         crate::slash_commands::execute_shell_command,
+        session::get_auto_chat_config,
+        session::update_auto_chat_config,
+        session::get_auto_chat_status,
     ]
 }

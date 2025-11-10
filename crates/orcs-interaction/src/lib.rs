@@ -18,8 +18,8 @@ use llm_toolkit::attachment::Attachment;
 use orcs_core::persona::{Persona as PersonaDomain, PersonaBackend};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{
-    AppMode, ConversationMessage, ConversationMode, ErrorSeverity, MessageMetadata, MessageRole,
-    Plan, Session, SystemEventType,
+    AppMode, AutoChatConfig, ConversationMessage, ConversationMode, ErrorSeverity, MessageMetadata,
+    MessageRole, Plan, Session, SystemEventType,
 };
 use orcs_core::user::UserService;
 use serde::{Deserialize, Serialize};
@@ -374,6 +374,10 @@ pub struct InteractionManager {
     conversation_mode: Arc<RwLock<ConversationMode>>,
     /// Talk style for dialogue context (Brainstorm, Debate, etc.)
     talk_style: Arc<RwLock<Option<TalkStyle>>>,
+    /// AutoChat configuration (None means AutoChat is disabled)
+    auto_chat_config: Arc<RwLock<Option<AutoChatConfig>>>,
+    /// Current iteration in AutoChat mode (None when not running)
+    auto_chat_iteration: Arc<RwLock<Option<u32>>>,
 }
 
 impl InteractionManager {
@@ -416,6 +420,8 @@ impl InteractionManager {
             system_messages: Arc::new(RwLock::new(Vec::new())),
             conversation_mode: Arc::new(RwLock::new(ConversationMode::default())),
             talk_style: Arc::new(RwLock::new(None)),
+            auto_chat_config: Arc::new(RwLock::new(None)),
+            auto_chat_iteration: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -457,6 +463,8 @@ impl InteractionManager {
             system_messages: Arc::new(RwLock::new(data.system_messages)),
             conversation_mode: Arc::new(RwLock::new(data.conversation_mode)),
             talk_style: Arc::new(RwLock::new(data.talk_style)),
+            auto_chat_config: Arc::new(RwLock::new(data.auto_chat_config)),
+            auto_chat_iteration: Arc::new(RwLock::new(None)), // Never running when restored from disk
         }
     }
 
@@ -693,6 +701,7 @@ impl InteractionManager {
 
         let conversation_mode = self.conversation_mode.read().await.clone();
         let talk_style = self.talk_style.read().await.clone();
+        let auto_chat_config = self.auto_chat_config.read().await.clone();
 
         Session {
             id: self.session_id.clone(),
@@ -714,7 +723,7 @@ impl InteractionManager {
             is_favorite: false,
             is_archived: false,
             sort_order: None,
-            auto_chat_config: None, // AutoChat config will be set via dedicated methods
+            auto_chat_config,
         }
     }
 
@@ -1056,6 +1065,26 @@ impl InteractionManager {
     /// Gets the current talk style.
     pub async fn get_talk_style(&self) -> Option<TalkStyle> {
         self.talk_style.read().await.clone()
+    }
+
+    /// Sets the AutoChat configuration.
+    pub async fn set_auto_chat_config(&self, config: Option<AutoChatConfig>) {
+        *self.auto_chat_config.write().await = config;
+    }
+
+    /// Gets the current AutoChat configuration.
+    pub async fn get_auto_chat_config(&self) -> Option<AutoChatConfig> {
+        self.auto_chat_config.read().await.clone()
+    }
+
+    /// Gets the current AutoChat iteration (None if not running).
+    pub async fn get_auto_chat_iteration(&self) -> Option<u32> {
+        *self.auto_chat_iteration.read().await
+    }
+
+    /// Sets the current AutoChat iteration.
+    pub async fn set_auto_chat_iteration(&self, iteration: Option<u32>) {
+        *self.auto_chat_iteration.write().await = iteration;
     }
 
     /// Invalidates the current dialogue, forcing it to be recreated with latest persona settings.

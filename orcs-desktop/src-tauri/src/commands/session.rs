@@ -2,8 +2,8 @@ use std::time::SystemTime;
 
 use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
 use orcs_core::session::{
-    AppMode, ConversationMode, ErrorSeverity, ModeratorAction, Session, SessionEvent,
-    PLACEHOLDER_WORKSPACE_ID,
+    AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction, Session,
+    SessionEvent, PLACEHOLDER_WORKSPACE_ID,
 };
 use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_interaction::InteractionResult;
@@ -755,4 +755,90 @@ async fn execute_shell_command(command: &str, working_dir: Option<&str>) -> Resu
             stderr
         ))
     }
+}
+
+// ============================================================================
+// AutoChat Commands
+// ============================================================================
+
+/// Gets the AutoChat configuration for a session.
+#[tauri::command]
+pub async fn get_auto_chat_config(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<Option<AutoChatConfig>, String> {
+    // Get the current active session's manager
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or_else(|| "No active session".to_string())?;
+
+    // Verify session ID matches
+    if manager.session_id() != session_id {
+        return Err(format!(
+            "Session ID mismatch: requested {}, active is {}",
+            session_id,
+            manager.session_id()
+        ));
+    }
+
+    Ok(manager.get_auto_chat_config().await)
+}
+
+/// Updates the AutoChat configuration for a session.
+#[tauri::command]
+pub async fn update_auto_chat_config(
+    session_id: String,
+    config: Option<AutoChatConfig>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    // Get the current active session's manager
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or_else(|| "No active session".to_string())?;
+
+    // Verify session ID matches
+    if manager.session_id() != session_id {
+        return Err(format!(
+            "Session ID mismatch: requested {}, active is {}",
+            session_id,
+            manager.session_id()
+        ));
+    }
+
+    manager.set_auto_chat_config(config).await;
+
+    // Persist the updated session
+    let app_mode = state.app_mode.lock().await.clone();
+    let _ = state.session_manager.save_active_session(app_mode).await;
+
+    Ok(())
+}
+
+/// Gets the current AutoChat iteration status.
+#[tauri::command]
+pub async fn get_auto_chat_status(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<Option<u32>, String> {
+    // Get the current active session's manager
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or_else(|| "No active session".to_string())?;
+
+    // Verify session ID matches
+    if manager.session_id() != session_id {
+        return Err(format!(
+            "Session ID mismatch: requested {}, active is {}",
+            session_id,
+            manager.session_id()
+        ));
+    }
+
+    Ok(manager.get_auto_chat_iteration().await)
 }

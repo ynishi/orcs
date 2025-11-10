@@ -201,13 +201,23 @@ function App() {
   // Listen for real-time dialogue turn events from backend
   // Use ref to ensure only one listener is registered
   const listenerRegistered = useRef(false);
-  const addMessageRef = useRef(addMessage);
+  const addMessageToTabRef = useRef(addMessageToTab);
+  const getTabBySessionIdRef = useRef(getTabBySessionId);
+  const personasRef = useRef(personas);
   const currentSessionIdRef = useRef(currentSessionId);
 
-  // 最新のaddMessageをrefに保持（クロージャーの問題を回避）
+  // 最新の関数をrefに保持（クロージャーの問題を回避）
   useEffect(() => {
-    addMessageRef.current = addMessage;
-  }, [addMessage]);
+    addMessageToTabRef.current = addMessageToTab;
+  }, [addMessageToTab]);
+
+  useEffect(() => {
+    getTabBySessionIdRef.current = getTabBySessionId;
+  }, [getTabBySessionId]);
+
+  useEffect(() => {
+    personasRef.current = personas;
+  }, [personas]);
 
   // 最新のcurrentSessionIdをrefに保持
   useEffect(() => {
@@ -230,39 +240,67 @@ function App() {
       unlisten = await listen<StreamingDialogueTurn>('dialogue-turn', (event) => {
         const turn = event.payload;
 
-        // Filter by session_id - only process messages for the active session
-        if (turn.session_id !== currentSessionIdRef.current) {
-          console.log(`[STREAM] Ignoring message for session ${turn.session_id}, current session is ${currentSessionIdRef.current}`);
+        // Find the tab for this session_id
+        const targetTab = getTabBySessionIdRef.current(turn.session_id);
+
+        if (!targetTab) {
+          console.log(`[STREAM] Ignoring message for session ${turn.session_id} - no tab found`);
           return;
         }
 
-        console.log('[STREAM] Event received for current session:', turn.type);
+        const isActiveSession = turn.session_id === currentSessionIdRef.current;
+        console.log('[STREAM] Event received:', turn.type, 'for session:', turn.session_id.substring(0, 8), 'active:', isActiveSession);
 
         // Handle different turn types
         switch (turn.type) {
-          case 'Chunk':
+          case 'Chunk': {
             console.log('[STREAM] Adding message chunk:', turn.author);
-            // 最新のaddMessageを使用
-            addMessageRef.current('ai', turn.author, turn.content);
-            break;
 
-          case 'Error':
+            // Find persona by name to get icon and base_color
+            const persona = personasRef.current.find(p => p.name === turn.author);
+
+            const newMessage: Message = {
+              id: `${Date.now()}-${Math.random()}`,
+              type: 'ai',
+              author: turn.author,
+              text: turn.content,
+              timestamp: new Date(),
+              icon: persona?.icon,
+              baseColor: persona?.base_color,
+            };
+
+            addMessageToTabRef.current(targetTab.id, newMessage);
+            break;
+          }
+
+          case 'Error': {
             console.log('[STREAM] Error received:', turn.message);
-            // 最新のaddMessageを使用
-            addMessageRef.current('error', '', turn.message);
 
-            // Show error toast
-            notifications.show({
-              title: 'Agent Error',
-              message: turn.message,
-              color: 'red',
-              icon: '❌',
-              autoClose: 10000,
-            });
+            const errorMessage: Message = {
+              id: `${Date.now()}-${Math.random()}`,
+              type: 'error',
+              author: '',
+              text: turn.message,
+              timestamp: new Date(),
+            };
+
+            addMessageToTabRef.current(targetTab.id, errorMessage);
+
+            // Show error toast only for active session
+            if (isActiveSession) {
+              notifications.show({
+                title: 'Agent Error',
+                message: turn.message,
+                color: 'red',
+                icon: '❌',
+                autoClose: 10000,
+              });
+            }
             break;
+          }
 
           case 'Final':
-            console.log('[STREAM] Streaming completed for session:', turn.session_id);
+            console.log('[STREAM] Streaming completed for session:', turn.session_id.substring(0, 8));
             // Final turn just indicates completion, no action needed
             break;
 

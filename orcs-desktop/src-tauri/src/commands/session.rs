@@ -364,11 +364,29 @@ pub async fn execute_message_as_task(
 
     let app_mode = state.app_mode.lock().await.clone();
     let session = manager.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
-    let session_id = session.id;
+    let session_id = session.id.clone();
+    let workspace_id = &session.workspace_id;
+
+    // Get workspace root path from workspace_id
+    let workspace_root = if workspace_id != PLACEHOLDER_WORKSPACE_ID {
+        match state.workspace_manager.get_workspace(workspace_id).await {
+            Ok(Some(workspace)) => Some(workspace.root_path),
+            Ok(None) => {
+                tracing::warn!("Workspace not found for id: {}, using None", workspace_id);
+                None
+            }
+            Err(e) => {
+                tracing::warn!("Failed to get workspace: {}, using None", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     state
         .task_executor
-        .execute_from_message(session_id, message_content)
+        .execute_from_message(session_id, message_content, workspace_root)
         .await
         .map_err(|e| e.to_string())
 }

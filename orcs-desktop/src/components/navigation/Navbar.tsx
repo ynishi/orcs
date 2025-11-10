@@ -179,6 +179,9 @@ export function Navbar({
           {activeTab === 'tasks' && (
             <TaskList
               tasks={tasks}
+              sessions={sessions}
+              workspaces={workspaces}
+              currentWorkspaceId={currentWorkspaceId}
               onTaskToggle={onTaskToggle}
               onTaskDelete={onTaskDelete}
               onRefresh={onRefreshTasks}

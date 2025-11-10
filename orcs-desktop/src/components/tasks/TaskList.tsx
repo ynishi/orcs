@@ -1,18 +1,42 @@
-import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, Badge, Switch } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { Task, getTaskIcon } from '../../types/task';
+import { Session } from '../../types/session';
+import { Workspace } from '../../types/workspace';
+import { useState } from 'react';
 
 interface TaskListProps {
   tasks: Task[];
+  sessions?: Session[];
+  workspaces?: Workspace[];
+  currentWorkspaceId?: string;
   onTaskToggle?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
   onRefresh?: () => void;
 }
 
-export function TaskList({ tasks, onTaskDelete, onRefresh }: TaskListProps) {
-  const activeTasks = tasks.filter(t => t.status === 'Running' || t.status === 'Pending');
-  const completedTasks = tasks.filter(t => t.status === 'Completed');
-  const failedTasks = tasks.filter(t => t.status === 'Failed');
+export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTaskDelete, onRefresh }: TaskListProps) {
+  const [filterCurrentWorkspace, setFilterCurrentWorkspace] = useState(false);
+
+  // Get workspace info for a task
+  const getTaskWorkspace = (task: Task): Workspace | undefined => {
+    if (!sessions || !workspaces) return undefined;
+    const session = sessions.find(s => s.id === task.session_id);
+    if (!session) return undefined;
+    return workspaces.find(w => w.id === session.workspace_id);
+  };
+
+  // Filter tasks by workspace if enabled
+  const filteredTasks = filterCurrentWorkspace && currentWorkspaceId
+    ? tasks.filter(task => {
+        const workspace = getTaskWorkspace(task);
+        return workspace?.id === currentWorkspaceId;
+      })
+    : tasks;
+
+  const activeTasks = filteredTasks.filter(t => t.status === 'Running' || t.status === 'Pending');
+  const completedTasks = filteredTasks.filter(t => t.status === 'Completed');
+  const failedTasks = filteredTasks.filter(t => t.status === 'Failed');
 
   const handleCopyTaskOutput = async (task: Task) => {
     try {
@@ -60,44 +84,61 @@ export function TaskList({ tasks, onTaskDelete, onRefresh }: TaskListProps) {
     }
   };
 
-  const renderTask = (task: Task) => (
-    <Group
-      key={task.id}
-      gap="sm"
-      wrap="nowrap"
-      p="xs"
-      style={{
-        borderRadius: '8px',
-        backgroundColor: task.status === 'Completed' ? '#f1f3f5' : 'transparent',
-        transition: 'background-color 0.15s ease',
-      }}
-    >
-      {/* ステータスアイコン */}
-      <Text size="lg">{getTaskIcon(task.status)}</Text>
+  const renderTask = (task: Task) => {
+    const workspace = getTaskWorkspace(task);
 
-      {/* タスク内容 */}
-      <Box style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          size="sm"
-          truncate
-          fw={task.status === 'Running' ? 600 : 400}
+    return (
+      <Tooltip
+        label={workspace ? `Working Dir: ${workspace.rootPath}` : 'Workspace not found'}
+        withArrow
+        position="top"
+      >
+        <Group
+          key={task.id}
+          gap="sm"
+          wrap="nowrap"
+          p="xs"
           style={{
-            textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
-            color: task.status === 'Completed' ? '#868e96' : task.status === 'Failed' ? '#fa5252' : undefined,
+            borderRadius: '8px',
+            backgroundColor: task.status === 'Completed' ? '#f1f3f5' : 'transparent',
+            transition: 'background-color 0.15s ease',
+            cursor: 'default',
           }}
         >
-          {task.title}
-        </Text>
-        <Group gap="xs" mt={2}>
-          <Text size="xs" c="dimmed">
-            {task.steps_executed} steps
-          </Text>
-          <Text size="xs" c="dimmed">•</Text>
-          <Text size="xs" c="dimmed">
-            {formatDate(task.updated_at)}
-          </Text>
-        </Group>
-      </Box>
+          {/* ステータスアイコン */}
+          <Text size="lg">{getTaskIcon(task.status)}</Text>
+
+          {/* タスク内容 */}
+          <Box style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              size="sm"
+              truncate
+              fw={task.status === 'Running' ? 600 : 400}
+              style={{
+                textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
+                color: task.status === 'Completed' ? '#868e96' : task.status === 'Failed' ? '#fa5252' : undefined,
+              }}
+            >
+              {task.title}
+            </Text>
+            <Group gap="xs" mt={2}>
+              {workspace && (
+                <>
+                  <Badge size="xs" variant="light" color="blue">
+                    {workspace.name}
+                  </Badge>
+                  <Text size="xs" c="dimmed">•</Text>
+                </>
+              )}
+              <Text size="xs" c="dimmed">
+                {task.steps_executed} steps
+              </Text>
+              <Text size="xs" c="dimmed">•</Text>
+              <Text size="xs" c="dimmed">
+                {formatDate(task.updated_at)}
+              </Text>
+            </Group>
+          </Box>
 
       {/* コピーボタン */}
       {(task.status === 'Completed' || task.status === 'Failed') && (
@@ -116,17 +157,19 @@ export function TaskList({ tasks, onTaskDelete, onRefresh }: TaskListProps) {
         </Tooltip>
       )}
 
-      {/* 削除ボタン */}
-      <ActionIcon
-        size="sm"
-        variant="subtle"
-        color="red"
-        onClick={() => onTaskDelete?.(task.id)}
-      >
-        🗑️
-      </ActionIcon>
-    </Group>
-  );
+          {/* 削除ボタン */}
+          <ActionIcon
+            size="sm"
+            variant="subtle"
+            color="red"
+            onClick={() => onTaskDelete?.(task.id)}
+          >
+            🗑️
+          </ActionIcon>
+        </Group>
+      </Tooltip>
+    );
+  };
 
   return (
     <Stack gap="md" h="100%">
@@ -151,6 +194,18 @@ export function TaskList({ tasks, onTaskDelete, onRefresh }: TaskListProps) {
           </Tooltip>
         </Group>
       </Group>
+
+      {/* フィルタオプション */}
+      {currentWorkspaceId && (
+        <Box px="md">
+          <Switch
+            size="xs"
+            label="Current Workspace Only"
+            checked={filterCurrentWorkspace}
+            onChange={(e) => setFilterCurrentWorkspace(e.currentTarget.checked)}
+          />
+        </Box>
+      )}
 
       {/* タスクリスト */}
       <ScrollArea style={{ flex: 1 }} px="sm">

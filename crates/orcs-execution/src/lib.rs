@@ -126,6 +126,7 @@ impl TaskExecutor {
     ///
     /// * `session_id` - The session ID where this task is being executed
     /// * `message_content` - The message content to execute as a task
+    /// * `workspace_root` - Optional workspace root path where the task should execute
     ///
     /// # Returns
     ///
@@ -135,9 +136,19 @@ impl TaskExecutor {
         &self,
         session_id: String,
         message_content: String,
+        workspace_root: Option<std::path::PathBuf>,
     ) -> Result<String, OrcsError> {
         tracing::info!("TaskExecutor: Executing task from message with ParallelOrchestrator");
         tracing::debug!("Task content: {}", message_content.chars().take(200).collect::<String>());
+
+        if let Some(ref root) = workspace_root {
+            tracing::info!("Task will execute in workspace: {}", root.display());
+        } else {
+            tracing::info!("Task will execute without specific workspace root");
+        }
+
+        // TODO: Pass workspace_root to ClaudeCodeAgent for execution in specific directory
+        // Currently, the agent uses the default working directory
 
         // Generate task ID and timestamps
         let task_id = Uuid::new_v4().to_string();

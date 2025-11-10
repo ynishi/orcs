@@ -107,13 +107,15 @@ export function ChatPanel({
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previousMessageCount = useRef<number>(0);
+  const previousTabId = useRef<string>(tab.id);
 
-  // Auto-scroll to bottom when new messages are added (not on tab switch)
+  // Auto-scroll to bottom when new messages are added or tab is newly opened
   useEffect(() => {
     const currentMessageCount = tab.messages.length;
+    const isNewTab = tab.id !== previousTabId.current;
 
-    // Only scroll if message count increased (new message added or tab first opened)
-    if (currentMessageCount > previousMessageCount.current && viewport.current) {
+    // Scroll if: (1) message count increased, OR (2) tab changed (new tab opened)
+    if ((currentMessageCount > previousMessageCount.current || isNewTab) && viewport.current) {
       viewport.current.scrollTo({
         top: viewport.current.scrollHeight,
         behavior: 'smooth',
@@ -121,7 +123,8 @@ export function ChatPanel({
     }
 
     previousMessageCount.current = currentMessageCount;
-  }, [tab.messages]);
+    previousTabId.current = tab.id;
+  }, [tab.messages, tab.id]);
 
   const getThreadAsText = (): string => {
     return tab.messages

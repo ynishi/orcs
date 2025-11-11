@@ -128,24 +128,33 @@ export function ChatPanel({
           sessionId: tab.id,
         });
 
-        // If no config exists, set default
+        // If no config exists, set default and save to backend
         if (!config) {
-          setAutoChatConfig({
+          const defaultConfig: AutoChatConfig = {
             max_iterations: 5,
             stop_condition: 'iteration_count',
             web_search_enabled: true,
+          };
+          setAutoChatConfig(defaultConfig);
+
+          // Save default config to backend
+          await invoke('update_auto_chat_config', {
+            sessionId: tab.id,
+            config: defaultConfig,
           });
+          console.log('[ChatPanel] Saved default AutoChat config to backend');
         } else {
           setAutoChatConfig(config);
         }
       } catch (error) {
         console.error('[ChatPanel] Failed to load AutoChat config:', error);
         // Set default on error
-        setAutoChatConfig({
+        const defaultConfig: AutoChatConfig = {
           max_iterations: 5,
           stop_condition: 'iteration_count',
           web_search_enabled: true,
-        });
+        };
+        setAutoChatConfig(defaultConfig);
       }
     };
 
@@ -236,7 +245,8 @@ export function ChatPanel({
         autoChatPollingRef.current = null;
       }
     };
-  }, [autoMode, tab.id, tab.input, tab.attachedFiles, onAutoModeChange]); // Re-run when autoMode changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoMode, tab.id, onAutoModeChange]); // Only re-run when autoMode/tab.id changes, NOT when input changes
 
   // Auto-scroll to bottom when new messages are added or tab is first opened
   useEffect(() => {

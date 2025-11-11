@@ -1376,6 +1376,16 @@ impl InteractionManager {
                 config.max_iterations
             );
 
+            // For iteration 2+, send system message notification
+            if current_iteration >= 2 {
+                let continuation_message = DialogueMessage {
+                    session_id: self.session_id().to_string(),
+                    author: "System".to_string(),
+                    content: "🔄 AutoMode: Discussion を続けましょう".to_string(),
+                };
+                on_turn(&continuation_message);
+            }
+
             // First iteration: use initial_input and file_paths
             // Subsequent iterations: continuation prompt (agents continue based on context)
             let input_for_this_iteration = if current_iteration == 1 {

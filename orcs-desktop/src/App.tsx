@@ -256,12 +256,15 @@ function App() {
           case 'Chunk': {
             console.log('[STREAM] Adding message chunk:', turn.author);
 
-            // Find persona by name to get icon and base_color
-            const persona = personasRef.current.find(p => p.name === turn.author);
+            // Determine message type: System messages vs AI messages
+            const isSystemMessage = turn.author === 'System';
+
+            // Find persona by name to get icon and base_color (only for AI messages)
+            const persona = !isSystemMessage ? personasRef.current.find(p => p.name === turn.author) : undefined;
 
             const newMessage: Message = {
               id: `${Date.now()}-${Math.random()}`,
-              type: 'ai',
+              type: isSystemMessage ? 'system' : 'ai',
               author: turn.author,
               text: turn.content,
               timestamp: new Date(),

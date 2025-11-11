@@ -115,8 +115,8 @@ export function ChatPanel({
   const previousTabId = useRef<string>(''); // Empty string to detect first render
   const hasScrolledForTab = useRef<Set<string>>(new Set()); // Track which tabs have been scrolled
 
-  // TabContext for adding messages
-  const { addMessageToTab, setTabThinking } = useTabContext();
+  // TabContext for adding messages and managing tab state
+  const { addMessageToTab, setTabThinking, updateTabInput, updateTabAttachedFiles } = useTabContext();
 
   // AutoChat settings state
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
@@ -189,20 +189,26 @@ export function ChatPanel({
     }
 
     // Turn on AutoChat and start
-    const input = tab.input.trim() || 'Continue the discussion.';
+    const input = tab.input.trim();
     const filePaths = tab.attachedFiles.length > 0 ? tab.attachedFiles.map(f => f.name) : undefined;
 
     console.log('[ChatPanel] Starting AutoChat with input:', input);
 
-    // Add user message (入力内容を表示)
-    const userMessage: Message = {
-      id: `${Date.now()}-${Math.random()}`,
-      type: 'user',
-      author: userNickname,
-      text: input,
-      timestamp: new Date(),
-    };
-    addMessageToTab(tab.id, userMessage);
+    // Clear input and attached files (same as normal send)
+    updateTabInput(tab.id, '');
+    updateTabAttachedFiles(tab.id, []);
+
+    // Add user message ONLY if user actually entered something
+    if (input) {
+      const userMessage: Message = {
+        id: `${Date.now()}-${Math.random()}`,
+        type: 'user',
+        author: userNickname,
+        text: input,
+        timestamp: new Date(),
+      };
+      addMessageToTab(tab.id, userMessage);
+    }
 
     // Add system message (AutoChat開始通知)
     const maxIterations = autoChatConfig?.max_iterations || 5;

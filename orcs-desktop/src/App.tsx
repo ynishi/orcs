@@ -1034,6 +1034,50 @@ function App() {
     });
   };
 
+  // ワークスペースファイルから新規セッションを作成するハンドラー
+  const handleNewSessionWithFile = async (file: File) => {
+    if (!workspace) {
+      addMessage('error', 'System', 'No workspace selected');
+      return;
+    }
+
+    try {
+      // 1. Create new session
+      const { invoke } = await import('@tauri-apps/api/core');
+      const newSession = await invoke<Session>('create_session', {
+        workspaceId: workspace.id,
+      });
+
+      console.log('[handleNewSessionWithFile] Created new session:', newSession.id);
+
+      // 2. Refresh sessions list to include the new session
+      await refreshSessions();
+
+      // 3. Get full session data (needed for openTab)
+      const fullSession = await switchSession(newSession.id);
+      const restoredMessages = convertSessionToMessages(fullSession, userNickname);
+
+      // 4. Open tab directly and get tabId
+      const tabId = openTab(fullSession, restoredMessages, workspace.id);
+      console.log('[handleNewSessionWithFile] Opened tab:', tabId);
+
+      // 5. Attach file to the newly created tab
+      addAttachedFileToTab(tabId, file);
+      console.log('[handleNewSessionWithFile] Attached file:', file.name);
+
+      // 6. Show notification
+      notifications.show({
+        title: 'New Session with File',
+        message: `Created session with ${file.name}`,
+        color: 'blue',
+        icon: '📎',
+      });
+    } catch (error) {
+      console.error('Failed to create session with file:', error);
+      addMessage('error', 'System', `Failed to create new session: ${error}`);
+    }
+  };
+
   // ワークスペースファイルからセッションに移動するハンドラー
   const handleGoToSessionFromFile = (sessionId: string, messageTimestamp?: string) => {
     const session = sessions.find(s => s.id === sessionId);
@@ -1554,6 +1598,7 @@ function App() {
           includeWorkspaceInPrompt={includeWorkspaceInPrompt}
           onToggleIncludeWorkspaceInPrompt={setIncludeWorkspaceInPrompt}
           onGoToSession={handleGoToSessionFromFile}
+          onNewSessionWithFile={handleNewSessionWithFile}
           onRefreshWorkspace={refreshWorkspace}
           onMessage={addMessage}
           onSlashCommandsUpdated={refreshCustomCommands}

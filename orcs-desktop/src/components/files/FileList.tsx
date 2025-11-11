@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton } from '@mantine/core';
-import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical } from '@tabler/icons-react';
+import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { UploadedFile } from '../../types/workspace';
 
@@ -10,9 +10,10 @@ interface FileListProps {
   onRenameFile?: (file: UploadedFile, newName: string) => void;
   onDeleteFile?: (file: UploadedFile) => void;
   onGoToSession?: (file: UploadedFile) => void;
+  onNewSessionWithFile?: (file: UploadedFile) => void;
 }
 
-export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession }: FileListProps) {
+export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession, onNewSessionWithFile }: FileListProps) {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
@@ -138,6 +139,15 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
                     <Menu.Divider />
                   </>
                 )}
+
+                {/* New chat with this file */}
+                <Menu.Item
+                  leftSection={<IconMessagePlus size={14} />}
+                  color="blue"
+                  onClick={() => onNewSessionWithFile?.(file)}
+                >
+                  New chat with this file
+                </Menu.Item>
 
                 {/* Attach to chat */}
                 <Menu.Item

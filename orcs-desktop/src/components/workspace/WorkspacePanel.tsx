@@ -12,10 +12,11 @@ interface WorkspacePanelProps {
   includeInPrompt?: boolean;
   onToggleIncludeInPrompt?: (value: boolean) => void;
   onGoToSession?: (sessionId: string, messageTimestamp?: string) => void;
+  onNewSessionWithFile?: (file: File) => void;
   onRefresh?: () => Promise<void>;
 }
 
-export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession, onRefresh }: WorkspacePanelProps) {
+export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession, onNewSessionWithFile, onRefresh }: WorkspacePanelProps) {
   const { workspace, files, isLoading, error, refresh } = useWorkspace();
 
   // Keep local list in sync and notify parent consumers when provided
@@ -136,6 +137,30 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
   const handleGoToSession = (file: UploadedFile) => {
     if (file.sessionId) {
       onGoToSession?.(file.sessionId, file.messageTimestamp);
+    }
+  };
+
+  // Handle creating new session with file
+  const handleNewSessionWithFile = async (file: UploadedFile) => {
+    try {
+      // Read file content from workspace
+      const fileData = await invoke<number[]>('read_workspace_file', {
+        filePath: file.path,
+      });
+
+      // Convert to Uint8Array then to Blob
+      const uint8Array = new Uint8Array(fileData);
+      const blob = new Blob([uint8Array], { type: file.mimeType });
+
+      // Create a File object
+      const browserFile = new File([blob], file.name, {
+        type: file.mimeType,
+      });
+
+      // Call the callback to create new session with file
+      onNewSessionWithFile?.(browserFile);
+    } catch (err) {
+      console.error('Failed to create new session with file:', err);
     }
   };
 
@@ -322,6 +347,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
           onRenameFile={handleRenameFile}
           onDeleteFile={handleDeleteFile}
           onGoToSession={handleGoToSession}
+          onNewSessionWithFile={handleNewSessionWithFile}
         />
       </ScrollArea>
     </Stack>

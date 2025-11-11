@@ -125,7 +125,7 @@ export function ChatPanel({
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         const config = await invoke<AutoChatConfig | null>('get_auto_chat_config', {
-          sessionId: tab.id,
+          sessionId: tab.sessionId,
         });
 
         // If no config exists, set default and save to backend
@@ -139,7 +139,7 @@ export function ChatPanel({
 
           // Save default config to backend
           await invoke('update_auto_chat_config', {
-            sessionId: tab.id,
+            sessionId: tab.sessionId,
             config: defaultConfig,
           });
           console.log('[ChatPanel] Saved default AutoChat config to backend');
@@ -159,7 +159,7 @@ export function ChatPanel({
     };
 
     loadAutoChatConfig();
-  }, [tab.id]); // Reload when tab changes
+  }, [tab.sessionId]); // Reload when tab changes
 
   const handleSaveAutoChatConfig = async (config: AutoChatConfig) => {
     setAutoChatConfig(config);
@@ -167,7 +167,7 @@ export function ChatPanel({
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       await invoke('update_auto_chat_config', {
-        sessionId: tab.id,
+        sessionId: tab.sessionId,
         config,
       });
       console.log('[ChatPanel] AutoChat config saved successfully');
@@ -203,7 +203,7 @@ export function ChatPanel({
         autoChatPollingRef.current = setInterval(async () => {
           try {
             const iteration = await invoke<number | null>('get_auto_chat_status', {
-              sessionId: tab.id,
+              sessionId: tab.sessionId,
             });
             setAutoChatIteration(iteration ?? undefined);
 
@@ -246,7 +246,7 @@ export function ChatPanel({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMode, tab.id, onAutoModeChange]); // Only re-run when autoMode/tab.id changes, NOT when input changes
+  }, [autoMode, tab.sessionId, onAutoModeChange]); // Only re-run when autoMode/sessionId changes, NOT when input changes
 
   // Auto-scroll to bottom when new messages are added or tab is first opened
   useEffect(() => {

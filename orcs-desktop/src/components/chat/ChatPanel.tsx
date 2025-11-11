@@ -117,22 +117,53 @@ export function ChatPanel({
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
   const [autoChatConfig, setAutoChatConfig] = useState<AutoChatConfig | null>(null);
 
-  // TODO: Load autoChatConfig from session when backend is ready
-  // For now, use default config
+  // Load AutoChat config from backend when tab changes
   useEffect(() => {
-    if (!autoChatConfig) {
-      setAutoChatConfig({
-        max_iterations: 5,
-        stop_condition: 'iteration_count',
-        web_search_enabled: true,
-      });
-    }
-  }, [autoChatConfig]);
+    const loadAutoChatConfig = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const config = await invoke<AutoChatConfig | null>('get_auto_chat_config', {
+          sessionId: tab.id,
+        });
 
-  const handleSaveAutoChatConfig = (config: AutoChatConfig) => {
+        // If no config exists, set default
+        if (!config) {
+          setAutoChatConfig({
+            max_iterations: 5,
+            stop_condition: 'iteration_count',
+            web_search_enabled: true,
+          });
+        } else {
+          setAutoChatConfig(config);
+        }
+      } catch (error) {
+        console.error('[ChatPanel] Failed to load AutoChat config:', error);
+        // Set default on error
+        setAutoChatConfig({
+          max_iterations: 5,
+          stop_condition: 'iteration_count',
+          web_search_enabled: true,
+        });
+      }
+    };
+
+    loadAutoChatConfig();
+  }, [tab.id]); // Reload when tab changes
+
+  const handleSaveAutoChatConfig = async (config: AutoChatConfig) => {
     setAutoChatConfig(config);
-    // TODO: Save to backend via invoke('update_auto_chat_config', { sessionId: tab.id, config })
-    console.log('[ChatPanel] AutoChat config saved:', config);
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('update_auto_chat_config', {
+        sessionId: tab.id,
+        config,
+      });
+      console.log('[ChatPanel] AutoChat config saved successfully');
+    } catch (error) {
+      console.error('[ChatPanel] Failed to save AutoChat config:', error);
+      // TODO: Show error notification to user
+    }
   };
 
   // Auto-scroll to bottom when new messages are added or tab is first opened

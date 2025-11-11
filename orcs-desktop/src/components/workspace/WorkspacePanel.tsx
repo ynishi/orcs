@@ -11,7 +11,7 @@ interface WorkspacePanelProps {
   onAttachFile?: (file: File) => void;
   includeInPrompt?: boolean;
   onToggleIncludeInPrompt?: (value: boolean) => void;
-  onGoToSession?: (sessionId: string) => void;
+  onGoToSession?: (sessionId: string, messageTimestamp?: string) => void;
   onRefresh?: () => Promise<void>;
 }
 
@@ -135,7 +135,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
   // Handle navigating to session
   const handleGoToSession = (file: UploadedFile) => {
     if (file.sessionId) {
-      onGoToSession?.(file.sessionId);
+      onGoToSession?.(file.sessionId, file.messageTimestamp);
     }
   };
 

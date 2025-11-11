@@ -86,6 +86,7 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, works
   if (style.showBadge) {
     return (
       <Box
+        id={`message-${message.id}`}
         style={{
           display: 'flex',
           justifyContent: style.align === 'center' ? 'center' : 'flex-start',
@@ -185,6 +186,7 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, works
   // 通常のメッセージ（User, AI）
   return (
     <Box
+      id={`message-${message.id}`}
       style={{
         display: 'flex',
         justifyContent: style.align === 'right' ? 'flex-end' : 'flex-start',

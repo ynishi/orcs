@@ -37,7 +37,7 @@ interface NavbarProps {
   onAttachFile?: (file: File) => void;
   includeWorkspaceInPrompt?: boolean;
   onToggleIncludeWorkspaceInPrompt?: (value: boolean) => void;
-  onGoToSession?: (sessionId: string) => void;
+  onGoToSession?: (sessionId: string, messageTimestamp?: string) => void;
   onRefreshWorkspace?: () => Promise<void>;
 
   // Common

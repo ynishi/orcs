@@ -1035,10 +1035,54 @@ function App() {
   };
 
   // ワークスペースファイルからセッションに移動するハンドラー
-  const handleGoToSessionFromFile = (sessionId: string) => {
+  const handleGoToSessionFromFile = (sessionId: string, messageTimestamp?: string) => {
     const session = sessions.find(s => s.id === sessionId);
     if (session) {
       handleSessionSelect(session);
+
+      // If messageTimestamp is provided, scroll to that message after session loads
+      if (messageTimestamp) {
+        // Retry mechanism to wait for DOM to be ready
+        const scrollToMessage = (attempt: number = 0) => {
+          const tab = tabs.find(t => t.sessionId === sessionId);
+
+          if (tab) {
+            // Find the message with matching timestamp (compare only up to milliseconds)
+            const targetTimestamp = messageTimestamp.substring(0, 23); // "2025-11-11T04:58:34.760"
+            const targetMessage = tab.messages.find(m => {
+              const msgTimestamp = m.timestamp.toISOString().substring(0, 23);
+              return msgTimestamp === targetTimestamp;
+            });
+
+            if (targetMessage) {
+              // Search for message element by timestamp prefix (since message IDs include random suffix)
+              const allMessageElements = document.querySelectorAll('[id^="message-"]');
+
+              // Find element whose ID contains the target timestamp
+              let messageElement: Element | null = null;
+              for (const element of allMessageElements) {
+                if (element.id.includes(targetTimestamp)) {
+                  messageElement = element;
+                  break;
+                }
+              }
+
+              if (messageElement) {
+                messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } else if (attempt < 10) {
+                // Retry after 200ms if element not found yet (max 10 attempts = 2 seconds)
+                setTimeout(() => scrollToMessage(attempt + 1), 200);
+              }
+            }
+          } else if (attempt < 10) {
+            // Tab not ready yet, retry
+            setTimeout(() => scrollToMessage(attempt + 1), 200);
+          }
+        };
+
+        // Start attempting after initial delay
+        setTimeout(() => scrollToMessage(0), 300);
+      }
     } else {
       addMessage('error', 'System', `Session not found: ${sessionId}`);
     }

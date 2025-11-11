@@ -862,7 +862,15 @@ pub async fn start_auto_chat(
 
     tracing::info!("[AutoChat] Starting with input: {}", input.chars().take(50).collect::<String>());
 
+    // Get config for progress tracking
+    let config = manager.get_auto_chat_config().await;
+    let max_iterations = config.as_ref().map(|c| c.max_iterations).unwrap_or(5);
+    let session_id = manager.session_id().to_string();
+
     let app_clone = app.clone();
+    let app_clone2 = app.clone();
+    let session_id_clone = session_id.clone();
+
     let result = manager
         .execute_auto_chat(&input, file_paths, move |turn| {
             use orcs_interaction::{StreamingDialogueTurn, StreamingDialogueTurnKind};
@@ -880,10 +888,22 @@ pub async fn start_auto_chat(
             if let Err(e) = app_clone.emit("dialogue-turn", streaming_turn) {
                 eprintln!("[TAURI] Failed to emit dialogue-turn event: {}", e);
             }
-
-            // Note: Iteration counter updates are polled by frontend via get_auto_chat_status
         })
         .await;
+
+    // Emit AutoChat completion event
+    use orcs_interaction::{StreamingDialogueTurn, StreamingDialogueTurnKind};
+    let completion_event = StreamingDialogueTurn {
+        session_id: session_id_clone.clone(),
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        kind: StreamingDialogueTurnKind::AutoChatComplete {
+            total_iterations: max_iterations,
+        },
+    };
+
+    if let Err(e) = app_clone2.emit("dialogue-turn", completion_event) {
+        eprintln!("[TAURI] Failed to emit AutoChat completion event: {}", e);
+    }
 
     // Save the session after AutoChat completes
     let app_mode = state.app_mode.lock().await.clone();

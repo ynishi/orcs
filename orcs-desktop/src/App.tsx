@@ -304,6 +304,29 @@ function App() {
             // Final turn just indicates completion, no action needed
             break;
 
+          case 'AutoChatProgress':
+            console.log('[STREAM] AutoChat progress:', turn.current_iteration, '/', turn.max_iterations);
+            // Update TabContext AutoChat iteration state
+            // TODO: Implement setTabAutoChatIteration call here
+            break;
+
+          case 'AutoChatComplete':
+            console.log('[STREAM] AutoChat completed:', turn.total_iterations, 'iterations');
+            // Turn off AutoChat mode
+            setAutoMode(false);
+
+            // Add system message to indicate completion
+            const completionMessage: Message = {
+              id: `${Date.now()}-${Math.random()}`,
+              type: 'system',
+              author: 'System',
+              text: `AutoChat completed after ${turn.total_iterations} iterations.`,
+              timestamp: new Date(),
+            };
+
+            addMessageToTabRef.current(targetTab.id, completionMessage);
+            break;
+
           default:
             console.warn('[STREAM] Unknown turn type:', (turn as any).type);
         }

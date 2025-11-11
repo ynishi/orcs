@@ -121,6 +121,18 @@ pub enum StreamingDialogueTurnKind {
         /// Error message to display
         message: String,
     },
+    /// AutoChat iteration progress update
+    AutoChatProgress {
+        /// Current iteration number (1-indexed)
+        current_iteration: u32,
+        /// Maximum iterations configured
+        max_iterations: u32,
+    },
+    /// AutoChat completion notification
+    AutoChatComplete {
+        /// Total iterations completed
+        total_iterations: u32,
+    },
 }
 
 /// Converts ORCS system_message_type string to llm-toolkit MessageType.

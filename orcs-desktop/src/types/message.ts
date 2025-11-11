@@ -23,6 +23,15 @@ export type StreamingDialogueTurnKind =
   | {
       type: 'Error';
       message: string;
+    }
+  | {
+      type: 'AutoChatProgress';
+      current_iteration: number;
+      max_iterations: number;
+    }
+  | {
+      type: 'AutoChatComplete';
+      total_iterations: number;
     };
 
 /**

@@ -116,6 +116,8 @@ export function ChatPanel({
   // AutoChat settings state
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
   const [autoChatConfig, setAutoChatConfig] = useState<AutoChatConfig | null>(null);
+  const [autoChatIteration, setAutoChatIteration] = useState<number | undefined>(undefined);
+  const autoChatPollingRef = useRef<number | null>(null);
 
   // Load AutoChat config from backend when tab changes
   useEffect(() => {
@@ -165,6 +167,76 @@ export function ChatPanel({
       // TODO: Show error notification to user
     }
   };
+
+  // Start AutoChat when autoMode changes to true
+  useEffect(() => {
+    if (!autoMode) {
+      // Stop polling when autoMode is off
+      if (autoChatPollingRef.current) {
+        clearInterval(autoChatPollingRef.current);
+        autoChatPollingRef.current = null;
+      }
+      setAutoChatIteration(undefined);
+      return;
+    }
+
+    // AutoMode turned ON - start AutoChat
+    const startAutoChat = async () => {
+      const input = tab.input.trim() || 'Continue the discussion.';
+      const filePaths = tab.attachedFiles.length > 0 ? tab.attachedFiles : undefined;
+
+      console.log('[ChatPanel] Starting AutoChat with input:', input);
+
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+
+        // Start polling iteration status
+        autoChatPollingRef.current = setInterval(async () => {
+          try {
+            const iteration = await invoke<number | null>('get_auto_chat_status', {
+              sessionId: tab.id,
+            });
+            setAutoChatIteration(iteration ?? undefined);
+
+            // Stop polling if iteration is null (AutoChat completed)
+            if (iteration === null && autoChatPollingRef.current) {
+              clearInterval(autoChatPollingRef.current);
+              autoChatPollingRef.current = null;
+              onAutoModeChange(false); // Turn off autoMode
+            }
+          } catch (error) {
+            console.error('[ChatPanel] Failed to poll AutoChat status:', error);
+          }
+        }, 500); // Poll every 500ms
+
+        // Start AutoChat (this is a long-running operation)
+        await invoke('start_auto_chat', {
+          input,
+          filePaths,
+        });
+
+        console.log('[ChatPanel] AutoChat completed');
+      } catch (error) {
+        console.error('[ChatPanel] AutoChat failed:', error);
+        onAutoModeChange(false); // Turn off autoMode on error
+
+        if (autoChatPollingRef.current) {
+          clearInterval(autoChatPollingRef.current);
+          autoChatPollingRef.current = null;
+        }
+      }
+    };
+
+    startAutoChat();
+
+    // Cleanup polling on unmount or when autoMode changes
+    return () => {
+      if (autoChatPollingRef.current) {
+        clearInterval(autoChatPollingRef.current);
+        autoChatPollingRef.current = null;
+      }
+    };
+  }, [autoMode, tab.id, tab.input, tab.attachedFiles, onAutoModeChange]); // Re-run when autoMode changes
 
   // Auto-scroll to bottom when new messages are added or tab is first opened
   useEffect(() => {
@@ -367,6 +439,8 @@ export function ChatPanel({
         conversationMode={conversationMode}
         talkStyle={talkStyle}
         executionStrategy={executionStrategy}
+        autoChatIteration={autoChatIteration}
+        autoChatMaxIterations={autoChatConfig?.max_iterations}
       />
 
       <AutoChatSettingsModal

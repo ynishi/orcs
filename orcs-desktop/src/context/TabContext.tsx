@@ -13,19 +13,23 @@ export interface SessionTab {
   sessionId: string; // 対応するセッションID
   workspaceId: string; // このタブが属するWorkspace ID
   title: string; // タブタイトル
-  
+
   // メッセージ関連
   messages: Message[]; // タブ固有のメッセージ履歴
-  
+
   // 入力フォーム状態
   input: string; // 入力中のテキスト
   attachedFiles: File[]; // 添付ファイル
-  
+
   // UI状態
   isDragging: boolean; // ドラッグ中かどうか
   isAiThinking: boolean; // AI思考中かどうか
   thinkingPersona: string; // 思考中のペルソナ名
-  
+
+  // AutoChat状態
+  autoMode: boolean; // AutoChatモードが有効かどうか
+  autoChatIteration: number | null; // 現在のAutoChat iteration番号 (null = 未実行)
+
   // メタデータ
   isDirty: boolean; // 未保存データがあるか
   lastAccessedAt: number; // 最終アクセス時刻 (タブ切り替え時に更新)
@@ -58,7 +62,11 @@ export interface TabContextValue {
   // UI状態
   setTabDragging: (tabId: string, isDragging: boolean) => void; // タブのドラッグ状態を更新
   setTabThinking: (tabId: string, isThinking: boolean, personaName?: string) => void; // タブのAI思考状態を更新
-  
+
+  // AutoChat状態
+  setTabAutoMode: (tabId: string, autoMode: boolean) => void; // タブのAutoMode状態を更新
+  setTabAutoChatIteration: (tabId: string, iteration: number | null) => void; // タブのAutoChat iteration状態を更新
+
   // ヘルパー
   getTab: (tabId: string) => SessionTab | undefined; // タブを取得
   getTabBySessionId: (sessionId: string) => SessionTab | undefined; // セッションIDからタブを取得
@@ -119,6 +127,10 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
         isDragging: false,
         isAiThinking: false,
         thinkingPersona: 'AI',
+
+        // AutoChat状態
+        autoMode: false,
+        autoChatIteration: null,
 
         // メタデータ
         isDirty: false,
@@ -300,6 +312,28 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   }, []);
 
   /**
+   * タブのAutoMode状態を更新
+   */
+  const setTabAutoMode = useCallback((tabId: string, autoMode: boolean) => {
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === tabId ? { ...tab, autoMode } : tab
+      )
+    );
+  }, []);
+
+  /**
+   * タブのAutoChat iteration状態を更新
+   */
+  const setTabAutoChatIteration = useCallback((tabId: string, iteration: number | null) => {
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === tabId ? { ...tab, autoChatIteration: iteration } : tab
+      )
+    );
+  }, []);
+
+  /**
    * タブを取得
    */
   const getTab = useCallback((tabId: string): SessionTab | undefined => {
@@ -398,7 +432,11 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       // UI状態
       setTabDragging,
       setTabThinking,
-      
+
+      // AutoChat状態
+      setTabAutoMode,
+      setTabAutoChatIteration,
+
       // ヘルパー
       getTab,
       getTabBySessionId,
@@ -424,6 +462,8 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       removeAttachedFileFromTab,
       setTabDragging,
       setTabThinking,
+      setTabAutoMode,
+      setTabAutoChatIteration,
       getTab,
       getTabBySessionId,
       getActiveTab,

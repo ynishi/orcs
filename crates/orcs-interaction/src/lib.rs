@@ -1119,7 +1119,7 @@ impl InteractionManager {
     pub async fn handle_input(&self, mode: &AppMode, input: &str) -> InteractionResult {
         match mode {
             AppMode::Idle => {
-                self.handle_idle_mode(input, None, None::<fn(&DialogueMessage)>)
+                self.handle_idle_mode(input, None, None::<fn(&DialogueMessage)>, true)
                     .await
             }
             AppMode::AwaitingConfirmation { plan } => {
@@ -1152,7 +1152,7 @@ impl InteractionManager {
     {
         match mode {
             AppMode::Idle => {
-                self.handle_idle_mode(input, file_paths, Some(on_turn))
+                self.handle_idle_mode(input, file_paths, Some(on_turn), true)
                     .await
             }
             AppMode::AwaitingConfirmation { plan } => {
@@ -1161,12 +1161,151 @@ impl InteractionManager {
         }
     }
 
+    /// Handles a system message that triggers dialogue continuation.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The system message content
+    /// * `on_turn` - Optional callback for streaming turns
+    async fn handle_system_message<F>(
+        &self,
+        message: &str,
+        on_turn: Option<F>,
+    ) -> InteractionResult
+    where
+        F: Fn(&DialogueMessage),
+    {
+        // Ensure dialogue is initialized
+        if let Err(e) = self.ensure_dialogue_initialized().await {
+            return InteractionResult::NewMessage(format!("Error initializing dialogue: {}", e));
+        }
+
+        // Add system message to history for persistence
+        self.add_system_conversation_message(
+            message.to_string(),
+            Some("system".to_string()),
+            None,
+        ).await;
+
+        // Send system message to UI via callback
+        if let Some(ref callback) = on_turn {
+            let system_msg = DialogueMessage {
+                session_id: self.session_id.clone(),
+                author: "System".to_string(),
+                content: message.to_string(),
+            };
+            callback(&system_msg);
+        }
+
+        // Run the dialogue with system speaker
+        let mut dialogue_guard = self.dialogue.lock().await;
+        let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
+
+        let speaker = Speaker::System;
+        let mut payload = Payload::new().with_message(speaker, message);
+
+        // Prepend conversation mode system instruction if available
+        let conversation_mode = self.conversation_mode.read().await;
+        if let Some(instruction) = conversation_mode.system_instruction() {
+            payload = payload.prepend_system(instruction);
+        }
+        drop(conversation_mode);
+
+        // Create a partial session for incremental turn processing
+        let mut session = dialogue.partial_session(payload);
+        let mut messages = Vec::new();
+
+        // Process each turn as it becomes available
+        while let Some(result) = session.next_turn().await {
+            match result {
+                Ok(turn) => {
+                    let speaker_name = turn.speaker.name();
+                    let preview: String = turn.content.chars().take(50).collect();
+                    tracing::debug!(
+                        "[DIALOGUE] Turn received: {} - {}...",
+                        speaker_name,
+                        preview
+                    );
+
+                    // Convert speaker name to persona_id (UUID)
+                    let persona_id = self
+                        .get_persona_id_by_name(speaker_name).await
+                        .unwrap_or_else(|| speaker_name.to_string());
+
+                    // Add each response to history using persona_id
+                    self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content)
+                        .await;
+
+                    // Create DialogueMessage for UI display
+                    let message = DialogueMessage {
+                        session_id: self.session_id.clone(),
+                        author: speaker_name.to_string(),
+                        content: turn.content.clone(),
+                    };
+
+                    // Call the streaming callback if provided
+                    if let Some(ref callback) = on_turn {
+                        callback(&message);
+                    }
+
+                    messages.push(message);
+                }
+                Err(e) => {
+                    tracing::error!("[DIALOGUE] Agent execution failed: {}", e);
+
+                    let error_msg = format!("{}\n\nPlease check the logs for more details.", e);
+
+                    // Emit error as a system message via callback if provided
+                    if let Some(ref callback) = on_turn {
+                        let error_turn = DialogueMessage {
+                            session_id: self.session_id.clone(),
+                            author: String::new(),
+                            content: error_msg.clone(),
+                        };
+                        callback(&error_turn);
+                    }
+
+                    // Add error to history for persistence with metadata
+                    let error_history = ConversationMessage {
+                        role: MessageRole::System,
+                        content: error_msg.clone(),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                        metadata: MessageMetadata {
+                            system_event_type: None,
+                            error_severity: Some(ErrorSeverity::Critical),
+                            system_message_type: None,
+                            include_in_dialogue: true,
+                        },
+                    };
+                    self.persona_histories
+                        .write()
+                        .await
+                        .entry("Error".to_string())
+                        .or_insert_with(Vec::new)
+                        .push(error_history);
+
+                    return InteractionResult::NewDialogueMessages(Vec::new());
+                }
+            }
+        }
+
+        InteractionResult::NewDialogueMessages(messages)
+    }
+
     /// Handles input when in Idle mode.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input text to process
+    /// * `file_paths` - Optional file attachments
+    /// * `on_turn` - Optional callback for streaming turns
+    /// * `add_to_history` - Whether to add the input to user history (default: true)
     async fn handle_idle_mode<F>(
         &self,
         input: &str,
         file_paths: Option<Vec<String>>,
         on_turn: Option<F>,
+        add_to_history: bool,
     ) -> InteractionResult
     where
         F: Fn(&DialogueMessage),
@@ -1182,9 +1321,12 @@ impl InteractionManager {
         }
 
         // Add user input to history BEFORE running dialogue (so timestamp is correct)
+        // Only if add_to_history is true (to avoid adding internal prompts like "Continue the discussion.")
         let user_name = self.user_service.get_user_name();
-        self.add_to_history(&user_name, MessageRole::User, input)
-            .await;
+        if add_to_history {
+            self.add_to_history(&user_name, MessageRole::User, input)
+                .await;
+        }
         let user_name_str = if user_name.to_lowercase() == "you" {
             tracing::warn!(
                 "[InteractionManager] Detected user name 'You', which may cause speaker attribution issues."
@@ -1376,38 +1518,27 @@ impl InteractionManager {
                 config.max_iterations
             );
 
-            // For iteration 2+, send system message notification
-            if current_iteration >= 2 {
-                let continuation_message = DialogueMessage {
-                    session_id: self.session_id().to_string(),
-                    author: "System".to_string(),
-                    content: "🔄 AutoMode: Discussion を続けましょう".to_string(),
-                };
-                on_turn(&continuation_message);
+            // Execute dialogue iteration
+            if current_iteration == 1 {
+                // First iteration: use user's actual input
+                last_result = self
+                    .handle_idle_mode(
+                        initial_input,
+                        file_paths.clone(),
+                        Some(&on_turn),
+                        true,  // Add to history
+                    )
+                    .await;
+            } else {
+                // Iteration 2+: Send system message to continue the discussion
+                let continuation_content = "🔄 AutoMode: Discussion を続けましょう".to_string();
+                last_result = self
+                    .handle_system_message(
+                        &continuation_content,
+                        Some(&on_turn),
+                    )
+                    .await;
             }
-
-            // First iteration: use initial_input and file_paths
-            // Subsequent iterations: continuation prompt (agents continue based on context)
-            let input_for_this_iteration = if current_iteration == 1 {
-                initial_input
-            } else {
-                "Continue the discussion." // Continuation prompt for subsequent iterations
-            };
-
-            let files_for_this_iteration = if current_iteration == 1 {
-                file_paths.clone()
-            } else {
-                None
-            };
-
-            // Execute one iteration (dialogue round)
-            last_result = self
-                .handle_idle_mode(
-                    input_for_this_iteration,
-                    files_for_this_iteration,
-                    Some(&on_turn),
-                )
-                .await;
 
             // Optional: Add delay between iterations to avoid overwhelming the UI
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -1425,6 +1556,14 @@ impl InteractionManager {
         self.set_auto_chat_iteration(None).await;
 
         tracing::info!("[AutoChat] Completed after {} iterations", current_iteration);
+
+        // Persist AutoChat completion message to session history
+        let completion_content = format!("✅ AutoChat completed after {} iterations.", current_iteration);
+        self.add_system_conversation_message(
+            completion_content,
+            Some("auto_chat_completion".to_string()),
+            None,
+        ).await;
 
         last_result
     }

@@ -7,12 +7,12 @@ use tempfile::TempDir;
 async fn test_get_all_personas_empty() {
     // Use temporary directory for test
     let temp_dir = TempDir::new().unwrap();
-    let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+    let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
         .await
         .unwrap();
 
     // Should return empty vec for non-existent personas
-    let personas = repo.get_all().expect("Should load personas");
+    let personas = repo.get_all().await.expect("Should load personas");
     assert!(personas.is_empty(), "Should have no personas initially");
 }
 
@@ -20,7 +20,7 @@ async fn test_get_all_personas_empty() {
 async fn test_save_and_load_personas() {
     // Use temporary directory for test
     let temp_dir = TempDir::new().unwrap();
-    let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+    let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
         .await
         .unwrap();
 
@@ -55,10 +55,10 @@ async fn test_save_and_load_personas() {
     ];
 
     // Save personas
-    repo.save_all(&test_personas).expect("Should save personas");
+    repo.save_all(&test_personas).await.expect("Should save personas");
 
     // Load personas
-    let loaded_personas = repo.get_all().expect("Should load personas");
+    let loaded_personas = repo.get_all().await.expect("Should load personas");
 
     // Verify
     assert_eq!(loaded_personas.len(), 2, "Should load 2 personas");
@@ -76,7 +76,7 @@ async fn test_save_and_load_personas() {
 async fn test_persona_fields() {
     // Use temporary directory for test
     let temp_dir = TempDir::new().unwrap();
-    let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+    let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
         .await
         .unwrap();
 
@@ -96,10 +96,10 @@ async fn test_persona_fields() {
     };
 
     // Save
-    repo.save_all(&[test_persona]).expect("Should save persona");
+    repo.save_all(&[test_persona]).await.expect("Should save persona");
 
     // Load and verify fields
-    let personas = repo.get_all().expect("Should load personas");
+    let personas = repo.get_all().await.expect("Should load personas");
     assert_eq!(personas.len(), 1);
 
     let persona = &personas[0];
@@ -119,7 +119,7 @@ async fn test_persona_fields() {
 async fn test_multiple_personas_stored_separately() {
     // Use temporary directory for test
     let temp_dir = TempDir::new().unwrap();
-    let repo = AsyncDirPersonaRepository::new(temp_dir.path())
+    let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
         .await
         .unwrap();
 
@@ -154,14 +154,14 @@ async fn test_multiple_personas_stored_separately() {
 
     // Save first persona
     repo.save_all(&[persona1.clone()])
-        .expect("Should save first persona");
+        .await.expect("Should save first persona");
 
     // Save second persona
     repo.save_all(&[persona2.clone()])
-        .expect("Should save second persona");
+        .await.expect("Should save second persona");
 
     // Load all personas
-    let personas = repo.get_all().expect("Should load personas");
+    let personas = repo.get_all().await.expect("Should load personas");
     assert_eq!(personas.len(), 2, "Should have 2 personas");
 
     // Verify both personas exist

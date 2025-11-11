@@ -214,6 +214,10 @@ mod tests {
             participant_colors: HashMap::new(),
             conversation_mode: Default::default(),
             talk_style: None,
+            is_favorite: false,
+            is_archived: false,
+            sort_order: None,
+            auto_chat_config: None,
         }
     }
 

@@ -842,3 +842,52 @@ pub async fn get_auto_chat_status(
 
     Ok(manager.get_auto_chat_iteration().await)
 }
+
+/// Starts AutoChat mode with the given initial input.
+///
+/// This will execute multiple dialogue iterations automatically based on the
+/// session's AutoChat configuration.
+#[tauri::command]
+pub async fn start_auto_chat(
+    input: String,
+    file_paths: Option<Vec<String>>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SerializableInteractionResult, String> {
+    let manager = state
+        .session_manager
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    tracing::info!("[AutoChat] Starting with input: {}", input.chars().take(50).collect::<String>());
+
+    let app_clone = app.clone();
+    let result = manager
+        .execute_auto_chat(&input, file_paths, move |turn| {
+            use orcs_interaction::{StreamingDialogueTurn, StreamingDialogueTurnKind};
+
+            // Convert DialogueMessage to StreamingDialogueTurn for frontend
+            let streaming_turn = StreamingDialogueTurn {
+                session_id: turn.session_id.clone(),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                kind: StreamingDialogueTurnKind::Chunk {
+                    author: turn.author.clone(),
+                    content: turn.content.clone(),
+                },
+            };
+
+            if let Err(e) = app_clone.emit("dialogue-turn", streaming_turn) {
+                eprintln!("[TAURI] Failed to emit dialogue-turn event: {}", e);
+            }
+
+            // Note: Iteration counter updates are polled by frontend via get_auto_chat_status
+        })
+        .await;
+
+    // Save the session after AutoChat completes
+    let app_mode = state.app_mode.lock().await.clone();
+    let _ = state.session_manager.save_active_session(app_mode).await;
+
+    Ok(result.into())
+}

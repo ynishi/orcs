@@ -1298,6 +1298,115 @@ impl InteractionManager {
         InteractionResult::NewDialogueMessages(messages)
     }
 
+    /// Executes AutoChat mode: runs multiple dialogue iterations automatically.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_input` - The user's initial input to start the auto-chat
+    /// * `file_paths` - Optional list of file paths to attach (only for initial input)
+    /// * `on_turn` - Callback function called for each dialogue turn as it becomes available
+    ///
+    /// # Returns
+    ///
+    /// Returns an `InteractionResult` indicating the outcome.
+    ///
+    /// # AutoChat Behavior
+    ///
+    /// - Iteration 1: Uses `initial_input` from the user
+    /// - Iteration 2+: Uses empty string (agents continue discussion based on context)
+    /// - Stops when: max_iterations reached OR user calls stop (via set_auto_chat_iteration(None))
+    pub async fn execute_auto_chat<F>(
+        &self,
+        initial_input: &str,
+        file_paths: Option<Vec<String>>,
+        on_turn: F,
+    ) -> InteractionResult
+    where
+        F: Fn(&DialogueMessage),
+    {
+        // Get AutoChat configuration
+        let config = match self.get_auto_chat_config().await {
+            Some(cfg) => cfg,
+            None => {
+                tracing::warn!("[AutoChat] No AutoChat config found, aborting");
+                return InteractionResult::NewMessage(
+                    "AutoChat is not configured for this session".to_string(),
+                );
+            }
+        };
+
+        tracing::info!(
+            "[AutoChat] Starting with max_iterations={}, stop_condition={:?}",
+            config.max_iterations,
+            config.stop_condition
+        );
+
+        // Set initial iteration
+        self.set_auto_chat_iteration(Some(0)).await;
+
+        let mut current_iteration = 0;
+        let mut last_result = InteractionResult::NoOp;
+
+        while current_iteration < config.max_iterations {
+            // Check if user manually stopped (set_auto_chat_iteration(None))
+            if self.get_auto_chat_iteration().await.is_none() {
+                tracing::info!("[AutoChat] Manually stopped by user");
+                break;
+            }
+
+            // Update iteration counter
+            current_iteration += 1;
+            self.set_auto_chat_iteration(Some(current_iteration)).await;
+
+            tracing::info!(
+                "[AutoChat] Iteration {}/{}",
+                current_iteration,
+                config.max_iterations
+            );
+
+            // First iteration: use initial_input and file_paths
+            // Subsequent iterations: continuation prompt (agents continue based on context)
+            let input_for_this_iteration = if current_iteration == 1 {
+                initial_input
+            } else {
+                "Continue the discussion." // Continuation prompt for subsequent iterations
+            };
+
+            let files_for_this_iteration = if current_iteration == 1 {
+                file_paths.clone()
+            } else {
+                None
+            };
+
+            // Execute one iteration (dialogue round)
+            last_result = self
+                .handle_idle_mode(
+                    input_for_this_iteration,
+                    files_for_this_iteration,
+                    Some(&on_turn),
+                )
+                .await;
+
+            // Optional: Add delay between iterations to avoid overwhelming the UI
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            // For user_interrupt mode, check if iteration counter was cleared
+            if matches!(config.stop_condition, orcs_core::session::StopCondition::UserInterrupt) {
+                if self.get_auto_chat_iteration().await.is_none() {
+                    tracing::info!("[AutoChat] User interrupt detected");
+                    break;
+                }
+            }
+        }
+
+        // Clear iteration counter when done
+        self.set_auto_chat_iteration(None).await;
+
+        tracing::info!("[AutoChat] Completed after {} iterations", current_iteration);
+
+        last_result
+    }
+
     /// Handles input when awaiting plan confirmation.
     fn handle_awaiting_confirmation(&self, input: &str, plan: &Plan) -> InteractionResult {
         let trimmed = input.trim().to_lowercase();

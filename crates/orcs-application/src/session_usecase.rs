@@ -136,7 +136,10 @@ impl SessionUseCase {
 
         // 3. Associate with workspace
         manager
-            .set_workspace_root(Some(workspace.root_path.clone()))
+            .set_workspace_id(
+                Some(workspace.id.clone()),
+                Some(workspace.root_path.clone()),
+            )
             .await;
 
         tracing::info!(
@@ -323,7 +326,10 @@ impl SessionUseCase {
 
         // 4. Associate with admin workspace
         manager
-            .set_workspace_root(Some(workspace.root_path.clone()))
+            .set_workspace_id(
+                Some(workspace.id.clone()),
+                Some(workspace.root_path.clone()),
+            )
             .await;
 
         tracing::info!(
@@ -425,7 +431,10 @@ impl SessionUseCase {
                     );
 
                     manager
-                        .set_workspace_root(Some(workspace.root_path.clone()))
+                        .set_workspace_id(
+                            Some(workspace_id.clone()),
+                            Some(workspace.root_path.clone()),
+                        )
                         .await;
 
                     // Update workspace last active session
@@ -576,7 +585,10 @@ impl SessionUseCase {
                         // Update session's workspace_id to the new workspace
                         if let Some(manager) = self.session_manager.active_session().await {
                             manager
-                                .set_workspace_root(Some(workspace.root_path.clone()))
+                                .set_workspace_id(
+                                    Some(workspace.id.clone()),
+                                    Some(workspace.root_path.clone()),
+                                )
                                 .await;
                             // Persist the updated workspace association
                             let _ = self
@@ -621,7 +633,10 @@ impl SessionUseCase {
                     // Update session's workspace_id to the new workspace
                     if let Some(manager) = self.session_manager.active_session().await {
                         manager
-                            .set_workspace_root(Some(workspace.root_path.clone()))
+                            .set_workspace_id(
+                                Some(workspace.id.clone()),
+                                Some(workspace.root_path.clone()),
+                            )
                             .await;
                         // Persist the updated workspace association
                         let _ = self
@@ -667,7 +682,10 @@ impl SessionUseCase {
 
         // Associate with workspace
         manager
-            .set_workspace_root(Some(workspace.root_path.clone()))
+            .set_workspace_id(
+                Some(workspace.id.clone()),
+                Some(workspace.root_path.clone()),
+            )
             .await;
 
         // Persist session
@@ -766,7 +784,10 @@ impl SessionUseCase {
                     );
 
                     manager
-                        .set_workspace_root(Some(workspace.root_path.clone()))
+                        .set_workspace_id(
+                            Some(workspace_id.clone()),
+                            Some(workspace.root_path.clone()),
+                        )
                         .await;
 
                     // Update workspace access timestamp

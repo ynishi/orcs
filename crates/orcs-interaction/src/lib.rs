@@ -364,6 +364,8 @@ pub struct InteractionManager {
     title: Arc<RwLock<String>>,
     /// Session creation timestamp
     created_at: String,
+    /// Optional workspace ID for filtering sessions by workspace
+    workspace_id: Arc<RwLock<Option<String>>>,
     /// Shared workspace root path for agents (updated when workspace switches)
     agent_workspace_root: Arc<RwLock<Option<PathBuf>>>,
     /// Lazily-initialized dialogue instance
@@ -419,6 +421,7 @@ impl InteractionManager {
             session_id,
             title: Arc::new(RwLock::new(default_title)),
             created_at: now,
+            workspace_id: Arc::new(RwLock::new(None)), // Will be set by the caller if needed
             agent_workspace_root: Arc::new(RwLock::new(None)), // Will be set when workspace is assigned
             dialogue: Arc::new(Mutex::new(None)),
             persona_histories: Arc::new(RwLock::new(persona_histories_map)),
@@ -461,6 +464,7 @@ impl InteractionManager {
             session_id: data.id,
             title: Arc::new(RwLock::new(data.title)),
             created_at: data.created_at,
+            workspace_id: Arc::new(RwLock::new(Some(data.workspace_id))),
             agent_workspace_root: Arc::new(RwLock::new(None)), // Will be resolved and set by the caller
             dialogue: Arc::new(Mutex::new(None)),
             persona_histories: Arc::new(RwLock::new(data.persona_histories)),
@@ -666,6 +670,10 @@ impl InteractionManager {
             })
             .unwrap_or_else(|| "unknown".to_string());
 
+        // Use internal workspace_id if set, otherwise use provided workspace_id as fallback
+        let internal_workspace_id = self.workspace_id.read().await.clone();
+        let final_workspace_id = internal_workspace_id.unwrap_or(workspace_id);
+
         // Get active participants if dialogue is initialized
         let active_participant_ids = self.get_active_participants().await.unwrap_or_default();
 
@@ -715,7 +723,7 @@ impl InteractionManager {
             current_persona_id,
             persona_histories,
             app_mode,
-            workspace_id,
+            workspace_id: final_workspace_id,
             active_participant_ids,
             execution_strategy,
             system_messages,
@@ -736,15 +744,28 @@ impl InteractionManager {
         &self.session_id
     }
 
-    /// Updates the workspace root path for agents in this session.
-    pub async fn set_workspace_root(&self, workspace_root: Option<PathBuf>) {
+    /// Updates the workspace ID for this session.
+    pub async fn set_workspace_id(
+        &self,
+        workspace_id: Option<String>,
+        workspace_root: Option<PathBuf>,
+    ) {
         tracing::info!(
-            "[InteractionManager::set_workspace_root] Setting workspace_root to: {:?}",
+            "[InteractionManager::set_workspace_id] Called with workspace_id={:?}, workspace_root={:?}",
+            workspace_id,
             workspace_root
         );
 
+        let mut ws_id = self.workspace_id.write().await;
+        *ws_id = workspace_id.clone();
+
         let mut ws_root = self.agent_workspace_root.write().await;
-        *ws_root = workspace_root;
+        *ws_root = workspace_root.clone();
+
+        tracing::info!(
+            "[InteractionManager::set_workspace_id] Updated agent_workspace_root to: {:?}",
+            workspace_root
+        );
     }
 
     /// Returns a list of available persona IDs.
@@ -1594,11 +1615,9 @@ impl orcs_core::session::InteractionManagerTrait for InteractionManager {
 
     async fn set_workspace_id(
         &self,
-        _workspace_id: Option<String>,
+        workspace_id: Option<String>,
         workspace_root: Option<PathBuf>,
     ) {
-        // Ignore workspace_id parameter (kept for trait compatibility)
-        // Only set workspace_root for agents
-        self.set_workspace_root(workspace_root).await
+        self.set_workspace_id(workspace_id, workspace_root).await
     }
 }

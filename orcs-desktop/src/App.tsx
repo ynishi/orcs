@@ -315,6 +315,9 @@ function App() {
             // Turn off AutoChat mode
             setAutoMode(false);
 
+            // Clear thinking state
+            setTabThinking(targetTab.id, false);
+
             // Add system message to indicate completion
             const completionMessage: Message = {
               id: `${Date.now()}-${Math.random()}`,

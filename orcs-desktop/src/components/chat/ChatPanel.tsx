@@ -116,7 +116,7 @@ export function ChatPanel({
   const hasScrolledForTab = useRef<Set<string>>(new Set()); // Track which tabs have been scrolled
 
   // TabContext for adding messages
-  const { addMessageToTab } = useTabContext();
+  const { addMessageToTab, setTabThinking } = useTabContext();
 
   // AutoChat settings state
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
@@ -218,6 +218,9 @@ export function ChatPanel({
     // Turn on autoMode
     onAutoModeChange(true);
 
+    // Set thinking state (display ThinkingIndicator)
+    setTabThinking(tab.id, true, 'AutoChat');
+
     try {
       const { invoke } = await import('@tauri-apps/api/core');
 
@@ -232,6 +235,9 @@ export function ChatPanel({
     } catch (error) {
       console.error('[ChatPanel] AutoChat failed:', error);
       onAutoModeChange(false); // Turn off autoMode on error
+    } finally {
+      // Clear thinking state when done
+      setTabThinking(tab.id, false);
     }
   };
 

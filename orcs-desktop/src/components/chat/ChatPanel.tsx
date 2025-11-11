@@ -25,6 +25,7 @@ import { CommandSuggestions } from './CommandSuggestions';
 import { AgentSuggestions } from './AgentSuggestions';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { AutoChatSettingsModal } from './AutoChatSettingsModal';
+import { useTabContext } from '../../context/TabContext';
 import type { SessionTab } from '../../context/TabContext';
 import type { StatusInfo } from '../../types/status';
 import type { GitInfo } from '../../types/git';
@@ -33,6 +34,7 @@ import type { CommandDefinition } from '../../types/command';
 import type { Agent } from '../../types/agent';
 import type { PersonaConfig } from '../../types/agent';
 import type { AutoChatConfig } from '../../types/session';
+import type { Message } from '../../types/message';
 
 interface ChatPanelProps {
   tab: SessionTab;
@@ -113,6 +115,9 @@ export function ChatPanel({
   const previousTabId = useRef<string>(''); // Empty string to detect first render
   const hasScrolledForTab = useRef<Set<string>>(new Set()); // Track which tabs have been scrolled
 
+  // TabContext for adding messages
+  const { addMessageToTab } = useTabContext();
+
   // AutoChat settings state
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
   const [autoChatConfig, setAutoChatConfig] = useState<AutoChatConfig | null>(null);
@@ -188,6 +193,27 @@ export function ChatPanel({
     const filePaths = tab.attachedFiles.length > 0 ? tab.attachedFiles.map(f => f.name) : undefined;
 
     console.log('[ChatPanel] Starting AutoChat with input:', input);
+
+    // Add user message (入力内容を表示)
+    const userMessage: Message = {
+      id: `${Date.now()}-${Math.random()}`,
+      type: 'user',
+      author: userNickname,
+      text: input,
+      timestamp: new Date(),
+    };
+    addMessageToTab(tab.id, userMessage);
+
+    // Add system message (AutoChat開始通知)
+    const maxIterations = autoChatConfig?.max_iterations || 5;
+    const startMessage: Message = {
+      id: `${Date.now()}-${Math.random()}-start`,
+      type: 'system',
+      author: 'System',
+      text: `🤖 AutoChat開始: Agent同士で${maxIterations}回の対話を進めます。`,
+      timestamp: new Date(),
+    };
+    addMessageToTab(tab.id, startMessage);
 
     // Turn on autoMode
     onAutoModeChange(true);

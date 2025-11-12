@@ -5,6 +5,7 @@ use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
     PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent,
 };
+use orcs_core::slash_command::{CommandType, SlashCommand};
 use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_interaction::InteractionResult;
 use serde::{Deserialize, Serialize};
@@ -316,6 +317,146 @@ pub async fn publish_session_event(
     }
 }
 
+struct BuiltInCommand {
+    usage: &'static str,
+    description: &'static str,
+    args: Option<&'static str>,
+}
+
+const BUILT_IN_COMMANDS: &[(&str, BuiltInCommand)] = &[
+    (
+        "help",
+        BuiltInCommand {
+            usage: "/help [command]",
+            description: "Show available commands and their usage",
+            args: Some("Optional command name to show detailed help"),
+        },
+    ),
+    (
+        "status",
+        BuiltInCommand {
+            usage: "/status",
+            description: "Display current system status and active tasks",
+            args: None,
+        },
+    ),
+    (
+        "task",
+        BuiltInCommand {
+            usage: "/task <description>",
+            description: "Create an orchestrated task from the provided description",
+            args: Some("Describe the work you want executed"),
+        },
+    ),
+    (
+        "expert",
+        BuiltInCommand {
+            usage: "/expert <expertise>",
+            description: "Create an adhoc expert persona for immediate collaboration",
+            args: Some("Expertise area or domain knowledge"),
+        },
+    ),
+    (
+        "blueprint",
+        BuiltInCommand {
+            usage: "/blueprint <task description>",
+            description: "Convert a task or topic into the BlueprintWorkflow format",
+            args: Some("Task or discussion context to convert"),
+        },
+    ),
+    (
+        "workspace",
+        BuiltInCommand {
+            usage: "/workspace [name]",
+            description: "Switch to a different workspace or list all available workspaces",
+            args: Some("Workspace name (optional)"),
+        },
+    ),
+    (
+        "files",
+        BuiltInCommand {
+            usage: "/files",
+            description: "List files in the current workspace",
+            args: None,
+        },
+    ),
+    (
+        "mode",
+        BuiltInCommand {
+            usage: "/mode [normal|concise|brief|discussion]",
+            description: "Change conversation mode to control agent verbosity",
+            args: Some("normal / concise / brief / discussion"),
+        },
+    ),
+    (
+        "talk",
+        BuiltInCommand {
+            usage: "/talk [brainstorm|casual|decision_making|debate|problem_solving|review|planning|none]",
+            description: "Set dialogue style for multi-agent collaboration",
+            args: Some(
+                "brainstorm / casual / decision_making / debate / problem_solving / review / planning / none",
+            ),
+        },
+    ),
+];
+
+fn build_slash_command_prompt(commands: &[SlashCommand]) -> Option<String> {
+    if commands.is_empty() && BUILT_IN_COMMANDS.is_empty() {
+        return None;
+    }
+
+    let mut output = String::from("## Slash Commands\n");
+    output.push_str("Use `/command` syntax in chat to trigger these helpers.\n\n");
+
+    if !BUILT_IN_COMMANDS.is_empty() {
+        output.push_str("### Built-in Commands\n");
+        for (name, cmd) in BUILT_IN_COMMANDS.iter() {
+            output.push_str(&format!(
+                "- `/{}` (`{}`): {}\n",
+                name, cmd.usage, cmd.description
+            ));
+            if let Some(args) = cmd.args {
+                output.push_str(&format!("  - Args: {}\n", args));
+            }
+        }
+        output.push('\n');
+    }
+
+    if commands.is_empty() {
+        return Some(output);
+    }
+
+    let mut by_type = |kind: CommandType, title: &str| {
+        let mut section = String::new();
+        for cmd in commands.iter().filter(|c| c.command_type == kind) {
+            let usage = cmd
+                .args_description
+                .as_ref()
+                .map(|u| format!(" {}", u))
+                .unwrap_or_default();
+            section.push_str(&format!(
+                "- `/{}`{}: {}\n",
+                cmd.name, usage, cmd.description
+            ));
+        }
+        if !section.is_empty() {
+            output.push_str(&format!("### {}\n", title));
+            output.push_str(&section);
+            output.push('\n');
+        }
+    };
+
+    by_type(CommandType::Task, "Custom Task Commands");
+    by_type(CommandType::Prompt, "Custom Prompt Commands");
+    by_type(CommandType::Shell, "Custom Shell Commands");
+
+    if output.trim().is_empty() {
+        None
+    } else {
+        Some(output)
+    }
+}
+
 async fn handle_moderator_action(
     action: ModeratorAction,
     state: State<'_, AppState>,
@@ -616,6 +757,17 @@ pub async fn handle_input(
         .active_session()
         .await
         .ok_or("No active session")?;
+
+    let slash_commands = state
+        .slash_command_repository
+        .list_commands()
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("[handle_input] Failed to list commands: {}", e);
+            Vec::new()
+        });
+    let prompt_extension = build_slash_command_prompt(&slash_commands);
+    manager.set_prompt_extension(prompt_extension).await;
 
     let current_mode = state.app_mode.lock().await.clone();
 

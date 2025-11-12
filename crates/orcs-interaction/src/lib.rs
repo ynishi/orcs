@@ -367,6 +367,8 @@ pub struct InteractionManager {
     auto_chat_config: Arc<RwLock<Option<AutoChatConfig>>>,
     /// Current iteration in AutoChat mode (None when not running)
     auto_chat_iteration: Arc<RwLock<Option<u32>>>,
+    /// Optional prompt extension appended to system prompt
+    prompt_extension: Arc<RwLock<Option<String>>>,
 }
 
 impl InteractionManager {
@@ -411,6 +413,7 @@ impl InteractionManager {
             talk_style: Arc::new(RwLock::new(None)),
             auto_chat_config: Arc::new(RwLock::new(None)),
             auto_chat_iteration: Arc::new(RwLock::new(None)),
+            prompt_extension: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -454,6 +457,7 @@ impl InteractionManager {
             talk_style: Arc::new(RwLock::new(data.talk_style)),
             auto_chat_config: Arc::new(RwLock::new(data.auto_chat_config)),
             auto_chat_iteration: Arc::new(RwLock::new(None)), // Never running when restored from disk
+            prompt_extension: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -565,15 +569,23 @@ impl InteractionManager {
         };
 
         // Apply context settings
-        dialogue
-            .with_environment("ORCS (Orchestrated Reasoning & Collaboration System) マルチエージェント対話アプリケーション")
-            .with_additional_context(
-                "【協調ガイドライン】\n\
+        let mut additional_context = "【協調ガイドライン】\n\
                  - 複数の AI ペルソナが協力してユーザーをサポートします\n\
                  - 他の参加者の意見を尊重し、重複を避けて新しい視点を提供してください\n\
                  - ユーザーのワークスペース環境で実行されています\n\
-                 - 建設的で協調的なコミュニケーションを心がけてください".to_string()
-            )
+                 - 建設的で協調的なコミュニケーションを心がけてください"
+            .to_string();
+
+        if let Some(extension) = self.prompt_extension.read().await.clone() {
+            if !extension.trim().is_empty() {
+                additional_context.push_str("\n\n");
+                additional_context.push_str(&extension);
+            }
+        }
+
+        dialogue
+            .with_environment("ORCS (Orchestrated Reasoning & Collaboration System) マルチエージェント対話アプリケーション")
+            .with_additional_context(additional_context)
             .with_reaction_strategy(ReactionStrategy::ExceptContextInfo);
 
         // Apply talk style if set
@@ -1065,6 +1077,12 @@ impl InteractionManager {
     /// Gets the current talk style.
     pub async fn get_talk_style(&self) -> Option<TalkStyle> {
         self.talk_style.read().await.clone()
+    }
+
+    /// Sets an additional prompt extension that will be appended to the system prompt.
+    pub async fn set_prompt_extension(&self, extension: Option<String>) {
+        *self.prompt_extension.write().await = extension;
+        self.invalidate_dialogue().await;
     }
 
     /// Sets the AutoChat configuration.

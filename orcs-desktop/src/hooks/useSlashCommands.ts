@@ -88,7 +88,25 @@ export function useSlashCommands({
           ? `${actorName ?? 'Agent'} issued ${rawInput}`
           : rawInput;
 
+      // NOTE: Slash command log entries are critical for UI parity.
+      // We add the live bubble via handleSystemMessage, but ALSO persist them
+      // immediately so a reload shows the same COMMAND card (session restore pulls
+      // from system_messages).  This code path has regressed multiple times,
+      // so keep it colocated with the live rendering.
       handleSystemMessage(commandMessage(commandLabel), addMessage);
+      try {
+        await invoke('append_system_messages', {
+          messages: [
+            {
+              content: commandLabel,
+              messageType: 'command',
+              severity: 'info',
+            },
+          ],
+        });
+      } catch (error) {
+        console.error('Failed to persist command log:', error);
+      }
 
       const isBuiltinCommand = isValidCommand(parsed.command);
 
@@ -532,11 +550,13 @@ Generate the BlueprintWorkflow now.`;
                 handleSystemMessage(shellOutputMessage(shellMessage), addMessage);
 
                 // 2. Persist to Backend as ContextInfo (survives session switches, no agent reaction)
+                // Persist shell output as well so reload shows the dark card.
+                // Without this, the UI only had the immediate toast.
                 await invoke('append_system_messages', {
                   messages: [
                     {
                       content: shellMessage,
-                      messageType: 'context_info',
+                      messageType: 'shell_output',
                       severity: 'info',
                     },
                   ],

@@ -916,7 +916,10 @@ impl InteractionManager {
         message_type: Option<String>,
         error_severity: Option<ErrorSeverity>,
     ) {
-        let is_context_info = matches!(message_type.as_deref(), Some("context_info"));
+        let is_context_info = matches!(
+            message_type.as_deref(),
+            Some("context_info" | "shell_output")
+        );
         let message = ConversationMessage {
             role: MessageRole::System,
             content,
@@ -932,11 +935,11 @@ impl InteractionManager {
         self.system_messages.write().await.push(message);
 
         if is_context_info {
-            // ContextInfo entries must be visible before the next agent turn.
-            // We intentionally invalidate the dialogue here so that any freshly
-            // executed shell command outputs are folded into the restored prompt
-            // on the very next ensure_dialogue_initialized() call. Without this,
-            // agents could miss shell results until another full rebuild happens.
+            // Context info (shell output, etc.) must be visible before the next agent turn.
+            // We intentionally invalidate the dialogue on every context info write so that
+            // shell results injected via append_system_messages are folded into the prompt
+            // on the very next ensure_dialogue_initialized() call.  This code path has caused
+            // regressions multiple times; resist the urge to “optimize” it away.
             self.invalidate_dialogue().await;
         }
     }

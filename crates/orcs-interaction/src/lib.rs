@@ -9,7 +9,6 @@ use crate::gemini_api_agent::GeminiApiAgent;
 use crate::openai_api_agent::OpenAIApiAgent;
 use llm_toolkit::agent::dialogue::{
     Dialogue, DialogueTurn, ExecutionModel, ReactionStrategy, Speaker, TalkStyle,
-    message::MessageType as LlmMessageType,
 };
 use llm_toolkit::agent::impls::{ClaudeCodeAgent, CodexAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
@@ -133,28 +132,6 @@ pub enum StreamingDialogueTurnKind {
         /// Total iterations completed
         total_iterations: u32,
     },
-}
-
-/// Converts ORCS system_message_type string to llm-toolkit MessageType.
-///
-/// This bridges the gap between ORCS's string-based message types and
-/// llm-toolkit's typed MessageType enum, enabling proper ContextInfo handling.
-///
-/// # Arguments
-///
-/// * `type_str` - Optional message type string from ORCS (e.g., "context_info", "notification")
-///
-/// # Returns
-///
-/// Returns the corresponding LlmMessageType, or None for default (Conversational).
-fn convert_to_llm_message_type(type_str: Option<&str>) -> Option<LlmMessageType> {
-    match type_str {
-        Some("context_info") => Some(LlmMessageType::ContextInfo),
-        Some("notification") => Some(LlmMessageType::Notification),
-        Some("system") => Some(LlmMessageType::System),
-        Some("conversational") => Some(LlmMessageType::Conversational),
-        None | Some(_) => None, // Default to Conversational (llm-toolkit default)
-    }
 }
 
 /// Agent wrapper that delegates to the configured backend.

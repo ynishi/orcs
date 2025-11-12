@@ -10,7 +10,7 @@ use orcs_core::config::SecretConfig;
 use orcs_core::secret::SecretService;
 use serde_json::json;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior, Migrator};
 
@@ -184,6 +184,12 @@ impl SecretService for SecretServiceImpl {
     async fn secret_file_exists(&self) -> bool {
         // Try to load secrets - if successful, file exists
         self.load_secrets_internal().is_ok()
+    }
+
+    async fn secret_file_path(&self) -> Result<PathBuf, String> {
+        let storage: std::sync::RwLockReadGuard<'_, FileStorage> = self.storage.read().map_err(|e|e.to_string())?;
+        let p= storage.path().to_owned();
+        Ok(p)
     }
 }
 

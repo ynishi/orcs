@@ -2,6 +2,8 @@
 //!
 //! Defines the interface for loading and managing secret configuration (API keys).
 
+use std::path::PathBuf;
+
 use crate::config::SecretConfig;
 
 /// Service for managing secret configuration.
@@ -31,4 +33,6 @@ pub trait SecretService: Send + Sync {
     ///
     /// `true` if the secret file exists, `false` otherwise.
     async fn secret_file_exists(&self) -> bool;
+
+    async fn secret_file_path(&self) -> Result<PathBuf, String>;
 }

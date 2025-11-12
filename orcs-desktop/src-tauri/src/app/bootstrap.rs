@@ -26,7 +26,6 @@ use crate::app::AppState;
 
 pub struct AppBootstrap {
     pub app_state: AppState,
-    pub app_state_service: Arc<AppStateService>,
 }
 
 /// Ensures a default workspace exists and returns its ID.
@@ -331,6 +330,5 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
 
     AppBootstrap {
         app_state,
-        app_state_service,
     }
 }

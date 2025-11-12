@@ -3,8 +3,8 @@
 //! This module provides `SessionUpdater` which abstracts the common
 //! "find → update → save" pattern used across session metadata operations.
 
-use orcs_core::session::{Session, SessionRepository};
 use orcs_core::error::{OrcsError, Result};
+use orcs_core::session::{Session, SessionRepository};
 use std::sync::Arc;
 
 /// Helper struct for updating sessions with a common pattern.
@@ -46,11 +46,9 @@ impl SessionUpdater {
             .repository
             .find_by_id(session_id)
             .await?
-            .ok_or_else(|| {
-                OrcsError::NotFound {
-                    entity_type: "Session",
-                    id: session_id.to_string(),
-                }
+            .ok_or_else(|| OrcsError::NotFound {
+                entity_type: "Session",
+                id: session_id.to_string(),
             })?;
 
         // Apply the updater function
@@ -65,4 +63,3 @@ impl SessionUpdater {
         Ok(())
     }
 }
-

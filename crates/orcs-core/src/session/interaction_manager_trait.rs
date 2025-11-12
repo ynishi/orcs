@@ -21,4 +21,3 @@ pub trait InteractionManagerTrait: Send + Sync {
         workspace_root: Option<std::path::PathBuf>,
     ) -> impl std::future::Future<Output = ()> + Send;
 }
-

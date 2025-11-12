@@ -86,4 +86,3 @@ impl SessionFactory {
         manager.to_session(app_mode, workspace_id).await
     }
 }
-

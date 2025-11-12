@@ -63,8 +63,7 @@ impl ClaudeApiAgent {
         // Fallback to environment variables
         let api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| {
             AgentError::ExecutionFailed(
-                "ANTHROPIC_API_KEY not found in secret.json or environment variables"
-                    .into(),
+                "ANTHROPIC_API_KEY not found in secret.json or environment variables".into(),
             )
         })?;
 

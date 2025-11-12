@@ -94,4 +94,3 @@ impl SessionMetadataService {
             .await
     }
 }
-

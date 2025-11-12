@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
+use orcs_application::session::{SessionMetadataService, SessionUpdater};
 use orcs_application::{AdhocPersonaService, SessionUseCase, UtilityAgentService};
 use orcs_core::{
     persona::{PersonaRepository, get_default_presets},
@@ -13,7 +14,6 @@ use orcs_core::{
     user::UserService,
     workspace::manager::WorkspaceManager,
 };
-use orcs_application::session::{SessionMetadataService, SessionUpdater};
 use orcs_execution::{TaskExecutor, tracing_layer::OrchestratorEvent};
 use orcs_infrastructure::{
     AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,

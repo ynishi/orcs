@@ -67,4 +67,3 @@ impl<T: InteractionManagerTrait> Default for SessionCache<T> {
         Self::new()
     }
 }
-

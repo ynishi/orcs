@@ -90,9 +90,7 @@ fn main() {
                         let app_mode_locked = AppMode::Idle;
                         // Get workspace_id from session
                         let workspace_id = PLACEHOLDER_WORKSPACE_ID.to_string();
-                        let session = session_mgr
-                            .to_session(app_mode_locked, workspace_id)
-                            .await;
+                        let session = session_mgr.to_session(app_mode_locked, workspace_id).await;
                         if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
                             let workspace_id = &session.workspace_id;
                             tracing::info!(

@@ -60,8 +60,7 @@ impl OpenAIApiAgent {
         // Fallback to environment variables
         let api_key = env::var("OPENAI_API_KEY").map_err(|_| {
             AgentError::ExecutionFailed(
-                "OPENAI_API_KEY not found in secret.json or environment variables"
-                    .into(),
+                "OPENAI_API_KEY not found in secret.json or environment variables".into(),
             )
         })?;
 

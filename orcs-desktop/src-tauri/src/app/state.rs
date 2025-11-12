@@ -4,7 +4,7 @@ use orcs_application::{AdhocPersonaService, SessionUseCase};
 use orcs_core::{
     persona::PersonaRepository,
     secret::SecretService,
-    session::{AppMode, SessionManager},
+    session::{AppMode, SessionManager, SessionMetadataService},
     slash_command::SlashCommandRepository,
     task::TaskRepository,
     user::UserService,
@@ -22,6 +22,7 @@ pub struct AppState {
     pub session_usecase: Arc<SessionUseCase>,
     pub session_manager: Arc<SessionManager<orcs_interaction::InteractionManager>>,
     pub session_repository: Arc<AsyncDirSessionRepository>,
+    pub session_metadata_service: Arc<SessionMetadataService>,
     pub app_mode: Mutex<AppMode>,
     pub persona_repository: Arc<dyn PersonaRepository>,
     pub persona_repository_concrete: Arc<AsyncDirPersonaRepository>,

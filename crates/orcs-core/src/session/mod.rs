@@ -24,8 +24,10 @@ mod app_mode;
 mod event;
 mod manager;
 mod message;
+mod metadata_service;
 mod model;
 mod repository;
+mod updater;
 mod user_input;
 
 // Re-export public API
@@ -35,6 +37,8 @@ pub use manager::{InteractionManagerTrait, SessionManager};
 pub use message::{
     ConversationMessage, ErrorSeverity, MessageMetadata, MessageRole, SystemEventType,
 };
+pub use metadata_service::SessionMetadataService;
 pub use model::{AutoChatConfig, PLACEHOLDER_WORKSPACE_ID, Session, StopCondition};
 pub use repository::SessionRepository;
+pub use updater::SessionUpdater;
 pub use user_input::UserInput;

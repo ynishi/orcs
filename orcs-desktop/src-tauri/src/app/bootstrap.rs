@@ -6,7 +6,7 @@ use orcs_core::{
     persona::{PersonaRepository, get_default_presets},
     repository::SessionRepository,
     secret::SecretService,
-    session::{AppMode, PLACEHOLDER_WORKSPACE_ID, SessionManager},
+    session::{AppMode, PLACEHOLDER_WORKSPACE_ID, SessionManager, SessionMetadataService, SessionUpdater},
     slash_command::SlashCommandRepository,
     state::{model::PLACEHOLDER_DEFAULT_WORKSPACE_ID, repository::StateRepository},
     task::TaskRepository,
@@ -212,6 +212,10 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         SessionManager::new(session_repository.clone(), app_state_service.clone()),
     );
 
+    // Create SessionMetadataService for session metadata operations
+    let session_updater = SessionUpdater::new(session_repository.clone());
+    let session_metadata_service = Arc::new(SessionMetadataService::new(session_updater));
+
     // Create SessionUseCase for coordinated session-workspace management
     let session_usecase = Arc::new(SessionUseCase::new(
         session_manager.clone(),
@@ -311,6 +315,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         session_usecase,
         session_manager: session_manager.clone(),
         session_repository: session_repository.clone(),
+        session_metadata_service,
         app_mode,
         persona_repository,
         persona_repository_concrete,

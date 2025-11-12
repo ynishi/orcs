@@ -167,8 +167,8 @@ pub async fn rename_session(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
-        .session_manager
-        .rename_session(&session_id, new_title)
+        .session_metadata_service
+        .rename(&session_id, new_title)
         .await
         .map_err(|e| e.to_string())
 }
@@ -180,7 +180,7 @@ pub async fn toggle_session_favorite(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
-        .session_manager
+        .session_metadata_service
         .toggle_favorite(&session_id)
         .await
         .map_err(|e| e.to_string())
@@ -193,7 +193,7 @@ pub async fn toggle_session_archive(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
-        .session_manager
+        .session_metadata_service
         .toggle_archive(&session_id)
         .await
         .map_err(|e| e.to_string())
@@ -207,7 +207,7 @@ pub async fn update_session_sort_order(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
-        .session_manager
+        .session_metadata_service
         .update_sort_order(&session_id, sort_order)
         .await
         .map_err(|e| e.to_string())

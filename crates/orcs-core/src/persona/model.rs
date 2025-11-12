@@ -100,6 +100,8 @@ impl PersonaBackend {
                 Capability::new("env:access").with_description("Access environment variables"),
                 Capability::new("payload:read").with_description("Read input payload and messages"),
                 Capability::new("attachment:read").with_description("Read file attachments"),
+                Capability::new("task:execute")
+                    .with_description("Execute multi-step orchestration tasks with agents"),
             ]
         } else {
             // API backends: read-only, remote access
@@ -131,6 +133,7 @@ impl PersonaBackend {
 ✅ Run local tools and scripts
 ✅ Access environment variables
 ✅ Full development workflow
+✅ Execute multi-step orchestration tasks
 
 ### Collaboration:
 For tasks requiring different capabilities, you can work with other agents using @mention."#,

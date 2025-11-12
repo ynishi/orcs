@@ -8,11 +8,13 @@ import { SlashCommandEditorModal } from './SlashCommandEditorModal';
 const COMMAND_TYPE_LABELS: Record<SlashCommand['type'], string> = {
   prompt: 'Prompt',
   shell: 'Shell',
+  task: 'Task',
 };
 
 const COMMAND_TYPE_COLORS: Record<SlashCommand['type'], string> = {
   prompt: 'blue',
   shell: 'violet',
+  task: 'orange',
 };
 
 interface SlashCommandListProps {

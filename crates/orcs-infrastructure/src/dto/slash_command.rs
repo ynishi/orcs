@@ -36,6 +36,7 @@ impl IntoDomain<SlashCommand> for SlashCommandV1 {
             content: self.content,
             working_dir: self.working_dir,
             args_description: None,
+            task_blueprint: None, // V1 didn't have task_blueprint
         }
     }
 }
@@ -83,14 +84,66 @@ impl IntoDomain<SlashCommand> for SlashCommandV1_1 {
             content: self.content,
             working_dir: self.working_dir,
             args_description: self.args_description,
+            task_blueprint: None, // V1.1 didn't have task_blueprint
         }
     }
 }
 
-/// Convert domain model to SlashCommandV1_1 DTO for persistence
-impl From<&SlashCommand> for SlashCommandV1_1 {
+/// Slash command DTO V1.2.0 (adds task_blueprint)
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.2.0")]
+pub struct SlashCommandV1_2 {
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub command_type: CommandType,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_blueprint: Option<String>,
+}
+
+/// Migration from SlashCommandV1_1 to SlashCommandV1_2.
+/// Adds task_blueprint field (defaults to None for existing commands).
+impl MigratesTo<SlashCommandV1_2> for SlashCommandV1_1 {
+    fn migrate(self) -> SlashCommandV1_2 {
+        SlashCommandV1_2 {
+            name: self.name,
+            icon: self.icon,
+            description: self.description,
+            command_type: self.command_type,
+            content: self.content,
+            working_dir: self.working_dir,
+            args_description: self.args_description,
+            task_blueprint: None, // Default: no task blueprint for V1.1 commands
+        }
+    }
+}
+
+/// Convert SlashCommandV1_2 DTO to domain model
+impl IntoDomain<SlashCommand> for SlashCommandV1_2 {
+    fn into_domain(self) -> SlashCommand {
+        SlashCommand {
+            name: self.name,
+            icon: self.icon,
+            description: self.description,
+            command_type: self.command_type,
+            content: self.content,
+            working_dir: self.working_dir,
+            args_description: self.args_description,
+            task_blueprint: self.task_blueprint,
+        }
+    }
+}
+
+/// Convert domain model to SlashCommandV1_2 DTO for persistence
+impl From<&SlashCommand> for SlashCommandV1_2 {
     fn from(cmd: &SlashCommand) -> Self {
-        SlashCommandV1_1 {
+        SlashCommandV1_2 {
             name: cmd.name.clone(),
             icon: cmd.icon.clone(),
             description: cmd.description.clone(),
@@ -98,14 +151,15 @@ impl From<&SlashCommand> for SlashCommandV1_1 {
             content: cmd.content.clone(),
             working_dir: cmd.working_dir.clone(),
             args_description: cmd.args_description.clone(),
+            task_blueprint: cmd.task_blueprint.clone(),
         }
     }
 }
 
-/// Convert domain model to SlashCommandV1_1 DTO (for version-migrate save support)
-impl FromDomain<SlashCommand> for SlashCommandV1_1 {
+/// Convert domain model to SlashCommandV1_2 DTO (for version-migrate save support)
+impl FromDomain<SlashCommand> for SlashCommandV1_2 {
     fn from_domain(cmd: SlashCommand) -> Self {
-        SlashCommandV1_1 {
+        SlashCommandV1_2 {
             name: cmd.name,
             icon: cmd.icon,
             description: cmd.description,
@@ -113,6 +167,7 @@ impl FromDomain<SlashCommand> for SlashCommandV1_1 {
             content: cmd.content,
             working_dir: cmd.working_dir,
             args_description: cmd.args_description,
+            task_blueprint: cmd.task_blueprint,
         }
     }
 }
@@ -127,6 +182,7 @@ pub fn create_slash_command_migrator() -> version_migrate::Migrator {
     let path = version_migrate::Migrator::define("slash_command")
         .from::<SlashCommandV1>()
         .step::<SlashCommandV1_1>()
+        .step::<SlashCommandV1_2>()
         .into_with_save::<SlashCommand>();
     migrator
         .register(path)

@@ -10,6 +10,8 @@ pub enum CommandType {
     Prompt,
     /// Executes a shell command and shows output
     Shell,
+    /// Executes a long-running orchestration task workflow
+    Task,
 }
 
 /// A custom slash command definition.
@@ -21,10 +23,10 @@ pub struct SlashCommand {
     pub icon: String,
     /// Human-readable description
     pub description: String,
-    /// Type of command (prompt or shell)
+    /// Type of command (prompt, shell, or task)
     #[serde(rename = "type")]
     pub command_type: CommandType,
-    /// Command content (prompt template or shell command)
+    /// Command content (prompt template, shell command, or task description)
     pub content: String,
     /// Working directory for shell commands (supports variables like {workspace_path})
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -34,6 +36,10 @@ pub struct SlashCommand {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "argsDescription")]
     pub args_description: Option<String>,
+    /// Task execution strategy blueprint (JSON serialized StrategyMap) for Task type commands
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "taskBlueprint")]
+    pub task_blueprint: Option<String>,
 }
 
 impl SlashCommand {
@@ -47,6 +53,7 @@ impl SlashCommand {
             content,
             working_dir: None,
             args_description: None,
+            task_blueprint: None,
         }
     }
 
@@ -79,6 +86,7 @@ impl SlashCommand {
             content,
             working_dir,
             args_description: None,
+            task_blueprint: None,
         }
     }
 
@@ -92,6 +100,40 @@ impl SlashCommand {
         args_description: Option<String>,
     ) -> Self {
         let mut cmd = Self::new_shell(name, icon, description, content, working_dir);
+        cmd.args_description = args_description;
+        cmd
+    }
+
+    /// Creates a new task-type slash command.
+    pub fn new_task(
+        name: String,
+        icon: String,
+        description: String,
+        content: String,
+        task_blueprint: Option<String>,
+    ) -> Self {
+        Self {
+            name,
+            icon,
+            description,
+            command_type: CommandType::Task,
+            content,
+            working_dir: None,
+            args_description: None,
+            task_blueprint,
+        }
+    }
+
+    /// Creates a new task-type slash command with an argument description.
+    pub fn new_task_with_args(
+        name: String,
+        icon: String,
+        description: String,
+        content: String,
+        task_blueprint: Option<String>,
+        args_description: Option<String>,
+    ) -> Self {
+        let mut cmd = Self::new_task(name, icon, description, content, task_blueprint);
         cmd.args_description = args_description;
         cmd
     }

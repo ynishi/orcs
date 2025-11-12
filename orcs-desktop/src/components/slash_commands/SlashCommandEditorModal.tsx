@@ -5,6 +5,7 @@ import { SlashCommand, CommandType } from '../../types/slash_command';
 const COMMAND_TYPE_OPTIONS = [
   { value: 'prompt', label: 'Prompt (template expansion)' },
   { value: 'shell', label: 'Shell (command execution)' },
+  { value: 'task', label: 'Task (orchestrated workflow)' },
 ];
 
 interface SlashCommandEditorModalProps {
@@ -78,6 +79,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
 
   const isEditing = !!command?.name;
   const isShellCommand = formData.type === 'shell';
+  const isTaskCommand = formData.type === 'task';
 
   return (
     <Modal
@@ -116,7 +118,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
 
         <Select
           label="Command Type"
-          description="Prompt: expands templates with variables. Shell: executes commands."
+          description="Prompt: expands templates. Shell: executes commands. Task: runs orchestrated workflows."
           data={COMMAND_TYPE_OPTIONS}
           value={formData.type}
           onChange={(value) => setFormData({ ...formData, type: value as CommandType })}
@@ -125,16 +127,26 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
         />
 
         <Textarea
-          label={isShellCommand ? 'Shell Command' : 'Prompt Template'}
+          label={
+            isShellCommand
+              ? 'Shell Command'
+              : isTaskCommand
+                ? 'Task Description'
+                : 'Prompt Template'
+          }
           placeholder={
             isShellCommand
               ? 'git status'
-              : 'Analyze the files in {workspace}:\n{files}\n\nCurrent branch: {git_branch}'
+              : isTaskCommand
+                ? 'Create a comprehensive README file with project overview, setup instructions, and usage examples'
+                : 'Analyze the files in {workspace}:\n{files}\n\nCurrent branch: {git_branch}'
           }
           description={
             isShellCommand
               ? 'Command to execute. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
-              : 'Prompt template. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
+              : isTaskCommand
+                ? 'Task description that will be executed using ParallelOrchestrator. Can use {args} for runtime arguments.'
+                : 'Prompt template. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
           }
           value={formData.content}
           onChange={(e) => setFormData({ ...formData, content: e.currentTarget.value })}

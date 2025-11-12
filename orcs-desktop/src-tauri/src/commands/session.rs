@@ -673,6 +673,13 @@ pub async fn handle_input(
                             Err(e) => format!("Error executing command: {}", e),
                         }
                     }
+                    CommandType::Task => {
+                        // Task commands should be handled separately via execute_task_command
+                        format!(
+                            "Task command '{}' requires async execution. Use the task execution UI or API instead.",
+                            cmd_name
+                        )
+                    }
                 }
             }
             Ok(None) => format!(

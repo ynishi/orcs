@@ -75,6 +75,84 @@ pub async fn expand_command_template(
     Ok(expanded)
 }
 
+/// Executes a task workflow command
+#[tauri::command]
+pub async fn execute_task_command(
+    command_name: String,
+    args: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    use orcs_core::slash_command::CommandType;
+
+    // Get the command
+    let command = state
+        .slash_command_repository
+        .get_command(&command_name)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Command not found: {}", command_name))?;
+
+    // Verify it's a Task type
+    if command.command_type != CommandType::Task {
+        return Err(format!(
+            "Command '{}' is not a task command (type: {:?})",
+            command_name, command.command_type
+        ));
+    }
+
+    // Note: task_blueprint is currently not used by TaskExecutor::execute_from_message
+    // The executor uses BlueprintWorkflow::new(message_content) internally
+    // Future enhancement: Pass blueprint to executor if provided
+
+    // Get active session information for task execution
+    let manager = state
+        .session_usecase
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let app_mode = state.app_mode.lock().await.clone();
+    let session = manager
+        .to_session(
+            app_mode,
+            orcs_core::session::PLACEHOLDER_WORKSPACE_ID.to_string(),
+        )
+        .await;
+    let session_id = session.id.clone();
+    let workspace_id = &session.workspace_id;
+
+    // Get workspace root path from workspace_id
+    let workspace_root = if workspace_id != orcs_core::session::PLACEHOLDER_WORKSPACE_ID {
+        match state
+            .workspace_storage_service
+            .get_workspace(workspace_id)
+            .await
+        {
+            Ok(Some(workspace)) => Some(workspace.root_path),
+            Ok(None) => {
+                tracing::warn!("Workspace not found for id: {}, using None", workspace_id);
+                None
+            }
+            Err(e) => {
+                tracing::warn!("Failed to get workspace: {}, using None", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Prepare message content for task execution
+    let message_content = args.unwrap_or_else(|| command.content.clone());
+
+    // Execute task using TaskExecutor (same as execute_message_as_task)
+    state
+        .task_executor
+        .execute_from_message(session_id, message_content, workspace_root)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Executes a shell command and returns the output
 #[tauri::command]
 pub async fn execute_shell_command(

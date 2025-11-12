@@ -51,6 +51,16 @@ pub async fn expand_slash_command(
                 command.content.clone()
             }
         }
+        CommandType::Task => {
+            // Task commands use content as description, substitute args if present
+            if command.content.contains("{args}") {
+                command.content.replace("{args}", trimmed_args)
+            } else if !trimmed_args.is_empty() {
+                format!("{}\n\n{}", command.content, trimmed_args)
+            } else {
+                command.content.clone()
+            }
+        }
     };
 
     // Get workspace info from active session

@@ -92,10 +92,35 @@ export function useSlashCommands({
             break;
 
           case 'task':
-            handleSystemMessage(
-              conversationMessage('Use the 🚀 button on messages to execute them as tasks', 'info'),
-              addMessage
-            );
+            if (parsed.args && parsed.args.length > 0) {
+              const taskDescription = parsed.args.join(' ');
+              try {
+                handleSystemMessage(
+                  conversationMessage(`🚀 Executing task: ${taskDescription}`, 'info'),
+                  addMessage
+                );
+
+                const taskResult = await invoke<string>('execute_message_as_task', {
+                  messageContent: taskDescription,
+                });
+
+                handleSystemMessage(
+                  conversationMessage(`✅ Task completed:\n${taskResult}`, 'info'),
+                  addMessage
+                );
+              } catch (error) {
+                console.error('Failed to execute task:', error);
+                handleSystemMessage(
+                  conversationMessage(`❌ Task execution failed: ${error}`, 'error'),
+                  addMessage
+                );
+              }
+            } else {
+              handleSystemMessage(
+                conversationMessage('Usage: /task <description>\nExample: /task Create a README file', 'error'),
+                addMessage
+              );
+            }
             await saveCurrentSession();
             break;
 
@@ -442,7 +467,37 @@ Generate the BlueprintWorkflow now.`;
                 nextInput = null;
                 suppressUserMessage = true;
               }
+            } else if (customCommand.type === 'task') {
+              // Execute task command
+              try {
+                handleSystemMessage(
+                  conversationMessage(`🚀 Executing task: ${parsed.command}...`, 'info'),
+                  addMessage
+                );
+
+                const taskResult = await invoke<string>('execute_task_command', {
+                  commandName: parsed.command,
+                  args: argsStr || null,
+                });
+
+                handleSystemMessage(
+                  conversationMessage(`✅ Task completed:\n${taskResult}`, 'info'),
+                  addMessage
+                );
+
+                nextInput = null;
+                suppressUserMessage = true;
+              } catch (error) {
+                console.error(`Failed to execute task command /${parsed.command}:`, error);
+                handleSystemMessage(
+                  conversationMessage(`❌ Task execution failed: ${error}`, 'error'),
+                  addMessage
+                );
+                nextInput = null;
+                suppressUserMessage = true;
+              }
             } else {
+              // Shell command execution
               try {
                 const executionOutput = await invoke<string>('execute_shell_command', {
                   command: expanded.content,

@@ -77,6 +77,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         slash_commands::remove_slash_command,
         slash_commands::expand_command_template,
         slash_commands::execute_shell_command,
+        slash_commands::execute_task_command,
         session::get_auto_chat_config,
         session::update_auto_chat_config,
         session::get_auto_chat_status,

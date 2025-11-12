@@ -18,9 +18,17 @@ import type { Workspace } from '../types/workspace';
 import type { UploadedFile } from '../types/workspace';
 import type { SlashCommand, ExpandedSlashCommand } from '../types/slash_command';
 
-interface SlashCommandResult {
+export interface SlashCommandResult {
   nextInput: string | null;
   suppressUserMessage?: boolean;
+}
+
+export type SlashCommandSource = 'user' | 'agent';
+
+export interface SlashCommandOptions {
+  source?: SlashCommandSource;
+  actorName?: string;
+  autoSubmit?: boolean;
 }
 
 interface UseSlashCommandsProps {
@@ -59,7 +67,11 @@ export function useSlashCommands({
    * @returns {Promise<SlashCommandResult>} - backendに送るテキストと表示制御
    */
   const handleSlashCommand = useCallback(
-    async (rawInput: string): Promise<SlashCommandResult> => {
+    async (
+      rawInput: string,
+      options: SlashCommandOptions = {}
+    ): Promise<SlashCommandResult> => {
+      const { source = 'user', actorName, autoSubmit = false } = options;
       const parsed = parseCommand(rawInput);
 
       if (!parsed.isCommand || !parsed.command) {
@@ -68,9 +80,15 @@ export function useSlashCommands({
 
       let nextInput: string | null = null;
       let suppressUserMessage = false;
-      const commandProvenance = `\n\n(Generated via /${parsed.command} command.)`;
+      const provenanceActor =
+        source === 'agent' ? `${actorName ?? 'Agent'}'s ` : '';
+      const commandProvenance = `\n\n(Generated via ${provenanceActor}/${parsed.command} command.)`;
+      const commandLabel =
+        source === 'agent'
+          ? `${actorName ?? 'Agent'} issued ${rawInput}`
+          : rawInput;
 
-      handleSystemMessage(commandMessage(rawInput), addMessage);
+      handleSystemMessage(commandMessage(commandLabel), addMessage);
 
       const isBuiltinCommand = isValidCommand(parsed.command);
 
@@ -555,6 +573,33 @@ Generate the BlueprintWorkflow now.`;
           );
           await saveCurrentSession();
         }
+      }
+
+      if (
+        autoSubmit &&
+        nextInput !== null &&
+        typeof nextInput === 'string' &&
+        nextInput.trim().length > 0
+      ) {
+        try {
+          await invoke('publish_session_event', {
+            event: {
+              type: 'user_input',
+              content: nextInput,
+            },
+          });
+          await saveCurrentSession();
+        } catch (error) {
+          console.error('Failed to submit generated command content:', error);
+          handleSystemMessage(
+            conversationMessage(
+              `Failed to submit generated command content: ${error}`,
+              'error'
+            ),
+            addMessage
+          );
+        }
+        return { nextInput: null, suppressUserMessage: true };
       }
 
       return { nextInput, suppressUserMessage };

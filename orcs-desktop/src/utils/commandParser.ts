@@ -48,6 +48,55 @@ export function isValidCommand(command: string): boolean {
 }
 
 /**
+ * Agentレスポンスなど任意のテキストから SlashCommand を抽出する
+ * - `<Slash><Name>...` フォーマットと、行頭 `/command` の両方に対応
+ */
+export function extractSlashCommands(text: string): string[] {
+  const commands: string[] = [];
+
+  // 1) XML-style blocks
+  const slashBlocks = text.matchAll(/<Slash>([\s\S]*?)<\/Slash>/gi);
+  for (const block of slashBlocks) {
+    const inner = block[1];
+    const nameMatch = inner.match(/<Name>([\s\S]*?)<\/Name>/i);
+    if (!nameMatch) continue;
+    const rawName = nameMatch[1].trim().replace(/^\/+/, '');
+    if (!rawName) continue;
+
+    const argsMatch = inner.match(/<Args>([\s\S]*?)<\/Args>/i);
+    const args = argsMatch ? argsMatch[1].trim() : '';
+    const fullCommand = args ? `/${rawName} ${args}` : `/${rawName}`;
+    commands.push(fullCommand.trim());
+  }
+
+  // 2) Plain text lines that start with slash
+  const lines = text.split(/\r?\n/);
+  let inCodeBlock = false;
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+
+    if (trimmedLine.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+
+    if (inCodeBlock) {
+      continue;
+    }
+
+    const trimmed = trimmedLine;
+    if (!trimmed.startsWith('/') || trimmed.length === 1) {
+      continue;
+    }
+    // Collapse inner whitespace to single spaces so command parser works consistently
+    const normalized = trimmed.replace(/\s+/g, ' ');
+    commands.push(normalized);
+  }
+
+  return commands;
+}
+
+/**
  * コマンドのヘルプテキストを取得
  * @deprecated Use generateCommandHelp from command.ts instead
  */

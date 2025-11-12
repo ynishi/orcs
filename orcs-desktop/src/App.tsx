@@ -26,7 +26,7 @@ import { GitInfo } from "./types/git";
 import { Navbar } from "./components/navigation/Navbar";
 import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
 import { SettingsMenu } from "./components/settings/SettingsMenu";
-import { parseCommand } from "./utils/commandParser";
+import { parseCommand, extractSlashCommands } from "./utils/commandParser";
 import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
 import { useSessions } from "./hooks/useSessions";
@@ -205,6 +205,10 @@ function App() {
   const getTabBySessionIdRef = useRef(getTabBySessionId);
   const personasRef = useRef(personas);
   const currentSessionIdRef = useRef(currentSessionId);
+  const handleSlashCommandRef =
+    useRef<ReturnType<typeof useSlashCommands>['handleSlashCommand'] | null>(
+      null
+    );
 
   // 最新の関数をrefに保持（クロージャーの問題を回避）
   useEffect(() => {
@@ -273,6 +277,34 @@ function App() {
             };
 
             addMessageToTabRef.current(targetTab.id, newMessage);
+
+            // Agent responses can themselves issue SlashCommands. Detect and execute them
+            if (
+              !isSystemMessage &&
+              turn.session_id === currentSessionIdRef.current &&
+              handleSlashCommandRef.current
+            ) {
+              const detectedCommands = extractSlashCommands(turn.content);
+              if (detectedCommands.length > 0) {
+                const actorName = turn.author || 'Agent';
+                void (async () => {
+                  for (const commandText of detectedCommands) {
+                    try {
+                      await handleSlashCommandRef.current?.(commandText, {
+                        source: 'agent',
+                        actorName,
+                        autoSubmit: true,
+                      });
+                    } catch (error) {
+                      console.error(
+                        '[STREAM] Failed to execute agent slash command:',
+                        error
+                      );
+                    }
+                  }
+                })();
+              }
+            }
             break;
           }
 
@@ -693,6 +725,10 @@ function App() {
     refreshPersonas,
     refreshSessions,
   });
+
+  useEffect(() => {
+    handleSlashCommandRef.current = handleSlashCommand;
+  }, [handleSlashCommand]);
 
   const processInput = useCallback(
     async (rawInput: string, attachedFiles: File[] = []) => {

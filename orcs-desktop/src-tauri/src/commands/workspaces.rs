@@ -36,7 +36,7 @@ pub async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspa
 
     println!("[Backend] No AppStateService workspace, checking session");
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;

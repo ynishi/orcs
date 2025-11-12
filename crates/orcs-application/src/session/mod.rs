@@ -3,14 +3,13 @@
 //! This module contains application-layer services for managing sessions,
 //! including lifecycle management, metadata operations, and session updates.
 
-mod manager;
+mod cache;
+mod factory;
 mod metadata_service;
 mod updater;
 
-#[cfg(test)]
-mod manager_test;
-
-pub use manager::SessionManager;
+pub use cache::SessionCache;
+pub use factory::SessionFactory;
 pub use metadata_service::SessionMetadataService;
 pub use updater::SessionUpdater;
 

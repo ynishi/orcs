@@ -114,9 +114,10 @@ pub async fn create_config_session(
 /// Lists all saved sessions with enriched participants
 #[tauri::command]
 pub async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, String> {
+    use orcs_core::session::SessionRepository;
     let sessions = state
-        .session_manager
-        .list_sessions()
+        .session_repository
+        .list_all()
         .await
         .map_err(|e| e.to_string())?;
 
@@ -153,7 +154,7 @@ pub async fn switch_session(
 #[tauri::command]
 pub async fn delete_session(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
     state
-        .session_manager
+        .session_usecase
         .delete_session(&session_id)
         .await
         .map_err(|e| e.to_string())
@@ -218,7 +219,7 @@ pub async fn update_session_sort_order(
 pub async fn save_current_session(state: State<'_, AppState>) -> Result<(), String> {
     let app_mode = state.app_mode.lock().await.clone();
     state
-        .session_manager
+        .session_usecase
         .save_active_session(app_mode)
         .await
         .map_err(|e| e.to_string())
@@ -231,7 +232,7 @@ pub async fn append_system_messages(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or_else(|| "No active session".to_string())?;
@@ -261,7 +262,7 @@ pub async fn append_system_messages(
 
     let app_mode = state.app_mode.lock().await.clone();
     state
-        .session_manager
+        .session_usecase
         .save_active_session(app_mode)
         .await
         .map_err(|e| e.to_string())
@@ -301,7 +302,7 @@ pub async fn publish_session_event(
             // Save the session (Tauri layer responsibility for now)
             let app_mode = state.app_mode.lock().await.clone();
             state
-                .session_manager
+                .session_usecase
                 .save_active_session(app_mode)
                 .await
                 .map_err(|e| e.to_string())?;
@@ -320,7 +321,7 @@ async fn handle_moderator_action(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or_else(|| "No active session".to_string())?;
@@ -342,7 +343,7 @@ async fn handle_moderator_action(
 
     let app_mode = state.app_mode.lock().await.clone();
     state
-        .session_manager
+        .session_usecase
         .save_active_session(app_mode)
         .await
         .map_err(|e| e.to_string())
@@ -351,7 +352,7 @@ async fn handle_moderator_action(
 /// Gets the currently active session
 #[tauri::command]
 pub async fn get_active_session(state: State<'_, AppState>) -> Result<Option<Session>, String> {
-    if let Some(manager) = state.session_manager.active_session().await {
+    if let Some(manager) = state.session_usecase.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();
         let session = manager
             .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
@@ -369,7 +370,7 @@ pub async fn execute_message_as_task(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -409,7 +410,7 @@ pub async fn execute_message_as_task(
 #[tauri::command]
 pub async fn add_participant(persona_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -420,7 +421,7 @@ pub async fn add_participant(persona_id: String, state: State<'_, AppState>) -> 
         .map_err(|e| e.to_string())?;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let _ = state.session_manager.save_active_session(app_mode).await;
+    let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(())
 }
@@ -432,7 +433,7 @@ pub async fn remove_participant(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -443,7 +444,7 @@ pub async fn remove_participant(
         .map_err(|e| e.to_string())?;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let _ = state.session_manager.save_active_session(app_mode).await;
+    let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(())
 }
@@ -452,7 +453,7 @@ pub async fn remove_participant(
 #[tauri::command]
 pub async fn get_active_participants(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -467,7 +468,7 @@ pub async fn set_execution_strategy(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -475,7 +476,7 @@ pub async fn set_execution_strategy(
     manager.set_execution_strategy(strategy).await;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let _ = state.session_manager.save_active_session(app_mode).await;
+    let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(())
 }
@@ -484,7 +485,7 @@ pub async fn set_execution_strategy(
 #[tauri::command]
 pub async fn get_execution_strategy(state: State<'_, AppState>) -> Result<ExecutionModel, String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -496,7 +497,7 @@ pub async fn get_execution_strategy(state: State<'_, AppState>) -> Result<Execut
 #[tauri::command]
 pub async fn set_conversation_mode(mode: String, state: State<'_, AppState>) -> Result<(), String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -512,7 +513,7 @@ pub async fn set_conversation_mode(mode: String, state: State<'_, AppState>) -> 
     manager.set_conversation_mode(conversation_mode).await;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let _ = state.session_manager.save_active_session(app_mode).await;
+    let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(())
 }
@@ -521,7 +522,7 @@ pub async fn set_conversation_mode(mode: String, state: State<'_, AppState>) -> 
 #[tauri::command]
 pub async fn get_conversation_mode(state: State<'_, AppState>) -> Result<String, String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -544,7 +545,7 @@ pub async fn set_talk_style(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -567,7 +568,7 @@ pub async fn set_talk_style(
     manager.set_talk_style(talk_style).await;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let _ = state.session_manager.save_active_session(app_mode).await;
+    let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(())
 }
@@ -576,7 +577,7 @@ pub async fn set_talk_style(
 #[tauri::command]
 pub async fn get_talk_style(state: State<'_, AppState>) -> Result<Option<String>, String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -607,7 +608,7 @@ pub async fn handle_input(
     state: State<'_, AppState>,
 ) -> Result<SerializableInteractionResult, String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -718,7 +719,7 @@ pub async fn handle_input(
     }
 
     let app_mode = state.app_mode.lock().await.clone();
-    let _ = state.session_manager.save_active_session(app_mode).await;
+    let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(result.into())
 }
@@ -778,7 +779,7 @@ pub async fn get_auto_chat_config(
 ) -> Result<Option<AutoChatConfig>, String> {
     // Get the current active session's manager
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or_else(|| "No active session".to_string())?;
@@ -804,7 +805,7 @@ pub async fn update_auto_chat_config(
 ) -> Result<(), String> {
     // Get the current active session's manager
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or_else(|| "No active session".to_string())?;
@@ -822,7 +823,7 @@ pub async fn update_auto_chat_config(
 
     // Persist the updated session
     let app_mode = state.app_mode.lock().await.clone();
-    let _ = state.session_manager.save_active_session(app_mode).await;
+    let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(())
 }
@@ -835,7 +836,7 @@ pub async fn get_auto_chat_status(
 ) -> Result<Option<u32>, String> {
     // Get the current active session's manager
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or_else(|| "No active session".to_string())?;
@@ -864,7 +865,7 @@ pub async fn start_auto_chat(
     state: State<'_, AppState>,
 ) -> Result<SerializableInteractionResult, String> {
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -919,7 +920,7 @@ pub async fn start_auto_chat(
 
     // Save the session after AutoChat completes
     let app_mode = state.app_mode.lock().await.clone();
-    let _ = state.session_manager.save_active_session(app_mode).await;
+    let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(result.into())
 }

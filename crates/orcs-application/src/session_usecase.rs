@@ -6,18 +6,18 @@
 
 use anyhow::{Result, anyhow};
 use orcs_core::repository::PersonaRepository;
-use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID, Session};
+use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID, Session, SessionRepository};
 use orcs_core::state::repository::StateRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_interaction::InteractionManager;
-use crate::session::SessionManager;
+use crate::session::{SessionCache, SessionFactory, SessionUpdater};
 use std::sync::Arc;
 use uuid::Uuid;
 
 /// Use case for managing sessions with workspace context.
 ///
-/// `SessionUseCase` coordinates between `SessionManager`, `WorkspaceManager`,
+/// `SessionUseCase` coordinates between `SessionRepository`, `WorkspaceManager`,
 /// and `AppStateService` to handle all session-related operations while maintaining
 /// consistency between sessions and their associated workspaces.
 ///
@@ -31,18 +31,22 @@ use uuid::Uuid;
 ///
 /// # Thread Safety
 ///
-/// All internal managers are wrapped in `Arc` and use interior mutability
+/// All internal components are wrapped in `Arc` and use interior mutability
 /// (`RwLock`, `Mutex`) for thread-safe concurrent access.
 pub struct SessionUseCase {
-    /// Manager for session lifecycle and state
-    session_manager: Arc<SessionManager<InteractionManager>>,
+    /// Repository for session data persistence
+    session_repository: Arc<dyn SessionRepository>,
+    /// Cache for in-memory InteractionManager instances
+    session_cache: Arc<SessionCache<InteractionManager>>,
+    /// Factory for creating InteractionManager instances
+    session_factory: Arc<SessionFactory>,
     /// Manager for workspace operations
     workspace_manager: Arc<dyn WorkspaceManager>,
     /// Service for application-level state (e.g., last selected workspace)
     app_state_service: Arc<orcs_infrastructure::AppStateService>,
-    /// Repository for persona configurations
+    /// Repository for persona configurations (for enrich_session_participants)
     persona_repository: Arc<dyn PersonaRepository>,
-    /// Service for user information
+    /// Service for user information (for enrich_session_participants)
     user_service: Arc<dyn UserService>,
 }
 
@@ -51,20 +55,25 @@ impl SessionUseCase {
     ///
     /// # Arguments
     ///
-    /// * `session_manager` - Manager for session operations
+    /// * `session_repository` - Repository for session data persistence
     /// * `workspace_manager` - Manager for workspace operations
     /// * `app_state_service` - Service for application-level state
     /// * `persona_repository` - Repository for accessing persona configurations
     /// * `user_service` - Service for retrieving user information
     pub fn new(
-        session_manager: Arc<SessionManager<InteractionManager>>,
+        session_repository: Arc<dyn SessionRepository>,
         workspace_manager: Arc<dyn WorkspaceManager>,
         app_state_service: Arc<orcs_infrastructure::AppStateService>,
         persona_repository: Arc<dyn PersonaRepository>,
         user_service: Arc<dyn UserService>,
     ) -> Self {
         Self {
-            session_manager,
+            session_repository: session_repository.clone(),
+            session_cache: Arc::new(SessionCache::new()),
+            session_factory: Arc::new(SessionFactory::new(
+                persona_repository.clone(),
+                user_service.clone(),
+            )),
             workspace_manager,
             app_state_service,
             persona_repository,
@@ -124,16 +133,8 @@ impl SessionUseCase {
         let session_id = Uuid::new_v4().to_string();
         tracing::debug!("[SessionUseCase] Generated session ID: {}", session_id);
 
-        let manager = self
-            .session_manager
-            .create_session(session_id.clone(), |sid| {
-                InteractionManager::new_session(
-                    sid,
-                    self.persona_repository.clone(),
-                    self.user_service.clone(),
-                )
-            })
-            .await?;
+        // Create InteractionManager using factory
+        let manager = Arc::new(self.session_factory.create_interaction_manager(session_id.clone()));
 
         // 3. Associate with workspace
         manager
@@ -143,6 +144,9 @@ impl SessionUseCase {
             )
             .await;
 
+        // Insert into cache
+        self.session_cache.insert(session_id.clone(), manager.clone()).await;
+
         tracing::info!(
             "[SessionUseCase] Session {} created and associated with workspace {}",
             session_id,
@@ -150,14 +154,18 @@ impl SessionUseCase {
         );
 
         // 4. Persist session
-        self.session_manager
-            .save_active_session(AppMode::Idle)
-            .await?;
-
-        // 5. Return session
-        let session = manager
-            .to_session(AppMode::Idle, workspace_id.to_string())
+        let session = self.session_factory
+            .to_session(manager.as_ref(), AppMode::Idle, workspace_id.to_string())
             .await;
+        self.session_repository.save(&session).await?;
+
+        // 5. Set as active session
+        self.app_state_service
+            .set_active_session(session_id.clone())
+            .await
+            .map_err(|e| anyhow!("Failed to set active session: {}", e))?;
+
+        // 6. Return session
         Ok(session)
     }
 
@@ -228,8 +236,8 @@ impl SessionUseCase {
 
         // 3. Check if there are existing sessions for this workspace
         let existing_sessions = self
-            .session_manager
-            .list_sessions()
+            .session_repository
+            .list_all()
             .await
             .map_err(|e| anyhow!("Failed to list sessions: {}", e))?;
 
@@ -326,16 +334,8 @@ impl SessionUseCase {
             session_id
         );
 
-        let manager = self
-            .session_manager
-            .create_session(session_id.clone(), |sid| {
-                InteractionManager::new_session(
-                    sid,
-                    self.persona_repository.clone(),
-                    self.user_service.clone(),
-                )
-            })
-            .await?;
+        // Create InteractionManager using factory
+        let manager = Arc::new(self.session_factory.create_interaction_manager(session_id.clone()));
 
         // 4. Associate with admin workspace
         manager
@@ -344,6 +344,9 @@ impl SessionUseCase {
                 Some(workspace.root_path.clone()),
             )
             .await;
+
+        // Insert into cache
+        self.session_cache.insert(session_id.clone(), manager.clone()).await;
 
         tracing::info!(
             "[SessionUseCase] Config session {} associated with workspace {}",
@@ -363,14 +366,18 @@ impl SessionUseCase {
         tracing::info!("[SessionUseCase] System prompt added to config session");
 
         // 6. Persist session
-        self.session_manager
-            .save_active_session(AppMode::Idle)
-            .await?;
-
-        // 7. Return session
-        let session = manager
-            .to_session(AppMode::Idle, workspace.id.clone())
+        let session = self.session_factory
+            .to_session(manager.as_ref(), AppMode::Idle, workspace.id.clone())
             .await;
+        self.session_repository.save(&session).await?;
+
+        // 7. Set as active session
+        self.app_state_service
+            .set_active_session(session_id.clone())
+            .await
+            .map_err(|e| anyhow!("Failed to set active session: {}", e))?;
+
+        // 8. Return session
         Ok(session)
     }
 
@@ -413,25 +420,36 @@ impl SessionUseCase {
     pub async fn switch_session(&self, session_id: &str) -> Result<Session> {
         tracing::info!("[SessionUseCase] Switching to session: {}", session_id);
 
-        // 1. Load session from storage
-        let manager = self
-            .session_manager
-            .switch_session(session_id, |data| {
-                InteractionManager::from_session(
-                    data,
-                    self.persona_repository.clone(),
-                    self.user_service.clone(),
-                )
-            })
-            .await?;
+        // 1. Get or load session
+        let manager = if let Some(cached) = self.session_cache.get(session_id).await {
+            cached
+        } else {
+            // Load from storage
+            let session = self
+                .session_repository
+                .find_by_id(session_id)
+                .await?
+                .ok_or_else(|| {
+                    anyhow!("Session not found: {}", session_id)
+                })?;
+            let manager = Arc::new(self.session_factory.from_session(session));
+            self.session_cache.insert(session_id.to_string(), manager.clone()).await;
+            manager
+        };
 
-        // 2. Get session data to check workspace_id - use placeholder for now, will be updated
-        let session = manager
-            .to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
+        // 2. Set as active session
+        self.app_state_service
+            .set_active_session(session_id.to_string())
+            .await
+            .map_err(|e| anyhow!("Failed to set active session: {}", e))?;
+
+        // 3. Get session data to check workspace_id - use placeholder for now, will be updated
+        let session = self.session_factory
+            .to_session(manager.as_ref(), AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
             .await;
         let workspace_id = &session.workspace_id;
 
-        // 3. Validate and restore workspace context if workspace_id exists
+        // 4. Validate and restore workspace context if workspace_id exists
         if workspace_id != PLACEHOLDER_WORKSPACE_ID {
             tracing::debug!(
                 "[SessionUseCase] Session references workspace: {}",
@@ -480,8 +498,19 @@ impl SessionUseCase {
                     );
 
                     // Clear the invalid workspace_id
-                    self.session_manager
-                        .update_workspace_id(session_id, PLACEHOLDER_WORKSPACE_ID.to_string(), None)
+                    // Update in-memory cache if present
+                    if let Some(cached_manager) = self.session_cache.get(session_id).await {
+                        cached_manager
+                            .set_workspace_id(Some(PLACEHOLDER_WORKSPACE_ID.to_string()), None)
+                            .await;
+                    }
+                    // Update in storage using SessionUpdater
+                    let updater = SessionUpdater::new(self.session_repository.clone());
+                    updater
+                        .update(session_id, |session| {
+                            session.workspace_id = PLACEHOLDER_WORKSPACE_ID.to_string();
+                            Ok(())
+                        })
                         .await?;
 
                     tracing::info!(
@@ -503,8 +532,8 @@ impl SessionUseCase {
         }
 
         // Return the session (potentially with cleared workspace_id)
-        let final_session = manager
-            .to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
+        let final_session = self.session_factory
+            .to_session(manager.as_ref(), AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
             .await;
         tracing::info!("[SessionUseCase] Switched to session: {}", session_id);
 
@@ -576,8 +605,8 @@ impl SessionUseCase {
 
         // Get all sessions for this workspace
         let all_sessions = self
-            .session_manager
-            .list_sessions()
+            .session_repository
+            .list_all()
             .await
             .map_err(|e| anyhow!("Failed to list sessions: {}", e))?;
 
@@ -602,18 +631,20 @@ impl SessionUseCase {
                 match self.switch_session(last_session_id).await {
                     Ok(_) => {
                         // Update session's workspace_id to the new workspace
-                        if let Some(manager) = self.session_manager.active_session().await {
-                            manager
-                                .set_workspace_id(
-                                    Some(workspace.id.clone()),
-                                    Some(workspace.root_path.clone()),
-                                )
-                                .await;
-                            // Persist the updated workspace association
-                            let _ = self
-                                .session_manager
-                                .save_active_session(orcs_core::session::AppMode::Idle)
-                                .await;
+                        if let Some(active_session_id) = self.active_session_id().await {
+                            if let Some(manager) = self.session_cache.get(&active_session_id).await {
+                                manager
+                                    .set_workspace_id(
+                                        Some(workspace.id.clone()),
+                                        Some(workspace.root_path.clone()),
+                                    )
+                                    .await;
+                                // Persist the updated workspace association
+                                let session = self.session_factory
+                                    .to_session(manager.as_ref(), orcs_core::session::AppMode::Idle, workspace.id.clone())
+                                    .await;
+                                let _ = self.session_repository.save(&session).await;
+                            }
                         }
                         println!(
                             "[SessionUseCase] Successfully switched to workspace {} with last active session {}",
@@ -649,20 +680,22 @@ impl SessionUseCase {
             );
             match self.switch_session(&most_recent.id).await {
                 Ok(_) => {
-                    // Update session's workspace_id to the new workspace
-                    if let Some(manager) = self.session_manager.active_session().await {
-                        manager
-                            .set_workspace_id(
-                                Some(workspace.id.clone()),
-                                Some(workspace.root_path.clone()),
-                            )
-                            .await;
-                        // Persist the updated workspace association
-                        let _ = self
-                            .session_manager
-                            .save_active_session(orcs_core::session::AppMode::Idle)
-                            .await;
-                    }
+                        // Update session's workspace_id to the new workspace
+                        if let Some(active_session_id) = self.active_session_id().await {
+                            if let Some(manager) = self.session_cache.get(&active_session_id).await {
+                                manager
+                                    .set_workspace_id(
+                                        Some(workspace.id.clone()),
+                                        Some(workspace.root_path.clone()),
+                                    )
+                                    .await;
+                                // Persist the updated workspace association
+                                let session = self.session_factory
+                                    .to_session(manager.as_ref(), orcs_core::session::AppMode::Idle, workspace.id.clone())
+                                    .await;
+                                let _ = self.session_repository.save(&session).await;
+                            }
+                        }
                     println!(
                         "[SessionUseCase] Successfully switched to workspace {} with recent session {}",
                         workspace_id, most_recent.id
@@ -688,16 +721,8 @@ impl SessionUseCase {
             session_id, workspace_id
         );
 
-        let manager = self
-            .session_manager
-            .create_session(session_id.clone(), |sid| {
-                InteractionManager::new_session(
-                    sid,
-                    self.persona_repository.clone(),
-                    self.user_service.clone(),
-                )
-            })
-            .await?;
+        // Create InteractionManager using factory
+        let manager = Arc::new(self.session_factory.create_interaction_manager(session_id.clone()));
 
         // Associate with workspace
         manager
@@ -707,10 +732,20 @@ impl SessionUseCase {
             )
             .await;
 
+        // Insert into cache
+        self.session_cache.insert(session_id.clone(), manager.clone()).await;
+
         // Persist session
-        self.session_manager
-            .save_active_session(orcs_core::session::AppMode::Idle)
-            .await?;
+        let session = self.session_factory
+            .to_session(manager.as_ref(), orcs_core::session::AppMode::Idle, workspace_id.to_string())
+            .await;
+        self.session_repository.save(&session).await?;
+
+        // Set as active session
+        self.app_state_service
+            .set_active_session(session_id.clone())
+            .await
+            .map_err(|e| anyhow!("Failed to set active session: {}", e))?;
 
         // Update workspace last active session
         workspace.last_active_session_id = Some(session_id.clone());
@@ -764,26 +799,37 @@ impl SessionUseCase {
     pub async fn restore_last_session(&self) -> Result<Option<Session>> {
         tracing::info!("[SessionUseCase] Attempting to restore last session");
 
-        // 1. Attempt to restore session
-        let manager = self
-            .session_manager
-            .restore_last_session(|data| {
-                InteractionManager::from_session(
-                    data,
-                    self.persona_repository.clone(),
-                    self.user_service.clone(),
-                )
-            })
-            .await?;
-
-        let Some(manager) = manager else {
-            tracing::info!("[SessionUseCase] No previous session found");
+        // 1. Get active session ID from state
+        let Some(session_id) = self.app_state_service.get_active_session().await else {
+            tracing::info!("[SessionUseCase] No active session ID found");
             return Ok(None);
         };
 
-        // 2. Get session data - use placeholder for now, will be updated
-        let session = manager
-            .to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
+        // 2. Attempt to restore session
+        let manager = if let Some(cached) = self.session_cache.get(&session_id).await {
+            Some(cached)
+        } else {
+            // Load from storage
+            if let Some(session) = self.session_repository.find_by_id(&session_id).await? {
+                let manager = Arc::new(self.session_factory.from_session(session));
+                self.session_cache.insert(session_id.clone(), manager.clone()).await;
+                Some(manager)
+            } else {
+                None
+            }
+        };
+
+        let Some(manager) = manager else {
+            tracing::info!("[SessionUseCase] Session {} not found", session_id);
+            // Clear invalid active session ID
+            self.app_state_service.clear_active_session().await
+                .map_err(|e| anyhow!("Failed to clear active session: {}", e))?;
+            return Ok(None);
+        };
+
+        // 3. Get session data - use placeholder for now, will be updated
+        let session = self.session_factory
+            .to_session(manager.as_ref(), AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
             .await;
         tracing::info!("[SessionUseCase] Restored session: {}", session.id);
         let workspace_id = &session.workspace_id;
@@ -828,12 +874,19 @@ impl SessionUseCase {
                     );
 
                     // Clear the invalid workspace_id
-                    self.session_manager
-                        .update_workspace_id(
-                            &session.id,
-                            PLACEHOLDER_WORKSPACE_ID.to_string(),
-                            None,
-                        )
+                    // Update in-memory cache if present
+                    if let Some(cached_manager) = self.session_cache.get(&session.id).await {
+                        cached_manager
+                            .set_workspace_id(Some(PLACEHOLDER_WORKSPACE_ID.to_string()), None)
+                            .await;
+                    }
+                    // Update in storage using SessionUpdater
+                    let updater = SessionUpdater::new(self.session_repository.clone());
+                    updater
+                        .update(&session.id, |s| {
+                            s.workspace_id = PLACEHOLDER_WORKSPACE_ID.to_string();
+                            Ok(())
+                        })
                         .await?;
 
                     tracing::info!(
@@ -854,19 +907,105 @@ impl SessionUseCase {
         }
 
         // Return the final session state
-        let final_session = manager
-            .to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
+        let final_session = self.session_factory
+            .to_session(manager.as_ref(), AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
             .await;
         Ok(Some(final_session))
     }
 
-    /// Returns a reference to the session manager.
+    /// Returns the ID of the currently active session.
     ///
-    /// This provides direct access to the underlying session manager for
-    /// operations that don't require workspace coordination.
-    pub fn session_manager(&self) -> &Arc<SessionManager<InteractionManager>> {
-        &self.session_manager
+    /// # Returns
+    ///
+    /// `Some(session_id)` if there is an active session, `None` otherwise.
+    pub async fn active_session_id(&self) -> Option<String> {
+        self.app_state_service.get_active_session().await
     }
+
+    /// Returns the currently active session manager.
+    ///
+    /// # Returns
+    ///
+    /// `Some(manager)` if there is an active session, `None` otherwise.
+    pub async fn active_session(&self) -> Option<Arc<InteractionManager>> {
+        let Some(session_id) = self.active_session_id().await else {
+            return None;
+        };
+        self.session_cache.get(&session_id).await
+    }
+
+    /// Saves the currently active session to storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `app_mode` - The current application mode
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there is no active session or if storage fails.
+    pub async fn save_active_session(&self, app_mode: AppMode) -> Result<()> {
+        let Some(session_id) = self.active_session_id().await else {
+            return Err(anyhow!("No active session"));
+        };
+
+        // Get manager from cache
+        let manager = self
+            .session_cache
+            .get(&session_id)
+            .await
+            .ok_or_else(|| anyhow!("Active session {} not found in cache", session_id))?;
+
+        // Load existing session to preserve workspace_id
+        let existing_workspace_id = self
+            .session_repository
+            .list_all()
+            .await?
+            .into_iter()
+            .find(|s| s.id == session_id)
+            .map(|s| s.workspace_id)
+            .unwrap_or_else(|| PLACEHOLDER_WORKSPACE_ID.to_string());
+
+        // Convert to session and save
+        let session = self.session_factory
+            .to_session(manager.as_ref(), app_mode, existing_workspace_id)
+            .await;
+        self.session_repository
+            .save(&session)
+            .await
+            .map_err(|e| anyhow!("Failed to save session: {}", e))?;
+
+        Ok(())
+    }
+
+    /// Deletes a session and clears active session if it was the active one.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The ID of the session to delete
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session deletion fails.
+    pub async fn delete_session(&self, session_id: &str) -> Result<()> {
+        // Remove from cache
+        self.session_cache.remove(session_id).await;
+
+        // Remove from storage
+        self.session_repository.delete(session_id).await?;
+
+        // Clear active session if this was the active session
+        if let Some(active_session_id) = self.active_session_id().await {
+            if active_session_id == session_id {
+                self.app_state_service
+                    .clear_active_session()
+                    .await
+                    .map_err(|e| anyhow!("Failed to clear active session: {}", e))?;
+            }
+        }
+
+        Ok(())
+    }
+
 
     /// Returns a reference to the workspace manager.
     ///
@@ -959,11 +1098,15 @@ impl SessionUseCase {
         message_type: Option<String>,
         severity: Option<orcs_core::session::ErrorSeverity>,
     ) -> Result<()> {
+        let Some(session_id) = self.active_session_id().await else {
+            return Err(anyhow!("No active session"));
+        };
+
         let manager = self
-            .session_manager
-            .active_session()
+            .session_cache
+            .get(&session_id)
             .await
-            .ok_or_else(|| anyhow!("No active session"))?;
+            .ok_or_else(|| anyhow!("Active session {} not found in cache", session_id))?;
 
         manager
             .add_system_conversation_message(content, message_type, severity)

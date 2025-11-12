@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use orcs_application::{AdhocPersonaService, SessionUseCase};
-use orcs_application::session::{SessionManager, SessionMetadataService};
+use orcs_application::session::SessionMetadataService;
 use orcs_core::{
     persona::PersonaRepository,
     secret::SecretService,
@@ -21,7 +21,6 @@ use tokio::sync::Mutex;
 /// Application state shared across Tauri commands.
 pub struct AppState {
     pub session_usecase: Arc<SessionUseCase>,
-    pub session_manager: Arc<SessionManager<orcs_interaction::InteractionManager>>,
     pub session_repository: Arc<AsyncDirSessionRepository>,
     pub session_metadata_service: Arc<SessionMetadataService>,
     pub app_mode: Mutex<AppMode>,

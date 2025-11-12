@@ -57,7 +57,7 @@ fn main() {
 
     tauri::async_runtime::block_on(async move {
         let bootstrap = app::bootstrap(event_tx.clone()).await;
-        let session_manager_for_setup = bootstrap.session_manager.clone();
+        let session_usecase_for_setup = bootstrap.app_state.session_usecase.clone();
 
         tauri::Builder::default()
             .plugin(tauri_plugin_opener::init())
@@ -82,14 +82,16 @@ fn main() {
                 });
 
                 let handle = app.handle().clone();
-                let session_manager_for_setup = session_manager_for_setup.clone();
+                let session_usecase_for_setup = session_usecase_for_setup.clone();
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-                    if let Some(session_mgr) = session_manager_for_setup.active_session().await {
+                    if let Some(session_mgr) = session_usecase_for_setup.active_session().await {
                         let app_mode_locked = AppMode::Idle;
+                        // Get workspace_id from session
+                        let workspace_id = PLACEHOLDER_WORKSPACE_ID.to_string();
                         let session = session_mgr
-                            .to_session(app_mode_locked, PLACEHOLDER_WORKSPACE_ID.to_string())
+                            .to_session(app_mode_locked, workspace_id)
                             .await;
                         if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
                             let workspace_id = &session.workspace_id;

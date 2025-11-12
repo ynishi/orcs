@@ -13,7 +13,7 @@ use orcs_core::{
     user::UserService,
     workspace::manager::WorkspaceManager,
 };
-use orcs_application::session::{SessionManager, SessionMetadataService, SessionUpdater};
+use orcs_application::session::{SessionMetadataService, SessionUpdater};
 use orcs_execution::{TaskExecutor, tracing_layer::OrchestratorEvent};
 use orcs_infrastructure::{
     AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
@@ -26,7 +26,6 @@ use crate::app::AppState;
 
 pub struct AppBootstrap {
     pub app_state: AppState,
-    pub session_manager: Arc<SessionManager<orcs_interaction::InteractionManager>>,
     pub app_state_service: Arc<AppStateService>,
 }
 
@@ -208,18 +207,13 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         .await
         .expect("Failed to replace placeholder sessions");
 
-    // Initialize SessionManager with both repositories
-    let session_manager: Arc<SessionManager<orcs_interaction::InteractionManager>> = Arc::new(
-        SessionManager::new(session_repository.clone(), app_state_service.clone()),
-    );
-
     // Create SessionMetadataService for session metadata operations
     let session_updater = SessionUpdater::new(session_repository.clone());
     let session_metadata_service = Arc::new(SessionMetadataService::new(session_updater));
 
     // Create SessionUseCase for coordinated session-workspace management
     let session_usecase = Arc::new(SessionUseCase::new(
-        session_manager.clone(),
+        session_repository.clone(),
         workspace_manager.clone(),
         app_state_service.clone(),
         persona_repository.clone(),
@@ -314,7 +308,6 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
 
     let app_state = AppState {
         session_usecase,
-        session_manager: session_manager.clone(),
         session_repository: session_repository.clone(),
         session_metadata_service,
         app_mode,
@@ -334,7 +327,6 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
 
     AppBootstrap {
         app_state,
-        session_manager,
         app_state_service,
     }
 }

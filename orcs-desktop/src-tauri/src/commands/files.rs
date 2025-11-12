@@ -37,7 +37,7 @@ pub async fn save_code_snippet(
         .await
         .map_err(|e| format!("Failed to write file: {}", e))?;
 
-    if let Some(manager) = state.session_manager.active_session().await {
+    if let Some(manager) = state.session_usecase.active_session().await {
         manager
             .add_system_conversation_message(
                 format!("Saved file: {}", file_path),
@@ -47,7 +47,7 @@ pub async fn save_code_snippet(
             .await;
 
         let app_mode = state.app_mode.lock().await.clone();
-        let _ = state.session_manager.save_active_session(app_mode).await;
+        let _ = state.session_usecase.save_active_session(app_mode).await;
     }
 
     Ok(())

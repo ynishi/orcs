@@ -9,6 +9,6 @@ pub mod session_usecase;
 pub mod utility_agent_service;
 
 pub use adhoc_persona_service::AdhocPersonaService;
-pub use session::{SessionManager, SessionMetadataService, SessionUpdater};
+pub use session::{SessionMetadataService, SessionUpdater};
 pub use session_usecase::SessionUseCase;
 pub use utility_agent_service::UtilityAgentService;

@@ -16,7 +16,7 @@ pub async fn create_adhoc_persona(
         .map_err(|e| e.to_string())?;
 
     let manager = state
-        .session_manager
+        .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
@@ -27,7 +27,7 @@ pub async fn create_adhoc_persona(
         .map_err(|e| e.to_string())?;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let _ = state.session_manager.save_active_session(app_mode).await;
+    let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(persona)
 }
@@ -44,7 +44,7 @@ pub async fn save_adhoc_persona(
         .await
         .map_err(|e| e.to_string())?;
 
-    if let Some(manager) = state.session_manager.active_session().await {
+    if let Some(manager) = state.session_usecase.active_session().await {
         manager.invalidate_dialogue().await;
     }
 
@@ -73,7 +73,7 @@ pub async fn save_persona_configs(
         .await
         .map_err(|e| e.to_string())?;
 
-    if let Some(manager) = state.session_manager.active_session().await {
+    if let Some(manager) = state.session_usecase.active_session().await {
         manager.invalidate_dialogue().await;
     }
 

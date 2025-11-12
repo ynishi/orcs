@@ -22,7 +22,7 @@ pub struct GitInfo {
 pub async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String> {
     use orcs_core::workspace::manager::WorkspaceManager;
 
-    let workspace = match state.session_manager.active_session().await {
+    let workspace = match state.session_usecase.active_session().await {
         Some(manager) => {
             let app_mode = state.app_mode.lock().await.clone();
             let session = manager

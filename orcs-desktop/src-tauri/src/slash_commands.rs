@@ -53,7 +53,7 @@ async fn expand_slash_command(
     };
 
     // Get workspace info from active session
-    let workspace = if let Some(session_mgr) = state.session_manager.active_session().await {
+    let workspace = if let Some(session_mgr) = state.session_usecase.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();
         let session = session_mgr
             .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
@@ -236,7 +236,7 @@ pub async fn execute_shell_command(
         dir
     } else {
         // Default to workspace directory from active session
-        let workspace = if let Some(session_mgr) = state.session_manager.active_session().await {
+        let workspace = if let Some(session_mgr) = state.session_usecase.active_session().await {
             let app_mode = state.app_mode.lock().await.clone();
             let session = session_mgr
                 .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())

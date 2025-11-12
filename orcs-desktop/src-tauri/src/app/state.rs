@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use orcs_application::{AdhocPersonaService, SessionUseCase};
+use orcs_application::session::{SessionManager, SessionMetadataService};
 use orcs_core::{
     persona::PersonaRepository,
     secret::SecretService,
-    session::{AppMode, SessionManager, SessionMetadataService},
+    session::AppMode,
     slash_command::SlashCommandRepository,
     task::TaskRepository,
     user::UserService,

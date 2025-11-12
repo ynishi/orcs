@@ -3,9 +3,8 @@
 //! This module provides `SessionUpdater` which abstracts the common
 //! "find → update → save" pattern used across session metadata operations.
 
-use super::model::Session;
-use super::repository::SessionRepository;
-use crate::error::{OrcsError, Result};
+use orcs_core::session::{Session, SessionRepository};
+use orcs_core::error::{OrcsError, Result};
 use std::sync::Arc;
 
 /// Helper struct for updating sessions with a common pattern.

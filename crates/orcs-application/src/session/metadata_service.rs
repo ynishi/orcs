@@ -4,7 +4,7 @@
 //! session metadata updates such as renaming, favoriting, archiving, etc.
 
 use super::updater::SessionUpdater;
-use crate::error::Result;
+use orcs_core::error::Result;
 
 /// Service for managing session metadata operations.
 ///

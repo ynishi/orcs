@@ -1,28 +1,11 @@
-use super::app_mode::AppMode;
-use super::model::Session;
-use super::repository::SessionRepository;
-use super::updater::SessionUpdater;
-use crate::error::{OrcsError, Result};
-use crate::state::repository::StateRepository;
+use orcs_core::session::{AppMode, Session, SessionRepository, InteractionManagerTrait};
+use orcs_core::error::{OrcsError, Result};
+use orcs_core::state::repository::StateRepository;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-// Forward declaration - orcs-interaction will provide this
-// We use dynamic dispatch to avoid circular dependencies
-pub trait InteractionManagerTrait: Send + Sync {
-    fn session_id(&self) -> &str;
-    fn to_session(
-        &self,
-        app_mode: AppMode,
-        workspace_id: String,
-    ) -> impl std::future::Future<Output = Session> + Send;
-    fn set_workspace_id(
-        &self,
-        workspace_id: Option<String>,
-        workspace_root: Option<std::path::PathBuf>,
-    ) -> impl std::future::Future<Output = ()> + Send;
-}
+use super::updater::SessionUpdater;
 
 /// Manages multiple sessions and their lifecycle.
 ///
@@ -184,7 +167,7 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
             .ok()
             .flatten()
             .map(|s| s.workspace_id)
-            .unwrap_or_else(|| crate::session::model::PLACEHOLDER_WORKSPACE_ID.to_string());
+            .unwrap_or_else(|| orcs_core::session::PLACEHOLDER_WORKSPACE_ID.to_string());
 
         let session = manager.to_session(app_mode, existing_workspace_id).await;
         self.session_repository.save(&session).await?;
@@ -330,3 +313,4 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
 #[cfg(test)]
 #[path = "manager_test.rs"]
 mod tests;
+

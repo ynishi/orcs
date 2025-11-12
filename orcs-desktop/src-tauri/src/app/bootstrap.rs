@@ -6,13 +6,14 @@ use orcs_core::{
     persona::{PersonaRepository, get_default_presets},
     repository::SessionRepository,
     secret::SecretService,
-    session::{AppMode, PLACEHOLDER_WORKSPACE_ID, SessionManager, SessionMetadataService, SessionUpdater},
+    session::{AppMode, PLACEHOLDER_WORKSPACE_ID},
     slash_command::SlashCommandRepository,
     state::{model::PLACEHOLDER_DEFAULT_WORKSPACE_ID, repository::StateRepository},
     task::TaskRepository,
     user::UserService,
     workspace::manager::WorkspaceManager,
 };
+use orcs_application::session::{SessionManager, SessionMetadataService, SessionUpdater};
 use orcs_execution::{TaskExecutor, tracing_layer::OrchestratorEvent};
 use orcs_infrastructure::{
     AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,

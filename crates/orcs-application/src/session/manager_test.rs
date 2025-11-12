@@ -1,10 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use crate::session::app_mode::{AppMode, ConversationMode};
-    use crate::session::manager::{InteractionManagerTrait, SessionManager};
-    use crate::session::model::Session;
-    use crate::session::repository::SessionRepository;
-    use crate::state::repository::StateRepository;
+    use orcs_core::session::{AppMode, ConversationMode, Session, SessionRepository};
+    use orcs_core::session::InteractionManagerTrait;
+    use orcs_core::state::repository::StateRepository;
+    use crate::session::manager::SessionManager;
     use llm_toolkit::agent::dialogue::ExecutionModel;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
@@ -80,24 +79,24 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SessionRepository for MockSessionRepository {
-        async fn find_by_id(&self, session_id: &str) -> crate::error::Result<Option<Session>> {
+        async fn find_by_id(&self, session_id: &str) -> orcs_core::error::Result<Option<Session>> {
             let sessions = self.sessions.lock().unwrap();
             Ok(sessions.get(session_id).cloned())
         }
 
-        async fn save(&self, session: &Session) -> crate::error::Result<()> {
+        async fn save(&self, session: &Session) -> orcs_core::error::Result<()> {
             let mut sessions = self.sessions.lock().unwrap();
             sessions.insert(session.id.clone(), session.clone());
             Ok(())
         }
 
-        async fn delete(&self, session_id: &str) -> crate::error::Result<()> {
+        async fn delete(&self, session_id: &str) -> orcs_core::error::Result<()> {
             let mut sessions = self.sessions.lock().unwrap();
             sessions.remove(session_id);
             Ok(())
         }
 
-        async fn list_all(&self) -> crate::error::Result<Vec<Session>> {
+        async fn list_all(&self) -> orcs_core::error::Result<Vec<Session>> {
             let sessions = self.sessions.lock().unwrap();
             Ok(sessions.values().cloned().collect())
         }
@@ -118,31 +117,31 @@ mod tests {
 
     #[async_trait::async_trait]
     impl StateRepository for MockStateRepository {
-        async fn save_state(&self, _state: crate::state::model::AppState) -> crate::error::Result<()> {
+        async fn save_state(&self, _state: orcs_core::state::model::AppState) -> orcs_core::error::Result<()> {
             Ok(())
         }
 
-        async fn get_state(&self) -> crate::error::Result<crate::state::model::AppState> {
-            Ok(crate::state::model::AppState::default())
+        async fn get_state(&self) -> orcs_core::error::Result<orcs_core::state::model::AppState> {
+            Ok(orcs_core::state::model::AppState::default())
         }
 
         async fn get_last_selected_workspace(&self) -> Option<String> {
             None
         }
 
-        async fn set_last_selected_workspace(&self, _workspace_id: String) -> crate::error::Result<()> {
+        async fn set_last_selected_workspace(&self, _workspace_id: String) -> orcs_core::error::Result<()> {
             Ok(())
         }
 
-        async fn clear_last_selected_workspace(&self) -> crate::error::Result<()> {
+        async fn clear_last_selected_workspace(&self) -> orcs_core::error::Result<()> {
             Ok(())
         }
 
         async fn get_default_workspace(&self) -> String {
-            crate::state::model::PLACEHOLDER_DEFAULT_WORKSPACE_ID.to_string()
+            orcs_core::state::model::PLACEHOLDER_DEFAULT_WORKSPACE_ID.to_string()
         }
 
-        async fn set_default_workspace(&self, _workspace_id: String) -> crate::error::Result<()> {
+        async fn set_default_workspace(&self, _workspace_id: String) -> orcs_core::error::Result<()> {
             Ok(())
         }
 
@@ -150,12 +149,12 @@ mod tests {
             self.active_session_id.lock().unwrap().clone()
         }
 
-        async fn set_active_session(&self, session_id: String) -> crate::error::Result<()> {
+        async fn set_active_session(&self, session_id: String) -> orcs_core::error::Result<()> {
             *self.active_session_id.lock().unwrap() = Some(session_id);
             Ok(())
         }
 
-        async fn clear_active_session(&self) -> crate::error::Result<()> {
+        async fn clear_active_session(&self) -> orcs_core::error::Result<()> {
             *self.active_session_id.lock().unwrap() = None;
             Ok(())
         }

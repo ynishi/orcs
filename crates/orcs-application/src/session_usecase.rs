@@ -6,11 +6,12 @@
 
 use anyhow::{Result, anyhow};
 use orcs_core::repository::PersonaRepository;
-use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID, Session, SessionManager};
+use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID, Session};
 use orcs_core::state::repository::StateRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_interaction::InteractionManager;
+use crate::session::SessionManager;
 use std::sync::Arc;
 use uuid::Uuid;
 

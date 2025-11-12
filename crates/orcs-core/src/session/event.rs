@@ -21,9 +21,7 @@ pub enum SessionEvent {
         severity: Option<ErrorSeverity>,
     },
     /// Action produced by an internal moderator.
-    ModeratorAction {
-        action: ModeratorAction,
-    },
+    ModeratorAction { action: ModeratorAction },
 }
 
 /// Actions the moderator can trigger within a session.
@@ -31,9 +29,7 @@ pub enum SessionEvent {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ModeratorAction {
     /// Update conversation mode.
-    SetConversationMode {
-        mode: ConversationMode,
-    },
+    SetConversationMode { mode: ConversationMode },
     /// Append a structured system message.
     AppendSystemMessage {
         content: String,

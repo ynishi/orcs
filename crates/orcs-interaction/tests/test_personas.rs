@@ -55,7 +55,9 @@ async fn test_save_and_load_personas() {
     ];
 
     // Save personas
-    repo.save_all(&test_personas).await.expect("Should save personas");
+    repo.save_all(&test_personas)
+        .await
+        .expect("Should save personas");
 
     // Load personas
     let loaded_personas = repo.get_all().await.expect("Should load personas");
@@ -96,7 +98,9 @@ async fn test_persona_fields() {
     };
 
     // Save
-    repo.save_all(&[test_persona]).await.expect("Should save persona");
+    repo.save_all(&[test_persona])
+        .await
+        .expect("Should save persona");
 
     // Load and verify fields
     let personas = repo.get_all().await.expect("Should load personas");
@@ -154,11 +158,13 @@ async fn test_multiple_personas_stored_separately() {
 
     // Save first persona
     repo.save_all(&[persona1.clone()])
-        .await.expect("Should save first persona");
+        .await
+        .expect("Should save first persona");
 
     // Save second persona
     repo.save_all(&[persona2.clone()])
-        .await.expect("Should save second persona");
+        .await
+        .expect("Should save second persona");
 
     // Load all personas
     let personas = repo.get_all().await.expect("Should load personas");

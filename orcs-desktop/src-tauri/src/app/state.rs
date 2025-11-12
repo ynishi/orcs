@@ -2,13 +2,18 @@ use std::sync::Arc;
 
 use orcs_application::{AdhocPersonaService, SessionUseCase};
 use orcs_core::{
-    persona::PersonaRepository, secret::SecretService, session::{AppMode, SessionManager}, slash_command::SlashCommandRepository, task::TaskRepository, user::UserService
+    persona::PersonaRepository,
+    secret::SecretService,
+    session::{AppMode, SessionManager},
+    slash_command::SlashCommandRepository,
+    task::TaskRepository,
+    user::UserService,
 };
 use orcs_execution::TaskExecutor;
 use orcs_infrastructure::{
-    workspace_manager::FileSystemWorkspaceManager,
     AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
     AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
+    workspace_manager::FileSystemWorkspaceManager,
 };
 use tokio::sync::Mutex;
 
@@ -31,4 +36,3 @@ pub struct AppState {
     pub task_repository_concrete: Arc<AsyncDirTaskRepository>,
     pub task_executor: Arc<TaskExecutor>,
 }
-

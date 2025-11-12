@@ -4,8 +4,8 @@
 //! summarization, and icon suggestions using fast models (Gemini Flash API).
 
 use anyhow::Result;
-use llm_toolkit::agent::Agent;
 use llm_toolkit::ToPrompt;
+use llm_toolkit::agent::Agent;
 use serde::{Deserialize, Serialize};
 
 /// Generic title/metadata response from lightweight LLM
@@ -127,9 +127,8 @@ impl UtilityAgentService {
     ) -> Result<TitleResponse> {
         use llm_toolkit::prompt::ToPrompt;
 
-        let mut requirements = vec![
-            "Generate a concise, descriptive title (3-8 words recommended)".to_string(),
-        ];
+        let mut requirements =
+            vec!["Generate a concise, descriptive title (3-8 words recommended)".to_string()];
 
         if include_description {
             requirements.push("Generate a brief description (1-2 sentences)".to_string());
@@ -138,9 +137,8 @@ impl UtilityAgentService {
         }
 
         if include_icon {
-            requirements.push(
-                "Suggest an appropriate emoji/icon that represents the content".to_string(),
-            );
+            requirements
+                .push("Suggest an appropriate emoji/icon that represents the content".to_string());
         } else {
             requirements.push("Set icon to null (not needed)".to_string());
         }

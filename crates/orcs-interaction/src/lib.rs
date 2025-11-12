@@ -153,7 +153,7 @@ fn convert_to_llm_message_type(type_str: Option<&str>) -> Option<LlmMessageType>
         Some("notification") => Some(LlmMessageType::Notification),
         Some("system") => Some(LlmMessageType::System),
         Some("conversational") => Some(LlmMessageType::Conversational),
-        None | Some(_) => None,  // Default to Conversational (llm-toolkit default)
+        None | Some(_) => None, // Default to Conversational (llm-toolkit default)
     }
 }
 
@@ -604,7 +604,10 @@ impl InteractionManager {
             dialogue.with_talk_style(style);
         }
 
-        tracing::info!("[InteractionManager] Restored dialogue with {} history turns", history_turns.len());
+        tracing::info!(
+            "[InteractionManager] Restored dialogue with {} history turns",
+            history_turns.len()
+        );
 
         let mut dialogue = dialogue.with_history_as_system_prompt(history_turns);
 
@@ -613,7 +616,10 @@ impl InteractionManager {
 
         let personas_to_add: Vec<PersonaDomain> = if let Some(restored_ids) = restored_ids_opt {
             // Restore specific participants from session
-            let all_personas = self.persona_repository.get_all().await
+            let all_personas = self
+                .persona_repository
+                .get_all()
+                .await
                 .map_err(|e| e.to_string())?;
             all_personas
                 .into_iter()
@@ -622,7 +628,8 @@ impl InteractionManager {
         } else {
             // Use default participants
             self.persona_repository
-                .get_all().await
+                .get_all()
+                .await
                 .map_err(|e| e.to_string())?
                 .into_iter()
                 .filter(|p| p.default_participant)
@@ -660,7 +667,8 @@ impl InteractionManager {
         // Use the first default participant as current_persona_id
         let current_persona_id = self
             .persona_repository
-            .get_all().await
+            .get_all()
+            .await
             .ok()
             .and_then(|personas| {
                 personas
@@ -771,7 +779,8 @@ impl InteractionManager {
     /// Returns a list of available persona IDs.
     pub async fn available_personas(&self) -> Vec<String> {
         self.persona_repository
-            .get_all().await
+            .get_all()
+            .await
             .unwrap_or_default()
             .into_iter()
             .map(|p| p.id)
@@ -794,7 +803,8 @@ impl InteractionManager {
         // Find the persona
         let persona_config = self
             .persona_repository
-            .get_all().await
+            .get_all()
+            .await
             .map_err(|e| e.to_string())?
             .into_iter()
             .find(|p| p.id == persona_id)
@@ -859,7 +869,8 @@ impl InteractionManager {
         // Find the persona to get its full name
         let persona_config = self
             .persona_repository
-            .get_all().await
+            .get_all()
+            .await
             .map_err(|e| e.to_string())?
             .into_iter()
             .find(|p| p.id == persona_id)
@@ -1167,11 +1178,7 @@ impl InteractionManager {
     ///
     /// * `message` - The system message content
     /// * `on_turn` - Optional callback for streaming turns
-    async fn handle_system_message<F>(
-        &self,
-        message: &str,
-        on_turn: Option<F>,
-    ) -> InteractionResult
+    async fn handle_system_message<F>(&self, message: &str, on_turn: Option<F>) -> InteractionResult
     where
         F: Fn(&DialogueMessage),
     {
@@ -1181,11 +1188,8 @@ impl InteractionManager {
         }
 
         // Add system message to history for persistence
-        self.add_system_conversation_message(
-            message.to_string(),
-            Some("system".to_string()),
-            None,
-        ).await;
+        self.add_system_conversation_message(message.to_string(), Some("system".to_string()), None)
+            .await;
 
         // Send system message to UI via callback
         if let Some(ref callback) = on_turn {
@@ -1229,7 +1233,8 @@ impl InteractionManager {
 
                     // Convert speaker name to persona_id (UUID)
                     let persona_id = self
-                        .get_persona_id_by_name(speaker_name).await
+                        .get_persona_id_by_name(speaker_name)
+                        .await
                         .unwrap_or_else(|| speaker_name.to_string());
 
                     // Add each response to history using persona_id
@@ -1386,7 +1391,8 @@ impl InteractionManager {
 
                     // Convert speaker name to persona_id (UUID)
                     let persona_id = self
-                        .get_persona_id_by_name(speaker_name).await
+                        .get_persona_id_by_name(speaker_name)
+                        .await
                         .unwrap_or_else(|| speaker_name.to_string());
 
                     // Add each response to history using persona_id
@@ -1526,17 +1532,14 @@ impl InteractionManager {
                         initial_input,
                         file_paths.clone(),
                         Some(&on_turn),
-                        true,  // Add to history
+                        true, // Add to history
                     )
                     .await;
             } else {
                 // Iteration 2+: Send system message to continue the discussion
                 let continuation_content = "🔄 AutoMode: Discussion を続けましょう".to_string();
                 last_result = self
-                    .handle_system_message(
-                        &continuation_content,
-                        Some(&on_turn),
-                    )
+                    .handle_system_message(&continuation_content, Some(&on_turn))
                     .await;
             }
 
@@ -1544,7 +1547,10 @@ impl InteractionManager {
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
             // For user_interrupt mode, check if iteration counter was cleared
-            if matches!(config.stop_condition, orcs_core::session::StopCondition::UserInterrupt) {
+            if matches!(
+                config.stop_condition,
+                orcs_core::session::StopCondition::UserInterrupt
+            ) {
                 if self.get_auto_chat_iteration().await.is_none() {
                     tracing::info!("[AutoChat] User interrupt detected");
                     break;
@@ -1555,15 +1561,22 @@ impl InteractionManager {
         // Clear iteration counter when done
         self.set_auto_chat_iteration(None).await;
 
-        tracing::info!("[AutoChat] Completed after {} iterations", current_iteration);
+        tracing::info!(
+            "[AutoChat] Completed after {} iterations",
+            current_iteration
+        );
 
         // Persist AutoChat completion message to session history
-        let completion_content = format!("✅ AutoChat completed after {} iterations.", current_iteration);
+        let completion_content = format!(
+            "✅ AutoChat completed after {} iterations.",
+            current_iteration
+        );
         self.add_system_conversation_message(
             completion_content,
             Some("auto_chat_completion".to_string()),
             None,
-        ).await;
+        )
+        .await;
 
         last_result
     }

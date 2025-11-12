@@ -109,4 +109,3 @@ pub trait WorkspaceRepository: Send + Sync {
         Ok(self.find_by_id(workspace_id).await?.is_some())
     }
 }
-

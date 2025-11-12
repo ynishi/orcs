@@ -1,7 +1,7 @@
 //! GeminiApiAgent - Direct REST API implementation for Gemini.
 //!
 //! This agent calls the Gemini REST API directly without CLI dependency.
-//! Configuration is loaded from ~/.config/orcs/secret.json
+//! Configuration is loaded from secret.json
 
 use async_trait::async_trait;
 use base64::Engine;
@@ -37,27 +37,27 @@ impl GeminiApiAgent {
         }
     }
 
-    /// Loads configuration from ~/.config/orcs/secret.json
+    /// Loads configuration from secret.json
     ///
     /// Model name defaults to `gemini-2.5-flash` if not specified.
     pub async fn try_from_env() -> Result<Self, AgentError> {
-        let service = SecretServiceImpl::default()
-            .map_err(|e| AgentError::ExecutionFailed(format!("Failed to initialize SecretService: {}", e)))?;
+        let service = SecretServiceImpl::default().map_err(|e| {
+            AgentError::ExecutionFailed(format!("Failed to initialize SecretService: {}", e))
+        })?;
 
-        let secret_config = service
-            .load_secrets().await
-            .map_err(|e| AgentError::ExecutionFailed(format!("Failed to load secret.json: {}", e)))?;
+        let secret_config = service.load_secrets().await.map_err(|e| {
+            AgentError::ExecutionFailed(format!("Failed to load secret.json: {}", e))
+        })?;
 
-        let gemini_config = secret_config
-            .gemini
-            .ok_or_else(|| AgentError::ExecutionFailed("Gemini configuration not found in secret.json".to_string()))?;
+        let gemini_config = secret_config.gemini.ok_or_else(|| {
+            AgentError::ExecutionFailed("Gemini configuration not found in secret.json".to_string())
+        })?;
 
         // Use default model (model settings now in config.toml)
         let model = DEFAULT_GEMINI_MODEL.to_string();
 
         Ok(Self::new(gemini_config.api_key, model))
     }
-
 
     /// Overrides the model after construction.
     pub fn with_model(mut self, model: impl Into<String>) -> Self {

@@ -95,7 +95,8 @@ impl PersonaBackend {
                 Capability::new("file:read").with_description("Read file contents from disk"),
                 Capability::new("file:write").with_description("Write content to files on disk"),
                 Capability::new("file:edit").with_description("Edit existing files on disk"),
-                Capability::new("command:execute").with_description("Execute shell commands and scripts"),
+                Capability::new("command:execute")
+                    .with_description("Execute shell commands and scripts"),
                 Capability::new("env:access").with_description("Access environment variables"),
                 Capability::new("payload:read").with_description("Read input payload and messages"),
                 Capability::new("attachment:read").with_description("Read file attachments"),
@@ -106,7 +107,8 @@ impl PersonaBackend {
                 Capability::new("payload:read").with_description("Read input payload and messages"),
                 Capability::new("attachment:read").with_description("Read file attachments"),
                 Capability::new("analysis:code").with_description("Analyze and review code"),
-                Capability::new("suggestion:provide").with_description("Provide suggestions and designs"),
+                Capability::new("suggestion:provide")
+                    .with_description("Provide suggestions and designs"),
             ]
         }
     }

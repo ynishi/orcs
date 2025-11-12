@@ -2,8 +2,8 @@ use std::time::SystemTime;
 
 use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
 use orcs_core::session::{
-    AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction, Session,
-    SessionEvent, PLACEHOLDER_WORKSPACE_ID,
+    AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
+    PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent,
 };
 use orcs_core::workspace::manager::WorkspaceManager;
 use orcs_interaction::InteractionResult;
@@ -51,7 +51,9 @@ impl From<InteractionResult> for SerializableInteractionResult {
     fn from(result: InteractionResult) -> Self {
         match result {
             InteractionResult::NewMessage(msg) => SerializableInteractionResult::NewMessage(msg),
-            InteractionResult::ModeChanged(mode) => SerializableInteractionResult::ModeChanged(mode),
+            InteractionResult::ModeChanged(mode) => {
+                SerializableInteractionResult::ModeChanged(mode)
+            }
             InteractionResult::TasksToDispatch { tasks } => {
                 SerializableInteractionResult::TasksToDispatch { tasks }
             }
@@ -120,7 +122,10 @@ pub async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, S
 
     let mut enriched_sessions = Vec::new();
     for session in sessions {
-        let enriched = state.session_usecase.enrich_session_participants(session).await;
+        let enriched = state
+            .session_usecase
+            .enrich_session_participants(session)
+            .await;
         enriched_sessions.push(enriched);
     }
 
@@ -238,15 +243,16 @@ pub async fn append_system_messages(
             severity,
         } = message;
 
-        let severity_enum = severity
-            .as_ref()
-            .map(|s| s.to_lowercase())
-            .and_then(|level| match level.as_str() {
-                "error" => Some(ErrorSeverity::Critical),
-                "warning" => Some(ErrorSeverity::Warning),
-                "info" => Some(ErrorSeverity::Info),
-                _ => None,
-            });
+        let severity_enum =
+            severity
+                .as_ref()
+                .map(|s| s.to_lowercase())
+                .and_then(|level| match level.as_str() {
+                    "error" => Some(ErrorSeverity::Critical),
+                    "warning" => Some(ErrorSeverity::Warning),
+                    "info" => Some(ErrorSeverity::Info),
+                    _ => None,
+                });
 
         manager
             .add_system_conversation_message(content, message_type, severity_enum)
@@ -269,7 +275,10 @@ pub async fn publish_session_event(
     state: State<'_, AppState>,
 ) -> Result<SerializableInteractionResult, String> {
     match event {
-        SessionEvent::UserInput { content, attachments } => {
+        SessionEvent::UserInput {
+            content,
+            attachments,
+        } => {
             let paths = if attachments.is_empty() {
                 None
             } else {
@@ -344,7 +353,9 @@ async fn handle_moderator_action(
 pub async fn get_active_session(state: State<'_, AppState>) -> Result<Option<Session>, String> {
     if let Some(manager) = state.session_manager.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();
-        let session = manager.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+        let session = manager
+            .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+            .await;
         Ok(Some(session))
     } else {
         Ok(None)
@@ -364,7 +375,9 @@ pub async fn execute_message_as_task(
         .ok_or("No active session")?;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let session = manager.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+    let session = manager
+        .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+        .await;
     let session_id = session.id.clone();
     let workspace_id = &session.workspace_id;
 
@@ -481,10 +494,7 @@ pub async fn get_execution_strategy(state: State<'_, AppState>) -> Result<Execut
 
 /// Sets the conversation mode for the active session
 #[tauri::command]
-pub async fn set_conversation_mode(
-    mode: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn set_conversation_mode(mode: String, state: State<'_, AppState>) -> Result<(), String> {
     let manager = state
         .session_manager
         .active_session()
@@ -572,16 +582,18 @@ pub async fn get_talk_style(state: State<'_, AppState>) -> Result<Option<String>
         .ok_or("No active session")?;
 
     let style = manager.get_talk_style().await;
-    let style_str = style.map(|s| match s {
-        TalkStyle::Brainstorm => "brainstorm",
-        TalkStyle::Casual => "casual",
-        TalkStyle::DecisionMaking => "decision_making",
-        TalkStyle::Debate => "debate",
-        TalkStyle::ProblemSolving => "problem_solving",
-        TalkStyle::Review => "review",
-        TalkStyle::Planning => "planning",
-    }
-    .to_string());
+    let style_str = style.map(|s| {
+        match s {
+            TalkStyle::Brainstorm => "brainstorm",
+            TalkStyle::Casual => "casual",
+            TalkStyle::DecisionMaking => "decision_making",
+            TalkStyle::Debate => "debate",
+            TalkStyle::ProblemSolving => "problem_solving",
+            TalkStyle::Review => "review",
+            TalkStyle::Planning => "planning",
+        }
+        .to_string()
+    });
 
     Ok(style_str)
 }
@@ -620,10 +632,7 @@ pub async fn handle_input(
         if let Ok(all_commands) = state.slash_command_repository.list_commands().await {
             eprintln!(
                 "[SLASH_COMMAND] Available commands: {:?}",
-                all_commands
-                    .iter()
-                    .map(|c| &c.name)
-                    .collect::<Vec<_>>()
+                all_commands.iter().map(|c| &c.name).collect::<Vec<_>>()
             );
         }
 
@@ -860,7 +869,10 @@ pub async fn start_auto_chat(
         .await
         .ok_or("No active session")?;
 
-    tracing::info!("[AutoChat] Starting with input: {}", input.chars().take(50).collect::<String>());
+    tracing::info!(
+        "[AutoChat] Starting with input: {}",
+        input.chars().take(50).collect::<String>()
+    );
 
     // Get config for progress tracking
     let config = manager.get_auto_chat_config().await;

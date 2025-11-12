@@ -7,8 +7,8 @@
 //! - Fully async I/O (no spawn_blocking)
 //! - 1 persona = 1 file (scalable for large prompts)
 
-use crate::{dto::create_persona_migrator, storage_repository::StorageRepository};
 use crate::OrcsPaths;
+use crate::{dto::create_persona_migrator, storage_repository::StorageRepository};
 use orcs_core::error::Result;
 use orcs_core::persona::Persona;
 use orcs_core::repository::PersonaRepository;
@@ -61,10 +61,7 @@ impl AsyncDirPersonaRepository {
 #[async_trait::async_trait]
 impl PersonaRepository for AsyncDirPersonaRepository {
     async fn get_all(&self) -> Result<Vec<Persona>> {
-        let all_personas = self
-            .storage
-            .load_all::<Persona>(Self::ENTITY_NAME)
-            .await?;
+        let all_personas = self.storage.load_all::<Persona>(Self::ENTITY_NAME).await?;
 
         // Extract values from Vec<(String, Persona)>
         let personas: Vec<Persona> = all_personas.into_iter().map(|(_, p)| p).collect();
@@ -72,10 +69,7 @@ impl PersonaRepository for AsyncDirPersonaRepository {
     }
 
     async fn save_all(&self, personas: &[Persona]) -> Result<()> {
-        let existing = self
-            .storage
-            .load_all::<Persona>(Self::ENTITY_NAME)
-            .await?;
+        let existing = self.storage.load_all::<Persona>(Self::ENTITY_NAME).await?;
 
         let existing_ids: std::collections::HashSet<String> =
             existing.iter().map(|(id, _)| id.clone()).collect();
@@ -170,7 +164,8 @@ mod tests {
         };
 
         // Save multiple
-        repo.save_all(&[persona1.clone(), persona2.clone()]).await
+        repo.save_all(&[persona1.clone(), persona2.clone()])
+            .await
             .unwrap();
 
         // Load all

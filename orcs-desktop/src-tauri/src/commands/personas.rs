@@ -54,7 +54,10 @@ pub async fn save_adhoc_persona(
 /// Gets all personas from the single source of truth
 #[tauri::command]
 pub async fn get_personas(state: State<'_, AppState>) -> Result<Vec<Persona>, String> {
-    state.persona_repository.get_all().await
+    state
+        .persona_repository
+        .get_all()
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -64,7 +67,10 @@ pub async fn save_persona_configs(
     configs: Vec<Persona>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.persona_repository.save_all(&configs).await
+    state
+        .persona_repository
+        .save_all(&configs)
+        .await
         .map_err(|e| e.to_string())?;
 
     if let Some(manager) = state.session_manager.active_session().await {
@@ -79,4 +85,3 @@ pub async fn save_persona_configs(
 pub async fn get_persona_backend_options() -> Result<Vec<(String, String)>, String> {
     Ok(PersonaBackend::all_variants())
 }
-

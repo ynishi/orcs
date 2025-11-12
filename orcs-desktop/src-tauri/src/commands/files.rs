@@ -75,7 +75,10 @@ pub async fn open_terminal(directory: String) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         let terminals = [
-            ("x-terminal-emulator", vec!["--working-directory", &directory]),
+            (
+                "x-terminal-emulator",
+                vec!["--working-directory", &directory],
+            ),
             ("gnome-terminal", vec!["--working-directory", &directory]),
             ("xterm", vec!["-e", &format!("cd '{}' && bash", directory)]),
         ];
@@ -95,5 +98,3 @@ pub async fn open_terminal(directory: String) -> Result<(), String> {
 
     Ok(())
 }
-
-

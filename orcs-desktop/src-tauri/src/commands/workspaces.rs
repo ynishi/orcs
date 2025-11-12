@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::state::repository::StateRepository;
-use orcs_core::workspace::{manager::WorkspaceManager, UploadedFile, Workspace};
+use orcs_core::workspace::{UploadedFile, Workspace, manager::WorkspaceManager};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::app::AppState;
@@ -42,7 +42,9 @@ pub async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspa
         .ok_or("No active session")?;
 
     let app_mode = state.app_mode.lock().await.clone();
-    let session = manager.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+    let session = manager
+        .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+        .await;
 
     println!("[Backend] Session workspace_id: {:?}", session.workspace_id);
 
@@ -298,4 +300,3 @@ pub async fn rename_file_in_workspace(
         .await
         .map_err(|e| e.to_string())
 }
-

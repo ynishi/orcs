@@ -51,8 +51,7 @@ impl AsyncDirSessionRepository {
     /// # Errors
     ///
     /// Returns an error if the storage cannot be created.
-    pub async fn default(
-    ) -> Result<Self> {
+    pub async fn default() -> Result<Self> {
         Self::new(None).await
     }
 
@@ -62,9 +61,7 @@ impl AsyncDirSessionRepository {
     ///
     /// * `base_dir` - Base directory for sessions
     /// * `persona_repository` - Required for persona ID migration
-    pub async fn new(
-        base_dir: Option<&Path>,
-    ) -> Result<Self> {
+    pub async fn new(base_dir: Option<&Path>) -> Result<Self> {
         use crate::paths::OrcsPaths;
 
         let migrator = create_session_migrator();
@@ -73,16 +70,18 @@ impl AsyncDirSessionRepository {
             .create_async_dir_storage(Self::SERVICE_TYPE, migrator)
             .await?;
 
-        Ok(Self {
-            storage,
-        })
+        Ok(Self { storage })
     }
 }
 
 #[async_trait]
 impl SessionRepository for AsyncDirSessionRepository {
     async fn find_by_id(&self, session_id: &str) -> Result<Option<Session>> {
-        match self.storage.load::<Session>(Self::ENTITY_NAME, session_id).await {
+        match self
+            .storage
+            .load::<Session>(Self::ENTITY_NAME, session_id)
+            .await
+        {
             Ok(session) => Ok(Some(session)),
             Err(e) => {
                 let orcs_err = e.into();
@@ -109,9 +108,7 @@ impl SessionRepository for AsyncDirSessionRepository {
     }
 
     async fn delete(&self, session_id: &str) -> Result<()> {
-        self.storage
-            .delete(session_id)
-            .await?;
+        self.storage.delete(session_id).await?;
         Ok(())
     }
 

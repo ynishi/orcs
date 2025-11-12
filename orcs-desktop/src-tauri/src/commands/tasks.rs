@@ -1,13 +1,11 @@
-use tauri::State;
 use orcs_infrastructure::storage_repository::StorageRepository;
+use tauri::State;
 
 use crate::app::AppState;
 
 /// Lists all saved tasks
 #[tauri::command]
-pub async fn list_tasks(
-    state: State<'_, AppState>,
-) -> Result<Vec<orcs_core::task::Task>, String> {
+pub async fn list_tasks(state: State<'_, AppState>) -> Result<Vec<orcs_core::task::Task>, String> {
     state
         .task_repository
         .list_all()
@@ -36,4 +34,3 @@ pub async fn get_tasks_directory(state: State<'_, AppState>) -> Result<String, S
 
     Ok(path_str.to_string())
 }
-

@@ -1,8 +1,12 @@
 //! AsyncDirStorage-based TaskRepository implementation
 
-use crate::{dto::create_task_migrator, storage_repository::StorageRepository, paths::{OrcsPaths, ServiceType}};
+use crate::{
+    dto::create_task_migrator,
+    paths::{OrcsPaths, ServiceType},
+    storage_repository::StorageRepository,
+};
 use async_trait::async_trait;
-use orcs_core::{repository::TaskRepository, task::Task, error::Result};
+use orcs_core::{error::Result, repository::TaskRepository, task::Task};
 use std::path::Path;
 use version_migrate::AsyncDirStorage;
 
@@ -68,24 +72,17 @@ impl TaskRepository for AsyncDirTaskRepository {
     }
 
     async fn save(&self, task: &Task) -> Result<()> {
-        self.storage
-            .save(Self::ENTITY_NAME, &task.id, task)
-            .await?;
+        self.storage.save(Self::ENTITY_NAME, &task.id, task).await?;
         Ok(())
     }
 
     async fn delete(&self, task_id: &str) -> Result<()> {
-        self.storage
-            .delete(task_id)
-            .await?;
+        self.storage.delete(task_id).await?;
         Ok(())
     }
 
     async fn list_all(&self) -> Result<Vec<Task>> {
-        let all_tasks = self
-            .storage
-            .load_all::<Task>(Self::ENTITY_NAME)
-            .await?;
+        let all_tasks = self.storage.load_all::<Task>(Self::ENTITY_NAME).await?;
 
         // Extract tasks from (id, task) tuples
         let mut tasks: Vec<Task> = all_tasks.into_iter().map(|(_, task)| task).collect();
@@ -113,7 +110,9 @@ mod tests {
 
     async fn create_test_repository() -> (AsyncDirTaskRepository, TempDir) {
         let temp_dir = TempDir::new().unwrap();
-        let repo = AsyncDirTaskRepository::new(Some(temp_dir.path())).await.unwrap();
+        let repo = AsyncDirTaskRepository::new(Some(temp_dir.path()))
+            .await
+            .unwrap();
         (repo, temp_dir)
     }
 

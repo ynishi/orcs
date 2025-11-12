@@ -5,8 +5,8 @@
 //! expertise descriptions.
 
 use anyhow::Result;
-use llm_toolkit::agent::Agent;
 use llm_toolkit::ToPrompt;
+use llm_toolkit::agent::Agent;
 use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
 use orcs_core::repository::PersonaRepository;
 use serde::{Deserialize, Serialize};
@@ -49,9 +49,7 @@ pub struct AdhocPersonaService {
 impl AdhocPersonaService {
     /// Create a new AdhocPersonaService
     pub fn new(persona_repository: Arc<dyn PersonaRepository>) -> Self {
-        Self {
-            persona_repository,
-        }
+        Self { persona_repository }
     }
 
     /// Generate an adhoc expert persona from expertise description
@@ -102,11 +100,13 @@ Generate a complete PersonaDefinition.",
         // Save adhoc persona to repository (temporary)
         let mut all_personas = self
             .persona_repository
-            .get_all().await
+            .get_all()
+            .await
             .map_err(|e| anyhow::anyhow!(e))?;
         all_personas.push(persona.clone());
         self.persona_repository
-            .save_all(&all_personas).await
+            .save_all(&all_personas)
+            .await
             .map_err(|e| anyhow::anyhow!(e))?;
 
         Ok(persona)
@@ -126,7 +126,8 @@ Generate a complete PersonaDefinition.",
         // Get all personas
         let mut personas = self
             .persona_repository
-            .get_all().await
+            .get_all()
+            .await
             .map_err(|e| anyhow::anyhow!(e))?;
 
         // Find and update the adhoc persona
@@ -145,7 +146,8 @@ Generate a complete PersonaDefinition.",
 
         // Save all personas
         self.persona_repository
-            .save_all(&personas).await
+            .save_all(&personas)
+            .await
             .map_err(|e| anyhow::anyhow!(e))?;
 
         // Get the updated persona

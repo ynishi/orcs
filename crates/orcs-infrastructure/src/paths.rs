@@ -198,7 +198,9 @@ impl OrcsPaths {
     ///
     /// * `base_path` - Optional custom base path for testing. None uses default platform paths.
     pub fn new(base_path: Option<&Path>) -> Self {
-        Self { base_path: base_path.map(|p|p.to_path_buf()) }
+        Self {
+            base_path: base_path.map(|p| p.to_path_buf()),
+        }
     }
 
     // ============================================
@@ -301,19 +303,13 @@ impl OrcsPaths {
         }
         match service_type {
             // Single-file services (return File path)
-            ServiceType::AppState => {
-                Ok(PathType::File(self.config_dir()?.join("app_state.json")))
-            }
+            ServiceType::AppState => Ok(PathType::File(self.config_dir()?.join("app_state.json"))),
             ServiceType::Config => Ok(PathType::File(self.config_dir()?.join("config.toml"))),
             ServiceType::Secret => Ok(PathType::File(self.secret_dir()?.join("secret.json"))),
 
             // Multi-file services - Data (metadata/records)
-            ServiceType::Session => {
-                Ok(PathType::Dir(self.data_dir()?.join("sessions")))
-            }
-            ServiceType::Workspace => {
-                Ok(PathType::Dir(self.data_dir()?.join("workspaces")))
-            }
+            ServiceType::Session => Ok(PathType::Dir(self.data_dir()?.join("sessions"))),
+            ServiceType::Workspace => Ok(PathType::Dir(self.data_dir()?.join("workspaces"))),
             ServiceType::WorkspaceStorage => {
                 Ok(PathType::Dir(self.storage_dir()?.join("workspaces")))
             }

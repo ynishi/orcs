@@ -4,9 +4,9 @@ use llm_toolkit::agent::impls::ClaudeCodeAgent;
 use llm_toolkit::agent::{Agent, AgentError, AgentOutput, Payload};
 use llm_toolkit::orchestrator::{BlueprintWorkflow, ParallelOrchestrator};
 use orcs_application::UtilityAgentService;
+use orcs_core::OrcsError;
 use orcs_core::repository::TaskRepository;
 use orcs_core::task::{Task, TaskContext, TaskStatus};
-use orcs_core::OrcsError;
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -139,7 +139,10 @@ impl TaskExecutor {
         workspace_root: Option<std::path::PathBuf>,
     ) -> Result<String, OrcsError> {
         tracing::info!("TaskExecutor: Executing task from message with ParallelOrchestrator");
-        tracing::debug!("Task content: {}", message_content.chars().take(200).collect::<String>());
+        tracing::debug!(
+            "Task content: {}",
+            message_content.chars().take(200).collect::<String>()
+        );
 
         if let Some(ref root) = workspace_root {
             tracing::info!("Task will execute in workspace: {}", root.display());
@@ -161,10 +164,20 @@ impl TaskExecutor {
                 .await
                 .unwrap_or_else(|e| {
                     tracing::warn!("Failed to generate task title: {}, using fallback", e);
-                    message_content.chars().take(100).collect::<String>().trim().to_string()
+                    message_content
+                        .chars()
+                        .take(100)
+                        .collect::<String>()
+                        .trim()
+                        .to_string()
                 })
         } else {
-            message_content.chars().take(100).collect::<String>().trim().to_string()
+            message_content
+                .chars()
+                .take(100)
+                .collect::<String>()
+                .trim()
+                .to_string()
         };
 
         // Create initial task record
@@ -202,9 +215,13 @@ impl TaskExecutor {
                     "task_id": &task_id,
                     "session_id": &task.session_id,
                     "title": &task.title,
-                }).as_object().unwrap().clone().into_iter()
-                    .map(|(k, v)| (k, v))
-                    .collect(),
+                })
+                .as_object()
+                .unwrap()
+                .clone()
+                .into_iter()
+                .map(|(k, v)| (k, v))
+                .collect(),
                 span: std::collections::HashMap::new(),
                 timestamp: chrono::Utc::now().to_rfc3339(),
             };
@@ -287,9 +304,13 @@ impl TaskExecutor {
                         "status": "Completed",
                         "steps_executed": task.steps_executed,
                         "steps_skipped": task.steps_skipped,
-                    }).as_object().unwrap().clone().into_iter()
-                        .map(|(k, v)| (k, v))
-                        .collect(),
+                    })
+                    .as_object()
+                    .unwrap()
+                    .clone()
+                    .into_iter()
+                    .map(|(k, v)| (k, v))
+                    .collect(),
                     span: std::collections::HashMap::new(),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 };
@@ -329,16 +350,23 @@ impl TaskExecutor {
                         "error": &error_msg,
                         "steps_executed": task.steps_executed,
                         "steps_skipped": task.steps_skipped,
-                    }).as_object().unwrap().clone().into_iter()
-                        .map(|(k, v)| (k, v))
-                        .collect(),
+                    })
+                    .as_object()
+                    .unwrap()
+                    .clone()
+                    .into_iter()
+                    .map(|(k, v)| (k, v))
+                    .collect(),
                     span: std::collections::HashMap::new(),
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 };
                 let _ = sender.send(event);
             }
 
-            Err(OrcsError::Execution(format!("Task execution failed: {}", error_msg)))
+            Err(OrcsError::Execution(format!(
+                "Task execution failed: {}",
+                error_msg
+            )))
         }
     }
 }

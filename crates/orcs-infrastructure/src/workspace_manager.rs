@@ -43,7 +43,6 @@ pub struct FileSystemWorkspaceManager {
 }
 
 impl FileSystemWorkspaceManager {
-
     pub async fn default() -> Result<Self> {
         Self::new(None).await
     }
@@ -70,15 +69,14 @@ impl FileSystemWorkspaceManager {
         let path_type = orcs_paths.get_path(ServiceType::WorkspaceStorage)?;
         let path = path_type.as_path_buf();
 
-        // Ensure the root directory exists    
+        // Ensure the root directory exists
         fs::create_dir_all(&path).await.map_err(|e| {
             OrcsError::io(format!(
                 "Failed to create workspace root directory '{:?}': {}",
-                root_path,
-                e
+                root_path, e
             ))
         })?;
-        
+
         // Initialize AsyncDirWorkspaceRepository
         let workspace_repository = Arc::new(AsyncDirWorkspaceRepository::default().await?);
 

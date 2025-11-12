@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use version_migrate::{IntoDomain, MigratesTo, Versioned};
 
-use orcs_core::session::{AppMode, AutoChatConfig, ConversationMessage, ConversationMode, MessageRole, Session, PLACEHOLDER_WORKSPACE_ID};
+use orcs_core::session::{
+    AppMode, AutoChatConfig, ConversationMessage, ConversationMode, MessageRole,
+    PLACEHOLDER_WORKSPACE_ID, Session,
+};
 
 /// Represents V1.0.0 of the session data schema.
 /// Legacy schema with 'name' field instead of 'title'.

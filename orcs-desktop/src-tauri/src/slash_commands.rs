@@ -55,7 +55,9 @@ async fn expand_slash_command(
     // Get workspace info from active session
     let workspace = if let Some(session_mgr) = state.session_manager.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();
-        let session = session_mgr.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+        let session = session_mgr
+            .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+            .await;
         if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
             let workspace_id = &session.workspace_id;
             tracing::info!(
@@ -236,7 +238,9 @@ pub async fn execute_shell_command(
         // Default to workspace directory from active session
         let workspace = if let Some(session_mgr) = state.session_manager.active_session().await {
             let app_mode = state.app_mode.lock().await.clone();
-            let session = session_mgr.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+            let session = session_mgr
+                .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+                .await;
             if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
                 let workspace_id = &session.workspace_id;
                 state

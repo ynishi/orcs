@@ -5,8 +5,8 @@
 
 use crate::dto::create_config_root_migrator;
 use crate::paths::{OrcsPaths, ServiceType};
-use orcs_core::user::{UserProfile, UserService};
 use orcs_core::config::RootConfig;
+use orcs_core::user::{UserProfile, UserService};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
@@ -109,7 +109,9 @@ impl ConfigBasedUserService {
 
     /// Gets the default config path via centralized path management.
     fn get_config_path() -> Result<PathBuf, String> {
-        let path_type = OrcsPaths::new(None).get_path(ServiceType::Config).map_err(|e| e.to_string())?;
+        let path_type = OrcsPaths::new(None)
+            .get_path(ServiceType::Config)
+            .map_err(|e| e.to_string())?;
         // ServiceType::Config returns PathType::File(config.toml)
         Ok(path_type.into_path_buf())
     }

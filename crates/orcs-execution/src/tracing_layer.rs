@@ -7,8 +7,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tracing::{Event, Subscriber};
-use tracing_subscriber::layer::Context;
 use tracing_subscriber::Layer;
+use tracing_subscriber::layer::Context;
 
 /// Event data sent to the frontend
 #[derive(Debug, Clone, serde::Serialize)]

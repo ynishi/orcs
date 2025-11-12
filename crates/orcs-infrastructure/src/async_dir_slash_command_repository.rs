@@ -42,11 +42,10 @@ impl StorageRepository for AsyncDirSlashCommandRepository {
 }
 
 impl AsyncDirSlashCommandRepository {
-
     pub async fn default() -> Result<Self> {
         Self::new(None).await
     }
-    
+
     /// Creates an AsyncDirSlashCommandRepository instance at the default location.
     ///
     /// Uses centralized path management and storage creation via `OrcsPaths`.
@@ -106,9 +105,7 @@ impl SlashCommandRepository for AsyncDirSlashCommandRepository {
     }
 
     async fn remove_command(&self, name: &str) -> Result<()> {
-        self.storage
-            .delete(name)
-            .await?;
+        self.storage.delete(name).await?;
         Ok(())
     }
 }

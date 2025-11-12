@@ -9,7 +9,7 @@ use version_migrate::AsyncDirStorage;
 pub trait StorageRepository {
     /// The service type for path resolution
     const SERVICE_TYPE: crate::paths::ServiceType;
-    
+
     /// The entity name used in storage operations
     const ENTITY_NAME: &'static str;
 

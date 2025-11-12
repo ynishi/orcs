@@ -25,7 +25,9 @@ pub async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String>
     let workspace = match state.session_manager.active_session().await {
         Some(manager) => {
             let app_mode = state.app_mode.lock().await.clone();
-            let session = manager.to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+            let session = manager
+                .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+                .await;
 
             if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
                 state
@@ -120,5 +122,3 @@ pub async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String>
         repo_name,
     })
 }
-
-

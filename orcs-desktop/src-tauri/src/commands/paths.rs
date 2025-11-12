@@ -48,7 +48,9 @@ pub async fn get_workspaces_directory(state: State<'_, AppState>) -> Result<Stri
 
 /// Gets the workspaces directory path
 #[tauri::command]
-pub async fn get_workspaces_repository_directory(state: State<'_, AppState>) -> Result<String, String> {
+pub async fn get_workspaces_repository_directory(
+    state: State<'_, AppState>,
+) -> Result<String, String> {
     let workspaces_dir = state.workspace_manager.workspace_data_path();
 
     let path_str = workspaces_dir
@@ -110,7 +112,7 @@ pub async fn get_logs_directory() -> Result<String, String> {
     Ok(path_str.to_string())
 }
 
-/// Gets the secret file path (~/.config/orcs/secret.json)
+/// Gets the secret file path (secret.json)
 /// Creates the file with a template if it doesn't exist
 #[tauri::command]
 pub async fn get_secret_path() -> Result<String, String> {
@@ -143,8 +145,9 @@ pub async fn get_default_workspace_path() -> Result<String, String> {
 
 /// Gets the default workspace ID from AppState
 #[tauri::command]
-pub async fn get_default_workspace_id(state: tauri::State<'_, crate::app::AppState>) -> Result<String, String> {
+pub async fn get_default_workspace_id(
+    state: tauri::State<'_, crate::app::AppState>,
+) -> Result<String, String> {
     let workspace_id = state.app_state_service.get_default_workspace().await;
     Ok(workspace_id)
 }
-

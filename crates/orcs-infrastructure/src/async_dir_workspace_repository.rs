@@ -120,9 +120,7 @@ impl WorkspaceRepository for AsyncDirWorkspaceRepository {
     }
 
     async fn delete(&self, workspace_id: &str) -> Result<()> {
-        self.storage
-            .delete(workspace_id)
-            .await?;
+        self.storage.delete(workspace_id).await?;
         Ok(())
     }
 

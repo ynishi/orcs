@@ -5,9 +5,9 @@
 
 use crate::dto::create_app_state_migrator;
 use crate::paths::{OrcsPaths, ServiceType};
+use orcs_core::error::{OrcsError, Result};
 use orcs_core::state::model::AppState;
 use orcs_core::state::repository::StateRepository;
-use orcs_core::error::{OrcsError, Result};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
@@ -55,8 +55,9 @@ impl StateRepositoryImpl {
         let migrator = create_app_state_migrator();
 
         // Setup storage strategy: TOML format, SaveIfMissing with default value
-        let default_state = serde_json::to_value(AppState::default())
-            .map_err(|e| OrcsError::Config(format!("Failed to serialize default AppState: {}", e)))?;
+        let default_state = serde_json::to_value(AppState::default()).map_err(|e| {
+            OrcsError::Config(format!("Failed to serialize default AppState: {}", e))
+        })?;
 
         let strategy = FileStorageStrategy::new()
             .with_format(FormatStrategy::Json)
@@ -80,12 +81,10 @@ impl StateRepositoryImpl {
             storage,
         })
     }
-
 }
 
 #[async_trait::async_trait]
 impl StateRepository for StateRepositoryImpl {
-
     /// Saves the app state to storage.
     async fn save_state(&self, state: AppState) -> Result<()> {
         // Update in-memory cache first
@@ -108,7 +107,6 @@ impl StateRepository for StateRepositoryImpl {
 
         Ok(())
     }
-
 
     /// Gets the last selected workspace ID.
     async fn get_last_selected_workspace(&self) -> Option<String> {
@@ -202,7 +200,10 @@ mod tests {
     #[tokio::test]
     async fn test_set_and_get_last_selected_workspace() {
         let service = AppStateService::new().await.unwrap();
-        service.set_last_selected_workspace("ws-123".to_string()).await.unwrap();
+        service
+            .set_last_selected_workspace("ws-123".to_string())
+            .await
+            .unwrap();
         let workspace_id = service.get_last_selected_workspace().await;
         assert_eq!(workspace_id, Some("ws-123".to_string()));
     }
@@ -210,7 +211,10 @@ mod tests {
     #[tokio::test]
     async fn test_clear_last_selected_workspace() {
         let service = AppStateService::new().await.unwrap();
-        service.set_last_selected_workspace("ws-456".to_string()).await.unwrap();
+        service
+            .set_last_selected_workspace("ws-456".to_string())
+            .await
+            .unwrap();
         service.clear_last_selected_workspace().await.unwrap();
         let workspace_id = service.get_last_selected_workspace().await;
         assert!(workspace_id.is_none());

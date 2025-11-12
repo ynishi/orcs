@@ -15,5 +15,3 @@ pub async fn get_user_profile(
 ) -> Result<orcs_core::user::UserProfile, String> {
     Ok(state.user_service.get_user_profile())
 }
-
-

@@ -43,11 +43,12 @@ fn main() {
                 .with_filter(LevelFilter::TRACE),
         )
         .with(
-            orcs_execution::tracing_layer::OrchestratorEventLayer::new(event_tx.clone()).with_filter(
-                tracing_subscriber::filter::EnvFilter::new("off")
-                    .add_directive("llm_toolkit=debug".parse().unwrap())
-                    .add_directive("orcs_execution=debug".parse().unwrap()),
-            ),
+            orcs_execution::tracing_layer::OrchestratorEventLayer::new(event_tx.clone())
+                .with_filter(
+                    tracing_subscriber::filter::EnvFilter::new("off")
+                        .add_directive("llm_toolkit=debug".parse().unwrap())
+                        .add_directive("orcs_execution=debug".parse().unwrap()),
+                ),
         );
 
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
@@ -87,7 +88,9 @@ fn main() {
 
                     if let Some(session_mgr) = session_manager_for_setup.active_session().await {
                         let app_mode_locked = AppMode::Idle;
-                        let session = session_mgr.to_session(app_mode_locked, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+                        let session = session_mgr
+                            .to_session(app_mode_locked, PLACEHOLDER_WORKSPACE_ID.to_string())
+                            .await;
                         if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
                             let workspace_id = &session.workspace_id;
                             tracing::info!(

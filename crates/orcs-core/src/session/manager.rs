@@ -263,7 +263,9 @@ impl<T: InteractionManagerTrait + 'static> SessionManager<T> {
         self.session_repository.delete(session_id).await?;
 
         // Clear active if this was the active session
-        if self.state_repository.get_active_session().await.as_ref() == Some(&session_id.to_string()) {
+        if self.state_repository.get_active_session().await.as_ref()
+            == Some(&session_id.to_string())
+        {
             self.state_repository
                 .clear_active_session()
                 .await

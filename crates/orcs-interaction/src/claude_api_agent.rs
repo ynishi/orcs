@@ -1,7 +1,7 @@
 //! ClaudeApiAgent - Direct REST API implementation for Claude.
 //!
 //! This agent calls the Claude REST API directly without CLI dependency.
-//! Configuration priority: ~/.config/orcs/secret.json > environment variables
+//! Configuration priority: secret.json > environment variables
 
 use async_trait::async_trait;
 use base64::Engine;
@@ -41,10 +41,10 @@ impl ClaudeApiAgent {
         }
     }
 
-    /// Loads configuration from ~/.config/orcs/secret.json or environment variables.
+    /// Loads configuration from secret.json or environment variables.
     ///
     /// Priority:
-    /// 1. ~/.config/orcs/secret.json
+    /// 1. secret.json
     /// 2. Environment variables (ANTHROPIC_API_KEY, CLAUDE_MODEL_NAME)
     ///
     /// Model name defaults to `claude-sonnet-4-20250514` if not specified.
@@ -63,7 +63,7 @@ impl ClaudeApiAgent {
         // Fallback to environment variables
         let api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| {
             AgentError::ExecutionFailed(
-                "ANTHROPIC_API_KEY not found in ~/.config/orcs/secret.json or environment variables"
+                "ANTHROPIC_API_KEY not found in secret.json or environment variables"
                     .into(),
             )
         })?;

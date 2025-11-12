@@ -1,4 +1,3 @@
-pub mod state;
 pub mod config;
 pub mod error;
 pub mod persona;
@@ -6,6 +5,7 @@ pub mod repository;
 pub mod secret;
 pub mod session;
 pub mod slash_command;
+pub mod state;
 pub mod task;
 pub mod user;
 pub mod workspace;

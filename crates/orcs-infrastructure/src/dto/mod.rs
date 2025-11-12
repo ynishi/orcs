@@ -23,6 +23,7 @@
 mod app_state;
 mod config_root;
 mod persona;
+mod secret;
 mod session;
 mod slash_command;
 mod task;
@@ -43,6 +44,9 @@ pub use persona::{
     PersonaBackendDTO, PersonaConfigV1_0_0, PersonaConfigV1_1_0, PersonaSourceDTO,
     create_persona_migrator,
 };
+
+// Re-export secret DTOs and migrator
+pub use secret::{SecretConfigV1_0_0, create_secret_migrator};
 
 // Re-export session DTOs and migrator
 pub use session::{SessionV1_0_0, SessionV1_1_0, SessionV2_0_0, create_session_migrator};

@@ -6,7 +6,7 @@
 
 use anyhow::{Result, anyhow};
 use orcs_core::repository::PersonaRepository;
-use orcs_core::session::{AppMode, Session, SessionManager, PLACEHOLDER_WORKSPACE_ID};
+use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID, Session, SessionManager};
 use orcs_core::state::repository::StateRepository;
 use orcs_core::user::UserService;
 use orcs_core::workspace::manager::WorkspaceManager;
@@ -154,7 +154,9 @@ impl SessionUseCase {
             .await?;
 
         // 5. Return session
-        let session = manager.to_session(AppMode::Idle, workspace_id.to_string()).await;
+        let session = manager
+            .to_session(AppMode::Idle, workspace_id.to_string())
+            .await;
         Ok(session)
     }
 
@@ -292,7 +294,10 @@ impl SessionUseCase {
         workspace_root_path: String,
         system_prompt: String,
     ) -> Result<Session> {
-        tracing::info!("[SessionUseCase] Creating config session at workspace: {}", workspace_root_path);
+        tracing::info!(
+            "[SessionUseCase] Creating config session at workspace: {}",
+            workspace_root_path
+        );
 
         // 1. Get or create the admin workspace
         let workspace = self
@@ -301,7 +306,11 @@ impl SessionUseCase {
             .await
             .map_err(|e| anyhow!("Failed to get/create admin workspace: {}", e))?;
 
-        tracing::info!("[SessionUseCase] Admin workspace: {} ({})", workspace.name, workspace.id);
+        tracing::info!(
+            "[SessionUseCase] Admin workspace: {} ({})",
+            workspace.name,
+            workspace.id
+        );
 
         // 2. Update AppStateService to use this workspace
         self.app_state_service
@@ -311,7 +320,10 @@ impl SessionUseCase {
 
         // 3. Create session
         let session_id = Uuid::new_v4().to_string();
-        tracing::debug!("[SessionUseCase] Generated config session ID: {}", session_id);
+        tracing::debug!(
+            "[SessionUseCase] Generated config session ID: {}",
+            session_id
+        );
 
         let manager = self
             .session_manager
@@ -355,7 +367,9 @@ impl SessionUseCase {
             .await?;
 
         // 7. Return session
-        let session = manager.to_session(AppMode::Idle, workspace.id.clone()).await;
+        let session = manager
+            .to_session(AppMode::Idle, workspace.id.clone())
+            .await;
         Ok(session)
     }
 
@@ -411,7 +425,9 @@ impl SessionUseCase {
             .await?;
 
         // 2. Get session data to check workspace_id - use placeholder for now, will be updated
-        let session = manager.to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+        let session = manager
+            .to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
+            .await;
         let workspace_id = &session.workspace_id;
 
         // 3. Validate and restore workspace context if workspace_id exists
@@ -486,7 +502,9 @@ impl SessionUseCase {
         }
 
         // Return the session (potentially with cleared workspace_id)
-        let final_session = manager.to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+        let final_session = manager
+            .to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
+            .await;
         tracing::info!("[SessionUseCase] Switched to session: {}", session_id);
 
         Ok(final_session)
@@ -763,7 +781,9 @@ impl SessionUseCase {
         };
 
         // 2. Get session data - use placeholder for now, will be updated
-        let session = manager.to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+        let session = manager
+            .to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
+            .await;
         tracing::info!("[SessionUseCase] Restored session: {}", session.id);
         let workspace_id = &session.workspace_id;
 
@@ -808,7 +828,11 @@ impl SessionUseCase {
 
                     // Clear the invalid workspace_id
                     self.session_manager
-                        .update_workspace_id(&session.id, PLACEHOLDER_WORKSPACE_ID.to_string(), None)
+                        .update_workspace_id(
+                            &session.id,
+                            PLACEHOLDER_WORKSPACE_ID.to_string(),
+                            None,
+                        )
                         .await?;
 
                     tracing::info!(
@@ -829,7 +853,9 @@ impl SessionUseCase {
         }
 
         // Return the final session state
-        let final_session = manager.to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string()).await;
+        let final_session = manager
+            .to_session(AppMode::Idle, PLACEHOLDER_WORKSPACE_ID.to_string())
+            .await;
         Ok(Some(final_session))
     }
 

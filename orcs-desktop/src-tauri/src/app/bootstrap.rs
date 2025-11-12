@@ -1,26 +1,25 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use orcs_application::{AdhocPersonaService, SessionUseCase, UtilityAgentService};
 use orcs_core::{
     persona::{PersonaRepository, get_default_presets},
     repository::SessionRepository,
     secret::SecretService,
-    session::{AppMode, SessionManager, PLACEHOLDER_WORKSPACE_ID},
+    session::{AppMode, PLACEHOLDER_WORKSPACE_ID, SessionManager},
     slash_command::SlashCommandRepository,
     state::{model::PLACEHOLDER_DEFAULT_WORKSPACE_ID, repository::StateRepository},
     task::TaskRepository,
     user::UserService,
-    workspace::manager::WorkspaceManager
+    workspace::manager::WorkspaceManager,
 };
-use orcs_execution::{
-    tracing_layer::OrchestratorEvent,
-    TaskExecutor,
-};
+use orcs_execution::{TaskExecutor, tracing_layer::OrchestratorEvent};
 use orcs_infrastructure::{
-    AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository, SecretServiceImpl, user_service::ConfigBasedUserService, workspace_manager::FileSystemWorkspaceManager, paths::OrcsPaths
+    AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
+    AsyncDirSlashCommandRepository, AsyncDirTaskRepository, SecretServiceImpl, paths::OrcsPaths,
+    user_service::ConfigBasedUserService, workspace_manager::FileSystemWorkspaceManager,
 };
-use tokio::sync::{mpsc::UnboundedSender, Mutex};
+use tokio::sync::{Mutex, mpsc::UnboundedSender};
 
 use crate::app::AppState;
 
@@ -51,7 +50,10 @@ async fn ensure_default_workspace(
     // Skip if it's not a placeholder and the workspace exists
     if current_default_id != PLACEHOLDER_DEFAULT_WORKSPACE_ID {
         if let Ok(Some(_)) = workspace_manager.get_workspace(&current_default_id).await {
-            tracing::info!("[Bootstrap] Using existing default workspace: {}", current_default_id);
+            tracing::info!(
+                "[Bootstrap] Using existing default workspace: {}",
+                current_default_id
+            );
             return Ok(current_default_id);
         }
     }
@@ -62,7 +64,10 @@ async fn ensure_default_workspace(
         .default_user_workspace_path()
         .map_err(|e| anyhow!("Failed to get default workspace path: {}", e))?;
 
-    tracing::info!("[Bootstrap] Creating default workspace at: {:?}", default_path);
+    tracing::info!(
+        "[Bootstrap] Creating default workspace at: {:?}",
+        default_path
+    );
 
     // 2.5. Ensure the directory exists before creating workspace
     tokio::fs::create_dir_all(&default_path)
@@ -75,7 +80,10 @@ async fn ensure_default_workspace(
         .await
         .map_err(|e| anyhow!("Failed to create default workspace: {}", e))?;
 
-    tracing::info!("[Bootstrap] Default workspace created with ID: {}", workspace.id);
+    tracing::info!(
+        "[Bootstrap] Default workspace created with ID: {}",
+        workspace.id
+    );
 
     // 4. Save to AppState
     app_state_service
@@ -95,7 +103,9 @@ async fn replace_placeholder_sessions(
 ) -> Result<()> {
     // Cast to trait to use list_all method
     let repo: &dyn SessionRepository = session_repository.as_ref();
-    let sessions = repo.list_all().await
+    let sessions = repo
+        .list_all()
+        .await
         .map_err(|e| anyhow!("Failed to list sessions: {}", e))?;
 
     let mut updated_count = 0;
@@ -106,7 +116,8 @@ async fn replace_placeholder_sessions(
                 session.id
             );
             session.workspace_id = default_workspace_id.to_string();
-            repo.save(&session).await
+            repo.save(&session)
+                .await
                 .map_err(|e| anyhow!("Failed to save session: {}", e))?;
             updated_count += 1;
         }
@@ -139,7 +150,8 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
     let user_service: Arc<dyn UserService> = Arc::new(user_service_impl);
 
     // Initialize SecretService and ensure secret.json exists by loading secrets
-    let secret_service_impl = SecretServiceImpl::default().expect("Failed to initialize secret service");
+    let secret_service_impl =
+        SecretServiceImpl::default().expect("Failed to initialize secret service");
     let _ = secret_service_impl.load_secrets().await; // Trigger file creation if missing
     let secret_service: Arc<dyn SecretService> = Arc::new(secret_service_impl);
 
@@ -229,11 +241,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
     );
 
     // Try to restore last session using SessionUseCase
-    let restored = session_usecase
-        .restore_last_session()
-        .await
-        .ok()
-        .flatten();
+    let restored = session_usecase.restore_last_session().await.ok().flatten();
 
     if restored.is_none() {
         // Try to restore workspace from last selected workspace ID
@@ -288,9 +296,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
                     }
                 }
                 Ok(_) => {
-                    tracing::info!(
-                        "[Startup] No workspaces found, starting with empty session"
-                    );
+                    tracing::info!("[Startup] No workspaces found, starting with empty session");
                 }
                 Err(e) => {
                     tracing::warn!("[Startup] Failed to list workspaces: {}", e);
@@ -326,4 +332,3 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         app_state_service,
     }
 }
-

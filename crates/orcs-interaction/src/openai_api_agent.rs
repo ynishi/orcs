@@ -1,7 +1,7 @@
 //! OpenAIApiAgent - Direct REST API implementation for OpenAI GPT.
 //!
 //! This agent calls the OpenAI Chat Completions API directly without CLI dependency.
-//! Configuration priority: ~/.config/orcs/secret.json > environment variables
+//! Configuration priority: secret.json > environment variables
 
 use async_trait::async_trait;
 use base64::Engine;
@@ -38,10 +38,10 @@ impl OpenAIApiAgent {
         }
     }
 
-    /// Loads configuration from ~/.config/orcs/secret.json or environment variables.
+    /// Loads configuration from secret.json or environment variables.
     ///
     /// Priority:
-    /// 1. ~/.config/orcs/secret.json
+    /// 1. secret.json
     /// 2. Environment variables (OPENAI_API_KEY, OPENAI_MODEL_NAME)
     ///
     /// Model name defaults to `gpt-4o` if not specified.
@@ -60,7 +60,7 @@ impl OpenAIApiAgent {
         // Fallback to environment variables
         let api_key = env::var("OPENAI_API_KEY").map_err(|_| {
             AgentError::ExecutionFailed(
-                "OPENAI_API_KEY not found in ~/.config/orcs/secret.json or environment variables"
+                "OPENAI_API_KEY not found in secret.json or environment variables"
                     .into(),
             )
         })?;

@@ -18,9 +18,7 @@ pub enum OrcsError {
 
     /// IO error (file system operations)
     #[error("IO error: {message}")]
-    Io {
-        message: String,
-    },
+    Io { message: String },
 
     /// Data access error (repository/storage layer)
     #[error("Data access error: {0}")]
@@ -62,7 +60,7 @@ impl OrcsError {
     // ============================================================================
     // Constructor helpers
     // ============================================================================
-    
+
     /// Creates a NotFound error
     pub fn not_found(entity_type: &'static str, id: impl Into<String>) -> Self {
         Self::NotFound {
@@ -101,7 +99,7 @@ impl OrcsError {
     // ============================================================================
     // Type checking methods
     // ============================================================================
-    
+
     /// Check if this is a NotFound error
     pub fn is_not_found(&self) -> bool {
         matches!(self, Self::NotFound { .. })
@@ -165,34 +163,26 @@ impl From<toml::ser::Error> for OrcsError {
 impl From<version_migrate::MigrationError> for OrcsError {
     fn from(err: version_migrate::MigrationError) -> Self {
         use version_migrate::MigrationError;
-        
+
         match err {
-            MigrationError::EntityNotFound(id) => {
-                Self::not_found("entity", id)
-            }
-            MigrationError::DeserializationError(_) => {
-                Self::Serialization {
-                    format: "migration".to_string(),
-                    message: err.to_string(),
-                }
-            }
-            MigrationError::SerializationError(_) => {
-                Self::Serialization {
-                    format: "migration".to_string(),
-                    message: err.to_string(),
-                }
-            }
+            MigrationError::EntityNotFound(id) => Self::not_found("entity", id),
+            MigrationError::DeserializationError(_) => Self::Serialization {
+                format: "migration".to_string(),
+                message: err.to_string(),
+            },
+            MigrationError::SerializationError(_) => Self::Serialization {
+                format: "migration".to_string(),
+                message: err.to_string(),
+            },
             MigrationError::TomlParseError(_) | MigrationError::TomlSerializeError(_) => {
                 Self::Serialization {
                     format: "TOML".to_string(),
                     message: err.to_string(),
                 }
             }
-            MigrationError::IoError { .. } => {
-                Self::Io {
-                    message: err.to_string(),
-                }
-            }
+            MigrationError::IoError { .. } => Self::Io {
+                message: err.to_string(),
+            },
             _ => Self::Migration(err.to_string()),
         }
     }

@@ -21,7 +21,6 @@
 //!
 //! See [`paths`] module for detailed documentation on the path management system.
 
-pub mod state_repository;
 pub mod async_dir_persona_repository;
 pub mod async_dir_session_repository;
 pub mod async_dir_slash_command_repository;
@@ -30,11 +29,11 @@ pub mod async_dir_workspace_repository;
 pub mod dto;
 pub mod paths;
 pub mod secret_service;
+pub mod state_repository;
+pub mod storage_repository;
 pub mod user_service;
 pub mod workspace_manager;
-pub mod storage_repository;
 
-pub use crate::state_repository::AppStateService;
 pub use crate::async_dir_persona_repository::AsyncDirPersonaRepository;
 pub use crate::async_dir_session_repository::AsyncDirSessionRepository;
 pub use crate::async_dir_slash_command_repository::AsyncDirSlashCommandRepository;
@@ -42,3 +41,4 @@ pub use crate::async_dir_task_repository::AsyncDirTaskRepository;
 pub use crate::async_dir_workspace_repository::AsyncDirWorkspaceRepository;
 pub use crate::paths::{OrcsPaths, PathType, ServiceType};
 pub use crate::secret_service::SecretServiceImpl;
+pub use crate::state_repository::AppStateService;

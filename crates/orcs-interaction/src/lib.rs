@@ -916,6 +916,7 @@ impl InteractionManager {
         message_type: Option<String>,
         error_severity: Option<ErrorSeverity>,
     ) {
+        let is_context_info = matches!(message_type.as_deref(), Some("context_info"));
         let message = ConversationMessage {
             role: MessageRole::System,
             content,
@@ -929,6 +930,15 @@ impl InteractionManager {
         };
 
         self.system_messages.write().await.push(message);
+
+        if is_context_info {
+            // ContextInfo entries must be visible before the next agent turn.
+            // We intentionally invalidate the dialogue here so that any freshly
+            // executed shell command outputs are folded into the restored prompt
+            // on the very next ensure_dialogue_initialized() call. Without this,
+            // agents could miss shell results until another full rebuild happens.
+            self.invalidate_dialogue().await;
+        }
     }
 
     /// Returns a list of active participant IDs.

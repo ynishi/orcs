@@ -116,7 +116,7 @@ pub async fn get_logs_directory() -> Result<String, String> {
 /// Creates the file with a template if it doesn't exist
 #[tauri::command]
 pub async fn get_secret_path(state: State<'_, AppState>) -> Result<String, String> {
-    let  secret_file= state.secret_service.secret_file_path().await?;
+    let secret_file = state.secret_service.secret_file_path().await?;
     let path_str = secret_file
         .to_str()
         .ok_or("Secret file path is not valid UTF-8")?;

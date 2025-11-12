@@ -328,7 +328,5 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         task_executor,
     };
 
-    AppBootstrap {
-        app_state,
-    }
+    AppBootstrap { app_state }
 }

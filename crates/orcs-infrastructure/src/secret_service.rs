@@ -187,8 +187,9 @@ impl SecretService for SecretServiceImpl {
     }
 
     async fn secret_file_path(&self) -> Result<PathBuf, String> {
-        let storage: std::sync::RwLockReadGuard<'_, FileStorage> = self.storage.read().map_err(|e|e.to_string())?;
-        let p= storage.path().to_owned();
+        let storage: std::sync::RwLockReadGuard<'_, FileStorage> =
+            self.storage.read().map_err(|e| e.to_string())?;
+        let p = storage.path().to_owned();
         Ok(p)
     }
 }

@@ -20,7 +20,7 @@ pub struct GitInfo {
 /// Gets Git repository information for the current workspace
 #[tauri::command]
 pub async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String> {
-    use orcs_core::workspace::manager::WorkspaceManager;
+    use orcs_core::workspace::manager::WorkspaceStorageService;
 
     let workspace = match state.session_usecase.active_session().await {
         Some(manager) => {
@@ -31,7 +31,7 @@ pub async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String>
 
             if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
                 state
-                    .workspace_manager
+                    .workspace_storage_service
                     .get_workspace(&session.workspace_id)
                     .await
                     .map_err(|e| e.to_string())?

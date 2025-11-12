@@ -1,6 +1,6 @@
 //! Workspace management trait definition.
 //!
-//! This module defines the `WorkspaceManager` trait, which provides an abstraction
+//! This module defines the `WorkspaceStorageService` trait, which provides an abstraction
 //! for managing workspaces, files, and their associations with sessions.
 
 use async_trait::async_trait;
@@ -11,7 +11,7 @@ use crate::workspace::model::{SessionWorkspace, TempFile, UploadedFile, Workspac
 
 /// Trait for managing workspaces and their associated files.
 ///
-/// The `WorkspaceManager` provides a high-level interface for:
+/// The `WorkspaceStorageService` provides a high-level interface for:
 /// - Creating and retrieving workspaces
 /// - Managing files within workspaces
 /// - Creating temporary files
@@ -20,7 +20,7 @@ use crate::workspace::model::{SessionWorkspace, TempFile, UploadedFile, Workspac
 ///
 /// Implementations should ensure thread-safety and asynchronous operation.
 #[async_trait]
-pub trait WorkspaceManager: Send + Sync {
+pub trait WorkspaceStorageService: Send + Sync {
     /// Gets an existing workspace or creates a new one for the given repository path.
     ///
     /// # Arguments

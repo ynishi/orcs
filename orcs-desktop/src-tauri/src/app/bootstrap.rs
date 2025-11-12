@@ -12,13 +12,13 @@ use orcs_core::{
     state::{model::PLACEHOLDER_DEFAULT_WORKSPACE_ID, repository::StateRepository},
     task::TaskRepository,
     user::UserService,
-    workspace::manager::WorkspaceManager,
+    workspace::manager::WorkspaceStorageService,
 };
 use orcs_execution::{TaskExecutor, tracing_layer::OrchestratorEvent};
 use orcs_infrastructure::{
     AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
     AsyncDirSlashCommandRepository, AsyncDirTaskRepository, SecretServiceImpl, paths::OrcsPaths,
-    user_service::ConfigBasedUserService, workspace_manager::FileSystemWorkspaceManager,
+    user_service::ConfigBasedUserService, workspace_storage_service::FileSystemWorkspaceManager,
 };
 use tokio::sync::{Mutex, mpsc::UnboundedSender};
 
@@ -41,7 +41,7 @@ pub struct AppBootstrap {
 ///
 /// The workspace ID of the default workspace
 async fn ensure_default_workspace(
-    workspace_manager: &Arc<FileSystemWorkspaceManager>,
+    workspace_storage_service: &Arc<FileSystemWorkspaceManager>,
     app_state_service: &Arc<AppStateService>,
 ) -> Result<String> {
     // 1. Check existing default_workspace_id
@@ -49,7 +49,10 @@ async fn ensure_default_workspace(
 
     // Skip if it's not a placeholder and the workspace exists
     if current_default_id != PLACEHOLDER_DEFAULT_WORKSPACE_ID {
-        if let Ok(Some(_)) = workspace_manager.get_workspace(&current_default_id).await {
+        if let Ok(Some(_)) = workspace_storage_service
+            .get_workspace(&current_default_id)
+            .await
+        {
             tracing::info!(
                 "[Bootstrap] Using existing default workspace: {}",
                 current_default_id
@@ -75,7 +78,7 @@ async fn ensure_default_workspace(
         .map_err(|e| anyhow!("Failed to create default workspace directory: {}", e))?;
 
     // 3. Create workspace (ID will be deterministically generated from path)
-    let workspace = workspace_manager
+    let workspace = workspace_storage_service
         .get_or_create_workspace(&default_path)
         .await
         .map_err(|e| anyhow!("Failed to create default workspace: {}", e))?;
@@ -155,7 +158,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
     let _ = secret_service_impl.load_secrets().await; // Trigger file creation if missing
     let secret_service: Arc<dyn SecretService> = Arc::new(secret_service_impl);
 
-    let workspace_manager = Arc::new(
+    let workspace_storage_service = Arc::new(
         FileSystemWorkspaceManager::default()
             .await
             .expect("Failed to initialize workspace manager"),
@@ -196,9 +199,10 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
     );
 
     // Ensure default workspace exists (before session restoration)
-    let default_workspace_id = ensure_default_workspace(&workspace_manager, &app_state_service)
-        .await
-        .expect("Failed to ensure default workspace");
+    let default_workspace_id =
+        ensure_default_workspace(&workspace_storage_service, &app_state_service)
+            .await
+            .expect("Failed to ensure default workspace");
 
     tracing::info!("[Bootstrap] Default workspace ID: {}", default_workspace_id);
 
@@ -214,7 +218,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
     // Create SessionUseCase for coordinated session-workspace management
     let session_usecase = Arc::new(SessionUseCase::new(
         session_repository.clone(),
-        workspace_manager.clone(),
+        workspace_storage_service.clone(),
         app_state_service.clone(),
         persona_repository.clone(),
         user_service.clone(),
@@ -276,7 +280,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
 
         if !workspace_selected {
             // No last workspace or failed to restore - try to find any workspace
-            match workspace_manager.list_all_workspaces().await {
+            match workspace_storage_service.list_all_workspaces().await {
                 Ok(workspaces) if !workspaces.is_empty() => {
                     // Use most recently accessed workspace
                     let most_recent = &workspaces[0];
@@ -316,7 +320,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         adhoc_persona_service,
         user_service,
         secret_service,
-        workspace_manager: workspace_manager.clone(),
+        workspace_storage_service: workspace_storage_service.clone(),
         slash_command_repository,
         slash_command_repository_concrete,
         app_state_service: app_state_service.clone(),

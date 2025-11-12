@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::state::repository::StateRepository;
-use orcs_core::workspace::{UploadedFile, Workspace, manager::WorkspaceManager};
+use orcs_core::workspace::{UploadedFile, Workspace, manager::WorkspaceStorageService};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::app::AppState;
@@ -18,7 +18,7 @@ pub async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspa
             workspace_id
         );
         let workspace = state
-            .workspace_manager
+            .workspace_storage_service
             .get_workspace(&workspace_id)
             .await
             .map_err(|e| e.to_string())?;
@@ -52,7 +52,7 @@ pub async fn get_current_workspace(state: State<'_, AppState>) -> Result<Workspa
         let workspace_id = &session.workspace_id;
         println!("[Backend] Looking up workspace: {}", workspace_id);
         let workspace = state
-            .workspace_manager
+            .workspace_storage_service
             .get_workspace(workspace_id)
             .await
             .map_err(|e| e.to_string())?;
@@ -76,7 +76,7 @@ pub async fn create_workspace(
 ) -> Result<Workspace, String> {
     let path = PathBuf::from(root_path);
     state
-        .workspace_manager
+        .workspace_storage_service
         .get_or_create_workspace(&path)
         .await
         .map_err(|e| e.to_string())
@@ -125,7 +125,7 @@ pub async fn create_workspace_with_session(
 #[tauri::command]
 pub async fn list_workspaces(state: State<'_, AppState>) -> Result<Vec<Workspace>, String> {
     state
-        .workspace_manager
+        .workspace_storage_service
         .list_all_workspaces()
         .await
         .map_err(|e| e.to_string())
@@ -173,7 +173,7 @@ pub async fn toggle_favorite_workspace(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
-        .workspace_manager
+        .workspace_storage_service
         .toggle_favorite(&workspace_id)
         .await
         .map_err(|e| e.to_string())
@@ -191,7 +191,7 @@ pub async fn delete_workspace(
     );
 
     state
-        .workspace_manager
+        .workspace_storage_service
         .delete_workspace(&workspace_id)
         .await
         .map_err(|e| {
@@ -210,7 +210,7 @@ pub async fn list_workspace_files(
     state: State<'_, AppState>,
 ) -> Result<Vec<UploadedFile>, String> {
     let workspace = state
-        .workspace_manager
+        .workspace_storage_service
         .get_workspace(&workspace_id)
         .await
         .map_err(|e| e.to_string())?;
@@ -230,7 +230,7 @@ pub async fn upload_file_to_workspace(
     let file_path = Path::new(&local_file_path);
 
     state
-        .workspace_manager
+        .workspace_storage_service
         .add_file_to_workspace(&workspace_id, file_path)
         .await
         .map_err(|e| e.to_string())
@@ -249,7 +249,7 @@ pub async fn upload_file_from_bytes(
     app: AppHandle,
 ) -> Result<UploadedFile, String> {
     let result = state
-        .workspace_manager
+        .workspace_storage_service
         .add_file_from_bytes(
             &workspace_id,
             &filename,
@@ -280,7 +280,7 @@ pub async fn delete_file_from_workspace(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
-        .workspace_manager
+        .workspace_storage_service
         .delete_file_from_workspace(&workspace_id, &file_id)
         .await
         .map_err(|e| e.to_string())
@@ -295,7 +295,7 @@ pub async fn rename_file_in_workspace(
     state: State<'_, AppState>,
 ) -> Result<UploadedFile, String> {
     state
-        .workspace_manager
+        .workspace_storage_service
         .rename_file_in_workspace(&workspace_id, &file_id, &new_name)
         .await
         .map_err(|e| e.to_string())

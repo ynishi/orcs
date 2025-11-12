@@ -10,7 +10,7 @@ use orcs_execution::TaskExecutor;
 use orcs_infrastructure::{
     AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
     AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
-    workspace_manager::FileSystemWorkspaceManager,
+    workspace_storage_service::FileSystemWorkspaceManager,
 };
 use tokio::sync::Mutex;
 
@@ -25,7 +25,7 @@ pub struct AppState {
     pub adhoc_persona_service: Arc<AdhocPersonaService>,
     pub user_service: Arc<dyn UserService>,
     pub secret_service: Arc<dyn SecretService>,
-    pub workspace_manager: Arc<FileSystemWorkspaceManager>,
+    pub workspace_storage_service: Arc<FileSystemWorkspaceManager>,
     pub slash_command_repository: Arc<dyn SlashCommandRepository>,
     pub slash_command_repository_concrete: Arc<AsyncDirSlashCommandRepository>,
     pub app_state_service: Arc<AppStateService>,

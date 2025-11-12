@@ -5,7 +5,7 @@ use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
     PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent,
 };
-use orcs_core::workspace::manager::WorkspaceManager;
+use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_interaction::InteractionResult;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
@@ -384,7 +384,11 @@ pub async fn execute_message_as_task(
 
     // Get workspace root path from workspace_id
     let workspace_root = if workspace_id != PLACEHOLDER_WORKSPACE_ID {
-        match state.workspace_manager.get_workspace(workspace_id).await {
+        match state
+            .workspace_storage_service
+            .get_workspace(workspace_id)
+            .await
+        {
             Ok(Some(workspace)) => Some(workspace.root_path),
             Ok(None) => {
                 tracing::warn!("Workspace not found for id: {}, using None", workspace_id);

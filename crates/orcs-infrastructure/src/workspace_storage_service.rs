@@ -1,6 +1,6 @@
 //! File system-based workspace manager implementation.
 //!
-//! This module provides a file system-based implementation of the `WorkspaceManager` trait,
+//! This module provides a file system-based implementation of the `WorkspaceStorageService` trait,
 //! storing workspace metadata and files in the `~/.orcs/workspaces` directory.
 
 use crate::ServiceType;
@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use orcs_core::error::{OrcsError, Result};
 use orcs_core::repository::WorkspaceRepository;
-use orcs_core::workspace::manager::WorkspaceManager;
+use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_core::workspace::{
     ProjectContext, SessionWorkspace, TempFile, UploadedFile, Workspace, WorkspaceResources,
 };
@@ -211,7 +211,7 @@ impl FileSystemWorkspaceManager {
 }
 
 #[async_trait]
-impl WorkspaceManager for FileSystemWorkspaceManager {
+impl WorkspaceStorageService for FileSystemWorkspaceManager {
     async fn get_or_create_workspace(&self, repo_path: &Path) -> Result<Workspace> {
         // Validate root_path: must not be root directory
         let canonical_path = repo_path.canonicalize().map_err(|e| {

@@ -44,7 +44,7 @@ ORCSには3つの異なる「workspace」概念が存在する:
 - **場所**: `ServiceType::WorkspaceStorage` で管理
   - macOS: `~/Library/Application Support/orcs/workspaces/<uuid>/`
 - **内容**: アップロードされたファイル、一時ファイルなど
-- **管理**: `WorkspaceManager`
+- **管理**: `WorkspaceStorageService`
 
 ## 設計判断
 
@@ -135,7 +135,7 @@ async fn replace_placeholder_sessions(
 
 **既存実装を踏襲:**
 ```rust
-// WorkspaceManager::get_workspace_id()
+// WorkspaceStorageService::get_workspace_id()
 fn get_workspace_id(canonical_path: &Path) -> Result<String> {
     let path_str = canonical_path.to_string_lossy();
     let namespace = Uuid::NAMESPACE_DNS;

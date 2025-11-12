@@ -210,7 +210,7 @@ AIが返答に含めたコードスニペットやファイルを、ユーザー
 1. **MCP Server Implementation**
    ```rust
    struct OrcsMcpServer {
-       workspace_manager: Arc<FileSystemWorkspaceManager>,
+       workspace_storage_service: Arc<FileSystemWorkspaceManager>,
    }
 
    impl McpToolProvider for OrcsMcpServer {

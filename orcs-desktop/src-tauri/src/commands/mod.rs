@@ -3,18 +3,10 @@ pub mod git;
 pub mod paths;
 pub mod personas;
 pub mod session;
+pub mod slash_commands;
 pub mod tasks;
 pub mod user;
 pub mod workspaces;
-
-pub use files::*;
-pub use git::*;
-pub use paths::*;
-pub use personas::*;
-pub use session::*;
-pub use tasks::*;
-pub use user::*;
-pub use workspaces::*;
 
 pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
@@ -79,12 +71,12 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         files::open_terminal,
         session::publish_session_event,
         session::handle_input,
-        crate::slash_commands::list_slash_commands,
-        crate::slash_commands::get_slash_command,
-        crate::slash_commands::save_slash_command,
-        crate::slash_commands::remove_slash_command,
-        crate::slash_commands::expand_command_template,
-        crate::slash_commands::execute_shell_command,
+        slash_commands::list_slash_commands,
+        slash_commands::get_slash_command,
+        slash_commands::save_slash_command,
+        slash_commands::remove_slash_command,
+        slash_commands::expand_command_template,
+        slash_commands::execute_shell_command,
         session::get_auto_chat_config,
         session::update_auto_chat_config,
         session::get_auto_chat_status,

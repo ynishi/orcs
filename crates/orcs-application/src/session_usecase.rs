@@ -1,7 +1,7 @@
 //! Session use case implementation.
 //!
 //! This module provides the `SessionUseCase` which orchestrates interactions
-//! between `SessionManager` and `WorkspaceManager` to ensure data consistency
+//! between `SessionManager` and `WorkspaceStorageService` to ensure data consistency
 //! and proper state management across workspace-session relationships.
 
 use crate::session::{SessionCache, SessionFactory, SessionUpdater};
@@ -10,14 +10,14 @@ use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID, Session, SessionRepository};
 use orcs_core::state::repository::StateRepository;
 use orcs_core::user::UserService;
-use orcs_core::workspace::manager::WorkspaceManager;
+use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_interaction::InteractionManager;
 use std::sync::Arc;
 use uuid::Uuid;
 
 /// Use case for managing sessions with workspace context.
 ///
-/// `SessionUseCase` coordinates between `SessionRepository`, `WorkspaceManager`,
+/// `SessionUseCase` coordinates between `SessionRepository`, `WorkspaceStorageService`,
 /// and `AppStateService` to handle all session-related operations while maintaining
 /// consistency between sessions and their associated workspaces.
 ///
@@ -41,7 +41,7 @@ pub struct SessionUseCase {
     /// Factory for creating InteractionManager instances
     session_factory: Arc<SessionFactory>,
     /// Manager for workspace operations
-    workspace_manager: Arc<dyn WorkspaceManager>,
+    workspace_storage_service: Arc<dyn WorkspaceStorageService>,
     /// Service for application-level state (e.g., last selected workspace)
     app_state_service: Arc<orcs_infrastructure::AppStateService>,
     /// Repository for persona configurations (for enrich_session_participants)
@@ -56,13 +56,13 @@ impl SessionUseCase {
     /// # Arguments
     ///
     /// * `session_repository` - Repository for session data persistence
-    /// * `workspace_manager` - Manager for workspace operations
+    /// * `workspace_storage_service` - Manager for workspace operations
     /// * `app_state_service` - Service for application-level state
     /// * `persona_repository` - Repository for accessing persona configurations
     /// * `user_service` - Service for retrieving user information
     pub fn new(
         session_repository: Arc<dyn SessionRepository>,
-        workspace_manager: Arc<dyn WorkspaceManager>,
+        workspace_storage_service: Arc<dyn WorkspaceStorageService>,
         app_state_service: Arc<orcs_infrastructure::AppStateService>,
         persona_repository: Arc<dyn PersonaRepository>,
         user_service: Arc<dyn UserService>,
@@ -74,7 +74,7 @@ impl SessionUseCase {
                 persona_repository.clone(),
                 user_service.clone(),
             )),
-            workspace_manager,
+            workspace_storage_service,
             app_state_service,
             persona_repository,
             user_service,
@@ -118,7 +118,7 @@ impl SessionUseCase {
 
         // 1. Validate workspace exists
         let workspace = self
-            .workspace_manager
+            .workspace_storage_service
             .get_workspace(workspace_id)
             .await?
             .ok_or_else(|| anyhow!("Workspace not found: {}", workspace_id))?;
@@ -218,7 +218,7 @@ impl SessionUseCase {
 
         // 1. Get or create the workspace
         let workspace = self
-            .workspace_manager
+            .workspace_storage_service
             .get_or_create_workspace(root_path)
             .await
             .map_err(|e| anyhow!("Failed to get/create workspace: {}", e))?;
@@ -316,7 +316,7 @@ impl SessionUseCase {
 
         // 1. Get or create the admin workspace
         let workspace = self
-            .workspace_manager
+            .workspace_storage_service
             .get_or_create_workspace(&std::path::PathBuf::from(&workspace_root_path))
             .await
             .map_err(|e| anyhow!("Failed to get/create admin workspace: {}", e))?;
@@ -473,7 +473,11 @@ impl SessionUseCase {
                 workspace_id
             );
 
-            match self.workspace_manager.get_workspace(workspace_id).await {
+            match self
+                .workspace_storage_service
+                .get_workspace(workspace_id)
+                .await
+            {
                 Ok(Some(mut workspace)) => {
                     // Valid workspace - restore context
                     tracing::info!(
@@ -491,7 +495,11 @@ impl SessionUseCase {
 
                     // Update workspace last active session
                     workspace.last_active_session_id = Some(session_id.to_string());
-                    if let Err(e) = self.workspace_manager.save_workspace(&workspace).await {
+                    if let Err(e) = self
+                        .workspace_storage_service
+                        .save_workspace(&workspace)
+                        .await
+                    {
                         tracing::warn!(
                             "[SessionUseCase] Failed to save workspace last active session: {}",
                             e
@@ -499,7 +507,11 @@ impl SessionUseCase {
                     }
 
                     // Update workspace access timestamp
-                    if let Err(e) = self.workspace_manager.touch_workspace(workspace_id).await {
+                    if let Err(e) = self
+                        .workspace_storage_service
+                        .touch_workspace(workspace_id)
+                        .await
+                    {
                         tracing::warn!(
                             "[SessionUseCase] Failed to update workspace access time: {}",
                             e
@@ -602,7 +614,7 @@ impl SessionUseCase {
 
         // 1. Validate workspace exists
         let mut workspace = self
-            .workspace_manager
+            .workspace_storage_service
             .get_workspace(workspace_id)
             .await?
             .ok_or_else(|| anyhow!("Workspace not found: {}", workspace_id))?;
@@ -792,8 +804,12 @@ impl SessionUseCase {
 
         // Update workspace last active session
         workspace.last_active_session_id = Some(session_id.clone());
-        self.workspace_manager.save_workspace(&workspace).await?;
-        self.workspace_manager.touch_workspace(workspace_id).await?;
+        self.workspace_storage_service
+            .save_workspace(&workspace)
+            .await?;
+        self.workspace_storage_service
+            .touch_workspace(workspace_id)
+            .await?;
 
         println!(
             "[SessionUseCase] Successfully created and switched to new session {} for workspace {}",
@@ -893,7 +909,11 @@ impl SessionUseCase {
                 workspace_id
             );
 
-            match self.workspace_manager.get_workspace(workspace_id).await {
+            match self
+                .workspace_storage_service
+                .get_workspace(workspace_id)
+                .await
+            {
                 Ok(Some(workspace)) => {
                     // Valid workspace - restore context
                     tracing::info!(
@@ -910,7 +930,11 @@ impl SessionUseCase {
                         .await;
 
                     // Update workspace access timestamp
-                    if let Err(e) = self.workspace_manager.touch_workspace(workspace_id).await {
+                    if let Err(e) = self
+                        .workspace_storage_service
+                        .touch_workspace(workspace_id)
+                        .await
+                    {
                         tracing::warn!(
                             "[SessionUseCase] Failed to update workspace access time: {}",
                             e
@@ -1068,8 +1092,8 @@ impl SessionUseCase {
     ///
     /// This provides direct access to the underlying workspace manager for
     /// workspace-only operations.
-    pub fn workspace_manager(&self) -> &Arc<dyn WorkspaceManager> {
-        &self.workspace_manager
+    pub fn workspace_storage_service(&self) -> &Arc<dyn WorkspaceStorageService> {
+        &self.workspace_storage_service
     }
 
     /// Enriches session participants field by resolving persona IDs to names.

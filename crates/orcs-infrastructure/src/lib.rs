@@ -32,7 +32,7 @@ pub mod secret_service;
 pub mod state_repository;
 pub mod storage_repository;
 pub mod user_service;
-pub mod workspace_manager;
+pub mod workspace_storage_service;
 
 pub use crate::async_dir_persona_repository::AsyncDirPersonaRepository;
 pub use crate::async_dir_session_repository::AsyncDirSessionRepository;

@@ -37,7 +37,7 @@ pub async fn get_sessions_directory(state: State<'_, AppState>) -> Result<String
 /// Gets the workspaces directory path
 #[tauri::command]
 pub async fn get_workspaces_directory(state: State<'_, AppState>) -> Result<String, String> {
-    let workspaces_dir = state.workspace_manager.workspaces_root_path();
+    let workspaces_dir = state.workspace_storage_service.workspaces_root_path();
 
     let path_str = workspaces_dir
         .to_str()
@@ -51,7 +51,7 @@ pub async fn get_workspaces_directory(state: State<'_, AppState>) -> Result<Stri
 pub async fn get_workspaces_repository_directory(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let workspaces_dir = state.workspace_manager.workspace_data_path();
+    let workspaces_dir = state.workspace_storage_service.workspace_data_path();
 
     let path_str = workspaces_dir
         .to_str()

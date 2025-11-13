@@ -20,6 +20,8 @@ export interface Session {
   participants: Record<string, string>; // Persona ID -> name mapping
   participant_icons: Record<string, string>; // Persona ID -> icon mapping
   participant_colors: Record<string, string>; // Persona ID -> base color mapping for UI theming
+  participant_backends?: Record<string, string>; // Persona ID -> backend (e.g., "claude_api", "gemini_cli")
+  participant_models?: Record<string, string | null>; // Persona ID -> model name (e.g., "claude-sonnet-4-5-20250929")
   is_favorite?: boolean; // Whether this session is marked as favorite (pinned to top)
   is_archived?: boolean; // Whether this session is archived (hidden by default)
   sort_order?: number; // Manual sort order (optional, for custom ordering within favorites)
@@ -248,6 +250,8 @@ export function convertToUIMessageWithAuthor(
   participants: Record<string, string>,
   participantIcons: Record<string, string> = {},
   participantColors: Record<string, string> = {},
+  participantBackends: Record<string, string> = {},
+  participantModels: Record<string, string | null> = {},
   userNickname: string = 'You'
 ): Message {
   // Check if this is an error message (special authorId "Error")
@@ -267,19 +271,23 @@ export function convertToUIMessageWithAuthor(
   let author: string;
   let icon: string | undefined;
   let baseColor: string | undefined;
+  let backend: string | undefined;
+  let modelName: string | null | undefined;
   if (msg.role === 'User') {
     // User messages always use the configured nickname
     author = userNickname;
-    // User has no icon or color
+    // User has no icon, color, backend, or model
   } else if (msg.role === 'System') {
     author = 'SYSTEM';
-    // System has no icon or color
+    // System has no icon, color, backend, or model
   } else {
     // Assistant: participantsマップから名前を解決、見つからない場合はauthorIdをそのまま使用
     author = participants[authorId] || authorId;
-    // Get icon and color from participantIcons/participantColors if available
+    // Get icon, color, backend, and model from participant maps if available
     icon = participantIcons[authorId];
     baseColor = participantColors[authorId];
+    backend = participantBackends[authorId];
+    modelName = participantModels[authorId];
   }
 
   return {
@@ -290,6 +298,8 @@ export function convertToUIMessageWithAuthor(
     timestamp: new Date(msg.timestamp),
     icon,
     baseColor,
+    backend,
+    modelName,
   };
 }
 
@@ -319,6 +329,8 @@ export function convertSessionToMessages(session: Session, userNickname: string 
       session.participants || {},
       session.participant_icons || {},
       session.participant_colors || {},
+      session.participant_backends || {},
+      session.participant_models || {},
       userNickname
     )
   );

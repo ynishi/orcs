@@ -59,6 +59,43 @@ function formatMessageTypeLabel(type: string): string {
   return type.replace(/_/g, ' ').toUpperCase();
 }
 
+// バックエンド名をフォーマット
+function formatBackendName(backend: string): string {
+  const backendNames: Record<string, string> = {
+    claude_cli: 'Claude CLI',
+    claude_api: 'Claude API',
+    gemini_cli: 'Gemini CLI',
+    gemini_api: 'Gemini API',
+    open_ai_api: 'OpenAI API',
+    codex_cli: 'Codex CLI',
+  };
+  return backendNames[backend] || backend;
+}
+
+// モデル名をフォーマット（短縮版）
+function formatModelName(modelName: string | null | undefined): string | null {
+  if (!modelName) return null;
+
+  // Claude models
+  if (modelName.includes('claude-sonnet-4-5')) return 'Sonnet 4.5';
+  if (modelName.includes('claude-sonnet-4')) return 'Sonnet 4';
+  if (modelName.includes('claude-opus')) return 'Opus';
+  if (modelName.includes('claude-haiku')) return 'Haiku';
+
+  // Gemini models
+  if (modelName.includes('gemini-2.5-flash')) return 'Gemini 2.5 Flash';
+  if (modelName.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
+  if (modelName.includes('gemini-pro')) return 'Gemini Pro';
+
+  // OpenAI models
+  if (modelName.includes('gpt-4o')) return 'GPT-4o';
+  if (modelName.includes('gpt-4')) return 'GPT-4';
+  if (modelName.includes('gpt-3.5')) return 'GPT-3.5';
+
+  // Return first 20 chars if no match
+  return modelName.slice(0, 20);
+}
+
 export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCreateSlashCommand, workspaceRootPath }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
@@ -237,6 +274,16 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
               <Text fw={600} size="sm" c="dimmed">
                 {message.author}
               </Text>
+              {message.backend && (
+                <Badge size="xs" color="gray" variant="outline">
+                  {formatBackendName(message.backend)}
+                </Badge>
+              )}
+              {message.modelName && formatModelName(message.modelName) && (
+                <Badge size="xs" color="blue" variant="outline">
+                  {formatModelName(message.modelName)}
+                </Badge>
+              )}
             </Group>
 
             {/* アクションボタン */}

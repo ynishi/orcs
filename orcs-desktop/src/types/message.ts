@@ -46,6 +46,8 @@ export interface Message {
   metadata?: MessageMetadata;
   icon?: string; // Optional icon/emoji for the author
   baseColor?: string; // Optional base color for message background tinting
+  backend?: string; // Optional backend type (e.g., "claude_api", "gemini_cli")
+  modelName?: string | null; // Optional model name (e.g., "claude-sonnet-4-5-20250929")
 }
 
 /**

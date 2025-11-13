@@ -98,6 +98,12 @@ pub struct Session {
     /// Participant persona ID to base color mapping for UI theming
     #[serde(default)]
     pub participant_colors: HashMap<String, String>,
+    /// Participant persona ID to backend mapping (e.g., "claude_api", "gemini_cli")
+    #[serde(default)]
+    pub participant_backends: HashMap<String, String>,
+    /// Participant persona ID to model name mapping (e.g., "claude-sonnet-4-5-20250929")
+    #[serde(default)]
+    pub participant_models: HashMap<String, Option<String>>,
     /// Conversation mode (controls verbosity and style)
     #[serde(default)]
     pub conversation_mode: ConversationMode,

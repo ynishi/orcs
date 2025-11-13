@@ -805,11 +805,15 @@ impl InteractionManager {
         let mut participant_icons = HashMap::new();
         // Build participant_colors map: persona ID -> base_color
         let mut participant_colors = HashMap::new();
+        // Build participant_backends map: persona ID -> backend (e.g., "claude_api")
+        let mut participant_backends = HashMap::new();
+        // Build participant_models map: persona ID -> model name
+        let mut participant_models = HashMap::new();
 
         // Always add user name first (user is always a participant)
         let user_name = self.user_service.get_user_name();
         participants.insert(user_name.clone(), user_name.clone());
-        // User has no icon/color for now
+        // User has no icon/color/backend/model for now
 
         // Add all personas from persona_histories (AI participants)
         if let Ok(all_personas) = self.persona_repository.get_all().await {
@@ -829,6 +833,14 @@ impl InteractionManager {
                     if let Some(color) = &persona.base_color {
                         participant_colors.insert(persona_id.clone(), color.clone());
                     }
+                    // Add backend (serialize backend enum to string)
+                    let backend_str = serde_json::to_string(&persona.backend)
+                        .unwrap_or_else(|_| "\"claude_cli\"".to_string())
+                        .trim_matches('"')
+                        .to_string();
+                    participant_backends.insert(persona_id.clone(), backend_str);
+                    // Add model_name if persona has one
+                    participant_models.insert(persona_id.clone(), persona.model_name.clone());
                 }
             }
         }
@@ -852,6 +864,8 @@ impl InteractionManager {
             participants,
             participant_icons,
             participant_colors,
+            participant_backends,
+            participant_models,
             conversation_mode,
             talk_style,
             is_favorite: false,

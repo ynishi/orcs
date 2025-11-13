@@ -182,10 +182,14 @@ const DEFAULT_ICONS: Record<MessageSeverity, string> = {
 /**
  * Handles system messages according to their category
  *
+ * ⚠️ INTERNAL USE ONLY - DO NOT EXPORT OR USE DIRECTLY
+ * Use handleAndPersistSystemMessage() instead for conversation events that need persistence.
+ * This function is internal to systemMessage module and should not be used outside.
+ *
  * @param msg - System message to handle
  * @param onMessage - Optional callback for chat messages (required for CONVERSATION_EVENT)
  */
-export function handleSystemMessage(
+function handleSystemMessage(
   msg: SystemMessage,
   onMessage?: OnMessageCallback
 ): void {

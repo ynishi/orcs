@@ -4,7 +4,7 @@ import { IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
-import { handleSystemMessage, conversationMessage } from '../../utils/systemMessage';
+import { handleAndPersistSystemMessage, conversationMessage } from '../../utils/systemMessage';
 import { CONVERSATION_MODES, TALK_STYLES } from '../../types/conversation';
 import { MessageType } from '../../types/message';
 
@@ -76,21 +76,21 @@ export function PersonasList({
       // Show system message
       const strategyLabel = STRATEGIES.find(s => s.value === strategy)?.label || strategy;
       const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-      handleSystemMessage(
+      onMessage && await handleAndPersistSystemMessage(
         conversationMessage(
           `Execution strategy changed to: ${strategyLabel} [${timestamp}]`,
           'info'
         ),
-        onMessage
+        onMessage, invoke
       );
     } catch (error) {
       console.error('Failed to set execution strategy:', error);
-      handleSystemMessage(
+      onMessage && await handleAndPersistSystemMessage(
         conversationMessage(
           `Failed to set execution strategy: ${error}`,
           'error'
         ),
-        onMessage
+        onMessage, invoke
       );
     }
   };
@@ -109,21 +109,21 @@ export function PersonasList({
       // Show system message
       const modeLabel = CONVERSATION_MODES.find(m => m.value === mode)?.label || mode;
       const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-      handleSystemMessage(
+      onMessage && await handleAndPersistSystemMessage(
         conversationMessage(
           `Conversation mode changed to: ${modeLabel} [${timestamp}]`,
           'info'
         ),
-        onMessage
+        onMessage, invoke
       );
     } catch (error) {
       console.error('Failed to set conversation mode:', error);
-      handleSystemMessage(
+      onMessage && await handleAndPersistSystemMessage(
         conversationMessage(
           `Failed to set conversation mode: ${error}`,
           'error'
         ),
-        onMessage
+        onMessage, invoke
       );
     }
   };
@@ -142,21 +142,21 @@ export function PersonasList({
       // Show system message
       const styleLabel = style ? (TALK_STYLES.find(s => s.value === style)?.label || style) : 'None';
       const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-      handleSystemMessage(
+      onMessage && await handleAndPersistSystemMessage(
         conversationMessage(
           `Talk style changed to: ${styleLabel} [${timestamp}]`,
           'info'
         ),
-        onMessage
+        onMessage, invoke
       );
     } catch (error) {
       console.error('Failed to set talk style:', error);
-      handleSystemMessage(
+      onMessage && await handleAndPersistSystemMessage(
         conversationMessage(
           `Failed to set talk style: ${error}`,
           'error'
         ),
-        onMessage
+        onMessage, invoke
       );
     }
   };
@@ -200,15 +200,15 @@ export function PersonasList({
 
       if (isChecked) {
         await invoke('add_participant', { personaId });
-        handleSystemMessage(
+        onMessage && await handleAndPersistSystemMessage(
           conversationMessage(`${persona.name} が会話に参加しました`, 'success'),
-          onMessage
+          onMessage, invoke
         );
       } else {
         await invoke('remove_participant', { personaId });
-        handleSystemMessage(
+        onMessage && await handleAndPersistSystemMessage(
           conversationMessage(`${persona.name} が会話から退出しました`, 'info'),
-          onMessage
+          onMessage, invoke
         );
       }
 
@@ -227,9 +227,9 @@ export function PersonasList({
       }
     } catch (error) {
       console.error(error);
-      handleSystemMessage(
+      onMessage && await handleAndPersistSystemMessage(
         conversationMessage(`Failed to update participant: ${error}`, 'error'),
-        onMessage
+        onMessage, invoke
       );
     }
   };
@@ -258,15 +258,15 @@ export function PersonasList({
         await fetchPersonas();
       }
 
-      handleSystemMessage(
+      onMessage && await handleAndPersistSystemMessage(
         conversationMessage('Persona configuration saved successfully.', 'success', '✅'),
-        onMessage
+        onMessage, invoke
       );
     } catch (error) {
       console.error('Failed to save persona configs:', error);
-      handleSystemMessage(
+      onMessage && await handleAndPersistSystemMessage(
         conversationMessage(`Failed to save configuration: ${error}`, 'error', '❌'),
-        onMessage
+        onMessage, invoke
       );
     }
   };

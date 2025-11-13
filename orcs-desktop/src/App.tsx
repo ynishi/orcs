@@ -29,6 +29,7 @@ import { SettingsMenu } from "./components/settings/SettingsMenu";
 import { parseCommand, extractSlashCommands } from "./utils/commandParser";
 import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
+import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages } from "./types/session";
@@ -1196,7 +1197,18 @@ function App() {
       // ワークスペースのファイルリストを更新
       await refreshWorkspace();
 
-      // Toast notification instead of system message
+      // Add system message to chat history and persist to session
+      await handleAndPersistSystemMessage(
+        conversationMessage(
+          `Message saved to workspace: ${filename}`,
+          'success',
+          '💾'
+        ),
+        addMessage,
+        invoke
+      );
+
+      // Toast notification for immediate feedback
       notifications.show({
         title: 'File saved',
         message: `${filename}`,

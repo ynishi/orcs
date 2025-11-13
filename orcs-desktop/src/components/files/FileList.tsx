@@ -1,5 +1,6 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton } from '@mantine/core';
-import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus } from '@tabler/icons-react';
+import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
 import { UploadedFile } from '../../types/workspace';
 
@@ -34,6 +35,37 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
   const handleCancelEdit = () => {
     setEditingFileId(null);
     setEditingFileName('');
+  };
+
+  const handleCopyToClipboard = async (file: UploadedFile) => {
+    try {
+      // Read file content from workspace
+      const { invoke } = await import('@tauri-apps/api/core');
+      const fileData = await invoke<number[]>('read_workspace_file', {
+        filePath: file.path,
+      });
+
+      // Convert to string (assuming text file)
+      const uint8Array = new Uint8Array(fileData);
+      const decoder = new TextDecoder('utf-8');
+      const content = decoder.decode(uint8Array);
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(content);
+
+      notifications.show({
+        title: 'Copied!',
+        message: `File content copied to clipboard`,
+        color: 'green',
+      });
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to copy file content',
+        color: 'red',
+      });
+    }
   };
 
   const formatFileSize = (bytes?: number) => {
@@ -155,6 +187,16 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
                   onClick={() => onAttachToChat?.(file)}
                 >
                   Attach to chat
+                </Menu.Item>
+
+                {/* Copy to clipboard */}
+                <Menu.Item
+                  leftSection={<IconCopy size={14} />}
+                  onClick={() => {
+                    void handleCopyToClipboard(file);
+                  }}
+                >
+                  Copy to clipboard
                 </Menu.Item>
 
                 {/* Open file */}

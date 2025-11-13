@@ -25,6 +25,7 @@ import { CommandSuggestions } from './CommandSuggestions';
 import { AgentSuggestions } from './AgentSuggestions';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { AutoChatSettingsModal } from './AutoChatSettingsModal';
+import { SlashCommandEditorModal } from '../slash_commands/SlashCommandEditorModal';
 import { useTabContext } from '../../context/TabContext';
 import type { SessionTab } from '../../context/TabContext';
 import type { StatusInfo } from '../../types/status';
@@ -35,6 +36,8 @@ import type { Agent } from '../../types/agent';
 import type { PersonaConfig } from '../../types/agent';
 import type { AutoChatConfig } from '../../types/session';
 import type { Message } from '../../types/message';
+import type { SlashCommand } from '../../types/slash_command';
+import { notifications } from '@mantine/notifications';
 
 interface ChatPanelProps {
   tab: SessionTab;
@@ -121,6 +124,10 @@ export function ChatPanel({
   // AutoChat settings state
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
   const [autoChatConfig, setAutoChatConfig] = useState<AutoChatConfig | null>(null);
+
+  // SlashCommand creation state
+  const [slashCommandModalOpened, setSlashCommandModalOpened] = useState(false);
+  const [slashCommandDraft, setSlashCommandDraft] = useState<Partial<SlashCommand> | null>(null);
 
   // Load AutoChat config from backend when tab changes
   useEffect(() => {
@@ -284,6 +291,43 @@ export function ChatPanel({
       .join('\n---\n\n');
   };
 
+  // Handle creating a slash command from a message
+  const handleCreateSlashCommand = (_message: Message) => {
+    const threadContent = getThreadAsText();
+    setSlashCommandDraft({
+      type: 'prompt',
+      content: threadContent,
+      icon: '⚡',
+    });
+    setSlashCommandModalOpened(true);
+  };
+
+  // Handle saving the new slash command
+  const handleSaveSlashCommand = async (command: SlashCommand) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('save_slash_command', {
+        command,
+      });
+
+      notifications.show({
+        title: 'Success',
+        message: `Slash command /${command.name} created successfully!`,
+        color: 'green',
+      });
+
+      setSlashCommandModalOpened(false);
+      setSlashCommandDraft(null);
+    } catch (error) {
+      console.error('Failed to save slash command:', error);
+      notifications.show({
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to save slash command',
+        color: 'red',
+      });
+    }
+  };
+
   return (
     <Stack gap="xs" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* メッセージエリア */}
@@ -301,6 +345,7 @@ export function ChatPanel({
                 message={message}
                 onSaveToWorkspace={onSaveMessageToWorkspace}
                 onExecuteAsTask={onExecuteAsTask}
+                onCreateSlashCommand={handleCreateSlashCommand}
                 workspaceRootPath={workspace?.rootPath}
               />
             ))}
@@ -455,6 +500,16 @@ export function ChatPanel({
         onClose={() => setAutoChatSettingsOpened(false)}
         config={autoChatConfig}
         onSave={handleSaveAutoChatConfig}
+      />
+
+      <SlashCommandEditorModal
+        opened={slashCommandModalOpened}
+        onClose={() => {
+          setSlashCommandModalOpened(false);
+          setSlashCommandDraft(null);
+        }}
+        command={slashCommandDraft}
+        onSave={handleSaveSlashCommand}
       />
     </Stack>
   );

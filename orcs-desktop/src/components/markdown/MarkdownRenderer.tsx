@@ -63,7 +63,11 @@ export function MarkdownRenderer({ content, onSaveFile, workspaceRootPath }: Mar
         components={{
           // Custom code block renderer
           code({ className, children, ...props }) {
-            const codeString = String(children).replace(/\n$/, '');
+            // Extract text content from children (handle both string and ReactNode array)
+            const codeString = (Array.isArray(children)
+              ? children.join('')
+              : String(children)
+            ).replace(/\n$/, '');
 
             // Check if this is inline code (no className usually means inline)
             const isInline = !className || className.indexOf('language-') === -1;

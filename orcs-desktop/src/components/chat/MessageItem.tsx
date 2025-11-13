@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor } from '@mantine/core';
-import { IconDeviceFloppy, IconRocket } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRocket, IconCommand } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Message, getMessageStyle } from '../../types/message';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
@@ -9,6 +9,7 @@ interface MessageItemProps {
   message: Message;
   onSaveToWorkspace?: (message: Message) => Promise<void>;
   onExecuteAsTask?: (message: Message) => Promise<void>;
+  onCreateSlashCommand?: (message: Message) => void;
   workspaceRootPath?: string;
 }
 
@@ -58,7 +59,7 @@ function formatMessageTypeLabel(type: string): string {
   return type.replace(/_/g, ' ').toUpperCase();
 }
 
-export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, workspaceRootPath }: MessageItemProps) {
+export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCreateSlashCommand, workspaceRootPath }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -175,6 +176,19 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, works
                     </ActionIcon>
                   </Tooltip>
                 )}
+
+                {onCreateSlashCommand && (
+                  <Tooltip label="Create Slash Command" withArrow>
+                    <ActionIcon
+                      color="grape"
+                      variant="subtle"
+                      onClick={() => onCreateSlashCommand(message)}
+                      size="sm"
+                    >
+                      <IconCommand size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
               </Group>
             )}
           </Group>
@@ -252,6 +266,19 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, works
                       size="sm"
                     >
                       <IconDeviceFloppy size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+
+                {onCreateSlashCommand && (
+                  <Tooltip label="Create Slash Command" withArrow>
+                    <ActionIcon
+                      color="grape"
+                      variant="subtle"
+                      onClick={() => onCreateSlashCommand(message)}
+                      size="sm"
+                    >
+                      <IconCommand size={16} />
                     </ActionIcon>
                   </Tooltip>
                 )}

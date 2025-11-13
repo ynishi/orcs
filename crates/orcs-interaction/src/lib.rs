@@ -1025,11 +1025,10 @@ impl InteractionManager {
             })
             .collect::<Vec<_>>();
 
-        if current_ids.is_empty() {
-            *self.restored_participant_ids.write().await = None;
-        } else {
-            *self.restored_participant_ids.write().await = Some(current_ids);
-        }
+        // Always set Some(...) to distinguish between:
+        // - None: initial state (use default_participant)
+        // - Some(vec![]): user explicitly removed all participants (add nobody)
+        *self.restored_participant_ids.write().await = Some(current_ids);
 
         Ok(())
     }

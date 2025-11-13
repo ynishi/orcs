@@ -1,6 +1,7 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton } from '@mantine/core';
 import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
+import { invoke } from '@tauri-apps/api/core';
 import { useState } from 'react';
 import { UploadedFile } from '../../types/workspace';
 
@@ -39,19 +40,34 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
 
   const handleCopyToClipboard = async (file: UploadedFile) => {
     try {
-      // Read file content from workspace
-      const { invoke } = await import('@tauri-apps/api/core');
-      const fileData = await invoke<number[]>('read_workspace_file', {
-        filePath: file.path,
-      });
+      console.log('[FileList] Copying file to clipboard:', file.path);
 
-      // Convert to string (assuming text file)
-      const uint8Array = new Uint8Array(fileData);
-      const decoder = new TextDecoder('utf-8');
-      const content = decoder.decode(uint8Array);
+      // Create a promise for the clipboard content
+      const contentPromise = (async () => {
+        // Read file content from workspace
+        const fileData = await invoke<number[]>('read_workspace_file', {
+          filePath: file.path,
+        });
 
-      // Copy to clipboard
-      await navigator.clipboard.writeText(content);
+        console.log('[FileList] File data received, length:', fileData.length);
+
+        // Convert to string (assuming text file)
+        const uint8Array = new Uint8Array(fileData);
+        const decoder = new TextDecoder('utf-8');
+        const content = decoder.decode(uint8Array);
+
+        console.log('[FileList] Decoded content length:', content.length);
+        return content;
+      })();
+
+      // Write to clipboard using promise-based approach to maintain user interaction context
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': contentPromise.then(text => new Blob([text], { type: 'text/plain' }))
+        })
+      ]);
+
+      console.log('[FileList] Successfully copied to clipboard');
 
       notifications.show({
         title: 'Copied!',
@@ -59,10 +75,11 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
         color: 'green',
       });
     } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
+      console.error('[FileList] Failed to copy to clipboard:', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
       notifications.show({
         title: 'Error',
-        message: 'Failed to copy file content',
+        message: `Failed to copy file content: ${errorMessage}`,
         color: 'red',
       });
     }

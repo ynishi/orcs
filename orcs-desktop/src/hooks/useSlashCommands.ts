@@ -127,6 +127,33 @@ export function useSlashCommands({
             await saveCurrentSession();
             break;
 
+          case 'agents':
+            try {
+              const personas = await invoke<import('../types/agent').PersonaConfig[]>('get_personas');
+              const agentList = personas.length > 0
+                ? personas.map((p) => {
+                    const icon = p.icon || '🤖';
+                    const source = p.source === 'Adhoc' ? '(Adhoc)' : '';
+                    return `${icon} ${p.name} - ${p.role} ${source}`;
+                  }).join('\n')
+                : 'No agents available';
+
+              await handleAndPersistSystemMessage(
+                conversationMessage(`Available agents:\n${agentList}`),
+                addMessage,
+                invoke
+              );
+            } catch (error) {
+              console.error('Failed to get agents:', error);
+              await handleAndPersistSystemMessage(
+                conversationMessage(`Failed to get agents: ${error}`, 'error'),
+                addMessage,
+                invoke
+              );
+            }
+            await saveCurrentSession();
+            break;
+
           case 'task':
             if (parsed.args && parsed.args.length > 0) {
               const taskDescription = parsed.args.join(' ');

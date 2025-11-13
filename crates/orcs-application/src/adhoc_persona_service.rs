@@ -133,9 +133,29 @@ pub struct PersonaDefinition {
     pub icon: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, ToPrompt, Default)]
+#[prompt(
+    mode = "full",
+    template(r#"Generate a complete PersonaDefinition based on the provided expertise area.
+{{expertise}}
+    "#
+    )
+)]
+struct ExpertPromptDto {
+   pub  expertise: String,
+}
+
 /// Typed agent for generating persona definitions
 #[llm_toolkit::agent(
-    expertise = "Generate expert persona definitions with appropriate characteristics and communication styles",
+    expertise = "Generate expert persona definitions with appropriate characteristics and communication styles.
+
+Consider:
+- Appropriate professional name that reflects the domain
+- Concise but descriptive role title
+- Background showing depth of expertise
+- Communication style that fits the domain
+- Representative emoji/icon
+",
     output = "PersonaDefinition",
     default_inner = "llm_toolkit::agent::impls::ClaudeCodeAgent",
     proxy_methods = ["with_cwd", "with_env"]
@@ -184,22 +204,12 @@ impl AdhocPersonaService {
                 .with_env("PATH", enhanced_path);
         }
 
-        let prompt = format!(
-            "Create a detailed expert persona definition for: {}
+        let expert_prompt_dto = ExpertPromptDto{
+            expertise,
+        };
 
-Consider:
-- Appropriate professional name that reflects the domain
-- Concise but descriptive role title
-- Background showing depth of expertise
-- Communication style that fits the domain
-- Representative emoji/icon
-
-Generate a complete PersonaDefinition.",
-            expertise
-        );
-
-        // Execute with typed output
-        let definition = agent.execute(prompt.into()).await?;
+        // Execute with typed output (expertise instructions are in agent's expertise attribute)
+        let definition = agent.execute(expert_prompt_dto.to_prompt().into()).await?;
 
         // Create Persona from definition
         let persona = Persona {

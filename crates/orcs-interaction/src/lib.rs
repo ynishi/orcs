@@ -2,7 +2,6 @@ pub mod claude_api_agent;
 pub mod gemini_api_agent;
 pub mod local_agents;
 pub mod openai_api_agent;
-pub mod persona_agent;
 
 use crate::claude_api_agent::ClaudeApiAgent;
 use crate::gemini_api_agent::GeminiApiAgent;

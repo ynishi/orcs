@@ -1,4 +1,6 @@
 use orcs_core::persona::{Persona, PersonaBackend};
+use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
+use orcs_core::workspace::manager::WorkspaceStorageService;
 use tauri::State;
 
 use crate::app::AppState;
@@ -9,9 +11,52 @@ pub async fn create_adhoc_persona(
     expertise: String,
     state: State<'_, AppState>,
 ) -> Result<Persona, String> {
+    // Get workspace root path from active session
+    let workspace_root = if let Some(session_mgr) = state.session_usecase.active_session().await {
+        let app_mode = state.app_mode.lock().await.clone();
+        let session = session_mgr
+            .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+            .await;
+        let workspace_id = &session.workspace_id;
+
+        if workspace_id != PLACEHOLDER_WORKSPACE_ID {
+            match state
+                .workspace_storage_service
+                .get_workspace(workspace_id)
+                .await
+            {
+                Ok(Some(workspace)) => {
+                    tracing::info!(
+                        "[create_adhoc_persona] Using workspace root: {}",
+                        workspace.root_path.display()
+                    );
+                    Some(workspace.root_path)
+                }
+                Ok(None) => {
+                    tracing::warn!(
+                        "[create_adhoc_persona] Workspace not found for id: {}, using None",
+                        workspace_id
+                    );
+                    None
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "[create_adhoc_persona] Failed to get workspace: {}, using None",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let persona = state
         .adhoc_persona_service
-        .generate_expert(expertise)
+        .generate_expert(expertise, workspace_root)
         .await
         .map_err(|e| e.to_string())?;
 

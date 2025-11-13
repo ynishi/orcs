@@ -8,12 +8,113 @@ use orcs_core::OrcsError;
 use orcs_core::repository::TaskRepository;
 use orcs_core::task::{Task, TaskContext, TaskStatus};
 use serde_json::Value as JsonValue;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 pub mod tracing_layer;
+
+/// Builds an enhanced PATH environment variable that includes workspace-specific tool directories
+/// and system binary paths.
+fn build_enhanced_path(workspace_root: &Path) -> String {
+    let current_path = std::env::var("PATH").unwrap_or_default();
+    let mut path_components = Vec::new();
+
+    // 1. Add workspace-specific tool directories (highest priority)
+    let workspace_tool_dirs = vec![
+        workspace_root.join("node_modules/.bin"), // npm/yarn
+        workspace_root.join(".venv/bin"),         // Python venv
+        workspace_root.join("target/debug"),      // Rust debug builds
+        workspace_root.join("target/release"),    // Rust release builds
+        workspace_root.join("bin"),               // Generic bin
+    ];
+
+    for dir in workspace_tool_dirs {
+        if dir.exists() {
+            if let Some(dir_str) = dir.to_str() {
+                if !path_components.contains(&dir_str.to_string()) {
+                    path_components.push(dir_str.to_string());
+                }
+            }
+        }
+    }
+
+    // 2. Read system paths from /etc/paths (macOS/Linux)
+    #[cfg(unix)]
+    {
+        if let Ok(contents) = std::fs::read_to_string("/etc/paths") {
+            for line in contents.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() && !path_components.contains(&trimmed.to_string()) {
+                    path_components.push(trimmed.to_string());
+                }
+            }
+        }
+
+        // Read from /etc/paths.d/*
+        if let Ok(entries) = std::fs::read_dir("/etc/paths.d") {
+            for entry in entries.flatten() {
+                if let Ok(contents) = std::fs::read_to_string(entry.path()) {
+                    for line in contents.lines() {
+                        let trimmed = line.trim();
+                        if !trimmed.is_empty() && !path_components.contains(&trimmed.to_string()) {
+                            path_components.push(trimmed.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Add common binary locations
+    let common_paths = vec![
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin",
+        "/opt/homebrew/bin", // Apple Silicon Homebrew
+        "/usr/local/opt",
+    ];
+
+    for path in common_paths {
+        if !path_components.contains(&path.to_string()) {
+            path_components.push(path.to_string());
+        }
+    }
+
+    // 4. Add user's home bin directories
+    if let Ok(home) = std::env::var("HOME") {
+        use std::path::PathBuf;
+        let home_paths = vec![
+            PathBuf::from(&home).join(".local/bin"),
+            PathBuf::from(&home).join("bin"),
+        ];
+
+        for path in home_paths {
+            if path.exists() {
+                if let Some(path_str) = path.to_str() {
+                    if !path_components.contains(&path_str.to_string()) {
+                        path_components.push(path_str.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // 5. Preserve any existing PATH entries that aren't already included
+    if !current_path.is_empty() {
+        for existing in current_path.split(':') {
+            if !existing.is_empty() && !path_components.contains(&existing.to_string()) {
+                path_components.push(existing.to_string());
+            }
+        }
+    }
+
+    path_components.join(":")
+}
 
 /// Dynamic agent adapter for ParallelOrchestrator.
 ///
@@ -150,8 +251,21 @@ impl TaskExecutor {
             tracing::info!("Task will execute without specific workspace root");
         }
 
-        // TODO: Pass workspace_root to ClaudeCodeAgent for execution in specific directory
-        // Currently, the agent uses the default working directory
+        // Create agent with workspace_root and enhanced PATH if provided
+        let agent = if let Some(ref workspace) = workspace_root {
+            tracing::info!(
+                "[TaskExecutor] Creating ClaudeCodeAgent with workspace_root: {}",
+                workspace.display()
+            );
+            let enhanced_path = build_enhanced_path(workspace);
+            Arc::new(
+                ClaudeCodeAgent::new()
+                    .with_cwd(workspace.clone())
+                    .with_env("PATH", enhanced_path),
+            ) as Arc<dyn Agent<Output = String> + Send + Sync>
+        } else {
+            self.agent.clone()
+        };
 
         // Generate task ID and timestamps
         let task_id = Uuid::new_v4().to_string();
@@ -234,9 +348,9 @@ impl TaskExecutor {
         // Initialize ParallelOrchestrator with default internal agents
         let mut orchestrator = ParallelOrchestrator::new(blueprint);
 
-        // Register our executor agent as a DynamicAgent
+        // Register our executor agent as a DynamicAgent (with workspace context if provided)
         let executor_agent = Arc::new(DynamicAgentAdapter::new(
-            self.agent.clone(),
+            agent.clone(),
             "executor".to_string(),
         ));
         orchestrator.add_agent("executor", executor_agent);

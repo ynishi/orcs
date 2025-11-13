@@ -1,5 +1,6 @@
 use std::time::SystemTime;
 
+use llm_toolkit::ToPrompt;
 use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
 use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
@@ -317,6 +318,123 @@ pub async fn publish_session_event(
     }
 }
 
+/// Custom command information (Task/Prompt/Shell)
+#[derive(Debug, Clone, Serialize, ToPrompt)]
+#[prompt(
+    template = r#"- `/{{ name }}`{% if args %} {{ args }}{% endif %}: {{ description }}"#
+)]
+struct CustomCommandInfo {
+    name: String,
+    description: String,
+    args: Option<String>,
+}
+
+impl From<&SlashCommand> for CustomCommandInfo {
+    fn from(cmd: &SlashCommand) -> Self {
+        Self {
+            name: cmd.name.clone(),
+            description: cmd.description.clone(),
+            args: cmd.args_description.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, ToPrompt)]
+#[prompt(
+    template = r#"# Slash Commands - Execution Guide
+
+You are authorized to execute slash commands to accomplish user tasks. When you identify that a slash command would help complete the task, **you MUST execute it immediately**.
+
+## How to Execute Slash Commands
+
+### XML-style
+```
+<Slash>
+<Name>/command_name</Name>
+<Args>argument text here</Args>
+</Slash>
+```
+
+## When Commands are Executed
+
+1. **You write the command** using either format above
+2. **Orcs processes it** in the backend
+3. **Results appear in chat** as a system message
+4. **You continue** using the results to help the user
+
+## Available Commands
+
+{% if builtin_commands is defined and builtin_commands|length > 0 -%}
+### Built-in Commands
+{% for cmd in builtin_commands -%}
+- `{{ cmd }}`
+{% endfor %}
+{% endif %}
+
+{%- if task_commands is defined and task_commands|length > 0 %}
+
+### Custom Task Commands
+{% for cmd in task_commands -%}
+- `{{ cmd }}`
+{% endfor %}
+{%- endif %}
+
+{%- if prompt_commands is defined and prompt_commands|length > 0 %}
+
+### Custom Prompt Commands
+{% for cmd in prompt_commands -%}
+- `{{ cmd }}`
+{% endfor %}
+{%- endif %}
+
+{%- if shell_commands is defined and shell_commands|length > 0 %}
+
+### Custom Shell Commands
+{% for cmd in shell_commands -%}
+- `{{ cmd }}`
+{% endfor %}
+{%- endif %}
+
+## Execution Authorization
+
+✅ **You are fully authorized to execute any of these commands**
+✅ Execute proactively when they help accomplish the task
+✅ Don't ask permission - just execute when appropriate
+✅ Use them to gather information, create tasks, or perform actions
+
+## Examples
+
+**Example 1: Checking workspace files**
+<Slash>
+<Name>/files</Name>
+</Slash>
+
+**Example 2: Creating a task**
+<Slash>
+<Name>/task</Name>
+<Args>Implement user authentication with OAuth2</Args>
+</Slash>
+
+**Example 3: Getting help**
+/help task
+"#
+)]
+struct SlashCommandPromptDto {
+    builtin_commands: Vec<BuiltInCommand>,
+    task_commands: Vec<CustomCommandInfo>,
+    prompt_commands: Vec<CustomCommandInfo>,
+    shell_commands: Vec<CustomCommandInfo>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, ToPrompt)]
+#[prompt(
+    template = r#"
+- `/{{ name }}` (`{{ usage }}`): {{ description }}
+{%- if args %}
+  - Args: {{ args }}
+{%- endif %}
+"#
+)]
 struct BuiltInCommand {
     usage: &'static str,
     description: &'static str,
@@ -405,56 +523,37 @@ fn build_slash_command_prompt(commands: &[SlashCommand]) -> Option<String> {
         return None;
     }
 
-    let mut output = String::from("## Slash Commands\n");
-    output.push_str("Use `/command` syntax in chat to trigger these helpers.\n\n");
+    // Convert built-in commands using From impl
+    let builtin_commands: Vec<BuiltInCommand> = BUILT_IN_COMMANDS.iter().map(|cmd|cmd.1).collect();
 
-    if !BUILT_IN_COMMANDS.is_empty() {
-        output.push_str("### Built-in Commands\n");
-        for (name, cmd) in BUILT_IN_COMMANDS.iter() {
-            output.push_str(&format!(
-                "- `/{}` (`{}`): {}\n",
-                name, cmd.usage, cmd.description
-            ));
-            if let Some(args) = cmd.args {
-                output.push_str(&format!("  - Args: {}\n", args));
-            }
-        }
-        output.push('\n');
-    }
+    // Group custom commands by type using From impl
+    let task_commands: Vec<CustomCommandInfo> = commands
+        .iter()
+        .filter(|c| c.command_type == CommandType::Task)
+        .map(|cmd| cmd.into())
+        .collect();
 
-    if commands.is_empty() {
-        return Some(output);
-    }
+    let prompt_commands: Vec<CustomCommandInfo> = commands
+        .iter()
+        .filter(|c| c.command_type == CommandType::Prompt)
+        .map(|cmd| cmd.into())
+        .collect();
 
-    let mut by_type = |kind: CommandType, title: &str| {
-        let mut section = String::new();
-        for cmd in commands.iter().filter(|c| c.command_type == kind) {
-            let usage = cmd
-                .args_description
-                .as_ref()
-                .map(|u| format!(" {}", u))
-                .unwrap_or_default();
-            section.push_str(&format!(
-                "- `/{}`{}: {}\n",
-                cmd.name, usage, cmd.description
-            ));
-        }
-        if !section.is_empty() {
-            output.push_str(&format!("### {}\n", title));
-            output.push_str(&section);
-            output.push('\n');
-        }
+    let shell_commands: Vec<CustomCommandInfo> = commands
+        .iter()
+        .filter(|c| c.command_type == CommandType::Shell)
+        .map(|cmd| cmd.into())
+        .collect();
+
+    // Build DTO and render template
+    let dto = SlashCommandPromptDto {
+        builtin_commands,
+        task_commands,
+        prompt_commands,
+        shell_commands,
     };
 
-    by_type(CommandType::Task, "Custom Task Commands");
-    by_type(CommandType::Prompt, "Custom Prompt Commands");
-    by_type(CommandType::Shell, "Custom Shell Commands");
-
-    if output.trim().is_empty() {
-        None
-    } else {
-        Some(output)
-    }
+    Some(dto.to_prompt())
 }
 
 async fn handle_moderator_action(

@@ -2058,9 +2058,9 @@ checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
 
 [[package]]
 name = "llm-toolkit"
-version = "0.51.0"
+version = "0.51.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5af96fb7c54880d16772127a556c959f31a79e3d25c66c89cfe323cb6a85dc81"
+checksum = "cc15d843e8f37d21f7cbd1ea2bd6cc9c959b1a02264cc51d6c2c48093daef7d0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2086,9 +2086,9 @@ dependencies = [
 
 [[package]]
 name = "llm-toolkit-macros"
-version = "0.51.0"
+version = "0.51.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01faa71f16490ba1aeeb2a6101a7e43d6d5d36ec7665c9a0230d889341842380"
+checksum = "baf0ea984272b11e3d3963917c0ac8bac242d791f04f52580603cef2fa0c3e21"
 dependencies = [
  "minijinja",
  "proc-macro-crate 3.4.0",

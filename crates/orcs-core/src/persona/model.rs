@@ -101,7 +101,10 @@ impl PersonaBackend {
                 Capability::new("payload:read").with_description("Read input payload and messages"),
                 Capability::new("attachment:read").with_description("Read file attachments"),
                 Capability::new("task:execute")
-                    .with_description("Execute multi-step orchestration tasks with agents"),
+                    .with_description("Execute ORCS tasks: multi-step orchestration workflows with specialized agents"),
+                Capability::new("slashCommand:execute")
+                    .with_description("Execute ORCS slash commands: invoke built-in & user-defined operations"),
+                
             ]
         } else {
             // API backends: read-only, remote access
@@ -111,6 +114,10 @@ impl PersonaBackend {
                 Capability::new("analysis:code").with_description("Analyze and review code"),
                 Capability::new("suggestion:provide")
                     .with_description("Provide suggestions and designs"),
+                Capability::new("task:execute")
+                    .with_description("Execute ORCS tasks: multi-step orchestration workflows with specialized agents"),
+                Capability::new("slashCommand:execute")
+                    .with_description("Execute ORCS slash commands: invoke built-in & user-defined operations"),
             ]
         }
     }

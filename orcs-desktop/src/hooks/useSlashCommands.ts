@@ -178,10 +178,16 @@ export function useSlashCommands({
 
                 notifications.hide('expert-creation');
 
+                const successMessage = `🔶 Expert persona created: ${persona.name} ${persona.icon || '🔶'}\nRole: ${persona.role}\nBackground: ${persona.background}`;
+
+                // Display immediately in UI
+                handleSystemMessage(conversationMessage(successMessage, 'info'), addMessage);
+
+                // Persist to backend
                 await invoke('append_system_messages', {
                   messages: [
                     {
-                      content: `🔶 Expert persona created: ${persona.name} ${persona.icon || '🔶'}\nRole: ${persona.role}\nBackground: ${persona.background}`,
+                      content: successMessage,
                       messageType: 'info',
                       severity: 'info',
                     },
@@ -194,10 +200,16 @@ export function useSlashCommands({
                 console.error('Failed to create expert:', error);
                 notifications.hide('expert-creation');
 
+                const errorMessage = `❌ Failed to create expert: ${error}`;
+
+                // Display immediately in UI
+                handleSystemMessage(conversationMessage(errorMessage, 'error'), addMessage);
+
+                // Persist to backend
                 await invoke('append_system_messages', {
                   messages: [
                     {
-                      content: `❌ Failed to create expert: ${error}`,
+                      content: errorMessage,
                       messageType: 'error',
                       severity: 'error',
                     },

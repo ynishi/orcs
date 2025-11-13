@@ -27,3 +27,4 @@ uuid = { version = "1.11", features = ["v4"] }
 llm-toolkit = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+minijinja.workspace = true

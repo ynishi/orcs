@@ -133,13 +133,11 @@ pub struct PersonaDefinition {
     pub icon: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, ToPrompt, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToPrompt, Default)]
 #[prompt(
-    mode = "full",
-    template(r#"Generate a complete PersonaDefinition based on the provided expertise area.
+    template = r#"Generate a complete PersonaDefinition based on the provided expertise area.
 {{expertise}}
     "#
-    )
 )]
 struct ExpertPromptDto {
    pub  expertise: String,
@@ -287,5 +285,22 @@ impl AdhocPersonaService {
             .clone();
 
         Ok(saved_persona)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expert_prompt_dto_to_prompt_debug() {
+        let dto = ExpertPromptDto {
+            expertise: "映画制作プロセス".to_string(),
+        };
+
+        let prompt = dto.to_prompt();
+
+        assert!(prompt.contains("Generate a complete PersonaDefinition based on the provided expertise area."));
+        assert!(prompt.contains("映画制作プロセス"));
     }
 }

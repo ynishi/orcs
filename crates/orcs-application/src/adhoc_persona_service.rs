@@ -7,7 +7,6 @@
 use anyhow::Result;
 use llm_toolkit::ToPrompt;
 use llm_toolkit::agent::Agent;
-use llm_toolkit::agent::impls::ClaudeCodeAgent;
 use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
 use orcs_core::repository::PersonaRepository;
 use serde::{Deserialize, Serialize};
@@ -138,7 +137,8 @@ pub struct PersonaDefinition {
 #[llm_toolkit::agent(
     expertise = "Generate expert persona definitions with appropriate characteristics and communication styles",
     output = "PersonaDefinition",
-    default_inner = "llm_toolkit::agent::impls::ClaudeCodeAgent"
+    default_inner = "llm_toolkit::agent::impls::ClaudeCodeAgent",
+    proxy_methods = ["with_cwd", "with_env"]
 )]
 struct PersonaGeneratorAgent;
 
@@ -169,22 +169,20 @@ impl AdhocPersonaService {
         expertise: String,
         workspace_root: Option<PathBuf>,
     ) -> Result<Persona> {
-        // Create ClaudeCodeAgent with workspace context and enhanced PATH
-        let mut inner_agent = ClaudeCodeAgent::new();
+        // Create PersonaGeneratorAgent with default inner agent
+        let mut agent = PersonaGeneratorAgent::default();
 
+        // Configure workspace context if provided
         if let Some(workspace) = workspace_root {
             tracing::info!(
                 "[AdhocPersonaService] Setting workspace root for persona generation: {:?}",
                 workspace
             );
             let enhanced_path = build_enhanced_path(&workspace);
-            inner_agent = inner_agent
+            agent = agent
                 .with_cwd(workspace)
                 .with_env("PATH", enhanced_path);
         }
-
-        // Create PersonaGeneratorAgent with configured inner agent
-        let agent = PersonaGeneratorAgent::new(inner_agent);
 
         let prompt = format!(
             "Create a detailed expert persona definition for: {}

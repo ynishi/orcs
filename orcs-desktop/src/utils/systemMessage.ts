@@ -343,3 +343,49 @@ export function taskMessage(message: string): SystemMessage {
     messageType: 'task',
   };
 }
+
+/**
+ * Handles system message with both immediate UI display AND backend persistence
+ *
+ * This is the recommended method for important conversation events that should:
+ * 1. Display immediately in chat UI
+ * 2. Persist to session file (survives reloads and session switches)
+ *
+ * @param msg - System message to display and persist
+ * @param onMessage - Callback for adding message to chat UI
+ * @param invokeFunc - Tauri invoke function for backend persistence
+ *
+ * @example
+ * ```typescript
+ * await handleAndPersistSystemMessage(
+ *   conversationMessage('Expert created: Film Production Specialist', 'info'),
+ *   addMessage,
+ *   invoke
+ * );
+ * ```
+ */
+export async function handleAndPersistSystemMessage(
+  msg: SystemMessage,
+  onMessage: OnMessageCallback,
+  invokeFunc: typeof import('@tauri-apps/api/core').invoke
+): Promise<void> {
+  // 1. Display immediately in UI
+  handleSystemMessage(msg, onMessage);
+
+  // 2. Persist to backend
+  if (msg.category === MessageCategory.CONVERSATION_EVENT) {
+    const messageType = msg.messageType || (msg.severity === 'error' ? 'error' : 'info');
+    const prefix = msg.icon ? `${msg.icon} ` : '';
+    const content = `${prefix}${msg.message}`;
+
+    await invokeFunc('append_system_messages', {
+      messages: [
+        {
+          content,
+          messageType,
+          severity: msg.severity,
+        },
+      ],
+    });
+  }
+}

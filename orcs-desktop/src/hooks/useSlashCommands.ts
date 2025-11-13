@@ -7,7 +7,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { notifications } from '@mantine/notifications';
 import { parseCommand, isValidCommand, getCommandHelp } from '../utils/commandParser';
 import {
-  handleSystemMessage,
+  handleAndPersistSystemMessage,
   conversationMessage,
   commandMessage,
   shellOutputMessage,
@@ -93,17 +93,12 @@ export function useSlashCommands({
       // immediately so a reload shows the same COMMAND card (session restore pulls
       // from system_messages).  This code path has regressed multiple times,
       // so keep it colocated with the live rendering.
-      handleSystemMessage(commandMessage(commandLabel), addMessage);
       try {
-        await invoke('append_system_messages', {
-          messages: [
-            {
-              content: commandLabel,
-              messageType: 'command',
-              severity: 'info',
-            },
-          ],
-        });
+        await handleAndPersistSystemMessage(
+          commandMessage(commandLabel),
+          addMessage,
+          invoke
+        );
       } catch (error) {
         console.error('Failed to persist command log:', error);
       }
@@ -113,16 +108,21 @@ export function useSlashCommands({
       if (isBuiltinCommand) {
         switch (parsed.command) {
           case 'help':
-            handleSystemMessage(conversationMessage(getCommandHelp()), addMessage);
+            await handleAndPersistSystemMessage(
+              conversationMessage(getCommandHelp()),
+              addMessage,
+              invoke
+            );
             await saveCurrentSession();
             break;
 
           case 'status':
-            handleSystemMessage(
+            await handleAndPersistSystemMessage(
               conversationMessage(
                 `Connection: ${status.connection}\nTasks: ${status.activeTasks}\nAgent: ${status.currentAgent}\nApp Status: ${status.mode}`
               ),
-              addMessage
+              addMessage,
+              invoke
             );
             await saveCurrentSession();
             break;
@@ -131,30 +131,34 @@ export function useSlashCommands({
             if (parsed.args && parsed.args.length > 0) {
               const taskDescription = parsed.args.join(' ');
               try {
-                handleSystemMessage(
-                  conversationMessage(`🚀 Executing task: ${taskDescription}`, 'info'),
-                  addMessage
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Executing task: ${taskDescription}`, 'info', '🚀'),
+                  addMessage,
+                  invoke
                 );
 
                 const taskResult = await invoke<string>('execute_message_as_task', {
                   messageContent: taskDescription,
                 });
 
-                handleSystemMessage(
-                  conversationMessage(`✅ Task completed:\n${taskResult}`, 'info'),
-                  addMessage
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Task completed:\n${taskResult}`, 'info', '✅'),
+                  addMessage,
+                  invoke
                 );
               } catch (error) {
                 console.error('Failed to execute task:', error);
-                handleSystemMessage(
-                  conversationMessage(`❌ Task execution failed: ${error}`, 'error'),
-                  addMessage
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Task execution failed: ${error}`, 'error', '❌'),
+                  addMessage,
+                  invoke
                 );
               }
             } else {
-              handleSystemMessage(
+              await handleAndPersistSystemMessage(
                 conversationMessage('Usage: /task <description>\nExample: /task Create a README file', 'error'),
-                addMessage
+                addMessage,
+                invoke
               );
             }
             await saveCurrentSession();
@@ -178,21 +182,14 @@ export function useSlashCommands({
 
                 notifications.hide('expert-creation');
 
-                const successMessage = `🔶 Expert persona created: ${persona.name} ${persona.icon || '🔶'}\nRole: ${persona.role}\nBackground: ${persona.background}`;
+                const successMessage = `Expert persona created: ${persona.name} ${persona.icon || '🔶'}\nRole: ${persona.role}\nBackground: ${persona.background}`;
 
-                // Display immediately in UI
-                handleSystemMessage(conversationMessage(successMessage, 'info'), addMessage);
-
-                // Persist to backend
-                await invoke('append_system_messages', {
-                  messages: [
-                    {
-                      content: successMessage,
-                      messageType: 'info',
-                      severity: 'info',
-                    },
-                  ],
-                });
+                // Display in UI and persist to backend
+                await handleAndPersistSystemMessage(
+                  conversationMessage(successMessage, 'info', '🔶'),
+                  addMessage,
+                  invoke
+                );
 
                 await refreshPersonas();
                 await refreshSessions();
@@ -200,26 +197,20 @@ export function useSlashCommands({
                 console.error('Failed to create expert:', error);
                 notifications.hide('expert-creation');
 
-                const errorMessage = `❌ Failed to create expert: ${error}`;
+                const errorMessage = `Failed to create expert: ${error}`;
 
-                // Display immediately in UI
-                handleSystemMessage(conversationMessage(errorMessage, 'error'), addMessage);
-
-                // Persist to backend
-                await invoke('append_system_messages', {
-                  messages: [
-                    {
-                      content: errorMessage,
-                      messageType: 'error',
-                      severity: 'error',
-                    },
-                  ],
-                });
+                // Display in UI and persist to backend
+                await handleAndPersistSystemMessage(
+                  conversationMessage(errorMessage, 'error', '❌'),
+                  addMessage,
+                  invoke
+                );
               }
             } else {
-              handleSystemMessage(
+              await handleAndPersistSystemMessage(
                 conversationMessage('Usage: /expert <expertise>\nExample: /expert 映画制作プロセス', 'error'),
-                addMessage
+                addMessage,
+                invoke
               );
             }
             await saveCurrentSession();
@@ -261,12 +252,13 @@ Generate the BlueprintWorkflow now.`;
 
               nextInput = blueprintPrompt;
             } else {
-              handleSystemMessage(
+              await handleAndPersistSystemMessage(
                 conversationMessage(
                   'Usage: /blueprint <task description>\nExample: /blueprint Create technical article about Rust',
                   'error'
                 ),
-                addMessage
+                addMessage,
+                invoke
               );
             }
             await saveCurrentSession();
@@ -281,26 +273,33 @@ Generate the BlueprintWorkflow now.`;
               if (targetWorkspace && currentSessionId) {
                 try {
                   await switchWorkspace(currentSessionId, targetWorkspace.id);
-                  handleSystemMessage(
-                    conversationMessage(`✅ Switched to workspace: ${targetWorkspace.name}`),
-                    addMessage
+                  await handleAndPersistSystemMessage(
+                    conversationMessage(`Switched to workspace: ${targetWorkspace.name}`, 'success', '✅'),
+                    addMessage,
+                    invoke
                   );
                 } catch (err) {
-                  handleSystemMessage(
+                  await handleAndPersistSystemMessage(
                     conversationMessage(`Failed to switch workspace: ${err}`, 'error'),
-                    addMessage
+                    addMessage,
+                    invoke
                   );
                 }
               } else if (!targetWorkspace) {
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(
                     `Workspace not found: ${workspaceName}\n\nAvailable workspaces:\n${allWorkspaces.map((ws) => `- ${ws.name}`).join('\n')}`,
                     'error'
                   ),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
               } else {
-                handleSystemMessage(conversationMessage('No active session', 'error'), addMessage);
+                await handleAndPersistSystemMessage(
+                  conversationMessage('No active session', 'error'),
+                  addMessage,
+                  invoke
+                );
               }
             } else {
               const workspaceList = allWorkspaces
@@ -309,9 +308,10 @@ Generate the BlueprintWorkflow now.`;
                     `${ws.id === workspace?.id ? '📍' : '  '} ${ws.name}${ws.isFavorite ? ' ⭐' : ''}`
                 )
                 .join('\n');
-              handleSystemMessage(
+              await handleAndPersistSystemMessage(
                 conversationMessage(`Available workspaces:\n${workspaceList}\n\nUsage: /workspace <name>`),
-                addMessage
+                addMessage,
+                invoke
               );
             }
             await saveCurrentSession();
@@ -327,9 +327,10 @@ Generate the BlueprintWorkflow now.`;
                     )
                     .join('\n')
                 : 'No files in current workspace';
-            handleSystemMessage(
+            await handleAndPersistSystemMessage(
               conversationMessage(`Files in workspace "${workspace?.name}":\n${fileList}`),
-              addMessage
+              addMessage,
+              invoke
             );
             await saveCurrentSession();
             break;
@@ -340,12 +341,13 @@ Generate the BlueprintWorkflow now.`;
               const validModes = ['normal', 'concise', 'brief', 'discussion'];
 
               if (!validModes.includes(mode)) {
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(
                     `Invalid mode: ${mode}\n\nAvailable modes:\n- normal (通常)\n- concise (簡潔・300文字)\n- brief (極簡潔・150文字)\n- discussion (議論)`,
                     'error'
                   ),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
                 return { nextInput: null, suppressUserMessage: true };
               }
@@ -359,14 +361,16 @@ Generate the BlueprintWorkflow now.`;
                   brief: '極簡潔 (150文字)',
                   discussion: '議論 (Discussion)',
                 };
-                handleSystemMessage(
-                  conversationMessage(`✅ Conversation mode changed to: ${modeLabels[mode]}`),
-                  addMessage
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Conversation mode changed to: ${modeLabels[mode]}`, 'success', '✅'),
+                  addMessage,
+                  invoke
                 );
               } catch (error) {
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(`Failed to set conversation mode: ${error}`, 'error'),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
               }
             } else {
@@ -378,16 +382,18 @@ Generate the BlueprintWorkflow now.`;
                   brief: '極簡潔 (150文字)',
                   discussion: '議論 (Discussion)',
                 };
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(
                     `Current mode: ${modeLabels[currentMode] || currentMode}\n\nUsage: /mode <normal|concise|brief|discussion>`
                   ),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
               } catch (error) {
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage('Usage: /mode <normal|concise|brief|discussion>', 'error'),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
               }
             }
@@ -409,12 +415,13 @@ Generate the BlueprintWorkflow now.`;
               ];
 
               if (!validStyles.includes(style)) {
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(
                     `Invalid style: ${style}\n\nAvailable styles:\n- brainstorm (ブレインストーミング)\n- casual (カジュアル)\n- decision_making (意思決定)\n- debate (議論)\n- problem_solving (問題解決)\n- review (レビュー)\n- planning (計画)\n- none (解除)`,
                     'error'
                   ),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
                 await saveCurrentSession();
                 return { nextInput: null, suppressUserMessage: true };
@@ -434,14 +441,16 @@ Generate the BlueprintWorkflow now.`;
                   planning: '計画 (Planning)',
                   none: '解除 (None)',
                 };
-                handleSystemMessage(
-                  conversationMessage(`✅ Talk style changed to: ${styleLabels[style]}`),
-                  addMessage
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Talk style changed to: ${styleLabels[style]}`, 'success', '✅'),
+                  addMessage,
+                  invoke
                 );
               } catch (error) {
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(`Failed to set talk style: ${error}`, 'error'),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
               }
             } else {
@@ -457,19 +466,21 @@ Generate the BlueprintWorkflow now.`;
                   planning: '計画 (Planning)',
                 };
                 const currentLabel = currentStyle ? styleLabels[currentStyle] || currentStyle : 'Not set';
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(
                     `Current talk style: ${currentLabel}\n\nUsage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>`
                   ),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
               } catch (error) {
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(
                     'Usage: /talk <brainstorm|casual|decision_making|debate|problem_solving|review|planning|none>',
                     'error'
                   ),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
               }
             }
@@ -487,9 +498,10 @@ Generate the BlueprintWorkflow now.`;
           });
 
           if (!customCommand) {
-            handleSystemMessage(
+            await handleAndPersistSystemMessage(
               conversationMessage(`Unknown command: /${parsed.command}\nType /help for available commands`, 'error'),
-              addMessage
+              addMessage,
+              invoke
             );
             await saveCurrentSession();
             return { nextInput, suppressUserMessage };
@@ -508,9 +520,10 @@ Generate the BlueprintWorkflow now.`;
               const expandedPrompt = expanded.content.trim();
               nextInput = expandedPrompt ? `${expandedPrompt}${commandProvenance}` : '';
               if (!nextInput.trim()) {
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(`Command /${parsed.command} produced empty content.`, 'error'),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
                 nextInput = null;
                 suppressUserMessage = true;
@@ -518,9 +531,10 @@ Generate the BlueprintWorkflow now.`;
             } else if (customCommand.type === 'task') {
               // Execute task command
               try {
-                handleSystemMessage(
-                  conversationMessage(`🚀 Executing task: ${parsed.command}...`, 'info'),
-                  addMessage
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Executing task: ${parsed.command}...`, 'info', '🚀'),
+                  addMessage,
+                  invoke
                 );
 
                 const taskResult = await invoke<string>('execute_task_command', {
@@ -528,18 +542,20 @@ Generate the BlueprintWorkflow now.`;
                   args: argsStr || null,
                 });
 
-                handleSystemMessage(
-                  conversationMessage(`✅ Task completed:\n${taskResult}`, 'info'),
-                  addMessage
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Task completed:\n${taskResult}`, 'info', '✅'),
+                  addMessage,
+                  invoke
                 );
 
                 nextInput = null;
                 suppressUserMessage = true;
               } catch (error) {
                 console.error(`Failed to execute task command /${parsed.command}:`, error);
-                handleSystemMessage(
-                  conversationMessage(`❌ Task execution failed: ${error}`, 'error'),
-                  addMessage
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Task execution failed: ${error}`, 'error', '❌'),
+                  addMessage,
+                  invoke
                 );
                 nextInput = null;
                 suppressUserMessage = true;
@@ -558,30 +574,23 @@ Generate the BlueprintWorkflow now.`;
                   : '_No output_';
                 const shellMessage = `${shellHeader}\n${shellBody}`;
 
-                // 1. Display immediately in UI
-                handleSystemMessage(shellOutputMessage(shellMessage), addMessage);
-
-                // 2. Persist to Backend as ContextInfo (survives session switches, no agent reaction)
-                // Persist shell output as well so reload shows the dark card.
-                // Without this, the UI only had the immediate toast.
-                await invoke('append_system_messages', {
-                  messages: [
-                    {
-                      content: shellMessage,
-                      messageType: 'shell_output',
-                      severity: 'info',
-                    },
-                  ],
-                });
+                // Display in UI and persist to backend
+                // (survives session switches, no agent reaction)
+                await handleAndPersistSystemMessage(
+                  shellOutputMessage(shellMessage),
+                  addMessage,
+                  invoke
+                );
 
                 // Don't send to agent (ContextInfo is stored but doesn't trigger reactions)
                 nextInput = null;
                 suppressUserMessage = true;
               } catch (error) {
                 console.error(`Failed to run slash command /${parsed.command}:`, error);
-                handleSystemMessage(
+                await handleAndPersistSystemMessage(
                   conversationMessage(`Failed to run slash command: ${error}`, 'error'),
-                  addMessage
+                  addMessage,
+                  invoke
                 );
                 nextInput = null;
                 suppressUserMessage = true;
@@ -591,17 +600,19 @@ Generate the BlueprintWorkflow now.`;
             await saveCurrentSession();
           } catch (error) {
             console.error('Failed to expand slash command:', error);
-            handleSystemMessage(
+            await handleAndPersistSystemMessage(
               conversationMessage(`Failed to expand command: ${error}`, 'error'),
-              addMessage
+              addMessage,
+              invoke
             );
             await saveCurrentSession();
           }
         } catch (error) {
           console.error('Failed to fetch slash command:', error);
-          handleSystemMessage(
+          await handleAndPersistSystemMessage(
             conversationMessage(`Failed to fetch command: ${error}`, 'error'),
-            addMessage
+            addMessage,
+            invoke
           );
           await saveCurrentSession();
         }
@@ -623,12 +634,13 @@ Generate the BlueprintWorkflow now.`;
           await saveCurrentSession();
         } catch (error) {
           console.error('Failed to submit generated command content:', error);
-          handleSystemMessage(
+          await handleAndPersistSystemMessage(
             conversationMessage(
               `Failed to submit generated command content: ${error}`,
               'error'
             ),
-            addMessage
+            addMessage,
+            invoke
           );
         }
         return { nextInput: null, suppressUserMessage: true };

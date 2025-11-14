@@ -412,12 +412,31 @@ impl Agent for PersonaBackendAgent {
 fn agent_for_persona(
     persona: &PersonaDomain,
     workspace_root: Arc<RwLock<Option<PathBuf>>>,
-) -> PersonaBackendAgent {
-    PersonaBackendAgent::new(
+) -> Box<dyn Agent<Output = String>> {
+    use llm_toolkit::agent::chat::Chat;
+    use llm_toolkit::agent::persona::ContextConfig;
+
+    let backend_agent = PersonaBackendAgent::new(
         persona.backend.clone(),
         persona.model_name.clone(),
         workspace_root,
-    )
+    );
+
+    let llm_persona = domain_to_llm_persona(persona);
+    let mut chat = Chat::new(backend_agent).with_persona(llm_persona);
+
+    // ClaudeCode backend の場合のみ ContextConfig を適用
+    if matches!(persona.backend, PersonaBackend::ClaudeCli) {
+        let config = ContextConfig {
+            recent_messages_count: 20,
+            participants_after_context: true,  // Participants を Context の後に配置
+            include_trailing_prompt: true,
+            ..Default::default()
+        };
+        chat = chat.with_context_config(config);
+    }
+
+    chat.with_history(true).build()
 }
 
 /// Represents a single message in a dialogue conversation.
@@ -752,10 +771,8 @@ impl InteractionManager {
 
         for persona in personas_to_add {
             let llm_persona = domain_to_llm_persona(&persona);
-            dialogue.add_participant(
-                llm_persona,
-                agent_for_persona(&persona, self.agent_workspace_root.clone()),
-            );
+            let agent = agent_for_persona(&persona, self.agent_workspace_root.clone());
+            dialogue.add_agent(llm_persona, agent);
         }
 
         // Keep restored_participant_ids for future dialogue recreations
@@ -956,10 +973,8 @@ impl InteractionManager {
         // Lock the dialogue and add participant
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
-        dialogue.add_participant(
-            persona,
-            agent_for_persona(&persona_config, self.agent_workspace_root.clone()),
-        );
+        let agent = agent_for_persona(&persona_config, self.agent_workspace_root.clone());
+        dialogue.add_agent(persona, agent);
 
         // Update restored_participant_ids to persist across dialogue recreations
         // Get current active participants and add the new one

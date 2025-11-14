@@ -325,8 +325,8 @@ export function PersonasList({
         {/* ペルソナ情報 */}
         <Box style={{ flex: 1, minWidth: 0 }}>
           <Group gap="xs" mb={4}>
-            <Text size="sm" fw={600} truncate>
-              {persona.name}
+            <Text size="sm" fw={600} truncate style={{ minWidth: '80px' }}>
+              {persona.icon}{persona.name}
             </Text>
             {persona.source === 'Adhoc' && (
               <Badge size="xs" color="orange" variant="filled">

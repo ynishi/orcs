@@ -349,7 +349,9 @@ export function ChatPanel({
                 workspaceRootPath={workspace?.rootPath}
               />
             ))}
-            {tab.isAiThinking && <ThinkingIndicator personaName={tab.thinkingPersona} />}
+            {tab.isAiThinking && activeParticipantIds.length > 0 && (
+              <ThinkingIndicator personaName={tab.thinkingPersona} />
+            )}
           </Stack>
         </ScrollArea>
 

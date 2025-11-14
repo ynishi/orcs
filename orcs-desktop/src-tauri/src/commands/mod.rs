@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod files;
 pub mod git;
 pub mod paths;
@@ -10,6 +11,8 @@ pub mod workspaces;
 
 pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
+        ai::ai_generate,
+        ai::ai_refine,
         session::create_session,
         session::create_config_session,
         session::list_sessions,

@@ -1,7 +1,7 @@
 use std::process::Command;
 
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
-use orcs_core::slash_command::SlashCommand;
+use orcs_core::slash_command::{CreateSlashCommandRequest, SlashCommand};
 use orcs_core::workspace::manager::WorkspaceStorageService;
 use tauri::State;
 
@@ -29,6 +29,37 @@ pub async fn get_slash_command(
         .get_command(&name)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Creates a new slash command from a CreateSlashCommandRequest (unified creation logic)
+#[tauri::command]
+pub async fn create_slash_command(
+    request: CreateSlashCommandRequest,
+    state: State<'_, AppState>,
+) -> Result<SlashCommand, String> {
+    // Validate request
+    request.validate()?;
+
+    // Convert to SlashCommand
+    let command = request.into_slash_command();
+
+    // Check for duplicate name
+    if let Ok(Some(_)) = state
+        .slash_command_repository
+        .get_command(&command.name)
+        .await
+    {
+        return Err(format!("Slash command '{}' already exists", command.name));
+    }
+
+    // Save to repository
+    state
+        .slash_command_repository
+        .save_command(command.clone())
+        .await
+        .map_err(|e| format!("Failed to save slash command: {}", e))?;
+
+    Ok(command)
 }
 
 /// Saves a slash command (add or update)

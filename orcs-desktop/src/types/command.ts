@@ -103,10 +103,12 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   {
     name: 'create-slash-command',
     icon: '⚡',
-    description: 'Create a new slash command (not yet implemented)',
+    description: 'Create a new slash command from JSON definition',
     usage: '/create-slash-command <json>',
-    examples: ['/create-slash-command {"name": "my-command", ...}'],
-    argsDescription: 'JSON slash command definition',
+    examples: [
+      '/create-slash-command {"name": "greet", "type": "prompt", "description": "Greet someone", "content": "Say hello to {{args}}", "icon": "👋"}',
+    ],
+    argsDescription: 'JSON with required fields: name, type, description, content. Optional: icon (default: ⚡), workingDir, argsDescription, taskBlueprint',
   },
   {
     name: 'create-workspace',

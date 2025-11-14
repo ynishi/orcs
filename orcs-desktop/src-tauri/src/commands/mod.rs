@@ -75,6 +75,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         session::handle_input,
         slash_commands::list_slash_commands,
         slash_commands::get_slash_command,
+        slash_commands::create_slash_command,
         slash_commands::save_slash_command,
         slash_commands::remove_slash_command,
         slash_commands::expand_command_template,

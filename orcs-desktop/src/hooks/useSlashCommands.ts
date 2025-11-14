@@ -291,6 +291,63 @@ Generate the BlueprintWorkflow now.`;
             await saveCurrentSession();
             break;
 
+          case 'create-slash-command':
+            if (parsed.args && parsed.args.length > 0) {
+              const jsonString = parsed.args.join(' ');
+              try {
+                // Parse and validate JSON
+                const commandRequest = JSON.parse(jsonString);
+
+                notifications.show({
+                  title: 'Creating Slash Command',
+                  message: `Creating command: ${commandRequest.name || 'Unknown'}...`,
+                  color: 'blue',
+                  autoClose: false,
+                  id: 'command-creation',
+                });
+
+                const command = await invoke<import('../types/slash_command').SlashCommand>('create_slash_command', {
+                  request: commandRequest,
+                });
+
+                notifications.hide('command-creation');
+
+                const successMessage = `Slash command created: /${command.name} ${command.icon}\nType: ${command.type}\nDescription: ${command.description}`;
+
+                await handleAndPersistSystemMessage(
+                  conversationMessage(successMessage, 'info', '✅'),
+                  addMessage,
+                  invoke
+                );
+
+                // No need to refresh sessions, but might want to refresh command list in UI
+              } catch (error) {
+                console.error('Failed to create slash command:', error);
+                notifications.hide('command-creation');
+
+                const errorMessage = error instanceof SyntaxError
+                  ? `Invalid JSON format: ${error.message}`
+                  : `Failed to create slash command: ${error}`;
+
+                await handleAndPersistSystemMessage(
+                  conversationMessage(errorMessage, 'error', '❌'),
+                  addMessage,
+                  invoke
+                );
+              }
+            } else {
+              await handleAndPersistSystemMessage(
+                conversationMessage(
+                  'Usage: /create-slash-command <json>\nExample: /create-slash-command {"name": "greet", "type": "prompt", "description": "Greet someone", "content": "Say hello to {{args}}", "icon": "👋"}',
+                  'error'
+                ),
+                addMessage,
+                invoke
+              );
+            }
+            await saveCurrentSession();
+            break;
+
           case 'create-persona':
             if (parsed.args && parsed.args.length > 0) {
               const jsonString = parsed.args.join(' ');

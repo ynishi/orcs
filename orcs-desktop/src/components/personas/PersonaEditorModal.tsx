@@ -99,6 +99,26 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
       return;
     }
 
+    // If editing, bypass create_persona and let parent persist the updated config
+    if (isEditing && persona?.id) {
+      const updatedPersona: PersonaConfig = {
+        id: persona.id,
+        source: persona.source || 'User',
+        name: formData.name || '',
+        role: formData.role || '',
+        background: formData.background || '',
+        communication_style: formData.communication_style || '',
+        default_participant: formData.default_participant || false,
+        backend: (formData.backend || 'claude_cli') as PersonaConfig['backend'],
+        model_name: formData.model_name || undefined,
+        icon: formData.icon || undefined,
+        base_color: formData.base_color || undefined,
+      };
+
+      onSave(updatedPersona);
+      return;
+    }
+
     try {
       // Build CreatePersonaRequest (ID is always auto-generated)
       const request: CreatePersonaRequest = {

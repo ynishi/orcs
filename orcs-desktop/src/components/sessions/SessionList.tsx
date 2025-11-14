@@ -1,6 +1,6 @@
 import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput, Switch, Badge, Menu } from '@mantine/core';
 import { IconDotsVertical, IconArrowUp, IconArrowDown, IconPencil, IconArchive, IconTrash } from '@tabler/icons-react';
-import { Session, getMessageCount, getLastActive } from '../../types/session';
+import { Session, getMessageCount, getLastActive, getAllMessages } from '../../types/session';
 import { Workspace } from '../../types/workspace';
 import { useState } from 'react';
 
@@ -35,6 +35,7 @@ export function SessionList({
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [filterByWorkspace, setFilterByWorkspace] = useState<boolean>(true); // デフォルトON
   const [showArchived, setShowArchived] = useState<boolean>(false); // デフォルトOFF（非表示）
+  const [sessionPreviewCache, setSessionPreviewCache] = useState<Record<string, string>>({});
 
   // workspace_idからWorkspace名を取得するヘルパー関数
   const getWorkspaceName = (workspaceId?: string): string | null => {
@@ -112,6 +113,33 @@ export function SessionList({
   const handleCancelEdit = () => {
     setEditingSessionId(null);
     setEditingTitle('');
+  };
+
+  // ホバー時にセッションのプレビューをキャッシュ
+  const handleSessionHover = (session: Session) => {
+    // Skip if already cached
+    if (sessionPreviewCache[session.id]) {
+      return;
+    }
+
+    // Get all messages in chronological order
+    const allMessages = getAllMessages(session);
+
+    // Filter out System messages
+    const nonSystemMessages = allMessages.filter(msg => msg.role !== 'System');
+
+    if (nonSystemMessages.length === 0) {
+      return;
+    }
+
+    // 最初のメッセージの冒頭50文字をプレビューとして使用
+    const firstMessage = nonSystemMessages[0];
+    const preview = firstMessage.content.slice(0, 50).trim();
+
+    setSessionPreviewCache(prev => ({
+      ...prev,
+      [session.id]: preview,
+    }));
   };
 
   // セッションレンダリング関数
@@ -243,38 +271,47 @@ export function SessionList({
           </Group>
 
           {/* コンテンツエリア */}
-          <UnstyledButton
-            onClick={() => onSessionSelect?.(session)}
-            onDoubleClick={(e) => handleStartEdit(session, e)}
-            style={{ width: '100%', textAlign: 'left' }}
+          <Tooltip
+            label={sessionPreviewCache[session.id] || 'Hover to preview...'}
+            withArrow
+            position="right"
+            multiline
+            w={220}
           >
-            <Box p="md">
-              <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
-                {session.title}
-              </Text>
-              <Group gap="xs" mt={4}>
-                {getWorkspaceName(session.workspace_id) && (
-                  <>
-                    <Badge size="xs" variant="light" color="blue" style={{ textTransform: 'none' }}>
-                      {getWorkspaceName(session.workspace_id)}
-                    </Badge>
-                    <Text size="xs" c="dimmed">
-                      •
-                    </Text>
-                  </>
-                )}
-                <Text size="xs" c="dimmed">
-                  {getMessageCount(session)} msgs
+            <UnstyledButton
+              onClick={() => onSessionSelect?.(session)}
+              onDoubleClick={(e) => handleStartEdit(session, e)}
+              onMouseEnter={() => handleSessionHover(session)}
+              style={{ width: '100%', textAlign: 'left' }}
+            >
+              <Box p="md">
+                <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
+                  {session.title}
                 </Text>
-                <Text size="xs" c="dimmed">
-                  •
-                </Text>
-                <Text size="xs" c="dimmed">
-                  {formatDate(getLastActive(session))}
-                </Text>
-              </Group>
-            </Box>
-          </UnstyledButton>
+                <Group gap="xs" mt={4}>
+                  {getWorkspaceName(session.workspace_id) && (
+                    <>
+                      <Badge size="xs" variant="light" color="blue" style={{ textTransform: 'none' }}>
+                        {getWorkspaceName(session.workspace_id)}
+                      </Badge>
+                      <Text size="xs" c="dimmed">
+                        •
+                      </Text>
+                    </>
+                  )}
+                  <Text size="xs" c="dimmed">
+                    {getMessageCount(session)} msgs
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    •
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {formatDate(getLastActive(session))}
+                  </Text>
+                </Group>
+              </Box>
+            </UnstyledButton>
+          </Tooltip>
         </>
       )}
     </Box>

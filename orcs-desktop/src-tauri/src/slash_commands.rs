@@ -61,11 +61,6 @@ pub async fn expand_slash_command(
                 command.content.clone()
             }
         }
-        CommandType::Entity => {
-            // Entity commands are handled in handle_input, not here
-            // This is just for expansion, so return empty or args
-            trimmed_args.to_string()
-        }
     };
 
     // Get workspace info from active session

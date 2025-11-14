@@ -974,30 +974,6 @@ pub async fn handle_input(
                             cmd_name
                         )
                     }
-                    CommandType::Entity => {
-                        use orcs_core::slash_command::EntityType;
-
-                        match cmd.entity_type {
-                            Some(EntityType::Persona) => {
-                                match execute_create_persona(args, &state).await {
-                                    Ok(persona) => format!(
-                                        "✅ Successfully created persona '{}' ({})\n\nID: {}\nRole: {}\nBackend: {:?}",
-                                        persona.name, persona.id, persona.id, persona.role, persona.backend
-                                    ),
-                                    Err(e) => format!("❌ Failed to create persona: {}", e),
-                                }
-                            }
-                            Some(EntityType::Workspace) => {
-                                format!("Workspace creation not yet implemented")
-                            }
-                            Some(EntityType::SlashCommand) => {
-                                format!("SlashCommand creation not yet implemented")
-                            }
-                            None => {
-                                format!("Error: Entity command missing entity_type")
-                            }
-                        }
-                    }
                 }
                 }
                 Ok(None) => format!(

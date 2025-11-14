@@ -2,7 +2,7 @@ import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Toolti
 import { IconDotsVertical, IconArrowUp, IconArrowDown, IconPencil, IconArchive, IconTrash } from '@tabler/icons-react';
 import { Session, getMessageCount, getLastActive, getAllMessages } from '../../types/session';
 import { Workspace } from '../../types/workspace';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface SessionListProps {
   sessions: Session[];
@@ -44,55 +44,63 @@ export function SessionList({
     return workspace?.name || null;
   };
 
-  // フィルタリングされたセッション
-  const filteredSessions = filterByWorkspace && currentWorkspaceId
-    ? sessions.filter(s => {
-        // workspace_idがnullまたはundefinedのSessionは除外
-        if (!s.workspace_id) {
-          console.log('[SessionList] Filtering out session with no workspace_id:', s.id, s.title);
-          return false;
-        }
-        const matches = s.workspace_id === currentWorkspaceId;
-        console.log('[SessionList] Filter check:', s.id.substring(0, 8), 'workspace_id:', s.workspace_id?.substring(0, 8), 'current:', currentWorkspaceId?.substring(0, 8), 'matches:', matches);
-        return matches;
-      })
-    : sessions;
-
-  console.log('[SessionList] Filter active:', filterByWorkspace, 'currentWorkspaceId:', currentWorkspaceId?.substring(0, 8), 'total sessions:', sessions.length, 'filtered:', filteredSessions.length);
-
-  const sortedSessions = [...filteredSessions].sort((a, b) => {
-    // 1. Archivedは常に最後
-    if (a.is_archived !== b.is_archived) {
-      return a.is_archived ? 1 : -1;
+  // フィルタリングされたセッション（メモ化してパフォーマンス改善）
+  const filteredSessions = useMemo(() => {
+    if (!filterByWorkspace || !currentWorkspaceId) {
+      return sessions;
     }
 
-    // 2. Favoriteは常に上
-    if (a.is_favorite !== b.is_favorite) {
-      return a.is_favorite ? -1 : 1;
-    }
-
-    // 3. Favorite内では、sort_orderがあればそれを優先
-    if (a.is_favorite && b.is_favorite) {
-      if (a.sort_order !== undefined && b.sort_order !== undefined) {
-        return a.sort_order - b.sort_order;
+    return sessions.filter(s => {
+      // workspace_idがnullまたはundefinedのSessionは除外
+      if (!s.workspace_id) {
+        return false;
       }
-      if (a.sort_order !== undefined) return -1;
-      if (b.sort_order !== undefined) return 1;
-    }
+      return s.workspace_id === currentWorkspaceId;
+    });
+  }, [sessions, filterByWorkspace, currentWorkspaceId]);
 
-    // 4. それ以外はupdated_atで降順
-    return getLastActive(b).getTime() - getLastActive(a).getTime();
-  });
+  // ソート済みセッション（メモ化）
+  const sortedSessions = useMemo(() => {
+    return [...filteredSessions].sort((a, b) => {
+      // 1. Archivedは常に最後
+      if (a.is_archived !== b.is_archived) {
+        return a.is_archived ? 1 : -1;
+      }
 
-  // Show Archivedがfalseの場合は、Archivedセッションを除外
-  const visibleSessions = showArchived
-    ? sortedSessions
-    : sortedSessions.filter(s => !s.is_archived);
+      // 2. Favoriteは常に上
+      if (a.is_favorite !== b.is_favorite) {
+        return a.is_favorite ? -1 : 1;
+      }
 
-  // Favorites/Recentに分離
-  const favoriteSessions = visibleSessions.filter(s => s.is_favorite && !s.is_archived);
-  const recentSessions = visibleSessions.filter(s => !s.is_favorite && !s.is_archived);
-  const archivedSessions = visibleSessions.filter(s => s.is_archived);
+      // 3. Favorite内では、sort_orderがあればそれを優先
+      if (a.is_favorite && b.is_favorite) {
+        if (a.sort_order !== undefined && b.sort_order !== undefined) {
+          return a.sort_order - b.sort_order;
+        }
+        if (a.sort_order !== undefined) return -1;
+        if (b.sort_order !== undefined) return 1;
+      }
+
+      // 4. それ以外はupdated_atで降順
+      return getLastActive(b).getTime() - getLastActive(a).getTime();
+    });
+  }, [filteredSessions]);
+
+  // 表示するセッション（メモ化）
+  const visibleSessions = useMemo(() => {
+    return showArchived
+      ? sortedSessions
+      : sortedSessions.filter(s => !s.is_archived);
+  }, [sortedSessions, showArchived]);
+
+  // カテゴリ別セッション（メモ化）
+  const { favoriteSessions, recentSessions, archivedSessions } = useMemo(() => {
+    return {
+      favoriteSessions: visibleSessions.filter(s => s.is_favorite && !s.is_archived),
+      recentSessions: visibleSessions.filter(s => !s.is_favorite && !s.is_archived),
+      archivedSessions: visibleSessions.filter(s => s.is_archived),
+    };
+  }, [visibleSessions]);
 
   // Favoriteセッションの数を数える（UP/DOWNボタンの表示判定用）
   const favoriteSessionsCount = favoriteSessions.length;

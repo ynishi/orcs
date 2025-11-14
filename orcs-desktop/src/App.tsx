@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { notifications } from '@mantine/notifications';
@@ -188,16 +188,30 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [tabs, activeTabId, closeTab, switchToTab]);
 
+  const activeTabScrollKey = useMemo(() => {
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    if (!activeTab) {
+      return null;
+    }
+    const lastMessageId =
+      activeTab.messages.length > 0
+        ? activeTab.messages[activeTab.messages.length - 1].id
+        : 'no-messages';
+    return `${activeTab.id}:${lastMessageId}`;
+  }, [tabs, activeTabId]);
+
   // Auto-scroll to bottom when active tab's messages change
   useEffect(() => {
-    const activeTab = getActiveTab();
-    if (viewport.current && activeTab) {
+    if (!activeTabScrollKey) {
+      return;
+    }
+    if (viewport.current) {
       viewport.current.scrollTo({
         top: viewport.current.scrollHeight,
         behavior: "smooth",
       });
     }
-  }, [tabs, activeTabId, getActiveTab]);
+  }, [activeTabScrollKey]);
 
   // Listen for real-time dialogue turn events from backend
   // Use ref to ensure only one listener is registered
@@ -664,11 +678,15 @@ function App() {
     };
   }, [refreshWorkspace, refreshWorkspaces, refreshSessions, switchWorkspaceTabs, openTab, switchToTab, getTabBySessionId, userNickname]);
 
+  // 現在のアクティブタブの入力値を取得（メモ化）
+  const activeTabInput = useMemo(() => {
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    return activeTab?.input || '';
+  }, [tabs, activeTabId]);
+
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
   useEffect(() => {
-    const activeTab = getActiveTab();
-    const input = activeTab?.input || '';
-    
+    const input = activeTabInput;
     const cursorPosition = textareaRef.current?.selectionStart || input.length;
     const spaceIndex = input.indexOf(' ');
     const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
@@ -704,7 +722,7 @@ function App() {
     } else {
       setShowAgentSuggestions(false);
     }
-  }, [tabs, activeTabId, getActiveTab, customCommands, personas, activeParticipantIds]);
+  }, [activeTabInput, customCommands, personas, activeParticipantIds]);
 
   // SlashCommand処理（addMessage, refreshPersonasの定義後に配置）
   const { handleSlashCommand } = useSlashCommands({

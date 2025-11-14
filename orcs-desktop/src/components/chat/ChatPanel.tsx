@@ -2,7 +2,7 @@
  * ChatPanel - 1つのタブ（セッション）のチャット画面を管理
  * TabContextから状態を取得し、軽量なプレゼンテーション層として機能
  */
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback, memo } from 'react';
 import {
   Textarea,
   Button,
@@ -75,6 +75,52 @@ interface ChatPanelProps {
   onSelectCommand: (command: CommandDefinition) => void;
   onSelectAgent: (agent: Agent) => void;
   onHoverSuggestion: (index: number) => void;
+}
+
+interface MessageListProps {
+  messages: Message[];
+  onSaveMessageToWorkspace: (message: Message) => Promise<void>;
+  onExecuteAsTask: (message: Message) => Promise<void>;
+  onCreateSlashCommand: (message: Message) => void;
+  workspaceRootPath?: string;
+}
+
+const MessageList = memo(
+  ({
+    messages,
+    onSaveMessageToWorkspace,
+    onExecuteAsTask,
+    onCreateSlashCommand,
+    workspaceRootPath,
+  }: MessageListProps) => (
+    <>
+      {messages.map((message) => (
+        <MessageItem
+          key={message.id}
+          message={message}
+          onSaveToWorkspace={onSaveMessageToWorkspace}
+          onExecuteAsTask={onExecuteAsTask}
+          onCreateSlashCommand={onCreateSlashCommand}
+          workspaceRootPath={workspaceRootPath}
+        />
+      ))}
+    </>
+  ),
+  (prev, next) =>
+    prev.messages === next.messages &&
+    prev.workspaceRootPath === next.workspaceRootPath &&
+    onSaveExecHandlersEqual(prev, next)
+);
+
+function onSaveExecHandlersEqual(
+  prev: MessageListProps,
+  next: MessageListProps
+): boolean {
+  return (
+    prev.onSaveMessageToWorkspace === next.onSaveMessageToWorkspace &&
+    prev.onExecuteAsTask === next.onExecuteAsTask &&
+    prev.onCreateSlashCommand === next.onCreateSlashCommand
+  );
 }
 
 export function ChatPanel({
@@ -282,17 +328,17 @@ export function ChatPanel({
     previousTabId.current = tab.id;
   }, [tab.messages, tab.id]);
 
-  const getThreadAsText = (): string => {
+  const getThreadAsText = useCallback((): string => {
     return tab.messages
       .map((msg) => {
         const time = msg.timestamp.toLocaleString();
         return `[${time}] ${msg.author} (${msg.type}):\n${msg.text}\n`;
       })
       .join('\n---\n\n');
-  };
+  }, [tab.messages]);
 
   // Handle creating a slash command from a message
-  const handleCreateSlashCommand = (_message: Message) => {
+  const handleCreateSlashCommand = useCallback((_message: Message) => {
     const threadContent = getThreadAsText();
     setSlashCommandDraft({
       type: 'prompt',
@@ -300,7 +346,7 @@ export function ChatPanel({
       icon: '⚡',
     });
     setSlashCommandModalOpened(true);
-  };
+  }, [getThreadAsText]);
 
   // Handle saving the new slash command
   const handleSaveSlashCommand = async (command: SlashCommand) => {
@@ -339,16 +385,13 @@ export function ChatPanel({
       >
         <ScrollArea h="100%" viewportRef={viewport}>
           <Stack gap="sm" p="md">
-            {tab.messages.map((message) => (
-              <MessageItem
-                key={message.id}
-                message={message}
-                onSaveToWorkspace={onSaveMessageToWorkspace}
-                onExecuteAsTask={onExecuteAsTask}
-                onCreateSlashCommand={handleCreateSlashCommand}
-                workspaceRootPath={workspace?.rootPath}
-              />
-            ))}
+            <MessageList
+              messages={tab.messages}
+              onSaveMessageToWorkspace={onSaveMessageToWorkspace}
+              onExecuteAsTask={onExecuteAsTask}
+              onCreateSlashCommand={handleCreateSlashCommand}
+              workspaceRootPath={workspace?.rootPath}
+            />
             {tab.isAiThinking && activeParticipantIds.length > 0 && (
               <ThinkingIndicator personaName={tab.thinkingPersona} />
             )}

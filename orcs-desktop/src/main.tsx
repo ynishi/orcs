@@ -9,18 +9,21 @@ import { theme } from './theme';
 import { WorkspaceProvider } from './context/WorkspaceContext';
 import { SessionProvider } from './context/SessionContext';
 import { TabProvider } from './context/TabContext';
+import { AIProvider, GeminiProvider } from './ai';
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <MantineProvider theme={theme}>
       <Notifications position="top-right" />
-      <WorkspaceProvider>
-        <SessionProvider>
-          <TabProvider>
-            <App />
-          </TabProvider>
-        </SessionProvider>
-      </WorkspaceProvider>
+      <AIProvider provider={new GeminiProvider()}>
+        <WorkspaceProvider>
+          <SessionProvider>
+            <TabProvider>
+              <App />
+            </TabProvider>
+          </SessionProvider>
+        </WorkspaceProvider>
+      </AIProvider>
     </MantineProvider>
   </React.StrictMode>,
 );

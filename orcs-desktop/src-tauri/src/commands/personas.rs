@@ -130,3 +130,43 @@ pub async fn save_persona_configs(
 pub async fn get_persona_backend_options() -> Result<Vec<(String, String)>, String> {
     Ok(PersonaBackend::all_variants())
 }
+
+/// Creates a new persona from a CreatePersonaRequest (unified creation logic)
+#[tauri::command]
+pub async fn create_persona(
+    request: orcs_core::persona::CreatePersonaRequest,
+    state: State<'_, AppState>,
+) -> Result<Persona, String> {
+    // Validate request
+    request.validate()?;
+
+    // Convert to Persona (UUID auto-generated if needed)
+    let persona = request.into_persona();
+
+    // Save to repository
+    let mut all_personas = state
+        .persona_repository
+        .get_all()
+        .await
+        .map_err(|e| format!("Failed to load personas: {}", e))?;
+
+    // Check for duplicate ID
+    if all_personas.iter().any(|p| p.id == persona.id) {
+        return Err(format!("Persona with ID '{}' already exists", persona.id));
+    }
+
+    all_personas.push(persona.clone());
+
+    state
+        .persona_repository
+        .save_all(&all_personas)
+        .await
+        .map_err(|e| format!("Failed to save persona: {}", e))?;
+
+    // Invalidate dialogue cache to reflect new persona
+    if let Some(manager) = state.session_usecase.active_session().await {
+        manager.invalidate_dialogue().await;
+    }
+
+    Ok(persona)
+}

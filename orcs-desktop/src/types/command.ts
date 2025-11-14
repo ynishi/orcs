@@ -90,6 +90,32 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     examples: ['/blueprint Create technical article about Rust', '/blueprint Refactor auth module'],
     argsDescription: 'Task or discussion context to convert into Blueprint',
   },
+  {
+    name: 'create-persona',
+    icon: '👤',
+    description: 'Create a new persona from JSON definition (UUID auto-generated)',
+    usage: '/create-persona <json>',
+    examples: [
+      '/create-persona {"name": "Rust Expert", "role": "Senior Rust Developer", "background": "I specialize in Rust programming...", "communication_style": "Technical and detailed...", "backend": "claude_api"}',
+    ],
+    argsDescription: 'JSON with required fields: name, role, background, communication_style, backend. Optional: model_name, default_participant, icon, base_color. NOTE: ID is always auto-generated as UUID (not accepted in request)',
+  },
+  {
+    name: 'create-slash-command',
+    icon: '⚡',
+    description: 'Create a new slash command (not yet implemented)',
+    usage: '/create-slash-command <json>',
+    examples: ['/create-slash-command {"name": "my-command", ...}'],
+    argsDescription: 'JSON slash command definition',
+  },
+  {
+    name: 'create-workspace',
+    icon: '📁',
+    description: 'Create a new workspace (not yet implemented)',
+    usage: '/create-workspace <json>',
+    examples: ['/create-workspace {"name": "my-workspace", ...}'],
+    argsDescription: 'JSON workspace definition',
+  },
 ];
 
 /**

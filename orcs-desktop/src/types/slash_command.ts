@@ -1,7 +1,12 @@
 /**
  * Type of slash command execution
  */
-export type CommandType = 'prompt' | 'shell' | 'task';
+export type CommandType = 'prompt' | 'shell' | 'task' | 'entity';
+
+/**
+ * Type of entity that can be created or managed
+ */
+export type EntityType = 'persona' | 'workspace' | 'slashcommand';
 
 /**
  * Custom slash command definition
@@ -13,9 +18,9 @@ export interface SlashCommand {
   icon: string;
   /** Human-readable description */
   description: string;
-  /** Type of command (prompt, shell, or task) */
+  /** Type of command (prompt, shell, task, or entity) */
   type: CommandType;
-  /** Command content (prompt template, shell command, or task description) */
+  /** Command content (prompt template, shell command, task description, or empty for entity) */
   content: string;
   /** Working directory for shell commands (supports variables like {workspace_path}) */
   workingDir?: string;
@@ -23,6 +28,10 @@ export interface SlashCommand {
   argsDescription?: string;
   /** Task execution strategy blueprint (JSON serialized) for task type commands */
   taskBlueprint?: string;
+  /** Entity type for Entity commands */
+  entityType?: EntityType;
+  /** JSON Schema for validation (Entity commands only) */
+  entitySchema?: string;
 }
 
 export interface ExpandedSlashCommand {

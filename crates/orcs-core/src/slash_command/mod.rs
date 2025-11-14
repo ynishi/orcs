@@ -7,5 +7,5 @@
 pub mod model;
 pub mod repository;
 
-pub use model::{CommandType, SlashCommand};
+pub use model::{CommandType, EntityType, SlashCommand};
 pub use repository::SlashCommandRepository;

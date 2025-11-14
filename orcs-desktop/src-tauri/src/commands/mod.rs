@@ -32,6 +32,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         personas::get_personas,
         personas::save_persona_configs,
         personas::get_persona_backend_options,
+        personas::create_persona,
         user::get_user_nickname,
         user::get_user_profile,
         session::execute_message_as_task,

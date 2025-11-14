@@ -18,8 +18,10 @@
 mod model;
 mod preset;
 mod repository;
+pub mod request;
 
 // Re-export public API
 pub use model::{Persona, PersonaBackend, PersonaSource};
 pub use preset::get_default_presets;
 pub use repository::PersonaRepository;
+pub use request::CreatePersonaRequest;

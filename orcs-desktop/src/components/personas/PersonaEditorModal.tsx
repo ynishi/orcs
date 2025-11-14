@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, TextInput, Textarea, Switch, Button, Stack, Group, Select, ColorInput } from '@mantine/core';
 import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
+import { CreatePersonaRequest } from '../../types/persona_request';
 
 const CLAUDE_MODEL_OPTIONS = [
   { value: '', label: 'Default (Sonnet 4.5)' },
@@ -91,32 +92,36 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
     }
   }, [persona]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Validate required fields
     if (!formData.name) {
       alert('Name is a required field');
       return;
     }
 
-    // Auto-generate UUID for new personas
-    const personaId = formData.id || crypto.randomUUID();
+    try {
+      // Build CreatePersonaRequest (ID is always auto-generated)
+      const request: CreatePersonaRequest = {
+        name: formData.name,
+        role: formData.role || '',
+        background: formData.background || '',
+        communication_style: formData.communication_style || '',
+        default_participant: formData.default_participant || false,
+        backend: (formData.backend || 'claude_cli') as CreatePersonaRequest['backend'],
+        model_name: formData.model_name || undefined,
+        icon: formData.icon || undefined,
+        base_color: formData.base_color || undefined,
+      };
 
-    // Cast to PersonaConfig since we've validated required fields
-    const validatedPersona: PersonaConfig = {
-      id: personaId,
-      name: formData.name,
-      role: formData.role || '',
-      background: formData.background || '',
-      communication_style: formData.communication_style || '',
-      default_participant: formData.default_participant || false,
-      backend: formData.backend || 'claude_cli',
-      source: 'User',
-      model_name: formData.model_name || undefined,
-      icon: formData.icon || undefined,
-      base_color: formData.base_color || undefined,
-    };
+      // Call unified create_persona command
+      const createdPersona = await invoke<PersonaConfig>('create_persona', { request });
 
-    onSave(validatedPersona);
+      // Pass to parent
+      onSave(createdPersona);
+    } catch (error) {
+      console.error('Failed to create persona:', error);
+      alert(`Failed to create persona: ${error}`);
+    }
   };
 
   const isEditing = !!persona?.id;

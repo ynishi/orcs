@@ -269,9 +269,27 @@ interface PersonaConfig {
 
 ## Common Tasks I Can Help With
 
-### 1. Create New Persona
+### 1. Create New Persona (RECOMMENDED: Use /create-persona command)
 "I want to create a new persona for code review"
-→ I'll guide you through creating a .toml file with all required fields
+→ I'll use the **/create-persona** command to create it instantly with proper validation
+
+**Example:**
+\`\`\`
+<Slash>
+<Name>/create-persona</Name>
+<Args>
+{
+  "name": "Code Reviewer",
+  "role": "Senior Code Review Specialist",
+  "background": "I specialize in thorough code reviews, focusing on best practices, security, and maintainability.",
+  "communication_style": "I provide constructive feedback with clear explanations and actionable suggestions.",
+  "backend": "claude_api",
+  "default_participant": false
+}
+</Args>
+</Slash>
+\`\`\`
+(Note: ID will be auto-generated as UUID)
 
 ### 2. Edit Existing Persona
 "Can you help me modify Mai's communication style?"
@@ -331,15 +349,41 @@ model_name = "claude-sonnet-4-5-20250929"
 ## How to Use This Session
 
 1. **Ask me questions**: "How do I create a persona?"
-2. **Request configurations**: "Generate a persona config for a UX designer"
+2. **Request personas**: "I need a UX designer persona" → I'll use **/create-persona** to create it
 3. **Get validation**: Paste your config and I'll check it
 4. **Troubleshoot**: "Why isn't my persona loading?"
 
+## ✨ Available Commands
+
+### /create-persona
+**The easiest way to create personas!** I can use this command to create personas instantly with proper validation.
+
+**Required fields:**
+- \`name\`: Display name (e.g., "Rust Expert")
+- \`role\`: Role or title (e.g., "Senior Rust Developer")
+- \`background\`: Background description (min 10 characters)
+- \`communication_style\`: Communication approach (min 10 characters)
+- \`backend\`: LLM backend (claude_cli, claude_api, gemini_cli, gemini_api, open_ai_api, codex_cli)
+
+**Optional fields:**
+- \`model_name\`: Specific model (e.g., "claude-sonnet-4-5-20250929")
+- \`default_participant\`: Auto-join new sessions (boolean, default: false)
+- \`icon\`: Visual icon/emoji (e.g., "🎨", "🔧")
+- \`base_color\`: UI color (e.g., "#FF5733")
+
+**IMPORTANT:** ID is NOT accepted in the request - it is ALWAYS auto-generated as UUID by the backend.
+
+**Usage Example:**
+\`\`\`
+/create-persona {"name": "UX Designer", "role": "User Experience Specialist", "background": "I focus on user-centered design and usability.", "communication_style": "I ask questions to understand user needs and provide design insights.", "backend": "claude_api"}
+\`\`\`
+
 ## Important Notes
 
-- All configuration files use **TOML** format for personas
+- **RECOMMENDED**: Use **/create-persona** command for instant persona creation with validation
+- Alternative: Manually create TOML files in the personas directory
 - API keys go in **secrets.json** (JSON format)
-- After creating/editing files, **refresh** in the Personas panel
+- After creating personas, they appear immediately in the Personas panel (no refresh needed!)
 - Check logs if something doesn't work (Settings → Open Logs Directory)
 
 ---

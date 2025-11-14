@@ -516,6 +516,30 @@ const BUILT_IN_COMMANDS: &[(&str, BuiltInCommand)] = &[
             ),
         },
     ),
+    (
+        "create-persona",
+        BuiltInCommand {
+            usage: "/create-persona <json>",
+            description: "Create a new persona from JSON definition (UUID auto-generated)",
+            args: Some(r#"JSON with required fields: name, role, background (min 10 chars), communication_style (min 10 chars), backend (claude_cli/claude_api/gemini_cli/gemini_api/open_ai_api/codex_cli). Optional: model_name, default_participant (bool), icon, base_color. NOTE: ID is always auto-generated as UUID (not accepted in request)"#),
+        },
+    ),
+    (
+        "create-slash-command",
+        BuiltInCommand {
+            usage: "/create-slash-command <json>",
+            description: "Create a new slash command (not yet implemented)",
+            args: Some("JSON slash command definition"),
+        },
+    ),
+    (
+        "create-workspace",
+        BuiltInCommand {
+            usage: "/create-workspace <json>",
+            description: "Create a new workspace (not yet implemented)",
+            args: Some("JSON workspace definition"),
+        },
+    ),
 ];
 
 fn build_slash_command_prompt(commands: &[SlashCommand]) -> Option<String> {
@@ -885,18 +909,37 @@ pub async fn handle_input(
             cmd_name, args
         );
 
-        if let Ok(all_commands) = state.slash_command_repository.list_commands().await {
-            eprintln!(
-                "[SLASH_COMMAND] Available commands: {:?}",
-                all_commands.iter().map(|c| &c.name).collect::<Vec<_>>()
-            );
-        }
+        // Check for built-in entity commands first (critical commands that should always work)
+        match cmd_name {
+            "create-persona" => {
+                match execute_create_persona(args, &state).await {
+                    Ok(persona) => format!(
+                        "✅ Successfully created persona '{}'\n\nID: {}\nRole: {}\nBackend: {:?}\n\nThe persona is now available in the Personas panel.",
+                        persona.name, persona.id, persona.role, persona.backend
+                    ),
+                    Err(e) => format!("❌ Failed to create persona: {}", e),
+                }
+            }
+            "create-slash-command" => {
+                format!("❌ /create-slash-command is not yet implemented.\n\nPlease create slash commands manually in ~/.orcs/slash_commands/ for now.")
+            }
+            "create-workspace" => {
+                format!("❌ /create-workspace is not yet implemented.\n\nPlease use the workspace management UI for now.")
+            }
+            // For all other commands, check the repository
+            _ => {
+                if let Ok(all_commands) = state.slash_command_repository.list_commands().await {
+                    eprintln!(
+                        "[SLASH_COMMAND] Available commands: {:?}",
+                        all_commands.iter().map(|c| &c.name).collect::<Vec<_>>()
+                    );
+                }
 
-        eprintln!(
-            "[SLASH_COMMAND] Getting command '{}' from repository...",
-            cmd_name
-        );
-        match state.slash_command_repository.get_command(cmd_name).await {
+                eprintln!(
+                    "[SLASH_COMMAND] Getting command '{}' from repository...",
+                    cmd_name
+                );
+                match state.slash_command_repository.get_command(cmd_name).await {
             Ok(Some(cmd)) => {
                 use orcs_core::slash_command::CommandType;
 
@@ -931,13 +974,39 @@ pub async fn handle_input(
                             cmd_name
                         )
                     }
+                    CommandType::Entity => {
+                        use orcs_core::slash_command::EntityType;
+
+                        match cmd.entity_type {
+                            Some(EntityType::Persona) => {
+                                match execute_create_persona(args, &state).await {
+                                    Ok(persona) => format!(
+                                        "✅ Successfully created persona '{}' ({})\n\nID: {}\nRole: {}\nBackend: {:?}",
+                                        persona.name, persona.id, persona.id, persona.role, persona.backend
+                                    ),
+                                    Err(e) => format!("❌ Failed to create persona: {}", e),
+                                }
+                            }
+                            Some(EntityType::Workspace) => {
+                                format!("Workspace creation not yet implemented")
+                            }
+                            Some(EntityType::SlashCommand) => {
+                                format!("SlashCommand creation not yet implemented")
+                            }
+                            None => {
+                                format!("Error: Entity command missing entity_type")
+                            }
+                        }
+                    }
+                }
+                }
+                Ok(None) => format!(
+                    "Unknown command: /{}\n\nAvailable commands can be viewed in Settings.",
+                    cmd_name
+                ),
+                Err(e) => format!("Error loading command: {}", e),
                 }
             }
-            Ok(None) => format!(
-                "Unknown command: /{}\n\nAvailable commands can be viewed in Settings.",
-                cmd_name
-            ),
-            Err(e) => format!("Error loading command: {}", e),
         }
     } else {
         input.clone()
@@ -984,6 +1053,51 @@ pub async fn handle_input(
     let _ = state.session_usecase.save_active_session(app_mode).await;
 
     Ok(result.into())
+}
+
+/// Helper function to create a persona from JSON arguments
+async fn execute_create_persona(
+    args: &str,
+    state: &State<'_, AppState>,
+) -> Result<orcs_core::persona::Persona, String> {
+    use orcs_core::persona::CreatePersonaRequest;
+
+    // Parse JSON into CreatePersonaRequest
+    let request: CreatePersonaRequest = serde_json::from_str(args)
+        .map_err(|e| format!("Invalid JSON: {}", e))?;
+
+    // Validate request
+    request.validate()?;
+
+    // Convert to Persona (UUID auto-generated if needed)
+    let persona = request.into_persona();
+
+    // Save to repository
+    let mut all_personas = state
+        .persona_repository
+        .get_all()
+        .await
+        .map_err(|e| format!("Failed to load personas: {}", e))?;
+
+    // Check for duplicate ID
+    if all_personas.iter().any(|p| p.id == persona.id) {
+        return Err(format!("Persona with ID '{}' already exists", persona.id));
+    }
+
+    all_personas.push(persona.clone());
+
+    state
+        .persona_repository
+        .save_all(&all_personas)
+        .await
+        .map_err(|e| format!("Failed to save persona: {}", e))?;
+
+    // Invalidate dialogue cache to reflect new persona
+    if let Some(manager) = state.session_usecase.active_session().await {
+        manager.invalidate_dialogue().await;
+    }
+
+    Ok(persona)
 }
 
 /// Helper function to execute shell commands

@@ -12,6 +12,20 @@ pub enum CommandType {
     Shell,
     /// Executes a long-running orchestration task workflow
     Task,
+    /// Creates or updates an entity (Persona, Workspace, SlashCommand, etc.)
+    Entity,
+}
+
+/// Type of entity that can be created or managed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum EntityType {
+    /// Persona configuration
+    Persona,
+    /// Workspace configuration
+    Workspace,
+    /// Slash command definition
+    SlashCommand,
 }
 
 /// A custom slash command definition.
@@ -23,10 +37,10 @@ pub struct SlashCommand {
     pub icon: String,
     /// Human-readable description
     pub description: String,
-    /// Type of command (prompt, shell, or task)
+    /// Type of command (prompt, shell, task, or entity)
     #[serde(rename = "type")]
     pub command_type: CommandType,
-    /// Command content (prompt template, shell command, or task description)
+    /// Command content (prompt template, shell command, task description, or empty for entity)
     pub content: String,
     /// Working directory for shell commands (supports variables like {workspace_path})
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -40,6 +54,14 @@ pub struct SlashCommand {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "taskBlueprint")]
     pub task_blueprint: Option<String>,
+    /// Entity type for Entity commands
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "entityType")]
+    pub entity_type: Option<EntityType>,
+    /// JSON Schema for validation (Entity commands only)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "entitySchema")]
+    pub entity_schema: Option<String>,
 }
 
 impl SlashCommand {
@@ -54,6 +76,8 @@ impl SlashCommand {
             working_dir: None,
             args_description: None,
             task_blueprint: None,
+            entity_type: None,
+            entity_schema: None,
         }
     }
 
@@ -87,6 +111,8 @@ impl SlashCommand {
             working_dir,
             args_description: None,
             task_blueprint: None,
+            entity_type: None,
+            entity_schema: None,
         }
     }
 
@@ -121,6 +147,31 @@ impl SlashCommand {
             working_dir: None,
             args_description: None,
             task_blueprint,
+            entity_type: None,
+            entity_schema: None,
+        }
+    }
+
+    /// Creates a new entity-type slash command.
+    pub fn new_entity(
+        name: String,
+        icon: String,
+        description: String,
+        entity_type: EntityType,
+        entity_schema: Option<String>,
+        args_description: Option<String>,
+    ) -> Self {
+        Self {
+            name,
+            icon,
+            description,
+            command_type: CommandType::Entity,
+            content: String::new(), // Empty for entity commands
+            working_dir: None,
+            args_description,
+            task_blueprint: None,
+            entity_type: Some(entity_type),
+            entity_schema,
         }
     }
 

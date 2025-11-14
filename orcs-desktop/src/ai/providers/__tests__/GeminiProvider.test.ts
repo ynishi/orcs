@@ -108,8 +108,10 @@ describe('GeminiProvider', () => {
       await provider.generate(context);
 
       const call = vi.mocked(invoke).mock.calls[0];
-      expect(call[1].prompt).toContain('user: John');
-      expect(call[1].prompt).toContain('role: developer');
+      expect(call?.[1]).toBeDefined();
+      const args = call[1] as { prompt: string };
+      expect(args.prompt).toContain('user: John');
+      expect(args.prompt).toContain('role: developer');
     });
   });
 
@@ -186,7 +188,9 @@ describe('GeminiProvider', () => {
       await provider.refine('Text', context);
 
       const call = vi.mocked(invoke).mock.calls[0];
-      expect(call[1].prompt).toContain('Maximum 100 characters');
+      expect(call?.[1]).toBeDefined();
+      const args = call[1] as { prompt: string };
+      expect(args.prompt).toContain('Maximum 100 characters');
     });
   });
 

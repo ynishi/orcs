@@ -303,6 +303,7 @@ function App() {
               handleSlashCommandRef.current
             ) {
               const detectedCommands = extractSlashCommands(turn.content);
+              console.log("detectedCommands", detectedCommands);
               if (detectedCommands.length > 0) {
                 const actorName = turn.author || 'Agent';
                 void (async () => {

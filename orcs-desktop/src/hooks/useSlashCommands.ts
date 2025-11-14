@@ -291,6 +291,64 @@ Generate the BlueprintWorkflow now.`;
             await saveCurrentSession();
             break;
 
+          case 'create-persona':
+            if (parsed.args && parsed.args.length > 0) {
+              const jsonString = parsed.args.join(' ');
+              try {
+                // Parse and validate JSON
+                const personaRequest = JSON.parse(jsonString);
+
+                notifications.show({
+                  title: 'Creating Persona',
+                  message: `Creating persona: ${personaRequest.name || 'Unknown'}...`,
+                  color: 'blue',
+                  autoClose: false,
+                  id: 'persona-creation',
+                });
+
+                const persona = await invoke<import('../types/agent').PersonaConfig>('create_persona', {
+                  request: personaRequest,
+                });
+
+                notifications.hide('persona-creation');
+
+                const successMessage = `Persona created: ${persona.name} ${persona.icon || '👤'}\nRole: ${persona.role}\nBackground: ${persona.background}`;
+
+                await handleAndPersistSystemMessage(
+                  conversationMessage(successMessage, 'info', '✅'),
+                  addMessage,
+                  invoke
+                );
+
+                await refreshPersonas();
+                await refreshSessions();
+              } catch (error) {
+                console.error('Failed to create persona:', error);
+                notifications.hide('persona-creation');
+
+                const errorMessage = error instanceof SyntaxError
+                  ? `Invalid JSON format: ${error.message}`
+                  : `Failed to create persona: ${error}`;
+
+                await handleAndPersistSystemMessage(
+                  conversationMessage(errorMessage, 'error', '❌'),
+                  addMessage,
+                  invoke
+                );
+              }
+            } else {
+              await handleAndPersistSystemMessage(
+                conversationMessage(
+                  'Usage: /create-persona <json>\nExample: /create-persona {"name": "Expert", "role": "Specialist", "background": "Experienced professional...", "communication_style": "Clear and helpful...", "backend": "claude_api"}',
+                  'error'
+                ),
+                addMessage,
+                invoke
+              );
+            }
+            await saveCurrentSession();
+            break;
+
           case 'workspace':
             if (parsed.args && parsed.args.length > 0) {
               const workspaceName = parsed.args.join(' ');

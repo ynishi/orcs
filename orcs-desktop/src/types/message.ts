@@ -35,6 +35,17 @@ export type StreamingDialogueTurnKind =
     };
 
 /**
+ * 添付ファイル情報
+ */
+export interface AttachedFile {
+  name: string;          // ファイル名
+  path: string;          // ワークスペース内のパス
+  mimeType: string;      // MIMEタイプ
+  size: number;          // ファイルサイズ（バイト）
+  data?: string;         // Base64エンコードされたデータ（画像の場合）
+}
+
+/**
  * メッセージインターフェース
  */
 export interface Message {
@@ -48,6 +59,7 @@ export interface Message {
   baseColor?: string; // Optional base color for message background tinting
   backend?: string; // Optional backend type (e.g., "claude_api", "gemini_cli")
   modelName?: string | null; // Optional model name (e.g., "claude-sonnet-4-5-20250929")
+  attachments?: AttachedFile[]; // 添付ファイル情報
 }
 
 /**

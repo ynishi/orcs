@@ -99,6 +99,7 @@ function App() {
     switchTab: switchToTab,
     switchWorkspace: switchWorkspaceTabs,
     updateTabTitle,
+    updateTabMessages: _updateTabMessages,
     addMessageToTab,
     updateTabInput,
     updateTabAttachedFiles,
@@ -107,6 +108,7 @@ function App() {
     setTabDragging,
     setTabThinking,
     getActiveTab,
+    getTab: _getTab,
     getVisibleTabs,
     getTabBySessionId,
   } = useTabContext();
@@ -117,7 +119,7 @@ function App() {
   const workspaceSwitchingRef = useRef(false);
 
   // メッセージを追加するヘルパー関数（early definition for useRef/useSlashCommands）
-  const addMessage = useCallback((type: MessageType, author: string, text: string) => {
+  const addMessage = useCallback((type: MessageType, author: string, text: string, attachments?: import('./types/message').AttachedFile[]) => {
     // アクティブなタブにメッセージを追加
     if (!activeTabId) return;
 
@@ -132,8 +134,9 @@ function App() {
       timestamp: new Date(),
       icon: persona?.icon,
       baseColor: persona?.base_color,
+      attachments,
     };
-    
+
     addMessageToTab(activeTabId, newMessage);
   }, [personas, activeTabId, addMessageToTab]);
 
@@ -463,35 +466,95 @@ function App() {
         return;
       }
 
-      // Skip if tab already exists (tab switching case)
-      const existingTab = getTabBySessionId(currentSessionId);
-      if (existingTab) {
-        return;
-      }
-
       try {
         const activeSession = sessions.find(s => s.id === currentSessionId);
-        if (activeSession) {
-          // Enrich participant_icons from current personas if missing
-          if (!activeSession.participant_icons || Object.keys(activeSession.participant_icons).length === 0) {
-            activeSession.participant_icons = {};
-            personas.forEach(persona => {
-              if (persona.icon && activeSession.participants[persona.id]) {
-                activeSession.participant_icons[persona.id] = persona.icon;
+        if (!activeSession) {
+          return;
+        }
+
+        // Enrich participant_icons from current personas if missing
+        if (!activeSession.participant_icons || Object.keys(activeSession.participant_icons).length === 0) {
+          activeSession.participant_icons = {};
+          personas.forEach(persona => {
+            if (persona.icon && activeSession.participants[persona.id]) {
+              activeSession.participant_icons[persona.id] = persona.icon;
+            }
+          });
+        }
+
+        // Check if tab already exists
+        const existingTab = getTabBySessionId(currentSessionId);
+
+        // If tab exists, check if messages need preview data
+        if (existingTab) {
+          const needsPreviewData = existingTab.messages.some(msg =>
+            msg.attachments && msg.attachments.length > 0 &&
+            msg.attachments.some(att => !att.data)
+          );
+
+          if (!needsPreviewData) {
+            return;
+          }
+        }
+
+        const loadingSessionId = activeSession.id;
+        let restoredMessages = convertSessionToMessages(activeSession, userNickname);
+
+        // Load preview data for attached files BEFORE opening tab
+        try {
+          restoredMessages = await Promise.all(
+            restoredMessages.map(async (message) => {
+              if (message.attachments && message.attachments.length > 0) {
+                const updatedAttachments = await Promise.all(
+                  message.attachments.map(async (attachment) => {
+                    if (attachment.data) return attachment; // Already has data
+
+                    try {
+                      const previewData = await invoke<{
+                        name: string;
+                        path: string;
+                        mime_type: string;
+                        size: number;
+                        data: string;
+                      }>("get_file_preview_data", {
+                        filePath: attachment.path,
+                      });
+
+                      return {
+                        name: previewData.name,
+                        path: previewData.path,
+                        mimeType: previewData.mime_type,
+                        size: previewData.size,
+                        data: previewData.data,
+                      };
+                    } catch (error) {
+                      console.error('[SESSION LOAD] Failed to load preview data:', attachment.path, error);
+                      return attachment; // Keep original if failed
+                    }
+                  })
+                );
+                return { ...message, attachments: updatedAttachments };
               }
-            });
-          }
-          const restoredMessages = convertSessionToMessages(activeSession, userNickname);
+              return message;
+            })
+          );
+        } catch (error) {
+          console.error('[SESSION LOAD] Error loading preview data:', error);
+        }
 
-          // タブが開いていない場合のみ、タブとして開く
-          if (workspace) {
-            openTab(activeSession, restoredMessages, workspace.id, true);
-          }
+        // Check if session is still current before opening tab
+        if (currentSessionId !== loadingSessionId) {
+          return;
+        }
 
-          // Restore execution strategy from session
-          if (activeSession.execution_strategy) {
-            setExecutionStrategy(activeSession.execution_strategy);
-          }
+        // Open or update tab with preview data
+        if (workspace) {
+          openTab(activeSession, restoredMessages, workspace.id, true);
+        }
+
+        // Restore execution strategy from session
+        if (activeSession.execution_strategy) {
+          setExecutionStrategy(activeSession.execution_strategy);
         }
       } catch (error) {
         console.error('[App] Failed to load active session messages:', error);
@@ -808,10 +871,6 @@ function App() {
         messageText = messageText + workspaceInfo;
       }
 
-      if (!suppressUserEcho) {
-        addMessage('user', userNickname, messageText);
-      }
-
       // アクティブなタブのAI思考状態を設定
       if (activeTabId) {
         setTabThinking(activeTabId, true, 'AI Assistant');
@@ -820,6 +879,7 @@ function App() {
       try {
         // Upload files to workspace and get paths
         const filePaths: string[] = [];
+        const attachedFileData: import('./types/message').AttachedFile[] = [];
         if (currentFiles.length > 0 && workspace) {
           for (const file of currentFiles) {
             try {
@@ -835,11 +895,46 @@ function App() {
               });
               filePaths.push(uploadedFile.path);
               console.log('[FILE] Uploaded file:', file.name, 'to', uploadedFile.path);
+
+              // Get file preview data for images
+              try {
+                const previewData = await invoke<{
+                  name: string;
+                  path: string;
+                  mime_type: string;
+                  size: number;
+                  data: string;
+                }>("get_file_preview_data", {
+                  filePath: uploadedFile.path,
+                });
+
+                attachedFileData.push({
+                  name: previewData.name,
+                  path: previewData.path,
+                  mimeType: previewData.mime_type,
+                  size: previewData.size,
+                  data: previewData.data,
+                });
+              } catch (previewError) {
+                console.error('[FILE] Failed to get preview data:', file.name, previewError);
+                // Still add basic file info even if preview fails
+                attachedFileData.push({
+                  name: file.name,
+                  path: uploadedFile.path,
+                  mimeType: file.type || 'application/octet-stream',
+                  size: file.size,
+                });
+              }
             } catch (uploadError) {
               console.error('[FILE] Failed to upload file:', file.name, uploadError);
               addMessage('error', 'System', `Failed to upload file ${file.name}: ${uploadError}`);
             }
           }
+        }
+
+        // Add user message with attachments after upload completes
+        if (!suppressUserEcho) {
+          addMessage('user', userNickname, messageText, attachedFileData.length > 0 ? attachedFileData : undefined);
         }
 
         const sessionEvent: SessionEvent = {
@@ -1051,7 +1146,12 @@ function App() {
       const activeTab = getActiveTab();
       if (activeTab) {
         updateTabAttachedFiles(activeTabId, [...activeTab.attachedFiles, ...files]);
-      addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
+        // Persist system message to backend
+        handleAndPersistSystemMessage(
+          conversationMessage(`📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`, 'info', undefined, 'system'),
+          addMessage,
+          invoke
+        );
       }
     }
   };
@@ -1069,7 +1169,12 @@ function App() {
       const activeTab = getActiveTab();
       if (activeTab) {
         updateTabAttachedFiles(activeTabId, [...activeTab.attachedFiles, ...files]);
-      addMessage('system', 'System', `📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
+        // Persist system message to backend
+        handleAndPersistSystemMessage(
+          conversationMessage(`📎 Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`, 'info', undefined, 'system'),
+          addMessage,
+          invoke
+        );
       }
     }
   };

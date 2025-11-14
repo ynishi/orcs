@@ -184,12 +184,14 @@ mod tests {
                     content: "Hello".to_string(),
                     timestamp: "2024-01-01T00:00:00Z".to_string(),
                     metadata: MessageMetadata::default(),
+                    attachments: vec![],
                 },
                 ConversationMessage {
                     role: MessageRole::Assistant,
                     content: "Hi there!".to_string(),
                     timestamp: "2024-01-01T00:00:01Z".to_string(),
                     metadata: MessageMetadata::default(),
+                    attachments: vec![],
                 },
             ],
         );
@@ -209,6 +211,8 @@ mod tests {
             participants: HashMap::new(),
             participant_icons: HashMap::new(),
             participant_colors: HashMap::new(),
+            participant_backends: HashMap::new(),
+            participant_models: HashMap::new(),
             conversation_mode: Default::default(),
             talk_style: None,
             is_favorite: false,

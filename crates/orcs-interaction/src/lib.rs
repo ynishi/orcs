@@ -967,6 +967,7 @@ impl InteractionManager {
                 system_message_type: None,
                 include_in_dialogue: true,
             },
+            attachments: vec![],
         };
         self.system_messages.write().await.push(system_msg);
 
@@ -1031,6 +1032,7 @@ impl InteractionManager {
                 system_message_type: None,
                 include_in_dialogue: true,
             },
+            attachments: vec![],
         };
         self.system_messages.write().await.push(system_msg);
 
@@ -1083,6 +1085,7 @@ impl InteractionManager {
                 system_message_type: message_type,
                 include_in_dialogue: true,
             },
+            attachments: vec![],
         };
 
         self.system_messages.write().await.push(message);
@@ -1146,6 +1149,7 @@ impl InteractionManager {
                 system_message_type: None,
                 include_in_dialogue: true,
             },
+            attachments: vec![],
         };
         self.system_messages.write().await.push(system_msg);
 
@@ -1187,6 +1191,7 @@ impl InteractionManager {
                 system_message_type: None,
                 include_in_dialogue: true,
             },
+            attachments: vec![],
         };
         self.system_messages.write().await.push(system_msg);
 
@@ -1230,6 +1235,7 @@ impl InteractionManager {
                     system_message_type: None,
                     include_in_dialogue: true,
                 },
+                attachments: vec![],
             };
             self.system_messages.write().await.push(system_msg);
         }
@@ -1399,7 +1405,7 @@ impl InteractionManager {
                         .unwrap_or_else(|| speaker_name.to_string());
 
                     // Add each response to history using persona_id
-                    self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content)
+                    self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content, None)
                         .await;
 
                     // Create DialogueMessage for UI display
@@ -1442,6 +1448,7 @@ impl InteractionManager {
                             system_message_type: None,
                             include_in_dialogue: true,
                         },
+                        attachments: vec![],
                     };
                     self.persona_histories
                         .write()
@@ -1490,7 +1497,7 @@ impl InteractionManager {
         // Only if add_to_history is true (to avoid adding internal prompts like "Continue the discussion.")
         let user_name = self.user_service.get_user_name();
         if add_to_history {
-            self.add_to_history(&user_name, MessageRole::User, input)
+            self.add_to_history(&user_name, MessageRole::User, input, file_paths.clone())
                 .await;
         }
         let user_name_str = if user_name.to_lowercase() == "you" {
@@ -1557,7 +1564,7 @@ impl InteractionManager {
                         .unwrap_or_else(|| speaker_name.to_string());
 
                     // Add each response to history using persona_id
-                    self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content)
+                    self.add_to_history(&persona_id, MessageRole::Assistant, &turn.content, None)
                         .await;
 
                     // Create DialogueMessage for UI display
@@ -1602,6 +1609,7 @@ impl InteractionManager {
                             system_message_type: None,
                             include_in_dialogue: true,
                         },
+                        attachments: vec![],
                     };
                     self.persona_histories
                         .write()
@@ -1756,7 +1764,13 @@ impl InteractionManager {
     }
 
     /// Adds a message to the conversation history.
-    async fn add_to_history(&self, persona_id: &str, role: MessageRole, content: &str) {
+    async fn add_to_history(
+        &self,
+        persona_id: &str,
+        role: MessageRole,
+        content: &str,
+        attachments: Option<Vec<String>>,
+    ) {
         let mut histories = self.persona_histories.write().await;
         let history = histories
             .entry(persona_id.to_string())
@@ -1767,6 +1781,7 @@ impl InteractionManager {
             content: content.to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
             metadata: MessageMetadata::default(), // User/Assistant messages with default metadata
+            attachments: attachments.unwrap_or_default(),
         });
     }
 }

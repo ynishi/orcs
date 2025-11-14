@@ -82,6 +82,7 @@ fn default_true() -> bool {
 /// and a timestamp indicating when it was created.
 ///
 /// Version 2 adds metadata field for extended information.
+/// Version 3 adds attachments field for file attachments.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Queryable)]
 #[queryable(entity = "conversation_message")]
 pub struct ConversationMessage {
@@ -94,4 +95,7 @@ pub struct ConversationMessage {
     /// Additional metadata about the message.
     #[serde(default)]
     pub metadata: MessageMetadata,
+    /// Attached files (file paths in workspace).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<String>,
 }

@@ -64,6 +64,7 @@ export interface ConversationMessage {
   content: string;
   timestamp: string; // ISO 8601 timestamp
   metadata?: ConversationMessageMetadata;
+  attachments?: string[]; // Attached file paths in workspace
 }
 
 /**
@@ -290,6 +291,19 @@ export function convertToUIMessageWithAuthor(
     modelName = participantModels[authorId];
   }
 
+  // Convert file paths to AttachedFile objects (without preview data initially)
+  const attachments = msg.attachments && msg.attachments.length > 0
+    ? msg.attachments.map(filePath => {
+        const fileName = filePath.split('/').pop() || 'unknown';
+        return {
+          name: fileName,
+          path: filePath,
+          mimeType: 'application/octet-stream', // Will be updated later
+          size: 0, // Will be updated later
+        };
+      })
+    : undefined;
+
   return {
     id: `${msg.timestamp}-${Math.random()}`,
     type: messageType,
@@ -300,6 +314,7 @@ export function convertToUIMessageWithAuthor(
     baseColor,
     backend,
     modelName,
+    attachments,
   };
 }
 

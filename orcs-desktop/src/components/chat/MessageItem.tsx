@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor } from '@mantine/core';
+import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor, Image, Stack } from '@mantine/core';
 import { IconDeviceFloppy, IconRocket, IconCommand } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Message, getMessageStyle } from '../../types/message';
@@ -178,6 +178,33 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
                 </Anchor>
               )}
 
+              {/* 添付ファイルプレビュー */}
+              {message.attachments && message.attachments.length > 0 && (
+                <Stack gap="xs" mt="md">
+                  {message.attachments.map((attachment, index) => (
+                    <Box key={index}>
+                      {attachment.mimeType.startsWith('image/') && attachment.data ? (
+                        <Box>
+                          <Image
+                            src={`data:${attachment.mimeType};base64,${attachment.data}`}
+                            alt={attachment.name}
+                            radius="md"
+                            style={{ maxWidth: '400px', maxHeight: '400px' }}
+                          />
+                          <Text size="xs" c="dimmed" mt={4}>
+                            📎 {attachment.name} ({(attachment.size / 1024).toFixed(1)} KB)
+                          </Text>
+                        </Box>
+                      ) : (
+                        <Badge size="lg" variant="light" leftSection="📎">
+                          {attachment.name} ({(attachment.size / 1024).toFixed(1)} KB)
+                        </Badge>
+                      )}
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+
               <Text size="xs" c="dimmed" mt={4}>
                 {message.timestamp.toLocaleTimeString()}
               </Text>
@@ -353,6 +380,34 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
               workspaceRootPath={workspaceRootPath}
             />
           </Box>
+
+          {/* 添付ファイルプレビュー */}
+          {message.attachments && message.attachments.length > 0 && (
+            <Stack gap="xs" mt="md">
+              {message.attachments.map((attachment, index) => (
+                <Box key={index}>
+                  {attachment.mimeType.startsWith('image/') && attachment.data ? (
+                    <Box>
+                      <Image
+                        src={`data:${attachment.mimeType};base64,${attachment.data}`}
+                        alt={attachment.name}
+                        radius="md"
+                        style={{ maxWidth: '400px', maxHeight: '400px' }}
+                      />
+                      <Text size="xs" c="dimmed" mt={4}>
+                        📎 {attachment.name} ({(attachment.size / 1024).toFixed(1)} KB)
+                      </Text>
+                    </Box>
+                  ) : (
+                    <Badge size="lg" variant="light" leftSection="📎">
+                      {attachment.name} ({(attachment.size / 1024).toFixed(1)} KB)
+                    </Badge>
+                  )}
+                </Box>
+              ))}
+            </Stack>
+          )}
+
           <Text size="xs" c="dimmed" mt={8}>
             {message.timestamp.toLocaleTimeString()}
           </Text>

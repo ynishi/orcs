@@ -1,4 +1,4 @@
-import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton, Tooltip } from '@mantine/core';
 import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
@@ -19,6 +19,7 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
+  const [filePreviewCache, setFilePreviewCache] = useState<Record<string, string>>({});
 
   const handleStartEdit = (file: UploadedFile, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -82,6 +83,39 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
         message: `Failed to copy file content: ${errorMessage}`,
         color: 'red',
       });
+    }
+  };
+
+  const handleFileHover = async (file: UploadedFile) => {
+    // Only preview text files
+    if (!file.mimeType.startsWith('text/')) {
+      return;
+    }
+
+    // Skip if already cached
+    if (filePreviewCache[file.id]) {
+      return;
+    }
+
+    try {
+      // Read file content from workspace
+      const fileData = await invoke<number[]>('read_workspace_file', {
+        filePath: file.path,
+      });
+
+      // Convert to string
+      const uint8Array = new Uint8Array(fileData);
+      const decoder = new TextDecoder('utf-8');
+      const content = decoder.decode(uint8Array);
+
+      // Cache the preview (first 50 characters)
+      const preview = content.slice(0, 50).trim();
+      setFilePreviewCache(prev => ({
+        ...prev,
+        [file.id]: preview,
+      }));
+    } catch (err) {
+      console.error('[FileList] Failed to load file preview:', err);
     }
   };
 
@@ -250,44 +284,56 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
           </Group>
 
           {/* コンテンツエリア */}
-          <UnstyledButton
-            onClick={() => setSelectedFileId(file.id)}
-            onDoubleClick={(e) => handleStartEdit(file, e)}
-            style={{ width: '100%', textAlign: 'left' }}
+          <Tooltip
+            label={filePreviewCache[file.id] || 'Hover to preview...'}
+            disabled={!file.mimeType.startsWith('text/')}
+            withArrow
+            position="right"
+            multiline
+            w={220}
           >
-            <Box p="md">
-              <Box style={{ flex: 1, minWidth: 0 }}>
-                {/* Primary: ファイル名 */}
-                <Text size="sm" fw={600} truncate>
-                  {file.name}
-                </Text>
-
-                {/* Secondary: サイズ + タイプ + From chat Badge */}
-                <Group gap="xs" mt={4}>
-                  <Text size="xs" c="dimmed">
-                    {formatFileSize(file.size)}
+            <UnstyledButton
+              onClick={() => setSelectedFileId(file.id)}
+              onDoubleClick={(e) => handleStartEdit(file, e)}
+              onMouseEnter={() => {
+                void handleFileHover(file);
+              }}
+              style={{ width: '100%', textAlign: 'left' }}
+            >
+              <Box p="md">
+                <Box style={{ flex: 1, minWidth: 0 }}>
+                  {/* Primary: ファイル名 */}
+                  <Text size="sm" fw={600} truncate>
+                    {file.name}
                   </Text>
-                  <Text size="xs" c="dimmed">•</Text>
-                  <Text size="xs" c="dimmed">
-                    {getFileTypeCategory(file.mimeType)}
-                  </Text>
-                  {file.sessionId && (
-                    <>
-                      <Text size="xs" c="dimmed">•</Text>
-                      <Badge size="xs" variant="light" color="violet" style={{ textTransform: 'none' }}>
-                        From chat
-                      </Badge>
-                    </>
-                  )}
-                </Group>
 
-                {/* Tertiary: 相対時間 */}
-                <Text size="xs" c="dimmed" mt={2}>
-                  {formatRelativeTime(file.uploadedAt)}
-                </Text>
+                  {/* Secondary: サイズ + タイプ + From chat Badge */}
+                  <Group gap="xs" mt={4}>
+                    <Text size="xs" c="dimmed">
+                      {formatFileSize(file.size)}
+                    </Text>
+                    <Text size="xs" c="dimmed">•</Text>
+                    <Text size="xs" c="dimmed">
+                      {getFileTypeCategory(file.mimeType)}
+                    </Text>
+                    {file.sessionId && (
+                      <>
+                        <Text size="xs" c="dimmed">•</Text>
+                        <Badge size="xs" variant="light" color="violet" style={{ textTransform: 'none' }}>
+                          From chat
+                        </Badge>
+                      </>
+                    )}
+                  </Group>
+
+                  {/* Tertiary: 相対時間 */}
+                  <Text size="xs" c="dimmed" mt={2}>
+                    {formatRelativeTime(file.uploadedAt)}
+                  </Text>
+                </Box>
               </Box>
-            </Box>
-          </UnstyledButton>
+            </UnstyledButton>
+          </Tooltip>
         </>
       )}
     </Box>

@@ -133,7 +133,10 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           author: file.author,
         }));
 
-        setFiles(convertedFiles);
+        // Sort by upload time (most recent first)
+        const sortedFiles = convertedFiles.sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+        setFiles(sortedFiles);
       } catch (fileError) {
         console.error('Failed to list workspace files:', fileError);
         setFiles([]);

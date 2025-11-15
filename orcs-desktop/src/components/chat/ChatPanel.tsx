@@ -536,7 +536,10 @@ export function ChatPanel({
       </form>
 
       <StatusBar
-        status={status}
+        status={{
+          ...status,
+          mode: tab.isAiThinking ? 'Thinking' : 'Idle',
+        }}
         gitInfo={gitInfo}
         participatingAgentsCount={activeParticipantIds.length}
         totalPersonas={personas.length}

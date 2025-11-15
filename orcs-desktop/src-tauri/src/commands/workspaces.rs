@@ -300,3 +300,17 @@ pub async fn rename_file_in_workspace(
         .await
         .map_err(|e| e.to_string())
 }
+
+/// Toggles the archive status of a file in a workspace
+#[tauri::command]
+pub async fn toggle_workspace_file_archive(
+    workspace_id: String,
+    file_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .workspace_storage_service
+        .toggle_file_archive(&workspace_id, &file_id)
+        .await
+        .map_err(|e| e.to_string())
+}

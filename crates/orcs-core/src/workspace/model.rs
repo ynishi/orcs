@@ -55,6 +55,9 @@ pub struct UploadedFile {
     pub message_timestamp: Option<String>,
     /// Author of the file (user ID, persona ID, or "system")
     pub author: Option<String>,
+    /// Whether this file is archived (hidden by default)
+    #[serde(default)]
+    pub is_archived: bool,
 }
 
 /// Project-specific context and metadata.

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { notifications } from '@mantine/notifications';
 import type { Workspace, UploadedFile } from '../types/workspace';
 
 export interface WorkspaceContextValue {
@@ -11,6 +12,7 @@ export interface WorkspaceContextValue {
   refresh: () => Promise<void>;
   switchWorkspace: (sessionId: string, workspaceId: string) => Promise<void>;
   toggleFavorite: (workspaceId: string) => Promise<void>;
+  toggleFileArchive: (file: UploadedFile) => Promise<void>;
   refreshWorkspaces: () => Promise<void>;
 }
 
@@ -30,6 +32,7 @@ interface RawUploadedFile {
   session_id?: string;
   message_timestamp?: string;
   author?: string;
+  is_archived: boolean;
 }
 
 interface RawWorkspace {
@@ -75,6 +78,7 @@ function convertWorkspace(raw: RawWorkspace): Workspace {
         sessionId: file.session_id,
         messageTimestamp: file.message_timestamp,
         author: file.author,
+        isArchived: file.is_archived,
       })),
       tempFiles: raw.resources.temp_files.map(file => ({
         id: file.id,
@@ -131,6 +135,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           sessionId: file.session_id,
           messageTimestamp: file.message_timestamp,
           author: file.author,
+          isArchived: file.is_archived,
         }));
 
         // Sort by upload time (most recent first)
@@ -201,6 +206,35 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     [fetchAllWorkspaces, fetchWorkspace],
   );
 
+  const toggleFileArchive = useCallback(
+    async (file: UploadedFile) => {
+      if (!workspace) return;
+
+      try {
+        await invoke('toggle_workspace_file_archive', {
+          workspaceId: workspace.id,
+          fileId: file.id,
+        });
+
+        // Refresh files
+        await fetchWorkspace();
+
+        notifications.show({
+          title: file.isArchived ? 'File Unarchived' : 'File Archived',
+          message: `${file.name} has been ${file.isArchived ? 'unarchived' : 'archived'}`,
+          color: 'blue',
+        });
+      } catch (err) {
+        notifications.show({
+          title: 'Error',
+          message: `Failed to ${file.isArchived ? 'unarchive' : 'archive'} file: ${err}`,
+          color: 'red',
+        });
+      }
+    },
+    [workspace, fetchWorkspace],
+  );
+
   useEffect(() => {
     fetchWorkspace();
     fetchAllWorkspaces();
@@ -240,9 +274,10 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       refresh: fetchWorkspace,
       switchWorkspace,
       toggleFavorite,
+      toggleFileArchive,
       refreshWorkspaces: fetchAllWorkspaces,
     }),
-    [workspace, allWorkspaces, files, isLoading, error, fetchWorkspace, switchWorkspace, toggleFavorite, fetchAllWorkspaces],
+    [workspace, allWorkspaces, files, isLoading, error, fetchWorkspace, switchWorkspace, toggleFavorite, toggleFileArchive, fetchAllWorkspaces],
   );
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

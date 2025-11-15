@@ -25,6 +25,8 @@ export interface UploadedFile {
   messageTimestamp?: string;
   /** Author of the file (user ID, persona ID, or "system") */
   author?: string;
+  /** Whether this file is archived (hidden by default) */
+  isArchived: boolean;
 }
 
 /**

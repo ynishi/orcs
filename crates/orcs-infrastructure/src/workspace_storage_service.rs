@@ -343,6 +343,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
             session_id: None,
             message_timestamp: None,
             author: None,
+            is_archived: false,
         };
 
         // Add to workspace's uploaded_files list
@@ -422,6 +423,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
             session_id,
             message_timestamp,
             author,
+            is_archived: false,
         };
 
         // Add to workspace's uploaded_files list
@@ -535,6 +537,29 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
         self.save_workspace(&workspace).await?;
 
         Ok(updated_file)
+    }
+
+    async fn toggle_file_archive(&self, workspace_id: &str, file_id: &str) -> Result<()> {
+        // Load existing workspace metadata
+        let mut workspace = self.load_workspace(workspace_id).await?;
+
+        // Find the file in the uploaded_files list
+        let file = workspace
+            .resources
+            .uploaded_files
+            .iter_mut()
+            .find(|f| f.id == file_id)
+            .ok_or_else(|| {
+                OrcsError::io(format!("File with ID '{}' not found in workspace", file_id))
+            })?;
+
+        // Toggle the archive status
+        file.is_archived = !file.is_archived;
+
+        // Save the updated workspace metadata
+        self.save_workspace(&workspace).await?;
+
+        Ok(())
     }
 
     async fn create_temp_file(

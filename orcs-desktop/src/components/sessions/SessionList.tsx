@@ -151,16 +151,31 @@ export function SessionList({
   };
 
   // セッションレンダリング関数
-  const renderSession = (session: Session) => (
+  const renderSession = (session: Session) => {
+    // 背景色の決定：選択中 > Archived > デフォルト
+    const getBackgroundColor = () => {
+      if (session.id === currentSessionId) return '#e7f5ff';
+      if (session.is_archived) return '#fafafa';
+      return 'white';
+    };
+
+    const getHeaderBackgroundColor = () => {
+      if (session.id === currentSessionId) return '#d0ebff';
+      if (session.is_archived) return '#f0f0f0';
+      return '#f8f9fa';
+    };
+
+    return (
     <Box
       key={session.id}
       style={{
         borderRadius: '8px',
         border: '1px solid var(--mantine-color-gray-3)',
-        backgroundColor: session.id === currentSessionId ? '#e7f5ff' : 'white',
+        backgroundColor: getBackgroundColor(),
         transition: 'all 0.15s ease',
         cursor: 'pointer',
         overflow: 'hidden',
+        opacity: session.is_archived ? 0.85 : 1,
       }}
     >
       {editingSessionId === session.id ? (
@@ -191,7 +206,7 @@ export function SessionList({
             py="xs"
             justify="flex-end"
             style={{
-              backgroundColor: session.id === currentSessionId ? '#d0ebff' : '#f8f9fa',
+              backgroundColor: getHeaderBackgroundColor(),
               borderBottom: '1px solid var(--mantine-color-gray-3)',
             }}
           >
@@ -316,6 +331,16 @@ export function SessionList({
                   <Text size="xs" c="dimmed">
                     {formatDate(getLastActive(session))}
                   </Text>
+                  {session.is_archived && (
+                    <>
+                      <Text size="xs" c="dimmed">
+                        •
+                      </Text>
+                      <Badge size="xs" variant="light" color="gray" style={{ textTransform: 'none' }}>
+                        Archived
+                      </Badge>
+                    </>
+                  )}
                 </Group>
               </Box>
             </UnstyledButton>
@@ -323,7 +348,8 @@ export function SessionList({
         </>
       )}
     </Box>
-  );
+    );
+  };
 
   return (
     <Stack gap="xs" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

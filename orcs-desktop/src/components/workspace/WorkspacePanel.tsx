@@ -17,7 +17,7 @@ interface WorkspacePanelProps {
 }
 
 export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession, onNewSessionWithFile, onRefresh }: WorkspacePanelProps) {
-  const { workspace, files, isLoading, error, refresh } = useWorkspace();
+  const { workspace, files, isLoading, error, refresh, toggleFileArchive } = useWorkspace();
 
   // Keep local list in sync and notify parent consumers when provided
   const refreshWorkspaceState = useCallback(async () => {
@@ -348,6 +348,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
           onDeleteFile={handleDeleteFile}
           onGoToSession={handleGoToSession}
           onNewSessionWithFile={handleNewSessionWithFile}
+          onToggleArchive={toggleFileArchive}
         />
       </ScrollArea>
     </Stack>

@@ -53,6 +53,37 @@ pub struct UploadedFileV1_1_0 {
     pub author: Option<String>,
 }
 
+/// Represents a file uploaded to the workspace (DTO V1.2.0).
+/// Added is_archived for file organization.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.2.0")]
+pub struct UploadedFileV1_2_0 {
+    /// Unique identifier for the uploaded file
+    pub id: String,
+    /// Original filename
+    pub name: String,
+    /// Path to the stored file
+    pub path: PathBuf,
+    /// MIME type of the file
+    pub mime_type: String,
+    /// File size in bytes
+    pub size: u64,
+    /// Timestamp when the file was uploaded
+    pub uploaded_at: i64,
+    /// Session ID if this file was saved from a chat message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// Message timestamp if this file was saved from a chat message (ISO 8601)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_timestamp: Option<String>,
+    /// Author of the file (user ID, persona ID, or "system")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    /// Whether this file is archived (hidden by default)
+    #[serde(default)]
+    pub is_archived: bool,
+}
+
 // ============================================================================
 // Migration implementations
 // ============================================================================
@@ -76,12 +107,32 @@ impl MigratesTo<UploadedFileV1_1_0> for UploadedFileV1_0_0 {
     }
 }
 
+/// Migration from UploadedFileV1_1_0 to UploadedFileV1_2_0.
+///
+/// V1.1.0 files don't have archive status, so we set is_archived to false.
+impl MigratesTo<UploadedFileV1_2_0> for UploadedFileV1_1_0 {
+    fn migrate(self) -> UploadedFileV1_2_0 {
+        UploadedFileV1_2_0 {
+            id: self.id,
+            name: self.name,
+            path: self.path,
+            mime_type: self.mime_type,
+            size: self.size,
+            uploaded_at: self.uploaded_at,
+            session_id: self.session_id,
+            message_timestamp: self.message_timestamp,
+            author: self.author,
+            is_archived: false, // Existing files are not archived by default
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
 
-/// Convert UploadedFileV1_1_0 DTO to domain model.
-impl IntoDomain<UploadedFile> for UploadedFileV1_1_0 {
+/// Convert UploadedFileV1_2_0 DTO to domain model.
+impl IntoDomain<UploadedFile> for UploadedFileV1_2_0 {
     fn into_domain(self) -> UploadedFile {
         UploadedFile {
             id: self.id,
@@ -93,14 +144,15 @@ impl IntoDomain<UploadedFile> for UploadedFileV1_1_0 {
             session_id: self.session_id,
             message_timestamp: self.message_timestamp,
             author: self.author,
+            is_archived: self.is_archived,
         }
     }
 }
 
-/// Convert domain model to UploadedFileV1_1_0 DTO for persistence.
-impl From<&UploadedFile> for UploadedFileV1_1_0 {
+/// Convert domain model to UploadedFileV1_2_0 DTO for persistence.
+impl From<&UploadedFile> for UploadedFileV1_2_0 {
     fn from(uploaded_file: &UploadedFile) -> Self {
-        UploadedFileV1_1_0 {
+        UploadedFileV1_2_0 {
             id: uploaded_file.id.clone(),
             name: uploaded_file.name.clone(),
             path: uploaded_file.path.clone(),
@@ -110,6 +162,7 @@ impl From<&UploadedFile> for UploadedFileV1_1_0 {
             session_id: uploaded_file.session_id.clone(),
             message_timestamp: uploaded_file.message_timestamp.clone(),
             author: uploaded_file.author.clone(),
+            is_archived: uploaded_file.is_archived,
         }
     }
 }
@@ -120,13 +173,14 @@ impl From<&UploadedFile> for UploadedFileV1_1_0 {
 
 /// Creates and configures a Migrator instance for UploadedFile entities.
 ///
-/// The migrator handles automatic schema migration from V1.0.0 to V1.1.0
+/// The migrator handles automatic schema migration from V1.0.0 to V1.2.0
 /// and conversion to the domain model.
 ///
 /// # Migration Path
 ///
-/// - V1.0.0 → V1.1.0: Adds `session_id` and `message_timestamp` fields with default value None
-/// - V1.1.0 → UploadedFile: Converts DTO to domain model
+/// - V1.0.0 → V1.1.0: Adds `session_id`, `message_timestamp`, and `author` fields with default value None
+/// - V1.1.0 → V1.2.0: Adds `is_archived` field with default value false
+/// - V1.2.0 → UploadedFile: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -137,10 +191,11 @@ impl From<&UploadedFile> for UploadedFileV1_1_0 {
 pub fn create_uploaded_file_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> V1.1.0 -> UploadedFile
+    // Register migration path: V1.0.0 -> V1.1.0 -> V1.2.0 -> UploadedFile
     let uploaded_file_path = version_migrate::Migrator::define("uploaded_file")
         .from::<UploadedFileV1_0_0>()
         .step::<UploadedFileV1_1_0>()
+        .step::<UploadedFileV1_2_0>()
         .into::<UploadedFile>();
 
     migrator

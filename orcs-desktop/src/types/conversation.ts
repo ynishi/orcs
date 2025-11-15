@@ -104,3 +104,40 @@ export function getConversationModeOption(mode: ConversationModeType): Conversat
 export function getTalkStyleOption(style: TalkStyleType): TalkStyleOption | undefined {
   return TALK_STYLES.find(s => s.value === style);
 }
+
+/**
+ * Execution Strategy definitions
+ */
+export type ExecutionStrategyType = 'broadcast' | 'sequential' | 'mentioned';
+
+export interface ExecutionStrategyOption {
+  value: ExecutionStrategyType;
+  label: string;
+  icon: string;
+  description: string;
+}
+
+export const EXECUTION_STRATEGIES: ExecutionStrategyOption[] = [
+  {
+    value: 'broadcast',
+    label: 'Broadcast',
+    icon: '📢',
+    description: 'Send to all participants',
+  },
+  {
+    value: 'sequential',
+    label: 'Sequential',
+    icon: '➡️',
+    description: 'Send one by one',
+  },
+  {
+    value: 'mentioned',
+    label: 'Mentioned',
+    icon: '👤',
+    description: 'Send to @mentioned only',
+  },
+];
+
+export function getExecutionStrategyOption(strategy: ExecutionStrategyType): ExecutionStrategyOption | undefined {
+  return EXECUTION_STRATEGIES.find(s => s.value === strategy);
+}

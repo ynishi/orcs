@@ -5,15 +5,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
 import { handleAndPersistSystemMessage, conversationMessage } from '../../utils/systemMessage';
-import { CONVERSATION_MODES, DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, TALK_STYLES } from '../../types/conversation';
+import { CONVERSATION_MODES, DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, TALK_STYLES, EXECUTION_STRATEGIES } from '../../types/conversation';
 import { MessageType } from '../../types/message';
-
-// Available execution strategies
-const STRATEGIES = [
-  { value: 'broadcast', label: '📢 Broadcast' },
-  { value: 'sequential', label: '➡️ Sequential' },
-  { value: 'mentioned', label: '👤 Mentioned' },
-];
 
 const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
   claude_cli: 'Claude CLI',
@@ -61,40 +54,14 @@ export function PersonasList({
   const [selectedConversationMode, setSelectedConversationMode] = useState<string>('normal');
   const [selectedTalkStyle, setSelectedTalkStyle] = useState<string | null>(null);
 
-  const handleStrategyChange = async (value: string | null) => {
+  const handleStrategyChange = (value: string | null) => {
     const strategy = value || 'broadcast';
+
+    // Update local state
     setSelectedStrategy(strategy);
+
+    // Notify parent component (parent will handle backend and system message)
     onStrategyChange?.(strategy);
-
-    // Update backend
-    try {
-      await invoke('set_execution_strategy', { strategy });
-
-      // Refresh sessions to update execution_strategy field
-      if (onRefreshSessions) {
-        await onRefreshSessions();
-      }
-
-      // Show system message
-      const strategyLabel = STRATEGIES.find(s => s.value === strategy)?.label || strategy;
-      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-      onMessage && await handleAndPersistSystemMessage(
-        conversationMessage(
-          `Execution strategy changed to: ${strategyLabel} [${timestamp}]`,
-          'info'
-        ),
-        onMessage, invoke
-      );
-    } catch (error) {
-      console.error('Failed to set execution strategy:', error);
-      onMessage && await handleAndPersistSystemMessage(
-        conversationMessage(
-          `Failed to set execution strategy: ${error}`,
-          'error'
-        ),
-        onMessage, invoke
-      );
-    }
   };
 
   const handleConversationModeChange = async (value: string | null) => {
@@ -450,7 +417,10 @@ export function PersonasList({
           </Text>
           <Select
             size="xs"
-            data={STRATEGIES}
+            data={EXECUTION_STRATEGIES.map(strategy => ({
+              value: strategy.value,
+              label: `${strategy.icon} ${strategy.label}`,
+            }))}
             value={selectedStrategy}
             onChange={handleStrategyChange}
             placeholder="Select strategy"

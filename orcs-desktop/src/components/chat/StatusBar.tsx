@@ -1,7 +1,7 @@
 import { Paper, Group, Badge, Text, Divider, Tooltip, Menu } from '@mantine/core';
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
-import { DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, getConversationModeOption, getTalkStyleOption, TALK_STYLES } from '../../types/conversation';
+import { DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, getConversationModeOption, getTalkStyleOption, TALK_STYLES, EXECUTION_STRATEGIES } from '../../types/conversation';
 
 interface StatusBarProps {
   status: StatusInfo;
@@ -13,9 +13,10 @@ interface StatusBarProps {
   talkStyle?: string | null;
   executionStrategy?: string;
   onTalkStyleChange?: (style: string | null) => void;
+  onExecutionStrategyChange?: (strategy: string) => void;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', onTalkStyleChange }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', onTalkStyleChange, onExecutionStrategyChange }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -147,11 +148,22 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
 
         {/* Execution Strategy */}
         <Divider orientation="vertical" />
-        <Tooltip label={getExecutionStrategyDisplay().label} withArrow>
-          <Text size="lg" style={{ cursor: 'pointer' }}>
-            {getExecutionStrategyDisplay().icon}
-          </Text>
-        </Tooltip>
+        <Menu position="top" withArrow>
+          <Menu.Target>
+            <Tooltip label={getExecutionStrategyDisplay().label} withArrow>
+              <Text size="lg" style={{ cursor: 'pointer' }}>
+                {getExecutionStrategyDisplay().icon}
+              </Text>
+            </Tooltip>
+          </Menu.Target>
+          <Menu.Dropdown>
+            {EXECUTION_STRATEGIES.map((strategy) => (
+              <Menu.Item key={strategy.value} onClick={() => onExecutionStrategyChange?.(strategy.value)}>
+                {strategy.icon} {strategy.label}
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
 
         {/* Conversation Mode (Response Style) */}
         <Divider orientation="vertical" />

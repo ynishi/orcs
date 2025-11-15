@@ -31,6 +31,7 @@ import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
 import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
 import { changeTalkStyle } from "./services/talkStyleService";
+import { changeExecutionStrategy } from "./services/executionStrategyService";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages } from "./types/session";
@@ -1677,8 +1678,12 @@ function App() {
   };
 
 
-  const handleStrategyChange = (strategy: string) => {
+  const handleStrategyChange = async (strategy: string) => {
+    // Update local state
     setExecutionStrategy(strategy);
+
+    // Delegate to service layer
+    await changeExecutionStrategy(strategy, { invoke, addMessage, onRefreshSessions: refreshSessions });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2061,6 +2066,7 @@ function App() {
                       onExecuteAsTask={handleExecuteAsTask}
                       onAutoModeChange={setAutoMode}
                       onTalkStyleChange={handleTalkStyleChange}
+                      onExecutionStrategyChange={handleStrategyChange}
                       onSelectCommand={selectCommand}
                       onSelectAgent={selectAgent}
                       onHoverSuggestion={setSelectedSuggestionIndex}

@@ -15,6 +15,7 @@ interface TaskListProps {
   onTaskToggle?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
   onSaveToWorkspace?: (task: Task) => Promise<void>;
+  onRefresh?: () => void;
 }
 
 export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWorkspaceId, onTaskDelete, onSaveToWorkspace }: TaskListProps) {

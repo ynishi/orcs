@@ -1,7 +1,19 @@
 /**
  * タスクのステータス
  */
-export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
+export type TaskStatus = 'Pending' | 'Planning' | 'Running' | 'Completed' | 'Failed';
+
+/**
+ * タスク実行進捗情報（リアルタイム更新用）
+ */
+export interface TaskProgress {
+  task_id: string;
+  current_wave?: number;
+  current_step?: string;
+  current_agent?: string;
+  last_message?: string;
+  last_updated: number;
+}
 
 /**
  * タスク実行履歴
@@ -57,6 +69,8 @@ export function getTaskIcon(status: TaskStatus): string {
   switch (status) {
     case 'Pending':
       return '⬜';
+    case 'Planning':
+      return '📋';
     case 'Running':
       return '🔄';
     case 'Completed':
@@ -75,6 +89,8 @@ export function getTaskColor(status: TaskStatus): string {
   switch (status) {
     case 'Pending':
       return 'gray';
+    case 'Planning':
+      return 'cyan';
     case 'Running':
       return 'blue';
     case 'Completed':

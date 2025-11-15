@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use version_migrate::{IntoDomain, Versioned};
+use version_migrate::{IntoDomain, MigratesTo, Versioned};
 
 use orcs_core::task::{ExecutionDetails, StepInfo, StepStatus, Task, TaskStatus};
 
@@ -172,12 +172,79 @@ pub struct TaskV1_0_0 {
     /// Detailed execution information.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_details: Option<ExecutionDetailsDTO>,
+}
+
+/// V1.1.0: Added strategy and journal_log fields for ParallelOrchestrator integration.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.1.0")]
+pub struct TaskV1_1_0 {
+    /// Unique task identifier (UUID format).
+    pub id: String,
+    /// Session ID where this task was executed.
+    pub session_id: String,
+    /// Task title.
+    pub title: String,
+    /// Full task description/request.
+    pub description: String,
+    /// Current task status.
+    pub status: TaskStatusDTO,
+    /// Timestamp when task was created (ISO 8601 format).
+    pub created_at: String,
+    /// Timestamp when task was last updated (ISO 8601 format).
+    pub updated_at: String,
+    /// Timestamp when task completed (ISO 8601 format).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<String>,
+    /// Number of steps executed.
+    pub steps_executed: u32,
+    /// Number of steps skipped.
+    pub steps_skipped: u32,
+    /// Number of context keys generated.
+    pub context_keys: u32,
+    /// Error message if task failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// Result summary text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    /// Detailed execution information.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_details: Option<ExecutionDetailsDTO>,
     /// Execution strategy (JSON string from ParallelOrchestrator).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub strategy: Option<String>,
     /// Journal log (execution trace from ParallelOrchestrator).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub journal_log: Option<String>,
+}
+
+// ============================================================================
+// Schema Migrations
+// ============================================================================
+
+/// Migration from TaskV1_0_0 to TaskV1_1_0.
+/// Added strategy and journal_log fields (defaults to None for existing tasks).
+impl MigratesTo<TaskV1_1_0> for TaskV1_0_0 {
+    fn migrate(self) -> TaskV1_1_0 {
+        TaskV1_1_0 {
+            id: self.id,
+            session_id: self.session_id,
+            title: self.title,
+            description: self.description,
+            status: self.status,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            completed_at: self.completed_at,
+            steps_executed: self.steps_executed,
+            steps_skipped: self.steps_skipped,
+            context_keys: self.context_keys,
+            error: self.error,
+            result: self.result,
+            execution_details: self.execution_details,
+            strategy: None, // Existing tasks have no strategy data
+            journal_log: None, // Existing tasks have no journal log data
+        }
+    }
 }
 
 // ============================================================================
@@ -190,8 +257,8 @@ fn generate_uuid_from_task(title: &str, timestamp: &str) -> String {
     Uuid::new_v5(&Uuid::NAMESPACE_OID, combined.as_bytes()).to_string()
 }
 
-/// Convert TaskV1_0_0 DTO to domain model.
-impl IntoDomain<Task> for TaskV1_0_0 {
+/// Convert TaskV1_1_0 DTO to domain model.
+impl IntoDomain<Task> for TaskV1_1_0 {
     fn into_domain(self) -> Task {
         // Validate and fix ID if needed
         let id = if Uuid::parse_str(&self.id).is_ok() {
@@ -222,10 +289,10 @@ impl IntoDomain<Task> for TaskV1_0_0 {
     }
 }
 
-/// Convert domain model to TaskV1_0_0 DTO for persistence.
-impl version_migrate::FromDomain<Task> for TaskV1_0_0 {
+/// Convert domain model to TaskV1_1_0 DTO for persistence.
+impl version_migrate::FromDomain<Task> for TaskV1_1_0 {
     fn from_domain(task: Task) -> Self {
-        TaskV1_0_0 {
+        TaskV1_1_0 {
             id: task.id,
             session_id: task.session_id,
             title: task.title,
@@ -256,7 +323,8 @@ impl version_migrate::FromDomain<Task> for TaskV1_0_0 {
 ///
 /// # Migration Path
 ///
-/// - V1.0.0 → Task: Converts DTO to domain model
+/// - V1.0.0 → V1.1.0: Adds strategy and journal_log fields
+/// - V1.1.0 → Task: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -267,9 +335,10 @@ impl version_migrate::FromDomain<Task> for TaskV1_0_0 {
 pub fn create_task_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> Task
+    // Register migration path: V1.0.0 -> V1.1.0 -> Task
     let task_path = version_migrate::Migrator::define("task")
         .from::<TaskV1_0_0>()
+        .step::<TaskV1_1_0>()
         .into_with_save::<Task>();
 
     migrator

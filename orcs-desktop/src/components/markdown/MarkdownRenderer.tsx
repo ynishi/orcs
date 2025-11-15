@@ -1,9 +1,10 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Paper, Text, Box, CopyButton, ActionIcon, Tooltip } from '@mantine/core';
+import { Paper, Text, Box, CopyButton, ActionIcon, Tooltip, Badge } from '@mantine/core';
 import { SaveableCodeBlock } from './SaveableCodeBlock';
 import 'highlight.js/styles/github-dark.css';
+import React from 'react';
 
 interface MarkdownRendererProps {
   content: string;
@@ -15,6 +16,46 @@ interface CodeBlockMetadata {
   language: string;
   saveable: boolean;
   path?: string;
+}
+
+/**
+ * Render text with mentions as badges
+ */
+function renderTextWithMentions(text: string): (string | React.ReactElement)[] {
+  const mentionRegex = /@(\S+)/g;
+  const parts: (string | React.ReactElement)[] = [];
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = mentionRegex.exec(text)) !== null) {
+    // Text before mention
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    // Mention part as Badge
+    parts.push(
+      <Badge
+        key={key++}
+        size="sm"
+        variant="light"
+        color="blue"
+        style={{ margin: '0 2px' }}
+      >
+        @{match[1]}
+      </Badge>
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
 }
 
 /**
@@ -128,11 +169,19 @@ export function MarkdownRenderer({ content, onSaveFile, workspaceRootPath }: Mar
             );
           },
 
-          // Custom paragraph renderer
+          // Custom paragraph renderer with mention support
           p({ children }) {
+            // Process children to handle mentions
+            const processedChildren = React.Children.map(children, (child) => {
+              if (typeof child === 'string') {
+                return renderTextWithMentions(child);
+              }
+              return child;
+            });
+
             return (
               <Text size="sm" mb="sm">
-                {children}
+                {processedChildren}
               </Text>
             );
           },

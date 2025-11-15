@@ -11,7 +11,8 @@ export interface Mention {
  * テキストから@メンションを抽出
  */
 export function extractMentions(text: string): Mention[] {
-  const mentionRegex = /@(\w+)/g;
+  // スペース以外の文字にマッチ（日本語、ハイフン、記号などもサポート）
+  const mentionRegex = /@(\S+)/g;
   const mentions: Mention[] = [];
   let match;
 

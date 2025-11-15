@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use llm_toolkit::agent::impls::ClaudeCodeAgent;
+use llm_toolkit::agent::impls::claude_code::{ClaudeCodeAgent, ClaudeCodeJsonAgent};
+use llm_toolkit::agent::impls::RetryAgent;
 use llm_toolkit::agent::{Agent, AgentError, AgentOutput, Payload};
 use llm_toolkit::orchestrator::{BlueprintWorkflow, ParallelOrchestrator};
 use orcs_application::UtilityAgentService;
@@ -345,8 +346,34 @@ impl TaskExecutor {
         // Create a blueprint using the message content as the workflow description
         let blueprint = BlueprintWorkflow::new(message_content.clone());
 
-        // Initialize ParallelOrchestrator with default internal agents
-        let mut orchestrator = ParallelOrchestrator::new(blueprint);
+        // Initialize ParallelOrchestrator with workspace-aware internal agents
+        // This ensures Strategy generation happens in the correct workspace context
+        let mut orchestrator = if let Some(ref workspace) = workspace_root {
+            tracing::info!(
+                "[TaskExecutor] Configuring ParallelOrchestrator internal agents with workspace: {}",
+                workspace.display()
+            );
+            let enhanced_path = build_enhanced_path(workspace);
+
+            // Configure internal_agent (String output, for redesign decisions)
+            let internal_agent = ClaudeCodeAgent::new()
+                .with_cwd(workspace.clone())
+                .with_env("PATH", enhanced_path.clone());
+
+            // Configure internal_json_agent (StrategyMap output, for strategy generation)
+            let internal_json_agent = ClaudeCodeJsonAgent::new()
+                .with_cwd(workspace.clone())
+                .with_env("PATH", enhanced_path.clone());
+
+            ParallelOrchestrator::with_internal_agents(
+                blueprint,
+                Box::new(RetryAgent::new(internal_agent, 3)),
+                Box::new(RetryAgent::new(internal_json_agent, 3)),
+            )
+        } else {
+            tracing::info!("[TaskExecutor] Using default ParallelOrchestrator (no workspace context)");
+            ParallelOrchestrator::new(blueprint)
+        };
 
         // Register our executor agent as a DynamicAgent (with workspace context if provided)
         let executor_agent = Arc::new(DynamicAgentAdapter::new(

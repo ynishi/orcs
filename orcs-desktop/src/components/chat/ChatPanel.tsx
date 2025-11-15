@@ -41,6 +41,7 @@ import { notifications } from '@mantine/notifications';
 
 interface ChatPanelProps {
   tab: SessionTab;
+  isActive: boolean; // Whether this tab is currently active
   status: StatusInfo;
   userNickname: string;
   gitInfo: GitInfo;
@@ -51,7 +52,7 @@ interface ChatPanelProps {
   personas: PersonaConfig[];
   activeParticipantIds: string[];
   workspace: Workspace | null;
-  
+
   // サジェスト関連
   showSuggestions: boolean;
   filteredCommands: CommandDefinition[];
@@ -59,7 +60,7 @@ interface ChatPanelProps {
   showAgentSuggestions: boolean;
   filteredAgents: Agent[];
   selectedAgentIndex: number;
-  
+
   // イベントハンドラー
   onSubmit: (e: React.FormEvent) => void;
   onInputChange: (value: string) => void;
@@ -129,6 +130,7 @@ function onSaveExecHandlersEqual(
 
 export function ChatPanel({
   tab,
+  isActive,
   status,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   // @ts-ignore - userNickname may be used in future features
@@ -393,13 +395,21 @@ export function ChatPanel({
       >
         <ScrollArea h="100%" viewportRef={viewport}>
           <Stack gap="sm" p="md">
-            <MessageList
-              messages={tab.messages}
-              onSaveMessageToWorkspace={onSaveMessageToWorkspace}
-              onExecuteAsTask={onExecuteAsTask}
-              onCreateSlashCommand={handleCreateSlashCommand}
-              workspaceRootPath={workspace?.rootPath}
-            />
+            {isActive ? (
+              // Active tab: Render full message list
+              <MessageList
+                messages={tab.messages}
+                onSaveMessageToWorkspace={onSaveMessageToWorkspace}
+                onExecuteAsTask={onExecuteAsTask}
+                onCreateSlashCommand={handleCreateSlashCommand}
+                workspaceRootPath={workspace?.rootPath}
+              />
+            ) : (
+              // Inactive tab: Lightweight placeholder to save rendering cost
+              <Box p="md" c="dimmed" ta="center">
+                <Text size="sm">{tab.messages.length} messages (tab inactive)</Text>
+              </Box>
+            )}
             {tab.isAiThinking && activeParticipantIds.length > 0 && (
               <ThinkingIndicator personaName={tab.thinkingPersona} />
             )}

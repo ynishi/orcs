@@ -222,6 +222,25 @@ function App() {
     }
   }, [activeTabScrollKey]);
 
+  // Auto-scroll active tab into view when tab is switched
+  useEffect(() => {
+    if (!activeTabId) return;
+
+    // Use setTimeout to ensure DOM is ready after tab switch
+    const timeoutId = setTimeout(() => {
+      const activeTabElement = document.querySelector(`[data-tab-id="${activeTabId}"]`);
+      if (activeTabElement) {
+        activeTabElement.scrollIntoView({
+          behavior: 'smooth',
+          inline: 'center',
+          block: 'nearest',
+        });
+      }
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [activeTabId]);
+
   // Listen for real-time dialogue turn events from backend
   // Use ref to ensure only one listener is registered
   const listenerRegistered = useRef(false);
@@ -1988,6 +2007,7 @@ function App() {
                     <Tabs.Tab
                       key={tab.id}
                       value={tab.id}
+                      data-tab-id={tab.id}
                       style={{
                         minWidth: '120px',
                         maxWidth: '200px',

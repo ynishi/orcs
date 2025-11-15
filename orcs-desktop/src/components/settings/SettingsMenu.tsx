@@ -390,7 +390,7 @@ export function SettingsMenu({
         </ActionIcon>
       </Menu.Target>
 
-      <Menu.Dropdown>
+      <Menu.Dropdown style={{ maxHeight: '80vh', overflowY: 'auto' }}>
         <Menu.Label>User Profile</Menu.Label>
         <Menu.Item
           leftSection={<IconUser size={16} />}

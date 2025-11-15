@@ -14,7 +14,7 @@ export const CONVERSATION_MODES: ConversationModeOption[] = [
   {
     value: 'normal',
     label: '通常',
-    icon: '💬',
+    icon: '🗨️',
     description: 'Normal conversation mode',
   },
   {

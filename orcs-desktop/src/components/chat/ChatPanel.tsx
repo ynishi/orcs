@@ -74,6 +74,7 @@ interface ChatPanelProps {
   onAutoModeChange: (autoMode: boolean) => void;
   onTalkStyleChange?: (style: string | null) => void;
   onExecutionStrategyChange?: (strategy: string) => void;
+  onConversationModeChange?: (mode: string) => void;
   onSelectCommand: (command: CommandDefinition) => void;
   onSelectAgent: (agent: Agent) => void;
   onHoverSuggestion: (index: number) => void;
@@ -158,6 +159,7 @@ export function ChatPanel({
   onAutoModeChange,
   onTalkStyleChange,
   onExecutionStrategyChange,
+  onConversationModeChange,
   onSelectCommand,
   onSelectAgent,
   onHoverSuggestion,
@@ -544,6 +546,7 @@ export function ChatPanel({
         executionStrategy={executionStrategy}
         onTalkStyleChange={onTalkStyleChange}
         onExecutionStrategyChange={onExecutionStrategyChange}
+        onConversationModeChange={onConversationModeChange}
       />
 
       <AutoChatSettingsModal

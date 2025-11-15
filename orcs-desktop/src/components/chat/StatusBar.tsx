@@ -1,7 +1,7 @@
 import { Paper, Group, Badge, Text, Divider, Tooltip, Menu } from '@mantine/core';
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
-import { DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, getConversationModeOption, getTalkStyleOption, TALK_STYLES, EXECUTION_STRATEGIES } from '../../types/conversation';
+import { DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, getConversationModeOption, getTalkStyleOption, TALK_STYLES, EXECUTION_STRATEGIES, CONVERSATION_MODES } from '../../types/conversation';
 
 interface StatusBarProps {
   status: StatusInfo;
@@ -14,9 +14,10 @@ interface StatusBarProps {
   executionStrategy?: string;
   onTalkStyleChange?: (style: string | null) => void;
   onExecutionStrategyChange?: (strategy: string) => void;
+  onConversationModeChange?: (mode: string) => void;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', onTalkStyleChange, onExecutionStrategyChange }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -167,11 +168,22 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
 
         {/* Conversation Mode (Response Style) */}
         <Divider orientation="vertical" />
-        <Tooltip label={getConversationModeOption(conversationMode as any)?.label || conversationMode} withArrow>
-          <Text size="lg" style={{ cursor: 'pointer' }}>
-            {getConversationModeOption(conversationMode as any)?.icon || '💬'}
-          </Text>
-        </Tooltip>
+        <Menu position="top" withArrow>
+          <Menu.Target>
+            <Tooltip label={getConversationModeOption(conversationMode as any)?.label || conversationMode} withArrow>
+              <Text size="lg" style={{ cursor: 'pointer' }}>
+                {getConversationModeOption(conversationMode as any)?.icon || '🗨️'}
+              </Text>
+            </Tooltip>
+          </Menu.Target>
+          <Menu.Dropdown>
+            {CONVERSATION_MODES.map((mode) => (
+              <Menu.Item key={mode.value} onClick={() => onConversationModeChange?.(mode.value)}>
+                {mode.icon} {mode.label}
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
 
         {/* Git リポジトリ情報 */}
         {gitInfo?.is_repo && (

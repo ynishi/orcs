@@ -53,6 +53,7 @@ interface NavbarProps {
   personas?: import('../../types/agent').PersonaConfig[];
   activeParticipantIds?: string[];
   executionStrategy?: string;
+  conversationMode?: string;
   talkStyle?: string | null;
   onRefreshPersonas?: () => Promise<void>;
   onRefreshSessions?: () => Promise<void>;
@@ -90,6 +91,7 @@ export function Navbar({
   personas,
   activeParticipantIds,
   executionStrategy,
+  conversationMode,
   talkStyle,
   onRefreshPersonas,
   onRefreshSessions,
@@ -205,6 +207,7 @@ export function Navbar({
               personas={personas}
               activeParticipantIds={activeParticipantIds}
               executionStrategy={executionStrategy}
+              conversationMode={conversationMode}
               talkStyle={talkStyle}
               onRefresh={onRefreshPersonas}
               onRefreshSessions={onRefreshSessions}

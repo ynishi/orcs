@@ -25,6 +25,7 @@ interface PersonasListProps {
   personas?: PersonaConfig[];
   activeParticipantIds?: string[];
   executionStrategy?: string;
+  conversationMode?: string;
   talkStyle?: string | null;
   onRefresh?: () => Promise<void>;
   onRefreshSessions?: () => Promise<void>;
@@ -38,6 +39,7 @@ export function PersonasList({
   personas: propsPersonas,
   activeParticipantIds: propsActiveParticipantIds,
   executionStrategy: propsExecutionStrategy,
+  conversationMode: propsConversationMode,
   talkStyle: propsTalkStyle,
   onRefresh,
   onRefreshSessions,
@@ -64,37 +66,14 @@ export function PersonasList({
     onStrategyChange?.(strategy);
   };
 
-  const handleConversationModeChange = async (value: string | null) => {
+  const handleConversationModeChange = (value: string | null) => {
     const mode = value || 'normal';
+
+    // Update local state
     setSelectedConversationMode(mode);
 
-    // Update backend
-    try {
-      await invoke('set_conversation_mode', { mode });
-
-      // Notify parent component
-      onConversationModeChange?.(mode);
-
-      // Show system message
-      const modeLabel = CONVERSATION_MODES.find(m => m.value === mode)?.label || mode;
-      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-      onMessage && await handleAndPersistSystemMessage(
-        conversationMessage(
-          `Conversation mode changed to: ${modeLabel} [${timestamp}]`,
-          'info'
-        ),
-        onMessage, invoke
-      );
-    } catch (error) {
-      console.error('Failed to set conversation mode:', error);
-      onMessage && await handleAndPersistSystemMessage(
-        conversationMessage(
-          `Failed to set conversation mode: ${error}`,
-          'error'
-        ),
-        onMessage, invoke
-      );
-    }
+    // Notify parent component (parent will handle backend and system message)
+    onConversationModeChange?.(mode);
   };
 
   const handleTalkStyleChange = (value: string | null) => {
@@ -113,6 +92,12 @@ export function PersonasList({
       setSelectedTalkStyle(propsTalkStyle);
     }
   }, [propsTalkStyle]);
+
+  useEffect(() => {
+    if (propsConversationMode !== undefined) {
+      setSelectedConversationMode(propsConversationMode);
+    }
+  }, [propsConversationMode]);
 
   // Fetch personas from backend (only if not provided via props)
   const fetchPersonas = async () => {

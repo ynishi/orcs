@@ -341,6 +341,14 @@ impl TaskExecutor {
                 context: result.context.clone(),
             });
 
+            // Extract strategy and journal log from orchestrator
+            task.strategy = orchestrator
+                .strategy_map()
+                .and_then(|s| serde_json::to_string_pretty(s).ok());
+            task.journal_log = orchestrator
+                .execution_journal()
+                .and_then(|j| serde_json::to_string_pretty(j).ok());
+
             // Save final task record
             if let Some(repo) = &self.task_repository {
                 if let Err(e) = repo.save(&task).await {
@@ -370,6 +378,14 @@ impl TaskExecutor {
                 steps: vec![], // TODO: Extract step info from orchestrator
                 context: result.context.clone(),
             });
+
+            // Extract strategy and journal log from orchestrator (even on failure)
+            task.strategy = orchestrator
+                .strategy_map()
+                .and_then(|s| serde_json::to_string_pretty(s).ok());
+            task.journal_log = orchestrator
+                .execution_journal()
+                .and_then(|j| serde_json::to_string_pretty(j).ok());
 
             // Save failed task record
             if let Some(repo) = &self.task_repository {

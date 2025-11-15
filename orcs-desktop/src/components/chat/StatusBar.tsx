@@ -122,8 +122,10 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
                       <Group gap="xs" wrap="nowrap">
                         <Checkbox
                           checked={isActive}
-                          onChange={() => {}}
-                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            onToggleParticipant?.(persona.id, e.currentTarget.checked);
+                          }}
                           size="sm"
                         />
                         <Text size="sm" truncate style={{ flex: 1 }}>

@@ -1712,9 +1712,8 @@ function App() {
         );
       }
 
-      // Refresh personas and sessions
+      // Refresh personas to update active participant list
       await refreshPersonas();
-      await refreshSessions();
     } catch (error) {
       console.error(error);
       await handleAndPersistSystemMessage(
@@ -1747,9 +1746,8 @@ function App() {
         try {
           await invoke('add_participant', { personaId: persona.id });
           addMessage('system', 'System', `${persona.name} が参加しました`);
-          // Refresh participants list and sessions to update participant_icons/colors
+          // Refresh participants list to update active participant IDs
           await refreshPersonas();
-          await refreshSessions();
         } catch (error) {
           console.error(`Failed to add participant ${persona.name}:`, error);
         }

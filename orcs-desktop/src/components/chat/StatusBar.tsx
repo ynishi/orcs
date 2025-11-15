@@ -117,42 +117,34 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
         {/* AUTOモード */}
         <Divider orientation="vertical" />
         <Tooltip label={autoMode ? 'AUTO: ON' : 'AUTO: OFF'} withArrow>
-          <Text size="lg" c={autoMode ? 'green' : 'red'} fw={700} style={{ cursor: 'default' }}>
+          <Text size="lg" c={autoMode ? 'green' : 'red'} fw={700} style={{ cursor: 'pointer' }}>
             ●
           </Text>
         </Tooltip>
 
         {/* Talk Style */}
-        {talkStyle && (
-          <>
-            <Divider orientation="vertical" />
-            <Tooltip label={getTalkStyleOption(talkStyle as any)?.label || talkStyle} withArrow>
-              <Text size="lg" style={{ cursor: 'default' }}>
-                {getTalkStyleOption(talkStyle as any)?.icon || '💬'}
-              </Text>
-            </Tooltip>
-          </>
-        )}
+        <Divider orientation="vertical" />
+        <Tooltip label={talkStyle ? (getTalkStyleOption(talkStyle as any)?.label || talkStyle) : 'No Talk Style'} withArrow>
+          <Text size="lg" style={{ cursor: 'pointer' }}>
+            {talkStyle ? (getTalkStyleOption(talkStyle as any)?.icon || '💬') : '💬'}
+          </Text>
+        </Tooltip>
 
         {/* Execution Strategy */}
         <Divider orientation="vertical" />
         <Tooltip label={getExecutionStrategyDisplay().label} withArrow>
-          <Text size="lg" style={{ cursor: 'default' }}>
+          <Text size="lg" style={{ cursor: 'pointer' }}>
             {getExecutionStrategyDisplay().icon}
           </Text>
         </Tooltip>
 
         {/* Conversation Mode (Response Style) */}
-        {conversationMode !== 'normal' && (
-          <>
-            <Divider orientation="vertical" />
-            <Tooltip label={getConversationModeOption(conversationMode as any)?.label || conversationMode} withArrow>
-              <Text size="lg" style={{ cursor: 'default' }}>
-                {getConversationModeOption(conversationMode as any)?.icon || '💬'}
-              </Text>
-            </Tooltip>
-          </>
-        )}
+        <Divider orientation="vertical" />
+        <Tooltip label={getConversationModeOption(conversationMode as any)?.label || conversationMode} withArrow>
+          <Text size="lg" style={{ cursor: 'pointer' }}>
+            {getConversationModeOption(conversationMode as any)?.icon || '💬'}
+          </Text>
+        </Tooltip>
 
         {/* Git リポジトリ情報 */}
         {gitInfo?.is_repo && (

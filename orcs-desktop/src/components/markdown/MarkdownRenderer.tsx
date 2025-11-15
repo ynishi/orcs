@@ -34,7 +34,9 @@ function renderTextWithMentions(text: string): (string | React.ReactElement)[] {
       parts.push(text.slice(lastIndex, match.index));
     }
 
-    // Mention part as Badge
+    // Mention part as Badge (convert _ to space for display)
+    const mentionName = match[1];
+    const displayName = mentionName.replace(/_/g, ' ');
     parts.push(
       <Badge
         key={key++}
@@ -43,7 +45,7 @@ function renderTextWithMentions(text: string): (string | React.ReactElement)[] {
         color="blue"
         style={{ margin: '0 2px' }}
       >
-        @{match[1]}
+        @{displayName}
       </Badge>
     );
 

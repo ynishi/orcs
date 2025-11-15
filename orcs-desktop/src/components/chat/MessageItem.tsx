@@ -18,7 +18,8 @@ const COLLAPSE_THRESHOLD = 200;
 
 // メンションをハイライト表示するヘルパー
 function renderTextWithMentions(text: string) {
-  const mentionRegex = /@(\w+)/g;
+  // スペース以外の文字にマッチ（日本語、ハイフン、記号などもサポート）
+  const mentionRegex = /@(\S+)/g;
   const parts: (string | React.ReactElement)[] = [];
   let lastIndex = 0;
   let match;
@@ -30,7 +31,9 @@ function renderTextWithMentions(text: string) {
       parts.push(text.slice(lastIndex, match.index));
     }
 
-    // メンション部分
+    // メンション部分（_ をスペースに変換して表示）
+    const mentionName = match[1];
+    const displayName = mentionName.replace(/_/g, ' ');
     parts.push(
       <Badge
         key={key++}
@@ -39,7 +42,7 @@ function renderTextWithMentions(text: string) {
         color="green"
         style={{ margin: '0 2px' }}
       >
-        @{match[1]}
+        @{displayName}
       </Badge>
     );
 

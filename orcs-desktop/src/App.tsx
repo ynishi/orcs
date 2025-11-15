@@ -28,7 +28,7 @@ import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
 import { SettingsMenu } from "./components/settings/SettingsMenu";
 import { parseCommand, extractSlashCommands } from "./utils/commandParser";
 import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
-import { extractMentions, getCurrentMention } from "./utils/mentionParser";
+import { extractMentions, getCurrentMention, normalizeMentionsInText } from "./utils/mentionParser";
 import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
 import { changeTalkStyle } from "./services/talkStyleService";
 import { changeExecutionStrategy } from "./services/executionStrategyService";
@@ -774,11 +774,18 @@ function App() {
 
     if (mentionFilter !== null) {
       // Filter personas by name (case-insensitive)
+      // Support both original name and underscore format (e.g., "Ayaka Nakamura" matches "Ayaka_Nakamura")
       const filtered: Agent[] = personas
-        .filter(p => p.name.toLowerCase().includes(mentionFilter.toLowerCase()))
+        .filter(p => {
+          const lowerFilter = mentionFilter.toLowerCase();
+          const nameMatch = p.name.toLowerCase().includes(lowerFilter);
+          const underscoreName = p.name.replace(/ /g, '_').toLowerCase();
+          const underscoreMatch = underscoreName.includes(lowerFilter);
+          return nameMatch || underscoreMatch;
+        })
         .map(p => ({
           id: p.id,
-          name: p.name,
+          name: p.name.replace(/ /g, '_'), // Display with underscores for mention input
           status: activeParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
           description: `${p.role} - ${p.background}`,
           isActive: activeParticipantIds.includes(p.id),
@@ -826,7 +833,7 @@ function App() {
 
       const mentions = extractMentions(rawInput);
       if (mentions.length > 0) {
-        console.log('[MENTION EVENT] Agents mentioned:', mentions.map(m => m.agentName));
+        console.log('[MENTION EVENT] Agents mentioned:', mentions.map(m => m.mentionText));
       }
 
       // SlashCommandの処理（分離済み）
@@ -941,9 +948,13 @@ function App() {
           addMessage('user', userNickname, messageText, attachedFileData.length > 0 ? attachedFileData : undefined);
         }
 
+        // Normalize mentions before sending to backend (_ → space)
+        // Example: "@Ayaka_Nakamura" → "@Ayaka Nakamura"
+        const normalizedInput = normalizeMentionsInText(backendInput);
+
         const sessionEvent: SessionEvent = {
           type: 'user_input',
-          content: backendInput,
+          content: normalizedInput,
           attachments: filePaths.length > 0 ? filePaths : undefined,
         };
 
@@ -1741,7 +1752,12 @@ function App() {
     // Check for @mentions and auto-add inactive personas
     const mentions = extractMentions(currentInput);
     for (const mention of mentions) {
-      const persona = personas.find(p => p.name === mention.agentName);
+      // Search by both mention text and search name (with _ → space conversion)
+      // Example: "@Ayaka_Nakamura" matches persona "Ayaka Nakamura"
+      const persona = personas.find(p =>
+        p.name === mention.mentionText || p.name === mention.searchName
+      );
+
       if (persona && !activeParticipantIds.includes(persona.id)) {
         try {
           await invoke('add_participant', { personaId: persona.id });

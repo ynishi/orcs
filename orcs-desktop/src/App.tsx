@@ -30,6 +30,7 @@ import { parseCommand, extractSlashCommands } from "./utils/commandParser";
 import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention } from "./utils/mentionParser";
 import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
+import { changeTalkStyle } from "./services/talkStyleService";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages } from "./types/session";
@@ -1665,9 +1666,16 @@ function App() {
     setConversationMode(mode);
   };
 
-  const handleTalkStyleChange = (style: string | null) => {
+  const handleTalkStyleChange = async (value: string | null) => {
+    const style = value || null;
+
+    // Update local state
     setTalkStyle(style);
+
+    // Delegate to service layer
+    await changeTalkStyle(style, { invoke, addMessage });
   };
+
 
   const handleStrategyChange = (strategy: string) => {
     setExecutionStrategy(strategy);
@@ -1781,6 +1789,7 @@ function App() {
           personas={personas}
           activeParticipantIds={activeParticipantIds}
           executionStrategy={executionStrategy}
+          talkStyle={talkStyle}
           onRefreshPersonas={refreshPersonas}
           onRefreshSessions={refreshSessions}
         />
@@ -2051,6 +2060,7 @@ function App() {
                       onSaveMessageToWorkspace={handleSaveMessageToWorkspace}
                       onExecuteAsTask={handleExecuteAsTask}
                       onAutoModeChange={setAutoMode}
+                      onTalkStyleChange={handleTalkStyleChange}
                       onSelectCommand={selectCommand}
                       onSelectAgent={selectAgent}
                       onHoverSuggestion={setSelectedSuggestionIndex}

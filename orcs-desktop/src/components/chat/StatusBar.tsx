@@ -12,9 +12,10 @@ interface StatusBarProps {
   conversationMode?: string;
   talkStyle?: string | null;
   executionStrategy?: string;
+  onTalkStyleChange?: (style: string | null) => void;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential' }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', onTalkStyleChange }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -133,11 +134,11 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
             </Tooltip>
           </Menu.Target>
           <Menu.Dropdown>
-            <Menu.Item key={DEFAULT_STYLE_LABEL}>
+            <Menu.Item key={DEFAULT_STYLE_LABEL} onClick={() => onTalkStyleChange?.(null)}>
               {DEFAULT_STYLE_ICON} {DEFAULT_STYLE_LABEL}
             </Menu.Item>
             {TALK_STYLES.map((style) => (
-              <Menu.Item key={style.value}>
+              <Menu.Item key={style.value} onClick={() => onTalkStyleChange?.(style.value)}>
                 {style.icon} {style.label}
               </Menu.Item>
             ))}

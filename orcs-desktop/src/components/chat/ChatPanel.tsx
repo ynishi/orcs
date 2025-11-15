@@ -72,6 +72,7 @@ interface ChatPanelProps {
   onSaveMessageToWorkspace: (message: import('../../types/message').Message) => Promise<void>;
   onExecuteAsTask: (message: import('../../types/message').Message) => Promise<void>;
   onAutoModeChange: (autoMode: boolean) => void;
+  onTalkStyleChange?: (style: string | null) => void;
   onSelectCommand: (command: CommandDefinition) => void;
   onSelectAgent: (agent: Agent) => void;
   onHoverSuggestion: (index: number) => void;
@@ -154,6 +155,7 @@ export function ChatPanel({
   onSaveMessageToWorkspace,
   onExecuteAsTask,
   onAutoModeChange,
+  onTalkStyleChange,
   onSelectCommand,
   onSelectAgent,
   onHoverSuggestion,
@@ -538,6 +540,7 @@ export function ChatPanel({
         conversationMode={conversationMode}
         talkStyle={talkStyle}
         executionStrategy={executionStrategy}
+        onTalkStyleChange={onTalkStyleChange}
       />
 
       <AutoChatSettingsModal

@@ -32,6 +32,7 @@ interface PersonasListProps {
   personas?: PersonaConfig[];
   activeParticipantIds?: string[];
   executionStrategy?: string;
+  talkStyle?: string | null;
   onRefresh?: () => Promise<void>;
   onRefreshSessions?: () => Promise<void>;
 }
@@ -44,6 +45,7 @@ export function PersonasList({
   personas: propsPersonas,
   activeParticipantIds: propsActiveParticipantIds,
   executionStrategy: propsExecutionStrategy,
+  talkStyle: propsTalkStyle,
   onRefresh,
   onRefreshSessions,
 }: PersonasListProps) {
@@ -128,38 +130,22 @@ export function PersonasList({
     }
   };
 
-  const handleTalkStyleChange = async (value: string | null) => {
+  const handleTalkStyleChange = (value: string | null) => {
     const style = value || null;
+
+    // Update local state
     setSelectedTalkStyle(style);
 
-    // Update backend
-    try {
-      await invoke('set_talk_style', { style });
-
-      // Notify parent component
-      onTalkStyleChange?.(style);
-
-      // Show system message
-      const styleLabel = style ? (TALK_STYLES.find(s => s.value === style)?.label || style) : DEFAULT_STYLE_LABEL;
-      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-      onMessage && await handleAndPersistSystemMessage(
-        conversationMessage(
-          `Talk style changed to: ${styleLabel} [${timestamp}]`,
-          'info'
-        ),
-        onMessage, invoke
-      );
-    } catch (error) {
-      console.error('Failed to set talk style:', error);
-      onMessage && await handleAndPersistSystemMessage(
-        conversationMessage(
-          `Failed to set talk style: ${error}`,
-          'error'
-        ),
-        onMessage, invoke
-      );
-    }
+    // Notify parent component (parent will handle backend and system message)
+    onTalkStyleChange?.(style);
   };
+
+  // Sync local state with props (for global changes from StatusBar)
+  useEffect(() => {
+    if (propsTalkStyle !== undefined) {
+      setSelectedTalkStyle(propsTalkStyle);
+    }
+  }, [propsTalkStyle]);
 
   // Fetch personas from backend (only if not provided via props)
   const fetchPersonas = async () => {

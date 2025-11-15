@@ -1,6 +1,7 @@
-import { Paper, Group, Badge, Text, Divider, Tooltip, Menu } from '@mantine/core';
+import { Paper, Group, Badge, Text, Divider, Tooltip, Menu, Checkbox, ScrollArea } from '@mantine/core';
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
+import { PersonaConfig } from '../../types/agent';
 import { DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, getConversationModeOption, getTalkStyleOption, TALK_STYLES, EXECUTION_STRATEGIES, CONVERSATION_MODES } from '../../types/conversation';
 
 interface StatusBarProps {
@@ -12,12 +13,15 @@ interface StatusBarProps {
   conversationMode?: string;
   talkStyle?: string | null;
   executionStrategy?: string;
+  personas?: PersonaConfig[];
+  activeParticipantIds?: string[];
   onTalkStyleChange?: (style: string | null) => void;
   onExecutionStrategyChange?: (strategy: string) => void;
   onConversationModeChange?: (mode: string) => void;
+  onToggleParticipant?: (personaId: string, isChecked: boolean) => void;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', personas = [], activeParticipantIds = [], onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange, onToggleParticipant }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -92,9 +96,46 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
           <Text size="sm" c="dimmed">
             Personas:
           </Text>
-          <Badge color={participatingAgentsCount > 0 ? 'green' : 'gray'} size="sm" variant="filled">
-            {participatingAgentsCount}/{totalPersonas}
-          </Badge>
+          <Menu position="top" withArrow closeOnItemClick={false}>
+            <Menu.Target>
+              <Badge
+                color={participatingAgentsCount > 0 ? 'green' : 'gray'}
+                size="sm"
+                variant="filled"
+                style={{ cursor: 'pointer' }}
+              >
+                {participatingAgentsCount}/{totalPersonas}
+              </Badge>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <ScrollArea h={Math.min(personas.length * 40 + 20, 300)}>
+                {personas.map((persona) => {
+                  const isActive = activeParticipantIds.includes(persona.id);
+                  return (
+                    <Menu.Item
+                      key={persona.id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onToggleParticipant?.(persona.id, !isActive);
+                      }}
+                    >
+                      <Group gap="xs" wrap="nowrap">
+                        <Checkbox
+                          checked={isActive}
+                          onChange={() => {}}
+                          onClick={(e) => e.stopPropagation()}
+                          size="sm"
+                        />
+                        <Text size="sm" truncate style={{ flex: 1 }}>
+                          {persona.icon || '👤'} {persona.name} - {persona.role.length > 20 ? persona.role.substring(0, 20) + '...' : persona.role}
+                        </Text>
+                      </Group>
+                    </Menu.Item>
+                  );
+                })}
+              </ScrollArea>
+            </Menu.Dropdown>
+          </Menu>
         </Group>
 
         <Divider orientation="vertical" />

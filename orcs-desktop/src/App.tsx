@@ -1691,6 +1691,40 @@ function App() {
     await changeExecutionStrategy(strategy, { invoke, addMessage });
   };
 
+  const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
+    try {
+      const persona = personas.find(p => p.id === personaId);
+      if (!persona) return;
+
+      if (isChecked) {
+        await invoke('add_participant', { personaId });
+        await handleAndPersistSystemMessage(
+          conversationMessage(`${persona.name} が会話に参加しました`, 'success'),
+          addMessage,
+          invoke
+        );
+      } else {
+        await invoke('remove_participant', { personaId });
+        await handleAndPersistSystemMessage(
+          conversationMessage(`${persona.name} が会話から退出しました`, 'info'),
+          addMessage,
+          invoke
+        );
+      }
+
+      // Refresh personas and sessions
+      await refreshPersonas();
+      await refreshSessions();
+    } catch (error) {
+      console.error(error);
+      await handleAndPersistSystemMessage(
+        conversationMessage(`Failed to update participant: ${error}`, 'error'),
+        addMessage,
+        invoke
+      );
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -2074,6 +2108,7 @@ function App() {
                       onTalkStyleChange={handleTalkStyleChange}
                       onExecutionStrategyChange={handleStrategyChange}
                       onConversationModeChange={handleConversationModeChange}
+                      onToggleParticipant={handleToggleParticipant}
                       onSelectCommand={selectCommand}
                       onSelectAgent={selectAgent}
                       onHoverSuggestion={setSelectedSuggestionIndex}

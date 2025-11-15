@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
 import { handleAndPersistSystemMessage, conversationMessage } from '../../utils/systemMessage';
-import { CONVERSATION_MODES, TALK_STYLES } from '../../types/conversation';
+import { CONVERSATION_MODES, DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, TALK_STYLES } from '../../types/conversation';
 import { MessageType } from '../../types/message';
 
 // Available execution strategies
@@ -140,7 +140,7 @@ export function PersonasList({
       onTalkStyleChange?.(style);
 
       // Show system message
-      const styleLabel = style ? (TALK_STYLES.find(s => s.value === style)?.label || style) : 'None';
+      const styleLabel = style ? (TALK_STYLES.find(s => s.value === style)?.label || style) : DEFAULT_STYLE_LABEL;
       const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
       onMessage && await handleAndPersistSystemMessage(
         conversationMessage(
@@ -444,7 +444,7 @@ export function PersonasList({
           <Select
             size="xs"
             data={[
-              { value: '', label: '❌ None' },
+              { value: '', label: `${DEFAULT_STYLE_ICON} ${DEFAULT_STYLE_LABEL}` },
               ...TALK_STYLES.map(style => ({
                 value: style.value,
                 label: `${style.icon} ${style.label}`,
@@ -452,7 +452,7 @@ export function PersonasList({
             ]}
             value={selectedTalkStyle || ''}
             onChange={handleTalkStyleChange}
-            placeholder="None"
+            placeholder={DEFAULT_STYLE_LABEL}
             clearable
           />
         </Box>

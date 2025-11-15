@@ -49,6 +49,9 @@ export interface TalkStyleOption {
   description: string;
 }
 
+export const DEFAULT_STYLE_ICON: string = '💬';
+export const DEFAULT_STYLE_LABEL: string = '通常';
+
 export const TALK_STYLES: TalkStyleOption[] = [
   {
     value: 'brainstorm',

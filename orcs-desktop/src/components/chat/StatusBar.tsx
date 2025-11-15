@@ -1,7 +1,7 @@
-import { Paper, Group, Badge, Text, Divider, Tooltip } from '@mantine/core';
+import { Paper, Group, Badge, Text, Divider, Tooltip, Menu } from '@mantine/core';
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
-import { getConversationModeOption, getTalkStyleOption } from '../../types/conversation';
+import { DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, getConversationModeOption, getTalkStyleOption, TALK_STYLES } from '../../types/conversation';
 
 interface StatusBarProps {
   status: StatusInfo;
@@ -124,11 +124,25 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
 
         {/* Talk Style */}
         <Divider orientation="vertical" />
-        <Tooltip label={talkStyle ? (getTalkStyleOption(talkStyle as any)?.label || talkStyle) : 'No Talk Style'} withArrow>
-          <Text size="lg" style={{ cursor: 'pointer' }}>
-            {talkStyle ? (getTalkStyleOption(talkStyle as any)?.icon || '💬') : '💬'}
-          </Text>
-        </Tooltip>
+        <Menu position="top" withArrow>
+          <Menu.Target>
+            <Tooltip label={talkStyle ? (getTalkStyleOption(talkStyle as any)?.label || talkStyle) : DEFAULT_STYLE_LABEL} withArrow>
+              <Text size="lg" style={{ cursor: 'pointer' }}>
+                {talkStyle ? (getTalkStyleOption(talkStyle as any)?.icon || DEFAULT_STYLE_ICON) : DEFAULT_STYLE_ICON}
+              </Text>
+            </Tooltip>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Item key={DEFAULT_STYLE_LABEL}>
+              {DEFAULT_STYLE_ICON} {DEFAULT_STYLE_LABEL}
+            </Menu.Item>
+            {TALK_STYLES.map((style) => (
+              <Menu.Item key={style.value}>
+                {style.icon} {style.label}
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
 
         {/* Execution Strategy */}
         <Divider orientation="vertical" />

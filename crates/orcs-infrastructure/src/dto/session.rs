@@ -904,7 +904,9 @@ impl MigratesTo<SessionV2_7_0> for SessionV2_6_0 {
         // Parse string execution_strategy to ExecutionModel
         let execution_strategy = match self.execution_strategy.as_str() {
             "sequential" => ExecutionModel::Sequential,
-            "mentioned" => ExecutionModel::Mentioned,
+            "mentioned" => ExecutionModel::Mentioned {
+                strategy: Default::default(),
+            },
             _ => ExecutionModel::Broadcast,
         };
 

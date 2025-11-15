@@ -593,7 +593,7 @@ impl InteractionManager {
         let mut dialogue = match strategy_model {
             ExecutionModel::Sequential => Dialogue::sequential(),
             ExecutionModel::Broadcast => Dialogue::broadcast(),
-            ExecutionModel::Mentioned => Dialogue::mentioned(),
+            ExecutionModel::Mentioned { .. } => Dialogue::mentioned(),
         };
 
         // Apply context settings
@@ -1021,7 +1021,7 @@ impl InteractionManager {
         let strategy_name = match strategy {
             ExecutionModel::Broadcast => "Broadcast",
             ExecutionModel::Sequential => "Sequential",
-            ExecutionModel::Mentioned => "Mentioned",
+            ExecutionModel::Mentioned { .. } => "Mentioned",
         };
         let system_msg = ConversationMessage {
             role: MessageRole::System,

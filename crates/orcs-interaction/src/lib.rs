@@ -13,6 +13,7 @@ use llm_toolkit::agent::impls::{ClaudeCodeAgent, CodexAgent, GeminiAgent};
 use llm_toolkit::agent::persona::Persona as LlmPersona;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
+use orcs_core::agent::build_enhanced_path;
 use orcs_core::persona::{Persona as PersonaDomain, PersonaBackend};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{
@@ -22,126 +23,9 @@ use orcs_core::session::{
 use orcs_core::user::UserService;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-
-/// Builds an enhanced PATH environment variable that includes workspace-specific tool directories
-/// and system binary paths.
-///
-/// This function combines:
-/// 1. Workspace-local tool directories (node_modules/.bin, .venv/bin, etc.)
-/// 2. System binary paths (from /etc/paths, /etc/paths.d/*, common locations)
-/// 3. Existing PATH entries
-///
-/// This ensures CLI agents have access to both workspace tools and system commands.
-///
-/// # Arguments
-///
-/// * `workspace_root` - The root path of the workspace
-///
-/// # Returns
-///
-/// An enhanced PATH string with all necessary directories
-fn build_enhanced_path(workspace_root: &Path) -> String {
-    let current_path = std::env::var("PATH").unwrap_or_default();
-    let mut path_components = Vec::new();
-
-    // 1. Add workspace-specific tool directories (highest priority)
-    let workspace_tool_dirs = vec![
-        workspace_root.join("node_modules/.bin"), // npm/yarn
-        workspace_root.join(".venv/bin"),         // Python venv
-        workspace_root.join("target/debug"),      // Rust debug builds
-        workspace_root.join("target/release"),    // Rust release builds
-        workspace_root.join("bin"),               // Generic bin
-    ];
-
-    for dir in workspace_tool_dirs {
-        if dir.exists() {
-            if let Some(dir_str) = dir.to_str() {
-                if !path_components.contains(&dir_str.to_string()) {
-                    path_components.push(dir_str.to_string());
-                    tracing::debug!("[build_enhanced_path] Adding workspace tool: {}", dir_str);
-                }
-            }
-        }
-    }
-
-    // 2. Read system paths from /etc/paths (macOS/Linux)
-    #[cfg(unix)]
-    {
-        if let Ok(contents) = std::fs::read_to_string("/etc/paths") {
-            for line in contents.lines() {
-                let trimmed = line.trim();
-                if !trimmed.is_empty() && !path_components.contains(&trimmed.to_string()) {
-                    path_components.push(trimmed.to_string());
-                }
-            }
-        }
-
-        // Read from /etc/paths.d/*
-        if let Ok(entries) = std::fs::read_dir("/etc/paths.d") {
-            for entry in entries.flatten() {
-                if let Ok(contents) = std::fs::read_to_string(entry.path()) {
-                    for line in contents.lines() {
-                        let trimmed = line.trim();
-                        if !trimmed.is_empty() && !path_components.contains(&trimmed.to_string()) {
-                            path_components.push(trimmed.to_string());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // 3. Add common binary locations
-    let common_paths = vec![
-        "/usr/local/bin",
-        "/usr/bin",
-        "/bin",
-        "/usr/sbin",
-        "/sbin",
-        "/opt/homebrew/bin", // Apple Silicon Homebrew
-        "/usr/local/opt",
-    ];
-
-    for path in common_paths {
-        if !path_components.contains(&path.to_string()) {
-            path_components.push(path.to_string());
-        }
-    }
-
-    // 4. Add user's home bin directories
-    if let Ok(home) = std::env::var("HOME") {
-        let home_paths = vec![
-            PathBuf::from(&home).join(".local/bin"),
-            PathBuf::from(&home).join("bin"),
-        ];
-
-        for path in home_paths {
-            if path.exists() {
-                if let Some(path_str) = path.to_str() {
-                    if !path_components.contains(&path_str.to_string()) {
-                        path_components.push(path_str.to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    // 5. Preserve any existing PATH entries that aren't already included
-    if !current_path.is_empty() {
-        for existing in current_path.split(':') {
-            if !existing.is_empty() && !path_components.contains(&existing.to_string()) {
-                path_components.push(existing.to_string());
-            }
-        }
-    }
-
-    let enhanced_path = path_components.join(":");
-    tracing::debug!("[build_enhanced_path] Enhanced PATH: {}", enhanced_path);
-    enhanced_path
-}
 
 /// Converts a Persona domain model to llm-toolkit Persona.
 ///

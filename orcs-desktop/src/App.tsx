@@ -14,7 +14,10 @@ import {
   CloseButton,
   Paper,
   Loader,
+  ActionIcon,
+  Tooltip,
 } from "@mantine/core";
+import { IconPlus } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import "./App.css";
 import { Message, MessageType, StreamingDialogueTurn } from "./types/message";
@@ -1980,7 +1983,7 @@ function App() {
                 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
               >
-                <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
+                <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap', display: 'flex', alignItems: 'center' }}>
                   {visibleTabs.map((tab) => (
                     <Tabs.Tab
                       key={tab.id}
@@ -2082,6 +2085,21 @@ function App() {
                       </Text>
                     </Tabs.Tab>
                   ))}
+
+                  {/* 新規セッション追加ボタン */}
+                  <Tooltip label="New Session" withArrow>
+                    <ActionIcon
+                      variant="subtle"
+                      color="blue"
+                      size="md"
+                      onClick={async () => {
+                        await createSession(workspace?.id);
+                      }}
+                      style={{ marginLeft: '8px' }}
+                    >
+                      <IconPlus size={16} />
+                    </ActionIcon>
+                  </Tooltip>
                 </Tabs.List>
 
                 {visibleTabs.map((tab) => (

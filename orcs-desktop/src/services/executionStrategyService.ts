@@ -11,7 +11,6 @@ import { handleAndPersistSystemMessage, conversationMessage } from '../utils/sys
 export interface ExecutionStrategyServiceDependencies {
   invoke: <T>(cmd: string, args?: InvokeArgs) => Promise<T>;
   addMessage: (type: MessageType, author: string, text: string) => void;
-  onRefreshSessions?: () => Promise<void>;
 }
 
 /**
@@ -21,16 +20,11 @@ export async function changeExecutionStrategy(
   strategy: string,
   deps: ExecutionStrategyServiceDependencies
 ): Promise<void> {
-  const { invoke, addMessage, onRefreshSessions } = deps;
+  const { invoke, addMessage } = deps;
 
   try {
     // Update backend
     await invoke('set_execution_strategy', { strategy });
-
-    // Refresh sessions to update execution_strategy field
-    if (onRefreshSessions) {
-      await onRefreshSessions();
-    }
 
     // Show system message
     const strategyLabel = EXECUTION_STRATEGIES.find(s => s.value === strategy)?.label || strategy;

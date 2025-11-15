@@ -1683,7 +1683,7 @@ function App() {
     setExecutionStrategy(strategy);
 
     // Delegate to service layer
-    await changeExecutionStrategy(strategy, { invoke, addMessage, onRefreshSessions: refreshSessions });
+    await changeExecutionStrategy(strategy, { invoke, addMessage });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

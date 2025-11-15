@@ -2018,6 +2018,18 @@ function App() {
                           visibleTabs.length > 1 ? (
                             <CloseButton
                               size="xs"
+                              aria-label="Close tab"
+                              style={{
+                                color: '#868e96',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#dee2e6';
+                                e.currentTarget.style.color = '#212529';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                                e.currentTarget.style.color = '#868e96';
+                              }}
                               onClick={async (e) => {
                                 console.log('[App] CloseButton clicked:', {
                                   tabId: tab.id,

@@ -22,7 +22,7 @@ import { useDisclosure } from '@mantine/hooks';
 import "./App.css";
 import { Message, MessageType, StreamingDialogueTurn } from "./types/message";
 import { StatusInfo, getDefaultStatus } from "./types/status";
-import { Task } from "./types/task";
+import { Task, TaskProgress, TaskStatus } from "./types/task";
 import { Agent } from "./types/agent";
 import { Session } from "./types/session";
 import { GitInfo } from "./types/git";
@@ -64,6 +64,7 @@ function App() {
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskProgress, setTaskProgress] = useState<Map<string, TaskProgress>>(new Map());
   const [userNickname, setUserNickname] = useState<string>('You');
   const [userProfile, setUserProfile] = useState<{ nickname: string; background: string } | null>(null);
   const [gitInfo, setGitInfo] = useState<GitInfo>({
@@ -672,27 +673,143 @@ function App() {
   // Listen for task events (real-time task status updates)
   useEffect(() => {
     console.log('[App] Setting up task-event listener');
-    const unlisten = listen<any>('task-event', async (event) => {
-      console.log('[App] task-event received:', event.payload);
-      const payload = event.payload;
-      console.log('[App] Event details - target:', payload.target, 'level:', payload.level, 'message:', payload.message);
-      console.log('[App] Event fields:', payload.fields);
+    let unlistenFn: (() => void) | null = null;
 
-      // Refresh task list to show updated status
-      console.log('[App] Refreshing tasks...');
-      await refreshTasks();
-      console.log('[App] Tasks refreshed');
-    });
+    (async () => {
+      unlistenFn = await listen<any>('task-event', async (event) => {
+      const payload = event.payload;
+
+      // Filter by event_type: Only process manually-sent task lifecycle events
+      const isTaskLifecycleEvent = payload.event_type === 'task_lifecycle';
+      const isOrchestratorEvent = payload.target?.includes('llm_toolkit') || payload.target?.includes('parallel_orchestrator');
+
+      if (!isTaskLifecycleEvent && !isOrchestratorEvent) {
+        // Skip auto-generated tracing events (event_type is null/undefined)
+        return;
+      }
+
+      // Extract task_id from fields
+      const taskId = payload.fields?.task_id;
+      const status = payload.fields?.status;
+
+      // Check for TaskExecutor lifecycle events by event_type marker
+      if (isTaskLifecycleEvent && taskId && payload.fields && status) {
+        // Manual events from TaskExecutor - update task list directly from event fields
+        console.log(`[App] 🎯 TaskExecutor lifecycle event: "${payload.message}", task_id: ${taskId}, status: ${status}`);
+
+        if (payload.fields) {
+          // Update task list optimistically from event fields (has all Task data)
+          setTasks((prevTasks) => {
+            const existingIndex = prevTasks.findIndex(t => t.id === taskId);
+
+            // Build updated task from event fields
+            const updatedTask: Task = {
+              id: payload.fields.task_id,
+              session_id: payload.fields.session_id,
+              title: payload.fields.title || '',
+              description: payload.fields.description || '',
+              status: payload.fields.status as TaskStatus,
+              created_at: payload.fields.created_at,
+              updated_at: payload.fields.updated_at,
+              completed_at: payload.fields.completed_at,
+              steps_executed: payload.fields.steps_executed || 0,
+              steps_skipped: payload.fields.steps_skipped || 0,
+              context_keys: payload.fields.context_keys || 0,
+              error: payload.fields.error,
+              result: payload.fields.result,
+              execution_details: payload.fields.execution_details,
+            };
+
+            if (existingIndex >= 0) {
+              // Update existing task
+              const newTasks = [...prevTasks];
+              newTasks[existingIndex] = updatedTask;
+              return newTasks;
+            } else {
+              // Add new task
+              return [updatedTask, ...prevTasks];
+            }
+          });
+        }
+
+        // Clear progress for completed/failed tasks
+        if (taskId && (status === 'Completed' || status === 'Failed')) {
+          setTaskProgress((prev) => {
+            const next = new Map(prev);
+            next.delete(taskId);
+            return next;
+          });
+        }
+      } else if (taskId) {
+        // TaskExecutor events with task_id
+        const status = payload.fields?.status;
+
+        // Task completed or failed - refresh from backend (redundant with above, but safe)
+        if (status === 'Completed' || status === 'Failed') {
+          console.log('[App] Task finished (from status field), refreshing from backend...');
+          await refreshTasks();
+
+          // Clear progress for this task
+          setTaskProgress((prev) => {
+            const next = new Map(prev);
+            next.delete(taskId);
+            return next;
+          });
+        } else {
+          // Optimistic update - extract progress info from event
+          setTaskProgress((prev) => {
+            const next = new Map(prev);
+            const progress: TaskProgress = {
+              task_id: taskId,
+              current_wave: payload.fields?.wave_number,
+              current_step: payload.fields?.step_id,
+              current_agent: payload.fields?.agent,
+              last_message: payload.message,
+              last_updated: Date.now(),
+            };
+            next.set(taskId, progress);
+            return next;
+          });
+        }
+      } else if (payload.target?.includes('llm_toolkit') || payload.target?.includes('parallel_orchestrator')) {
+        // ParallelOrchestrator internal events (no task_id) - extract from running tasks
+        // Find the currently running task and update its progress
+        const runningTask = tasks.find(t => t.status === 'Running');
+
+        if (runningTask) {
+          setTaskProgress((prev) => {
+            const next = new Map(prev);
+            const progress: TaskProgress = {
+              task_id: runningTask.id,
+              current_wave: payload.fields?.wave_number,
+              current_step: payload.fields?.step_id,
+              current_agent: payload.fields?.agent,
+              last_message: payload.message,
+              last_updated: Date.now(),
+            };
+            next.set(runningTask.id, progress);
+            return next;
+          });
+        }
+      }
+      });
+      console.log('[App] task-event listener registered successfully');
+    })();
 
     return () => {
       console.log('[App] Cleaning up task-event listener');
-      unlisten.then(fn => fn());
+      if (unlistenFn) {
+        unlistenFn();
+      }
     };
   }, [refreshTasks]);
 
   // Listen for workspace-switched events to refresh workspace data and Git info
   useEffect(() => {
-    const unlistenPromise = listen<string>('workspace-switched', async () => {
+    let unlistenFn: (() => void) | null = null;
+
+    (async () => {
+      unlistenFn = await listen<string>('workspace-switched', async () => {
       if (workspaceSwitchingRef.current) {
         console.log('[App] workspace-switched event ignored (refresh already in progress)');
         return;
@@ -760,10 +877,14 @@ function App() {
       } finally {
         workspaceSwitchingRef.current = false;
       }
-    });
+      });
+      console.log('[App] workspace-switched listener registered successfully');
+    })();
 
     return () => {
-      unlistenPromise.then(fn => fn());
+      if (unlistenFn) {
+        unlistenFn();
+      }
     };
   }, [refreshWorkspace, refreshWorkspaces, refreshSessions, switchWorkspaceTabs, openTab, switchToTab, getTabBySessionId, userNickname]);
 
@@ -1850,6 +1971,7 @@ function App() {
           onMoveSortOrder={handleMoveSortOrder}
           onNewSession={handleNewSession}
           tasks={tasks}
+          taskProgress={taskProgress}
           onTaskToggle={handleTaskToggle}
           onTaskDelete={handleTaskDelete}
           onRefreshTasks={refreshTasks}

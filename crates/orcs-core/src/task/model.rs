@@ -6,6 +6,7 @@
 use llm_toolkit::orchestrator::StrategyMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use version_migrate::DeriveQueryable as Queryable;
 
 /// Represents the current status of a task in the orchestration system.
@@ -21,6 +22,20 @@ pub enum TaskStatus {
     Completed,
     /// The task failed during execution.
     Failed,
+}
+
+impl TaskStatus {
+    /// Returns the string representation of the task status.
+    ///
+    /// This is equivalent to calling `.to_string()` via the Display trait.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TaskStatus::Pending => "Pending",
+            TaskStatus::Running => "Running",
+            TaskStatus::Completed => "Completed",
+            TaskStatus::Failed => "Failed",
+        }
+    }
 }
 
 /// A serializable representation of orchestration results.
@@ -150,6 +165,34 @@ pub enum StepStatus {
     Skipped,
     /// Step failed with error
     Failed,
+}
+
+impl fmt::Display for StepStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status_str = match self {
+            StepStatus::Pending => "Pending",
+            StepStatus::Running => "Running",
+            StepStatus::Completed => "Completed",
+            StepStatus::Skipped => "Skipped",
+            StepStatus::Failed => "Failed",
+        };
+        write!(f, "{}", status_str)
+    }
+}
+
+impl StepStatus {
+    /// Returns the string representation of the step status.
+    ///
+    /// This is equivalent to calling `.to_string()` via the Display trait.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            StepStatus::Pending => "Pending",
+            StepStatus::Running => "Running",
+            StepStatus::Completed => "Completed",
+            StepStatus::Skipped => "Skipped",
+            StepStatus::Failed => "Failed",
+        }
+    }
 }
 
 /// Detailed execution information for a task.

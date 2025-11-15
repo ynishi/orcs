@@ -1,23 +1,23 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, Badge, Switch } from '@mantine/core';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import { Task, getTaskIcon } from '../../types/task';
+import { Task, TaskProgress, getTaskIcon } from '../../types/task';
 import { Session } from '../../types/session';
 import { Workspace } from '../../types/workspace';
 import { useState } from 'react';
 
 interface TaskListProps {
   tasks: Task[];
+  taskProgress?: Map<string, TaskProgress>;
   sessions?: Session[];
   workspaces?: Workspace[];
   currentWorkspaceId?: string;
   onTaskToggle?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
-  onRefresh?: () => void;
   onSaveToWorkspace?: (task: Task) => Promise<void>;
 }
 
-export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTaskDelete, onRefresh, onSaveToWorkspace }: TaskListProps) {
+export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWorkspaceId, onTaskDelete, onSaveToWorkspace }: TaskListProps) {
   const [filterCurrentWorkspace, setFilterCurrentWorkspace] = useState(false);
 
   // Get workspace info for a task
@@ -36,7 +36,7 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
       })
     : tasks;
 
-  const activeTasks = filteredTasks.filter(t => t.status === 'Running' || t.status === 'Pending');
+  const activeTasks = filteredTasks.filter(t => t.status === 'Running' || t.status === 'Pending' || t.status === 'Planning');
   const completedTasks = filteredTasks.filter(t => t.status === 'Completed');
   const failedTasks = filteredTasks.filter(t => t.status === 'Failed');
 
@@ -88,6 +88,7 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
 
   const renderTask = (task: Task) => {
     const workspace = getTaskWorkspace(task);
+    const progress = taskProgress?.get(task.id);
 
     return (
       <Box
@@ -174,7 +175,7 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
             <Box style={{ flex: 1, minWidth: 0 }}>
               <Text
                 size="sm"
-                fw={task.status === 'Running' ? 600 : 400}
+                fw={task.status === 'Running' || task.status === 'Planning' ? 600 : 400}
                 style={{
                   textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
                   color: task.status === 'Completed' ? '#868e96' : task.status === 'Failed' ? '#fa5252' : undefined,
@@ -182,7 +183,63 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
               >
                 {task.title}
               </Text>
+
+              {/* Planning状態の表示 */}
+              {task.status === 'Planning' && (
+                <Box mt={4} p={4} style={{ backgroundColor: '#e3fafc', borderRadius: '4px' }}>
+                  <Text size="xs" c="cyan" fw={500}>
+                    📋 Generating execution strategy...
+                  </Text>
+                </Box>
+              )}
+
+              {/* リアルタイム進捗表示 (Running中のみ) */}
+              {true && progress && (
+                <Box mt={4} p={4} style={{ backgroundColor: '#e7f5ff', borderRadius: '4px' }}>
+                  <Stack gap={2}>
+                    {progress.current_wave !== undefined && (
+                      <Text size="xs" c="blue" fw={500}>
+                        Wave {progress.current_wave}
+                      </Text>
+                    )}
+                    {progress.current_step && (
+                      <Text size="xs" c="dimmed">
+                        Step: {progress.current_step}
+                      </Text>
+                    )}
+                    {progress.current_agent && (
+                      <Text size="xs" c="dimmed">
+                        Agent: {progress.current_agent}
+                      </Text>
+                    )}
+                    {progress.last_message && (
+                      <Text size="xs" c="dimmed" lineClamp={1}>
+                        {progress.last_message}
+                      </Text>
+                    )}
+                  </Stack>
+                </Box>
+              )}
+
               <Group gap="xs" mt={4}>
+                {/* Status Badge for active tasks */}
+                {(task.status === 'Pending' || task.status === 'Planning' || task.status === 'Running') && (
+                  <>
+                    <Badge
+                      size="xs"
+                      variant="dot"
+                      color={
+                        task.status === 'Pending' ? 'gray' :
+                        task.status === 'Planning' ? 'cyan' :
+                        'blue'
+                      }
+                    >
+                      {task.status}
+                    </Badge>
+                    {workspace && <Text size="xs" c="dimmed">•</Text>}
+                  </>
+                )}
+
                 {workspace && (
                   <>
                     <Badge size="xs" variant="light" color="blue">
@@ -191,9 +248,18 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
                     <Text size="xs" c="dimmed">•</Text>
                   </>
                 )}
-                <Text size="xs" c="dimmed">
-                  {task.steps_executed} steps
-                </Text>
+
+                {/* Progress display: show live progress for running tasks */}
+                {task.status === 'Running' && progress?.current_wave !== undefined ? (
+                  <Text size="xs" c="blue" fw={500}>
+                    Wave {progress.current_wave}
+                  </Text>
+                ) : (
+                  <Text size="xs" c="dimmed">
+                    {task.steps_executed} {task.steps_executed === 1 ? 'step' : 'steps'}
+                  </Text>
+                )}
+
                 <Text size="xs" c="dimmed">•</Text>
                 <Text size="xs" c="dimmed">
                   {formatDate(task.updated_at)}
@@ -213,21 +279,9 @@ export function TaskList({ tasks, sessions, workspaces, currentWorkspaceId, onTa
         <Text size="lg" fw={700}>
           Tasks
         </Text>
-        <Group gap="xs">
-          <Text size="sm" c="dimmed">
-            {activeTasks.length} active
-          </Text>
-          <Tooltip label="Refresh tasks" withArrow>
-            <ActionIcon
-              color="blue"
-              variant="light"
-              onClick={onRefresh}
-              size="xs"
-            >
-              🔄
-            </ActionIcon>
-          </Tooltip>
-        </Group>
+        <Text size="sm" c="dimmed">
+          {activeTasks.length} active
+        </Text>
       </Group>
 
       {/* フィルタオプション */}

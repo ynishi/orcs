@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ScrollArea, Box, Stack, Text } from '@mantine/core';
 import { Session } from '../../types/session';
-import { Task } from '../../types/task';
+import { Task, TaskProgress } from '../../types/task';
 import { MessageType } from '../../types/message';
 import { Workspace } from '../../types/workspace';
 import { SessionList } from '../sessions/SessionList';
@@ -28,6 +28,7 @@ interface NavbarProps {
 
   // Tasks
   tasks: Task[];
+  taskProgress?: Map<string, TaskProgress>;
   onTaskToggle: (taskId: string) => void;
   onTaskDelete: (taskId: string) => void;
   onRefreshTasks: () => void;
@@ -72,6 +73,7 @@ export function Navbar({
   onMoveSortOrder,
   onNewSession,
   tasks,
+  taskProgress,
   onTaskToggle,
   onTaskDelete,
   onRefreshTasks,
@@ -188,6 +190,7 @@ export function Navbar({
           {activeTab === 'tasks' && (
             <TaskList
               tasks={tasks}
+              taskProgress={taskProgress}
               sessions={sessions}
               workspaces={workspaces}
               currentWorkspaceId={currentWorkspaceId}

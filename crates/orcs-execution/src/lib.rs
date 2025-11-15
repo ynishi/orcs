@@ -172,36 +172,21 @@ impl TaskExecutor {
         let task_id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
 
-        // Generate title using utility service if available, otherwise fallback
-        let title = if let Some(utility) = &self.utility_service {
-            utility
-                .generate_task_title(&message_content)
-                .await
-                .unwrap_or_else(|e| {
-                    tracing::warn!("Failed to generate task title: {}, using fallback", e);
-                    message_content
-                        .chars()
-                        .take(100)
-                        .collect::<String>()
-                        .trim()
-                        .to_string()
-                })
-        } else {
-            message_content
-                .chars()
-                .take(100)
-                .collect::<String>()
-                .trim()
-                .to_string()
-        };
+        // Use fallback title immediately for fast UI display
+        let fallback_title = message_content
+            .chars()
+            .take(100)
+            .collect::<String>()
+            .trim()
+            .to_string();
 
-        // Create initial task record
+        // Create initial task record with Pending status and fallback title
         let mut task = Task {
             id: task_id.clone(),
             session_id,
-            title,
+            title: fallback_title.clone(),  // Temporary title
             description: message_content.clone(),
-            status: TaskStatus::Running,
+            status: TaskStatus::Pending,
             created_at: now.clone(),
             updated_at: now.clone(),
             completed_at: None,
@@ -213,34 +198,62 @@ impl TaskExecutor {
             execution_details: None,
         };
 
-        // Save initial task record if repository is available
+        // 🚀 STEP 1: Save immediately with Pending status (for instant UI display)
         if let Some(repo) = &self.task_repository {
             if let Err(e) = repo.save(&task).await {
                 tracing::warn!("Failed to save initial task record: {}", e);
             }
         }
 
-        // Send task started event
+        // Send task created event
         if let Some(sender) = &self.event_sender {
-            let event = tracing_layer::OrchestratorEvent {
-                target: "orcs_execution::task_executor".to_string(),
-                level: "INFO".to_string(),
-                message: "Task execution started".to_string(),
-                fields: serde_json::json!({
-                    "task_id": &task_id,
-                    "session_id": &task.session_id,
-                    "title": &task.title,
+            let event = tracing_layer::OrchestratorEventBuilder::info_from_task("Task created", &task)
+                .build();
+            match sender.send(event) {
+                Ok(_) => eprintln!("[TaskExecutor] Event sent successfully"),
+                Err(e) => eprintln!("[TaskExecutor] Failed to send event: {:?}", e),
+            }
+            tokio::task::yield_now().await;
+        }
+
+        // 📝 STEP 2: Generate better title using LLM (can take time, but doesn't block UI)
+        let generated_title = if let Some(utility) = &self.utility_service {
+            utility
+                .generate_task_title(&message_content)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::warn!("Failed to generate task title: {}, using fallback", e);
+                    fallback_title.clone()
                 })
-                .as_object()
-                .unwrap()
-                .clone()
-                .into_iter()
-                .map(|(k, v)| (k, v))
-                .collect(),
-                span: std::collections::HashMap::new(),
-                timestamp: chrono::Utc::now().to_rfc3339(),
-            };
-            let _ = sender.send(event);
+        } else {
+            fallback_title.clone()
+        };
+
+        // Update title (keep Pending status until Planning phase starts)
+        task.title = generated_title;
+        task.updated_at = chrono::Utc::now().to_rfc3339();
+
+        if let Some(repo) = &self.task_repository {
+            if let Err(e) = repo.save(&task).await {
+                tracing::warn!("Failed to update task title: {}", e);
+            }
+        }
+
+        task.status = TaskStatus::Running;
+        task.updated_at = chrono::Utc::now().to_rfc3339();
+        if let Some(repo) = &self.task_repository {
+            if let Err(e) = repo.save(&task).await {
+                tracing::warn!("Failed to update task to Running: {}", e);
+            }
+        }
+
+        if let Some(sender) = &self.event_sender {
+            let event = tracing_layer::OrchestratorEventBuilder::info_from_task("Task execution started", &task)
+                .build();
+            match sender.send(event) {
+                Ok(_) => eprintln!("[TaskExecutor] Event sent successfully"),
+                Err(e) => eprintln!("[TaskExecutor] Failed to send event: {:?}", e),
+            }
         }
 
         // Create a blueprint using the message content as the workflow description
@@ -335,27 +348,12 @@ impl TaskExecutor {
 
             // Send task completed event
             if let Some(sender) = &self.event_sender {
-                let event = tracing_layer::OrchestratorEvent {
-                    target: "orcs_execution::task_executor".to_string(),
-                    level: "INFO".to_string(),
-                    message: "Task execution completed".to_string(),
-                    fields: serde_json::json!({
-                        "task_id": &task_id,
-                        "session_id": &task.session_id,
-                        "status": "Completed",
-                        "steps_executed": task.steps_executed,
-                        "steps_skipped": task.steps_skipped,
-                    })
-                    .as_object()
-                    .unwrap()
-                    .clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, v))
-                    .collect(),
-                    span: std::collections::HashMap::new(),
-                    timestamp: chrono::Utc::now().to_rfc3339(),
-                };
-                let _ = sender.send(event);
+                let event = tracing_layer::OrchestratorEventBuilder::info_from_task("Task execution completed", &task)
+                    .build();
+                match sender.send(event) {
+                    Ok(_) => eprintln!("[TaskExecutor] Event sent successfully"),
+                    Err(e) => eprintln!("[TaskExecutor] Failed to send event: {:?}", e),
+                }
             }
 
             Ok(result_text)
@@ -380,28 +378,12 @@ impl TaskExecutor {
 
             // Send task failed event
             if let Some(sender) = &self.event_sender {
-                let event = tracing_layer::OrchestratorEvent {
-                    target: "orcs_execution::task_executor".to_string(),
-                    level: "ERROR".to_string(),
-                    message: "Task execution failed".to_string(),
-                    fields: serde_json::json!({
-                        "task_id": &task_id,
-                        "session_id": &task.session_id,
-                        "status": "Failed",
-                        "error": &error_msg,
-                        "steps_executed": task.steps_executed,
-                        "steps_skipped": task.steps_skipped,
-                    })
-                    .as_object()
-                    .unwrap()
-                    .clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, v))
-                    .collect(),
-                    span: std::collections::HashMap::new(),
-                    timestamp: chrono::Utc::now().to_rfc3339(),
-                };
-                let _ = sender.send(event);
+                let event = tracing_layer::OrchestratorEventBuilder::error_from_task("Task execution failed", &task)
+                    .build();
+                match sender.send(event) {
+                    Ok(_) => eprintln!("[TaskExecutor] Event sent successfully"),
+                    Err(e) => eprintln!("[TaskExecutor] Failed to send event: {:?}", e),
+                }
             }
 
             Err(OrcsError::Execution(format!(

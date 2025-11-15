@@ -1983,7 +1983,7 @@ function App() {
                 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
               >
-                <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap', display: 'flex', alignItems: 'center' }}>
+                <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {visibleTabs.map((tab) => (
                     <Tabs.Tab
                       key={tab.id}
@@ -1991,6 +1991,7 @@ function App() {
                       style={{
                         minWidth: '120px',
                         maxWidth: '200px',
+                        flexShrink: 0,
                       }}
                       leftSection={tab.isDirty ? '●' : undefined}
                         rightSection={

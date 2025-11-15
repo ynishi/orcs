@@ -86,6 +86,62 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
     }
   };
 
+  const handleDownloadStrategy = (task: Task) => {
+    if (!task.strategy) return;
+
+    try {
+      const blob = new Blob([task.strategy], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `task-${task.id}-strategy.json`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      notifications.show({
+        title: 'Downloaded!',
+        message: 'Strategy downloaded successfully',
+        color: 'green',
+        autoClose: 2000,
+      });
+    } catch (error) {
+      console.error('Failed to download strategy:', error);
+      notifications.show({
+        title: 'Failed to Download',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  const handleDownloadJournalLog = (task: Task) => {
+    if (!task.journal_log) return;
+
+    try {
+      const blob = new Blob([task.journal_log], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `task-${task.id}-journal.log`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      notifications.show({
+        title: 'Downloaded!',
+        message: 'Journal log downloaded successfully',
+        color: 'green',
+        autoClose: 2000,
+      });
+    } catch (error) {
+      console.error('Failed to download journal log:', error);
+      notifications.show({
+        title: 'Failed to Download',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
   const renderTask = (task: Task) => {
     const workspace = getTaskWorkspace(task);
     const progress = taskProgress?.get(task.id);
@@ -134,6 +190,40 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
                 }}
               >
                 📋
+              </ActionIcon>
+            </Tooltip>
+          )}
+
+          {/* Strategyダウンロードボタン */}
+          {task.strategy && (
+            <Tooltip label="Download Strategy" withArrow>
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="violet"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownloadStrategy(task);
+                }}
+              >
+                📊
+              </ActionIcon>
+            </Tooltip>
+          )}
+
+          {/* JournalLogダウンロードボタン */}
+          {task.journal_log && (
+            <Tooltip label="Download Journal Log" withArrow>
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="grape"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownloadJournalLog(task);
+                }}
+              >
+                📜
               </ActionIcon>
             </Tooltip>
           )}

@@ -21,6 +21,8 @@ export interface Task {
   error?: string;
   result?: string;
   execution_details?: ExecutionDetails;
+  strategy?: string;
+  journal_log?: string;
 }
 
 /**

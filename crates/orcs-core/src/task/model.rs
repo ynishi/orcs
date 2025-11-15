@@ -244,4 +244,10 @@ pub struct Task {
     /// Detailed execution information
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_details: Option<ExecutionDetails>,
+    /// Execution strategy (JSON string from ParallelOrchestrator)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<String>,
+    /// Journal log (execution trace from ParallelOrchestrator)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub journal_log: Option<String>,
 }

@@ -196,6 +196,8 @@ impl TaskExecutor {
             error: None,
             result: None,
             execution_details: None,
+            strategy: None,
+            journal_log: None,
         };
 
         // 🚀 STEP 1: Save immediately with Pending status (for instant UI display)

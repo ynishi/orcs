@@ -172,6 +172,12 @@ pub struct TaskV1_0_0 {
     /// Detailed execution information.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_details: Option<ExecutionDetailsDTO>,
+    /// Execution strategy (JSON string from ParallelOrchestrator).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<String>,
+    /// Journal log (execution trace from ParallelOrchestrator).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub journal_log: Option<String>,
 }
 
 // ============================================================================
@@ -210,6 +216,8 @@ impl IntoDomain<Task> for TaskV1_0_0 {
             error: self.error,
             result: self.result,
             execution_details: self.execution_details.map(Into::into),
+            strategy: self.strategy,
+            journal_log: self.journal_log,
         }
     }
 }
@@ -232,6 +240,8 @@ impl version_migrate::FromDomain<Task> for TaskV1_0_0 {
             error: task.error,
             result: task.result,
             execution_details: task.execution_details.map(Into::into),
+            strategy: task.strategy,
+            journal_log: task.journal_log,
         }
     }
 }

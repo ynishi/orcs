@@ -68,9 +68,7 @@ pub fn build_enhanced_path(workspace_root: &Path) -> String {
                 if let Ok(contents) = std::fs::read_to_string(entry.path()) {
                     for line in contents.lines() {
                         let trimmed = line.trim();
-                        if !trimmed.is_empty()
-                            && !path_components.contains(&trimmed.to_string())
-                        {
+                        if !trimmed.is_empty() && !path_components.contains(&trimmed.to_string()) {
                             path_components.push(trimmed.to_string());
                         }
                     }

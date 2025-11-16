@@ -132,6 +132,8 @@ mod tests {
             error: None,
             result: Some("Task completed successfully".to_string()),
             execution_details: None,
+            strategy: None,
+            journal_log: None,
         }
     }
 

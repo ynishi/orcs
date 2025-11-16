@@ -104,7 +104,6 @@ impl PersonaBackend {
                     .with_description("Execute ORCS tasks: multi-step orchestration workflows with specialized agents"),
                 Capability::new("slashCommand:execute")
                     .with_description("Execute ORCS slash commands: invoke built-in & user-defined operations"),
-                
             ]
         } else {
             // API backends: read-only, remote access

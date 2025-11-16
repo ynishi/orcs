@@ -59,20 +59,14 @@ where
         if let Some(span_id) = ctx.current_span().id() {
             if let Some(span) = ctx.span(span_id) {
                 let metadata = span.metadata();
-                span_fields.insert(
-                    "span_name".to_string(),
-                    serde_json::json!(metadata.name()),
-                );
+                span_fields.insert("span_name".to_string(), serde_json::json!(metadata.name()));
             }
         }
 
         // Extract wave_number from message if present
         // Message format: "Executing wave 2 with 3 steps"
         let wave_number = {
-            let message_str = fields
-                .get("message")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let message_str = fields.get("message").and_then(|v| v.as_str()).unwrap_or("");
 
             if message_str.contains("Executing wave ") {
                 message_str
@@ -170,24 +164,48 @@ impl OrchestratorEventBuilder {
 
         // Core identifiers
         fields.insert("task_id".to_string(), serde_json::json!(&task.id));
-        fields.insert("session_id".to_string(), serde_json::json!(&task.session_id));
+        fields.insert(
+            "session_id".to_string(),
+            serde_json::json!(&task.session_id),
+        );
 
         // Task metadata
         fields.insert("title".to_string(), serde_json::json!(&task.title));
-        fields.insert("description".to_string(), serde_json::json!(&task.description));
-        fields.insert("status".to_string(), serde_json::json!(task.status.as_str()));
+        fields.insert(
+            "description".to_string(),
+            serde_json::json!(&task.description),
+        );
+        fields.insert(
+            "status".to_string(),
+            serde_json::json!(task.status.as_str()),
+        );
 
         // Timestamps
-        fields.insert("created_at".to_string(), serde_json::json!(&task.created_at));
-        fields.insert("updated_at".to_string(), serde_json::json!(&task.updated_at));
+        fields.insert(
+            "created_at".to_string(),
+            serde_json::json!(&task.created_at),
+        );
+        fields.insert(
+            "updated_at".to_string(),
+            serde_json::json!(&task.updated_at),
+        );
         if let Some(ref completed_at) = task.completed_at {
             fields.insert("completed_at".to_string(), serde_json::json!(completed_at));
         }
 
         // Execution metrics
-        fields.insert("steps_executed".to_string(), serde_json::json!(task.steps_executed));
-        fields.insert("steps_skipped".to_string(), serde_json::json!(task.steps_skipped));
-        fields.insert("context_keys".to_string(), serde_json::json!(task.context_keys));
+        fields.insert(
+            "steps_executed".to_string(),
+            serde_json::json!(task.steps_executed),
+        );
+        fields.insert(
+            "steps_skipped".to_string(),
+            serde_json::json!(task.steps_skipped),
+        );
+        fields.insert(
+            "context_keys".to_string(),
+            serde_json::json!(task.context_keys),
+        );
 
         // Optional fields
         if let Some(ref error) = task.error {
@@ -253,8 +271,10 @@ impl OrchestratorEventBuilder {
 
     /// Adds a custom field (for advanced use cases).
     pub fn field(mut self, key: impl Into<String>, value: impl serde::Serialize) -> Self {
-        self.fields
-            .insert(key.into(), serde_json::to_value(value).unwrap_or(Value::Null));
+        self.fields.insert(
+            key.into(),
+            serde_json::to_value(value).unwrap_or(Value::Null),
+        );
         self
     }
 

@@ -59,16 +59,12 @@ impl CreatePersonaRequest {
 
         // Validate background (min 10 chars)
         if self.background.trim().len() < 10 {
-            return Err(
-                "Background must be at least 10 characters long".to_string()
-            );
+            return Err("Background must be at least 10 characters long".to_string());
         }
 
         // Validate communication_style (min 10 chars)
         if self.communication_style.trim().len() < 10 {
-            return Err(
-                "Communication style must be at least 10 characters long".to_string()
-            );
+            return Err("Communication style must be at least 10 characters long".to_string());
         }
 
         Ok(())

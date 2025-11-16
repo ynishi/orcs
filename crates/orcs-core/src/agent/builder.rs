@@ -128,8 +128,7 @@ mod tests {
 
     #[test]
     fn test_agent_builder_clone() {
-        let builder = AgentBuilder::new()
-            .with_workspace(PathBuf::from("/test/workspace"));
+        let builder = AgentBuilder::new().with_workspace(PathBuf::from("/test/workspace"));
 
         let cloned = builder.clone();
         let config1 = builder.build();

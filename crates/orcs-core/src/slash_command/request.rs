@@ -63,7 +63,10 @@ impl CreateSlashCommandRequest {
 
         // Command name should not start with slash
         if self.name.starts_with('/') {
-            return Err("Command name should not start with '/' (it will be added automatically)".to_string());
+            return Err(
+                "Command name should not start with '/' (it will be added automatically)"
+                    .to_string(),
+            );
         }
 
         // Validate description

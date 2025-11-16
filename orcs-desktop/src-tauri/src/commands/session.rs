@@ -320,9 +320,7 @@ pub async fn publish_session_event(
 
 /// Custom command information (Task/Prompt/Shell)
 #[derive(Debug, Clone, Serialize, ToPrompt)]
-#[prompt(
-    template = r#"- `/{{ name }}`{% if args %} {{ args }}{% endif %}: {{ description }}"#
-)]
+#[prompt(template = r#"- `/{{ name }}`{% if args %} {{ args }}{% endif %}: {{ description }}"#)]
 struct CustomCommandInfo {
     name: String,
     description: String,
@@ -340,8 +338,7 @@ impl From<&SlashCommand> for CustomCommandInfo {
 }
 
 #[derive(Debug, Clone, Serialize, ToPrompt)]
-#[prompt(
-    template = r#"# Slash Commands - Execution Guide
+#[prompt(template = r#"# Slash Commands - Execution Guide
 
 You are authorized to execute slash commands to accomplish user tasks. When you identify that a slash command would help complete the task, **you MUST execute it immediately**.
 
@@ -417,8 +414,7 @@ You are authorized to execute slash commands to accomplish user tasks. When you 
 
 **Example 3: Getting help**
 /help task
-"#
-)]
+"#)]
 struct SlashCommandPromptDto {
     builtin_commands: Vec<BuiltInCommand>,
     task_commands: Vec<CustomCommandInfo>,
@@ -427,14 +423,12 @@ struct SlashCommandPromptDto {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, ToPrompt)]
-#[prompt(
-    template = r#"
+#[prompt(template = r#"
 - `/{{ name }}` (`{{ usage }}`): {{ description }}
 {%- if args %}
   - Args: {{ args }}
 {%- endif %}
-"#
-)]
+"#)]
 struct BuiltInCommand {
     usage: &'static str,
     description: &'static str,
@@ -521,7 +515,9 @@ const BUILT_IN_COMMANDS: &[(&str, BuiltInCommand)] = &[
         BuiltInCommand {
             usage: "/create-persona <json>",
             description: "Create a new persona from JSON definition (UUID auto-generated)",
-            args: Some(r#"JSON with required fields: name, role, background (min 10 chars), communication_style (min 10 chars), backend (claude_cli/claude_api/gemini_cli/gemini_api/open_ai_api/codex_cli). Optional: model_name, default_participant (bool), icon, base_color. NOTE: ID is always auto-generated as UUID (not accepted in request)"#),
+            args: Some(
+                r#"JSON with required fields: name, role, background (min 10 chars), communication_style (min 10 chars), backend (claude_cli/claude_api/gemini_cli/gemini_api/open_ai_api/codex_cli). Optional: model_name, default_participant (bool), icon, base_color. NOTE: ID is always auto-generated as UUID (not accepted in request)"#,
+            ),
         },
     ),
     (
@@ -548,7 +544,7 @@ fn build_slash_command_prompt(commands: &[SlashCommand]) -> Option<String> {
     }
 
     // Convert built-in commands using From impl
-    let builtin_commands: Vec<BuiltInCommand> = BUILT_IN_COMMANDS.iter().map(|cmd|cmd.1).collect();
+    let builtin_commands: Vec<BuiltInCommand> = BUILT_IN_COMMANDS.iter().map(|cmd| cmd.1).collect();
 
     // Group custom commands by type using From impl
     let task_commands: Vec<CustomCommandInfo> = commands
@@ -911,20 +907,22 @@ pub async fn handle_input(
 
         // Check for built-in entity commands first (critical commands that should always work)
         match cmd_name {
-            "create-persona" => {
-                match execute_create_persona(args, &state).await {
-                    Ok(persona) => format!(
-                        "✅ Successfully created persona '{}'\n\nID: {}\nRole: {}\nBackend: {:?}\n\nThe persona is now available in the Personas panel.",
-                        persona.name, persona.id, persona.role, persona.backend
-                    ),
-                    Err(e) => format!("❌ Failed to create persona: {}", e),
-                }
-            }
+            "create-persona" => match execute_create_persona(args, &state).await {
+                Ok(persona) => format!(
+                    "✅ Successfully created persona '{}'\n\nID: {}\nRole: {}\nBackend: {:?}\n\nThe persona is now available in the Personas panel.",
+                    persona.name, persona.id, persona.role, persona.backend
+                ),
+                Err(e) => format!("❌ Failed to create persona: {}", e),
+            },
             "create-slash-command" => {
-                format!("❌ /create-slash-command is not yet implemented.\n\nPlease create slash commands manually in ~/.orcs/slash_commands/ for now.")
+                format!(
+                    "❌ /create-slash-command is not yet implemented.\n\nPlease create slash commands manually in ~/.orcs/slash_commands/ for now."
+                )
             }
             "create-workspace" => {
-                format!("❌ /create-workspace is not yet implemented.\n\nPlease use the workspace management UI for now.")
+                format!(
+                    "❌ /create-workspace is not yet implemented.\n\nPlease use the workspace management UI for now."
+                )
             }
             // For all other commands, check the repository
             _ => {
@@ -940,47 +938,47 @@ pub async fn handle_input(
                     cmd_name
                 );
                 match state.slash_command_repository.get_command(cmd_name).await {
-            Ok(Some(cmd)) => {
-                use orcs_core::slash_command::CommandType;
+                    Ok(Some(cmd)) => {
+                        use orcs_core::slash_command::CommandType;
 
-                match cmd.command_type {
-                    CommandType::Prompt => {
-                        if cmd.content.contains("{args}") {
-                            cmd.content.replace("{args}", args)
-                        } else if !args.is_empty() {
-                            format!("{}\n\n{}", cmd.content, args)
-                        } else {
-                            cmd.content.clone()
+                        match cmd.command_type {
+                            CommandType::Prompt => {
+                                if cmd.content.contains("{args}") {
+                                    cmd.content.replace("{args}", args)
+                                } else if !args.is_empty() {
+                                    format!("{}\n\n{}", cmd.content, args)
+                                } else {
+                                    cmd.content.clone()
+                                }
+                            }
+                            CommandType::Shell => {
+                                let cmd_to_run = if cmd.content.contains("{args}") {
+                                    cmd.content.replace("{args}", args)
+                                } else {
+                                    cmd.content.clone()
+                                };
+
+                                let working_dir = cmd.working_dir.as_deref();
+
+                                match execute_shell_command(&cmd_to_run, working_dir).await {
+                                    Ok(output) => format!("Command output:\n```\n{}\n```", output),
+                                    Err(e) => format!("Error executing command: {}", e),
+                                }
+                            }
+                            CommandType::Task => {
+                                // Task commands should be handled separately via execute_task_command
+                                format!(
+                                    "Task command '{}' requires async execution. Use the task execution UI or API instead.",
+                                    cmd_name
+                                )
+                            }
                         }
                     }
-                    CommandType::Shell => {
-                        let cmd_to_run = if cmd.content.contains("{args}") {
-                            cmd.content.replace("{args}", args)
-                        } else {
-                            cmd.content.clone()
-                        };
-
-                        let working_dir = cmd.working_dir.as_deref();
-
-                        match execute_shell_command(&cmd_to_run, working_dir).await {
-                            Ok(output) => format!("Command output:\n```\n{}\n```", output),
-                            Err(e) => format!("Error executing command: {}", e),
-                        }
-                    }
-                    CommandType::Task => {
-                        // Task commands should be handled separately via execute_task_command
-                        format!(
-                            "Task command '{}' requires async execution. Use the task execution UI or API instead.",
-                            cmd_name
-                        )
-                    }
-                }
-                }
-                Ok(None) => format!(
-                    "Unknown command: /{}\n\nAvailable commands can be viewed in Settings.",
-                    cmd_name
-                ),
-                Err(e) => format!("Error loading command: {}", e),
+                    Ok(None) => format!(
+                        "Unknown command: /{}\n\nAvailable commands can be viewed in Settings.",
+                        cmd_name
+                    ),
+                    Err(e) => format!("Error loading command: {}", e),
                 }
             }
         }
@@ -1039,8 +1037,8 @@ async fn execute_create_persona(
     use orcs_core::persona::CreatePersonaRequest;
 
     // Parse JSON into CreatePersonaRequest
-    let request: CreatePersonaRequest = serde_json::from_str(args)
-        .map_err(|e| format!("Invalid JSON: {}", e))?;
+    let request: CreatePersonaRequest =
+        serde_json::from_str(args).map_err(|e| format!("Invalid JSON: {}", e))?;
 
     // Validate request
     request.validate()?;

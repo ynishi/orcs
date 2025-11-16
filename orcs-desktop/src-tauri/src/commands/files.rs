@@ -72,7 +72,7 @@ fn guess_mime_type(file_path: &str) -> String {
 /// ファイルプレビューデータを取得（Base64エンコード付き）
 #[tauri::command]
 pub async fn get_file_preview_data(file_path: String) -> Result<FilePreviewData, String> {
-    use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
+    use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 
     // ファイルを読み込み
     let bytes = fs::read(&file_path)

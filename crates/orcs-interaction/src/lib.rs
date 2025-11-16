@@ -193,9 +193,7 @@ impl PersonaBackendAgent {
                 // Set workspace root and enhanced PATH if provided
                 if let Some(workspace) = workspace_root {
                     let enhanced_path = build_enhanced_path(&workspace);
-                    agent = agent
-                        .with_cwd(workspace)
-                        .with_env("PATH", enhanced_path);
+                    agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
                 }
                 // Apply model if specified
                 if let Some(ref model_str) = self.model_name {
@@ -218,9 +216,7 @@ impl PersonaBackendAgent {
                 // Set workspace root and enhanced PATH if provided
                 if let Some(workspace) = workspace_root {
                     let enhanced_path = build_enhanced_path(&workspace);
-                    agent = agent
-                        .with_cwd(workspace)
-                        .with_env("PATH", enhanced_path);
+                    agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
                 }
                 // Apply model if specified
                 if let Some(ref model_str) = self.model_name {
@@ -252,9 +248,7 @@ impl PersonaBackendAgent {
                 // Set workspace root and enhanced PATH if provided
                 if let Some(workspace) = workspace_root {
                     let enhanced_path = build_enhanced_path(&workspace);
-                    agent = agent
-                        .with_cwd(workspace)
-                        .with_env("PATH", enhanced_path);
+                    agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
                 }
                 // Apply model if specified
                 if let Some(ref model_str) = self.model_name {
@@ -313,7 +307,7 @@ fn agent_for_persona(
     if matches!(persona.backend, PersonaBackend::ClaudeCli) {
         let config = ContextConfig {
             recent_messages_count: 20,
-            participants_after_context: true,  // Participants を Context の後に配置
+            participants_after_context: true, // Participants を Context の後に配置
             include_trailing_prompt: true,
             ..Default::default()
         };

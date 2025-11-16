@@ -241,7 +241,7 @@ impl MigratesTo<TaskV1_1_0> for TaskV1_0_0 {
             error: self.error,
             result: self.result,
             execution_details: self.execution_details,
-            strategy: None, // Existing tasks have no strategy data
+            strategy: None,    // Existing tasks have no strategy data
             journal_log: None, // Existing tasks have no journal log data
         }
     }

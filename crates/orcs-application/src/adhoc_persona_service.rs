@@ -5,8 +5,8 @@
 //! expertise descriptions.
 
 use anyhow::Result;
-use llm_toolkit::agent::Agent;
 use llm_toolkit::ToPrompt;
+use llm_toolkit::agent::Agent;
 use orcs_core::agent::build_enhanced_path;
 use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
 use orcs_core::repository::PersonaRepository;
@@ -42,7 +42,7 @@ pub struct PersonaDefinition {
     "#
 )]
 struct ExpertPromptDto {
-   pub  expertise: String,
+    pub expertise: String,
 }
 
 /// Typed agent for generating persona definitions
@@ -99,14 +99,10 @@ impl AdhocPersonaService {
                 workspace
             );
             let enhanced_path = build_enhanced_path(&workspace);
-            agent = agent
-                .with_cwd(workspace)
-                .with_env("PATH", enhanced_path);
+            agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
         }
 
-        let expert_prompt_dto = ExpertPromptDto{
-            expertise,
-        };
+        let expert_prompt_dto = ExpertPromptDto { expertise };
 
         // Execute with typed output (expertise instructions are in agent's expertise attribute)
         let definition = agent.execute(expert_prompt_dto.to_prompt().into()).await?;
@@ -202,7 +198,9 @@ mod tests {
 
         let prompt = dto.to_prompt();
 
-        assert!(prompt.contains("Generate a complete PersonaDefinition based on the provided expertise area."));
+        assert!(prompt.contains(
+            "Generate a complete PersonaDefinition based on the provided expertise area."
+        ));
         assert!(prompt.contains("映画制作プロセス"));
     }
 }

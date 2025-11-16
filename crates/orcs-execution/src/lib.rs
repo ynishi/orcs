@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use llm_toolkit::agent::impls::claude_code::{ClaudeCodeAgent, ClaudeCodeJsonAgent};
 use llm_toolkit::agent::impls::RetryAgent;
+use llm_toolkit::agent::impls::claude_code::{ClaudeCodeAgent, ClaudeCodeJsonAgent};
 use llm_toolkit::agent::{Agent, AgentError, AgentOutput, Payload};
 use llm_toolkit::orchestrator::{BlueprintWorkflow, ParallelOrchestrator};
 use orcs_application::UtilityAgentService;
-use orcs_core::agent::build_enhanced_path;
 use orcs_core::OrcsError;
+use orcs_core::agent::build_enhanced_path;
 use orcs_core::repository::TaskRepository;
 use orcs_core::task::{Task, TaskContext, TaskStatus};
 use serde_json::Value as JsonValue;
@@ -184,7 +184,7 @@ impl TaskExecutor {
         let mut task = Task {
             id: task_id.clone(),
             session_id,
-            title: fallback_title.clone(),  // Temporary title
+            title: fallback_title.clone(), // Temporary title
             description: message_content.clone(),
             status: TaskStatus::Pending,
             created_at: now.clone(),
@@ -209,8 +209,9 @@ impl TaskExecutor {
 
         // Send task created event
         if let Some(sender) = &self.event_sender {
-            let event = tracing_layer::OrchestratorEventBuilder::info_from_task("Task created", &task)
-                .build();
+            let event =
+                tracing_layer::OrchestratorEventBuilder::info_from_task("Task created", &task)
+                    .build();
             match sender.send(event) {
                 Ok(_) => eprintln!("[TaskExecutor] Event sent successfully"),
                 Err(e) => eprintln!("[TaskExecutor] Failed to send event: {:?}", e),
@@ -250,8 +251,11 @@ impl TaskExecutor {
         }
 
         if let Some(sender) = &self.event_sender {
-            let event = tracing_layer::OrchestratorEventBuilder::info_from_task("Task execution started", &task)
-                .build();
+            let event = tracing_layer::OrchestratorEventBuilder::info_from_task(
+                "Task execution started",
+                &task,
+            )
+            .build();
             match sender.send(event) {
                 Ok(_) => eprintln!("[TaskExecutor] Event sent successfully"),
                 Err(e) => eprintln!("[TaskExecutor] Failed to send event: {:?}", e),
@@ -286,7 +290,9 @@ impl TaskExecutor {
                 Box::new(RetryAgent::new(internal_json_agent, 3)),
             )
         } else {
-            tracing::info!("[TaskExecutor] Using default ParallelOrchestrator (no workspace context)");
+            tracing::info!(
+                "[TaskExecutor] Using default ParallelOrchestrator (no workspace context)"
+            );
             ParallelOrchestrator::new(blueprint)
         };
 
@@ -358,8 +364,11 @@ impl TaskExecutor {
 
             // Send task completed event
             if let Some(sender) = &self.event_sender {
-                let event = tracing_layer::OrchestratorEventBuilder::info_from_task("Task execution completed", &task)
-                    .build();
+                let event = tracing_layer::OrchestratorEventBuilder::info_from_task(
+                    "Task execution completed",
+                    &task,
+                )
+                .build();
                 match sender.send(event) {
                     Ok(_) => eprintln!("[TaskExecutor] Event sent successfully"),
                     Err(e) => eprintln!("[TaskExecutor] Failed to send event: {:?}", e),
@@ -396,8 +405,11 @@ impl TaskExecutor {
 
             // Send task failed event
             if let Some(sender) = &self.event_sender {
-                let event = tracing_layer::OrchestratorEventBuilder::error_from_task("Task execution failed", &task)
-                    .build();
+                let event = tracing_layer::OrchestratorEventBuilder::error_from_task(
+                    "Task execution failed",
+                    &task,
+                )
+                .build();
                 match sender.send(event) {
                     Ok(_) => eprintln!("[TaskExecutor] Event sent successfully"),
                     Err(e) => eprintln!("[TaskExecutor] Failed to send event: {:?}", e),

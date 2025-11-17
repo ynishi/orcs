@@ -149,6 +149,8 @@ pub enum ServiceType {
     Task,
     /// Persona service (personas/)
     Persona,
+    /// Dialogue preset service (dialogue_presets/)
+    DialoguePreset,
     /// Slash command service (slash_commands/)
     SlashCommand,
     /// Logs directory (logs/)
@@ -315,6 +317,9 @@ impl OrcsPaths {
             }
             ServiceType::Task => Ok(PathType::Dir(self.data_dir()?.join("tasks"))),
             ServiceType::Persona => Ok(PathType::Dir(self.data_dir()?.join("personas"))),
+            ServiceType::DialoguePreset => {
+                Ok(PathType::Dir(self.data_dir()?.join("dialogue_presets")))
+            }
             ServiceType::SlashCommand => {
                 Ok(PathType::Dir(self.config_dir()?.join("slash_commands")))
             }

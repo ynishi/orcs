@@ -1,3 +1,4 @@
+pub mod dialogue_presets;
 pub mod files;
 pub mod git;
 pub mod paths;
@@ -32,6 +33,10 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         personas::save_persona_configs,
         personas::get_persona_backend_options,
         personas::create_persona,
+        dialogue_presets::get_dialogue_presets,
+        dialogue_presets::save_dialogue_preset,
+        dialogue_presets::delete_dialogue_preset,
+        dialogue_presets::apply_dialogue_preset,
         user::get_user_nickname,
         user::get_user_profile,
         session::execute_message_as_task,

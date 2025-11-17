@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod config;
+pub mod dialogue;
 pub mod error;
 pub mod persona;
 pub mod repository;

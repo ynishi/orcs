@@ -21,6 +21,7 @@
 //!
 //! See [`paths`] module for detailed documentation on the path management system.
 
+pub mod async_dir_dialogue_preset_repository;
 pub mod async_dir_persona_repository;
 pub mod async_dir_session_repository;
 pub mod async_dir_slash_command_repository;
@@ -34,6 +35,7 @@ pub mod storage_repository;
 pub mod user_service;
 pub mod workspace_storage_service;
 
+pub use crate::async_dir_dialogue_preset_repository::AsyncDirDialoguePresetRepository;
 pub use crate::async_dir_persona_repository::AsyncDirPersonaRepository;
 pub use crate::async_dir_session_repository::AsyncDirSessionRepository;
 pub use crate::async_dir_slash_command_repository::AsyncDirSlashCommandRepository;

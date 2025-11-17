@@ -22,6 +22,7 @@
 
 mod app_state;
 mod config_root;
+mod dialogue_preset;
 mod persona;
 mod secret;
 mod session;
@@ -38,6 +39,9 @@ pub use app_state::{AppStateDTO, AppStateV1_0, AppStateV1_1, create_app_state_mi
 pub use config_root::{
     ConfigRoot, ConfigRootV1_0_0, ConfigRootV1_1_0, ConfigRootV2_0_0, create_config_root_migrator,
 };
+
+// Re-export dialogue_preset DTOs and migrator
+pub use dialogue_preset::{create_dialogue_preset_migrator, DialoguePresetV1_0_0};
 
 // Re-export persona DTOs and migrator
 pub use persona::{

@@ -4,6 +4,7 @@ use anyhow::{Result, anyhow};
 use orcs_application::session::{SessionMetadataService, SessionUpdater};
 use orcs_application::{AdhocPersonaService, SessionUseCase, UtilityAgentService};
 use orcs_core::{
+    dialogue::DialoguePresetRepository,
     persona::{PersonaRepository, get_default_presets},
     repository::SessionRepository,
     secret::SecretService,
@@ -16,9 +17,10 @@ use orcs_core::{
 };
 use orcs_execution::{TaskExecutor, tracing_layer::OrchestratorEvent};
 use orcs_infrastructure::{
-    AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
-    AsyncDirSlashCommandRepository, AsyncDirTaskRepository, SecretServiceImpl, paths::OrcsPaths,
-    user_service::ConfigBasedUserService, workspace_storage_service::FileSystemWorkspaceManager,
+    AppStateService, AsyncDirDialoguePresetRepository, AsyncDirPersonaRepository,
+    AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
+    SecretServiceImpl, paths::OrcsPaths, user_service::ConfigBasedUserService,
+    workspace_storage_service::FileSystemWorkspaceManager,
 };
 use tokio::sync::{Mutex, mpsc::UnboundedSender};
 
@@ -172,6 +174,15 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
     let slash_command_repository: Arc<dyn SlashCommandRepository> =
         slash_command_repository_concrete.clone();
 
+    // Initialize AsyncDirDialoguePresetRepository
+    let dialogue_preset_repository_concrete = Arc::new(
+        AsyncDirDialoguePresetRepository::new(None)
+            .await
+            .expect("Failed to initialize dialogue preset repository"),
+    );
+    let dialogue_preset_repository: Arc<dyn DialoguePresetRepository> =
+        dialogue_preset_repository_concrete.clone();
+
     // Seed the personas directory with default personas if it's empty on first run.
     if let Ok(personas) = persona_repository.get_all().await {
         if personas.is_empty() {
@@ -322,6 +333,8 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         workspace_storage_service: workspace_storage_service.clone(),
         slash_command_repository,
         slash_command_repository_concrete,
+        dialogue_preset_repository,
+        dialogue_preset_repository_concrete,
         app_state_service: app_state_service.clone(),
         task_repository,
         task_repository_concrete,

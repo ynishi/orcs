@@ -3,13 +3,14 @@ use std::sync::Arc;
 use orcs_application::session::SessionMetadataService;
 use orcs_application::{AdhocPersonaService, SessionUseCase};
 use orcs_core::{
-    persona::PersonaRepository, secret::SecretService, session::AppMode,
-    slash_command::SlashCommandRepository, task::TaskRepository, user::UserService,
+    dialogue::DialoguePresetRepository, persona::PersonaRepository, secret::SecretService,
+    session::AppMode, slash_command::SlashCommandRepository, task::TaskRepository,
+    user::UserService,
 };
 use orcs_execution::TaskExecutor;
 use orcs_infrastructure::{
-    AppStateService, AsyncDirPersonaRepository, AsyncDirSessionRepository,
-    AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
+    AppStateService, AsyncDirDialoguePresetRepository, AsyncDirPersonaRepository,
+    AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
     workspace_storage_service::FileSystemWorkspaceManager,
 };
 use tokio::sync::Mutex;
@@ -28,6 +29,8 @@ pub struct AppState {
     pub workspace_storage_service: Arc<FileSystemWorkspaceManager>,
     pub slash_command_repository: Arc<dyn SlashCommandRepository>,
     pub slash_command_repository_concrete: Arc<AsyncDirSlashCommandRepository>,
+    pub dialogue_preset_repository: Arc<dyn DialoguePresetRepository>,
+    pub dialogue_preset_repository_concrete: Arc<AsyncDirDialoguePresetRepository>,
     pub app_state_service: Arc<AppStateService>,
     pub task_repository: Arc<dyn TaskRepository>,
     pub task_repository_concrete: Arc<AsyncDirTaskRepository>,

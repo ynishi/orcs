@@ -158,7 +158,8 @@ impl TaskExecutor {
                 "[TaskExecutor] Creating ClaudeCodeAgent with workspace_root: {}",
                 workspace.display()
             );
-            let enhanced_path = build_enhanced_path(workspace);
+            // TODO: Pass EnvSettings from config
+            let enhanced_path = build_enhanced_path(workspace, None);
             Arc::new(
                 ClaudeCodeAgent::new()
                     .with_cwd(workspace.clone())
@@ -272,7 +273,8 @@ impl TaskExecutor {
                 "[TaskExecutor] Configuring ParallelOrchestrator internal agents with workspace: {}",
                 workspace.display()
             );
-            let enhanced_path = build_enhanced_path(workspace);
+            // TODO: Pass EnvSettings from config
+            let enhanced_path = build_enhanced_path(workspace, None);
 
             // Configure internal_agent (String output, for redesign decisions)
             let internal_agent = ClaudeCodeAgent::new()

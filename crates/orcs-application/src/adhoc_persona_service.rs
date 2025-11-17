@@ -98,7 +98,8 @@ impl AdhocPersonaService {
                 "[AdhocPersonaService] Setting workspace root for persona generation: {:?}",
                 workspace
             );
-            let enhanced_path = build_enhanced_path(&workspace);
+            // TODO: Pass EnvSettings from config
+            let enhanced_path = build_enhanced_path(&workspace, None);
             agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
         }
 

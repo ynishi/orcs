@@ -82,6 +82,70 @@ pub struct OpenAIConfig {
 }
 
 // ============================================================================
+// Environment configuration models
+// ============================================================================
+
+/// Environment PATH configuration for CLI tools.
+///
+/// This configuration allows users to customize the PATH environment variable
+/// used when executing CLI-based agents (e.g., Gemini CLI, Claude CLI, Codex CLI).
+///
+/// # Use Cases
+///
+/// - **Tool Manager Support**: Automatically detect and include paths from mise, asdf, volta, etc.
+/// - **Custom Tool Paths**: Add custom directories for user-installed tools
+/// - **GUI App Compatibility**: Ensures CLI tools are found even when launched from GUI apps
+///
+/// # Example (config.toml)
+///
+/// ```toml
+/// [env_settings]
+/// auto_detect_tool_managers = true
+/// additional_paths = [
+///     "/custom/tools/bin",
+///     "/opt/my-cli/bin"
+/// ]
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnvSettings {
+    /// Additional PATH directories to prepend to the enhanced PATH.
+    ///
+    /// These paths are added with high priority, after workspace-specific directories
+    /// but before system paths.
+    ///
+    /// # Example
+    /// ```ignore
+    /// additional_paths = ["/custom/bin", "/opt/tools/bin"]
+    /// ```
+    #[serde(default)]
+    pub additional_paths: Vec<String>,
+
+    /// Enable automatic detection of tool managers (mise, asdf, volta, etc.).
+    ///
+    /// When enabled, the system automatically searches for and includes paths from:
+    /// - mise: `~/.local/share/mise/shims`, `~/.local/share/mise/installs/*/bin`
+    /// - asdf: `~/.asdf/shims`
+    /// - volta: `~/.volta/bin`
+    ///
+    /// Default: `true`
+    #[serde(default = "default_auto_detect_tool_managers")]
+    pub auto_detect_tool_managers: bool,
+}
+
+fn default_auto_detect_tool_managers() -> bool {
+    true
+}
+
+impl Default for EnvSettings {
+    fn default() -> Self {
+        Self {
+            additional_paths: Vec::new(),
+            auto_detect_tool_managers: true,
+        }
+    }
+}
+
+// ============================================================================
 // Model configuration models
 // ============================================================================
 
@@ -190,6 +254,7 @@ impl Default for OpenAIModelConfig {
 /// let config = RootConfig::default();
 /// let nickname = config.user_profile.nickname;
 /// let claude_model = config.model_settings.claude.unwrap().model_name;
+/// let custom_paths = &config.env_settings.additional_paths;
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RootConfig {
@@ -200,6 +265,10 @@ pub struct RootConfig {
     /// Non-sensitive configuration.
     #[serde(default)]
     pub model_settings: ModelSettings,
+    /// Environment PATH configuration for CLI tools.
+    /// Controls how PATH is built for CLI-based agents.
+    #[serde(default)]
+    pub env_settings: EnvSettings,
 }
 
 impl Default for RootConfig {
@@ -207,6 +276,7 @@ impl Default for RootConfig {
         Self {
             user_profile: UserProfile::default(),
             model_settings: ModelSettings::default(),
+            env_settings: EnvSettings::default(),
         }
     }
 }

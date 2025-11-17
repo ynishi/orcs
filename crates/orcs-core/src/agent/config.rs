@@ -24,7 +24,8 @@ impl WorkspaceConfig {
     /// assert!(!config.enhanced_path.is_empty());
     /// ```
     pub fn new(workspace_root: PathBuf) -> Self {
-        let enhanced_path = crate::agent::build_enhanced_path(&workspace_root);
+        // TODO: Accept EnvSettings parameter for customization
+        let enhanced_path = crate::agent::build_enhanced_path(&workspace_root, None);
         Self {
             workspace_root,
             enhanced_path,

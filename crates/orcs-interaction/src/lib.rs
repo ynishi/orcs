@@ -192,7 +192,8 @@ impl PersonaBackendAgent {
 
                 // Set workspace root and enhanced PATH if provided
                 if let Some(workspace) = workspace_root {
-                    let enhanced_path = build_enhanced_path(&workspace);
+                    // TODO: Pass EnvSettings from config
+                    let enhanced_path = build_enhanced_path(&workspace, None);
                     agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
                 }
                 // Apply model if specified
@@ -215,7 +216,8 @@ impl PersonaBackendAgent {
                 let mut agent = GeminiAgent::new();
                 // Set workspace root and enhanced PATH if provided
                 if let Some(workspace) = workspace_root {
-                    let enhanced_path = build_enhanced_path(&workspace);
+                    // TODO: Pass EnvSettings from config
+                    let enhanced_path = build_enhanced_path(&workspace, None);
                     agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
                 }
                 // Apply model if specified
@@ -247,7 +249,8 @@ impl PersonaBackendAgent {
                 let mut agent = CodexAgent::new();
                 // Set workspace root and enhanced PATH if provided
                 if let Some(workspace) = workspace_root {
-                    let enhanced_path = build_enhanced_path(&workspace);
+                    // TODO: Pass EnvSettings from config
+                    let enhanced_path = build_enhanced_path(&workspace, None);
                     agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
                 }
                 // Apply model if specified

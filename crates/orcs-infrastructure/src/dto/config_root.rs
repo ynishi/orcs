@@ -12,7 +12,8 @@ use version_migrate::{IntoDomain, MigratesTo, Versioned};
 
 use super::{AppStateDTO, UserProfileDTO, WorkspaceV1};
 use orcs_core::config::{
-    ClaudeModelConfig, GeminiModelConfig, ModelSettings, OpenAIModelConfig, RootConfig,
+    ClaudeModelConfig, EnvSettings, GeminiModelConfig, ModelSettings, OpenAIModelConfig,
+    RootConfig,
 };
 
 // ============================================================================
@@ -142,6 +143,50 @@ impl OpenAIModelConfigDTO {
 }
 
 // ============================================================================
+// EnvSettings DTOs
+// ============================================================================
+
+/// DTO for EnvSettings.
+///
+/// This is a simple passthrough DTO since EnvSettings is already well-structured.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnvSettingsDTO {
+    #[serde(default)]
+    pub additional_paths: Vec<String>,
+    #[serde(default = "default_auto_detect_tool_managers")]
+    pub auto_detect_tool_managers: bool,
+}
+
+fn default_auto_detect_tool_managers() -> bool {
+    true
+}
+
+impl Default for EnvSettingsDTO {
+    fn default() -> Self {
+        Self {
+            additional_paths: Vec::new(),
+            auto_detect_tool_managers: true,
+        }
+    }
+}
+
+impl EnvSettingsDTO {
+    fn into_domain(self) -> EnvSettings {
+        EnvSettings {
+            additional_paths: self.additional_paths,
+            auto_detect_tool_managers: self.auto_detect_tool_managers,
+        }
+    }
+
+    fn from_domain(settings: EnvSettings) -> Self {
+        Self {
+            additional_paths: settings.additional_paths,
+            auto_detect_tool_managers: settings.auto_detect_tool_managers,
+        }
+    }
+}
+
+// ============================================================================
 // ConfigRoot DTOs
 // ============================================================================
 
@@ -208,7 +253,7 @@ pub struct ConfigRootV2_0_0 {
     pub user_profile: UserProfileDTO,
 }
 
-/// Root configuration structure V2.1.0 for the application config file (current).
+/// Root configuration structure V2.1.0 for the application config file.
 ///
 /// Added model_settings field to separate model configuration from secrets.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
@@ -222,8 +267,25 @@ pub struct ConfigRootV2_1_0 {
     pub model_settings: ModelSettingsDTO,
 }
 
+/// Root configuration structure V2.2.0 for the application config file (current).
+///
+/// Added env_settings field to configure PATH for CLI-based agents.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "2.2.0")]
+pub struct ConfigRootV2_2_0 {
+    /// User profile configuration (name, background, etc.).
+    #[serde(default)]
+    pub user_profile: UserProfileDTO,
+    /// LLM model settings (non-sensitive configuration).
+    #[serde(default)]
+    pub model_settings: ModelSettingsDTO,
+    /// Environment PATH configuration for CLI tools.
+    #[serde(default)]
+    pub env_settings: EnvSettingsDTO,
+}
+
 /// Type alias for the latest ConfigRoot version.
-pub type ConfigRoot = ConfigRootV2_1_0;
+pub type ConfigRoot = ConfigRootV2_2_0;
 
 // ============================================================================
 // Default implementations
@@ -267,6 +329,16 @@ impl Default for ConfigRootV2_1_0 {
     }
 }
 
+impl Default for ConfigRootV2_2_0 {
+    fn default() -> Self {
+        Self {
+            user_profile: UserProfileDTO::default(),
+            model_settings: ModelSettingsDTO::default(),
+            env_settings: EnvSettingsDTO::default(),
+        }
+    }
+}
+
 // ============================================================================
 // Migration implementations
 // ============================================================================
@@ -306,28 +378,42 @@ impl MigratesTo<ConfigRootV2_1_0> for ConfigRootV2_0_0 {
     }
 }
 
-// ============================================================================
-// Domain model conversions
-// ============================================================================
-
-/// IntoDomain implementation for ConfigRootV2_1_0.
-/// Converts DTO to domain RootConfig.
-impl IntoDomain<RootConfig> for ConfigRootV2_1_0 {
-    fn into_domain(self) -> RootConfig {
-        RootConfig {
-            user_profile: self.user_profile.into_domain(),
-            model_settings: self.model_settings.into_domain(),
+/// Migration from ConfigRootV2_1_0 to ConfigRootV2_2_0.
+/// Adds env_settings field with default values (auto-detect enabled).
+impl MigratesTo<ConfigRootV2_2_0> for ConfigRootV2_1_0 {
+    fn migrate(self) -> ConfigRootV2_2_0 {
+        ConfigRootV2_2_0 {
+            user_profile: self.user_profile,
+            model_settings: self.model_settings,
+            env_settings: EnvSettingsDTO::default(),
         }
     }
 }
 
-/// FromDomain implementation for ConfigRootV2_1_0.
+// ============================================================================
+// Domain model conversions
+// ============================================================================
+
+/// IntoDomain implementation for ConfigRootV2_2_0.
+/// Converts DTO to domain RootConfig.
+impl IntoDomain<RootConfig> for ConfigRootV2_2_0 {
+    fn into_domain(self) -> RootConfig {
+        RootConfig {
+            user_profile: self.user_profile.into_domain(),
+            model_settings: self.model_settings.into_domain(),
+            env_settings: self.env_settings.into_domain(),
+        }
+    }
+}
+
+/// FromDomain implementation for ConfigRootV2_2_0.
 /// Converts domain RootConfig to DTO for persistence.
-impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_1_0 {
+impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_2_0 {
     fn from_domain(config: RootConfig) -> Self {
-        ConfigRootV2_1_0 {
+        ConfigRootV2_2_0 {
             user_profile: UserProfileDTO::from_domain(config.user_profile),
             model_settings: ModelSettingsDTO::from_domain(config.model_settings),
+            env_settings: EnvSettingsDTO::from_domain(config.env_settings),
         }
     }
 }
@@ -345,7 +431,8 @@ impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_1_0 {
 /// - V1.0.0 → V1.1.0: Adds `app_state` field with default value (None)
 /// - V1.1.0 → V2.0.0: Removes `personas`, `workspaces`, `app_state` (now managed separately)
 /// - V2.0.0 → V2.1.0: Adds `model_settings` field with default values
-/// - V2.1.0 → RootConfig: Converts DTO to domain model
+/// - V2.1.0 → V2.2.0: Adds `env_settings` field with default values (auto-detect enabled)
+/// - V2.2.0 → RootConfig: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -356,12 +443,13 @@ impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_1_0 {
 pub fn create_config_root_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> V1.1.0 -> V2.0.0 -> V2.1.0 -> RootConfig
+    // Register migration path: V1.0.0 -> V1.1.0 -> V2.0.0 -> V2.1.0 -> V2.2.0 -> RootConfig
     let config_path = version_migrate::Migrator::define("config_root")
         .from::<ConfigRootV1_0_0>()
         .step::<ConfigRootV1_1_0>()
         .step::<ConfigRootV2_0_0>()
         .step::<ConfigRootV2_1_0>()
+        .step::<ConfigRootV2_2_0>()
         .into_with_save::<RootConfig>();
 
     migrator

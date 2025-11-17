@@ -9,6 +9,7 @@ import { WorkspacePanel } from '../workspace/WorkspacePanel';
 import { TaskList } from '../tasks/TaskList';
 import { PersonasList } from '../personas/PersonasList';
 import { SlashCommandList } from '../slash_commands/SlashCommandList';
+import { DialoguePresetList } from '../dialogue_presets/DialoguePresetList';
 import { SlashCommand } from '../../types/slash_command';
 import { NavbarIcon } from './NavbarIcon';
 
@@ -98,7 +99,7 @@ export function Navbar({
   onRefreshPersonas,
   onRefreshSessions,
 }: NavbarProps) {
-  const [activeTab, setActiveTab] = useState<'sessions' | 'workspace' | 'tasks' | 'personas' | 'commands'>('sessions');
+  const [activeTab, setActiveTab] = useState<'sessions' | 'workspace' | 'tasks' | 'personas' | 'commands' | 'presets'>('sessions');
 
   const activeTasks = tasks.filter(t => t.status === 'Running' || t.status === 'Pending').length;
 
@@ -142,6 +143,12 @@ export function Navbar({
           active={activeTab === 'commands'}
           onClick={() => setActiveTab('commands')}
         />
+        <NavbarIcon
+          icon="🎨"
+          label="Dialogue Presets"
+          active={activeTab === 'presets'}
+          onClick={() => setActiveTab('presets')}
+        />
       </Stack>
 
       {/* Content Panel */}
@@ -157,6 +164,7 @@ export function Navbar({
             {activeTab === 'tasks' && 'Tasks'}
             {activeTab === 'personas' && 'Personas'}
             {activeTab === 'commands' && 'Slash Commands'}
+            {activeTab === 'presets' && 'Dialogue Presets'}
           </Text>
 
           {/* Content */}
@@ -223,6 +231,10 @@ export function Navbar({
               onCommandsUpdated={onSlashCommandsUpdated}
               onRunCommand={onRunSlashCommand}
             />
+          )}
+
+          {activeTab === 'presets' && (
+            <DialoguePresetList />
           )}
         </Box>
       </ScrollArea>

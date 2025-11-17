@@ -2,7 +2,7 @@ import { Paper, Group, Badge, Text, Divider, Tooltip, Menu, Checkbox, ScrollArea
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
 import { PersonaConfig } from '../../types/agent';
-import { DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, getConversationModeOption, getTalkStyleOption, TALK_STYLES, EXECUTION_STRATEGIES, CONVERSATION_MODES } from '../../types/conversation';
+import { DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, getConversationModeOption, getTalkStyleOption, TALK_STYLES, EXECUTION_STRATEGIES, CONVERSATION_MODES, DialoguePreset, matchesPreset } from '../../types/conversation';
 
 interface StatusBarProps {
   status: StatusInfo;
@@ -15,13 +15,15 @@ interface StatusBarProps {
   executionStrategy?: string;
   personas?: PersonaConfig[];
   activeParticipantIds?: string[];
+  dialoguePresets?: DialoguePreset[];
   onTalkStyleChange?: (style: string | null) => void;
   onExecutionStrategyChange?: (strategy: string) => void;
   onConversationModeChange?: (mode: string) => void;
   onToggleParticipant?: (personaId: string, isChecked: boolean) => void;
+  onApplyPreset?: (presetId: string) => void;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', personas = [], activeParticipantIds = [], onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange, onToggleParticipant }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', personas = [], activeParticipantIds = [], dialoguePresets = [], onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange, onToggleParticipant, onApplyPreset }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -225,6 +227,60 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
                 {mode.icon} {mode.label}
               </Menu.Item>
             ))}
+          </Menu.Dropdown>
+        </Menu>
+
+        {/* Dialogue Preset */}
+        <Divider orientation="vertical" />
+        <Menu position="top" withArrow>
+          <Menu.Target>
+            <Tooltip label="Dialogue Presets" withArrow>
+              <Text size="lg" style={{ cursor: 'pointer' }}>
+                🎨
+              </Text>
+            </Tooltip>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Label>System Presets</Menu.Label>
+            {dialoguePresets
+              .filter(p => p.source === 'system')
+              .map((preset) => {
+                const isMatching = matchesPreset(preset, executionStrategy, conversationMode, talkStyle);
+                return (
+                  <Menu.Item
+                    key={preset.id}
+                    onClick={() => onApplyPreset?.(preset.id)}
+                    leftSection={isMatching ? '🟡' : '　'}
+                  >
+                    {preset.name}{preset.icon && ` ${preset.icon}`}
+                    {preset.description && (
+                      <Text size="xs" c="dimmed" style={{ marginLeft: 8 }}>
+                        {preset.description}
+                      </Text>
+                    )}
+                  </Menu.Item>
+                );
+              })}
+            {dialoguePresets.filter(p => p.source === 'user').length > 0 && (
+              <>
+                <Menu.Divider />
+                <Menu.Label>User Presets</Menu.Label>
+                {dialoguePresets
+                  .filter(p => p.source === 'user')
+                  .map((preset) => {
+                    const isMatching = matchesPreset(preset, executionStrategy, conversationMode, talkStyle);
+                    return (
+                      <Menu.Item
+                        key={preset.id}
+                        onClick={() => onApplyPreset?.(preset.id)}
+                        leftSection={isMatching ? '🎨' : undefined}
+                      >
+                        {preset.name}{preset.icon && ` ${preset.icon}`}
+                      </Menu.Item>
+                    );
+                  })}
+              </>
+            )}
           </Menu.Dropdown>
         </Menu>
 

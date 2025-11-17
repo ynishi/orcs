@@ -86,7 +86,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             name: "アイデア出し".to_string(),
             icon: Some("💡".to_string()),
             description: Some(
-                "ブレストモード: 全員が自由にアイデアを出し合う (Broadcast + 簡潔)".to_string(),
+                "Broadcast + 簡潔 + Brainstorm: 全員が自由にアイデアを出し合う".to_string(),
             ),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Concise,
@@ -99,7 +99,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             name: "コードレビュー".to_string(),
             icon: Some("🔍".to_string()),
             description: Some(
-                "レビューモード: 順番に簡潔にレビュー (Sequential + 極簡潔)".to_string(),
+                "Sequential + 極簡潔 + Review: 順番に簡潔にレビュー".to_string(),
             ),
             execution_strategy: ExecutionModel::Sequential,
             conversation_mode: ConversationMode::Brief,
@@ -112,7 +112,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             name: "深い議論".to_string(),
             icon: Some("💭".to_string()),
             description: Some(
-                "議論モード: 全員で深く議論 (Broadcast + 議論モード)".to_string(),
+                "Broadcast + 議論 + Debate: 全員で深く議論".to_string(),
             ),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Discussion,
@@ -125,7 +125,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             name: "素早い意思決定".to_string(),
             icon: Some("⚡".to_string()),
             description: Some(
-                "意思決定モード: 簡潔に全員の意見を集める (Broadcast + 極簡潔)".to_string(),
+                "Broadcast + 極簡潔 + DecisionMaking: 簡潔に全員の意見を集める".to_string(),
             ),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Brief,
@@ -138,7 +138,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             name: "問題解決".to_string(),
             icon: Some("🔧".to_string()),
             description: Some(
-                "問題解決モード: 順番に解決策を検討 (Sequential + 簡潔)".to_string(),
+                "Sequential + 簡潔 + ProblemSolving: 順番に解決策を検討".to_string(),
             ),
             execution_strategy: ExecutionModel::Sequential,
             conversation_mode: ConversationMode::Concise,
@@ -151,7 +151,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             name: "計画立案".to_string(),
             icon: Some("📋".to_string()),
             description: Some(
-                "計画モード: 順番に計画を立てる (Sequential + 通常)".to_string(),
+                "Sequential + 通常 + Planning: 順番に計画を立てる".to_string(),
             ),
             execution_strategy: ExecutionModel::Sequential,
             conversation_mode: ConversationMode::Normal,
@@ -164,7 +164,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             name: "カジュアル雑談".to_string(),
             icon: Some("☕".to_string()),
             description: Some(
-                "雑談モード: 気楽に会話 (Broadcast + 通常)".to_string(),
+                "Broadcast + 通常 + Casual: 気楽に会話".to_string(),
             ),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Normal,

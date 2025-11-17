@@ -78,6 +78,7 @@ function App() {
   const [executionStrategy, setExecutionStrategy] = useState<string>('sequential');
   const [personas, setPersonas] = useState<import('./types/agent').PersonaConfig[]>([]);
   const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
+  const [dialoguePresets, setDialoguePresets] = useState<import('./types/conversation').DialoguePreset[]>([]);
 
   // セッション管理をカスタムフックに切り替え
   const {
@@ -607,6 +608,22 @@ function App() {
   useEffect(() => {
     refreshCustomCommands();
   }, [refreshCustomCommands]);
+
+  // Load dialogue presets
+  const refreshDialoguePresets = useCallback(async () => {
+    try {
+      const presets = await invoke<import('./types/conversation').DialoguePreset[]>('get_dialogue_presets');
+      setDialoguePresets(presets);
+      console.log('[App] Loaded dialogue presets:', presets.length);
+    } catch (error) {
+      console.error('Failed to load dialogue presets:', error);
+    }
+  }, []);
+
+  // Load dialogue presets on startup
+  useEffect(() => {
+    refreshDialoguePresets();
+  }, [refreshDialoguePresets]);
 
   // Load personas and active participants
   const refreshPersonas = useCallback(async () => {
@@ -1878,6 +1895,35 @@ function App() {
     }
   };
 
+  const handleApplyPreset = async (presetId: string) => {
+    try {
+      // Apply preset via backend
+      await invoke('apply_dialogue_preset', { presetId });
+
+      // Find the preset to update local state
+      const preset = dialoguePresets.find(p => p.id === presetId);
+      if (preset) {
+        // Update local state immediately for better UX
+        setExecutionStrategy(preset.execution_strategy);
+        setConversationMode(preset.conversation_mode);
+        setTalkStyle(preset.talk_style || null);
+
+        await handleAndPersistSystemMessage(
+          conversationMessage(`プリセット「${preset.name}」を適用しました`, 'success'),
+          addMessage,
+          invoke
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      await handleAndPersistSystemMessage(
+        conversationMessage(`Failed to apply preset: ${error}`, 'error'),
+        addMessage,
+        invoke
+      );
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -2297,6 +2343,8 @@ function App() {
                       onExecutionStrategyChange={handleStrategyChange}
                       onConversationModeChange={handleConversationModeChange}
                       onToggleParticipant={handleToggleParticipant}
+                      dialoguePresets={dialoguePresets}
+                      onApplyPreset={handleApplyPreset}
                       onSelectCommand={selectCommand}
                       onSelectAgent={selectAgent}
                       onHoverSuggestion={setSelectedSuggestionIndex}

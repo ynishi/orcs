@@ -141,3 +141,36 @@ export const EXECUTION_STRATEGIES: ExecutionStrategyOption[] = [
 export function getExecutionStrategyOption(strategy: ExecutionStrategyType): ExecutionStrategyOption | undefined {
   return EXECUTION_STRATEGIES.find(s => s.value === strategy);
 }
+
+/**
+ * Dialogue Preset definitions
+ */
+export type PresetSource = 'system' | 'user';
+
+export interface DialoguePreset {
+  id: string;
+  name: string;
+  icon?: string;
+  description?: string;
+  execution_strategy: ExecutionStrategyType;
+  conversation_mode: ConversationModeType;
+  talk_style?: TalkStyleType;
+  created_at: string;
+  source: PresetSource;
+}
+
+/**
+ * Check if current settings match a preset
+ */
+export function matchesPreset(
+  preset: DialoguePreset,
+  executionStrategy: string,
+  conversationMode: string,
+  talkStyle: string | null
+): boolean {
+  return (
+    preset.execution_strategy === executionStrategy &&
+    preset.conversation_mode === conversationMode &&
+    (preset.talk_style || null) === talkStyle
+  );
+}

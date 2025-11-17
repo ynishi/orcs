@@ -60,6 +60,39 @@ impl AsyncDirPersonaRepository {
 
 #[async_trait::async_trait]
 impl PersonaRepository for AsyncDirPersonaRepository {
+    async fn find_by_id(&self, persona_id: &str) -> Result<Option<Persona>> {
+        match self
+            .storage
+            .load::<Persona>(Self::ENTITY_NAME, persona_id)
+            .await
+        {
+            Ok(persona) => Ok(Some(persona)),
+            Err(e) => {
+                let orcs_err: orcs_core::OrcsError = e.into();
+                // Check if it's a NotFound error or an IO error with "File not found" message
+                if orcs_err.is_not_found()
+                    || (orcs_err.is_io() && orcs_err.to_string().contains("File not found"))
+                {
+                    Ok(None)
+                } else {
+                    Err(orcs_err)
+                }
+            }
+        }
+    }
+
+    async fn save(&self, persona: &Persona) -> Result<()> {
+        self.storage
+            .save(Self::ENTITY_NAME, &persona.id, persona)
+            .await?;
+        Ok(())
+    }
+
+    async fn delete(&self, persona_id: &str) -> Result<()> {
+        self.storage.delete(persona_id).await?;
+        Ok(())
+    }
+
     async fn get_all(&self) -> Result<Vec<Persona>> {
         let all_personas = self.storage.load_all::<Persona>(Self::ENTITY_NAME).await?;
 
@@ -187,5 +220,153 @@ mod tests {
 
         let personas = repo.get_all().await.unwrap();
         assert_eq!(personas.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_find_by_id() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
+            .await
+            .unwrap();
+
+        let persona = Persona {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: "Findable Persona".to_string(),
+            role: "Tester".to_string(),
+            background: "Test background".to_string(),
+            communication_style: "Test style".to_string(),
+            default_participant: true,
+            source: PersonaSource::User,
+            backend: PersonaBackend::ClaudeCli,
+            model_name: None,
+            icon: None,
+            base_color: None,
+        };
+
+        // Save persona
+        repo.save(&persona).await.unwrap();
+
+        // Find existing persona
+        let found = repo.find_by_id(&persona.id).await.unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name, "Findable Persona");
+
+        // Find non-existent persona
+        let not_found = repo.find_by_id("non-existent-id").await.unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_save_individual_persona() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
+            .await
+            .unwrap();
+
+        let persona = Persona {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: "Individual Save".to_string(),
+            role: "Tester".to_string(),
+            background: "Test background".to_string(),
+            communication_style: "Test style".to_string(),
+            default_participant: true,
+            source: PersonaSource::User,
+            backend: PersonaBackend::ClaudeCli,
+            model_name: None,
+            icon: None,
+            base_color: None,
+        };
+
+        // Save
+        repo.save(&persona).await.unwrap();
+
+        // Verify
+        let loaded = repo.find_by_id(&persona.id).await.unwrap();
+        assert!(loaded.is_some());
+        assert_eq!(loaded.unwrap().name, "Individual Save");
+    }
+
+    #[tokio::test]
+    async fn test_update_persona() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
+            .await
+            .unwrap();
+
+        let persona_id = uuid::Uuid::new_v4().to_string();
+        let mut persona = Persona {
+            id: persona_id.clone(),
+            name: "Original Name".to_string(),
+            role: "Original Role".to_string(),
+            background: "Original background".to_string(),
+            communication_style: "Original style".to_string(),
+            default_participant: true,
+            source: PersonaSource::User,
+            backend: PersonaBackend::ClaudeCli,
+            model_name: None,
+            icon: None,
+            base_color: None,
+        };
+
+        // Save original
+        repo.save(&persona).await.unwrap();
+
+        // Update and save again
+        persona.name = "Updated Name".to_string();
+        persona.role = "Updated Role".to_string();
+        repo.save(&persona).await.unwrap();
+
+        // Verify update
+        let loaded = repo.find_by_id(&persona_id).await.unwrap();
+        assert!(loaded.is_some());
+        let loaded = loaded.unwrap();
+        assert_eq!(loaded.name, "Updated Name");
+        assert_eq!(loaded.role, "Updated Role");
+    }
+
+    #[tokio::test]
+    async fn test_delete_persona() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
+            .await
+            .unwrap();
+
+        let persona = Persona {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: "To Delete".to_string(),
+            role: "Tester".to_string(),
+            background: "Test background".to_string(),
+            communication_style: "Test style".to_string(),
+            default_participant: true,
+            source: PersonaSource::User,
+            backend: PersonaBackend::ClaudeCli,
+            model_name: None,
+            icon: None,
+            base_color: None,
+        };
+
+        // Save
+        repo.save(&persona).await.unwrap();
+
+        // Verify exists
+        assert!(repo.find_by_id(&persona.id).await.unwrap().is_some());
+
+        // Delete
+        repo.delete(&persona.id).await.unwrap();
+
+        // Verify deleted
+        assert!(repo.find_by_id(&persona.id).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_non_existent_persona() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
+            .await
+            .unwrap();
+
+        // Delete non-existent persona should not error
+        let result = repo.delete("non-existent-id").await;
+        assert!(result.is_ok());
     }
 }

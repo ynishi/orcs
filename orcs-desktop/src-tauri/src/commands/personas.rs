@@ -106,7 +106,45 @@ pub async fn get_personas(state: State<'_, AppState>) -> Result<Vec<Persona>, St
         .map_err(|e| e.to_string())
 }
 
-/// Saves persona configurations
+/// Saves a single persona configuration
+#[tauri::command]
+pub async fn save_persona(
+    persona: Persona,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .persona_repository
+        .save(&persona)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if let Some(manager) = state.session_usecase.active_session().await {
+        manager.invalidate_dialogue().await;
+    }
+
+    Ok(())
+}
+
+/// Deletes a persona by ID
+#[tauri::command]
+pub async fn delete_persona(
+    persona_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .persona_repository
+        .delete(&persona_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if let Some(manager) = state.session_usecase.active_session().await {
+        manager.invalidate_dialogue().await;
+    }
+
+    Ok(())
+}
+
+/// Saves persona configurations (bulk save)
 #[tauri::command]
 pub async fn save_persona_configs(
     configs: Vec<Persona>,

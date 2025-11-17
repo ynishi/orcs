@@ -19,6 +19,43 @@ use crate::error::Result;
 /// - Concurrent access if needed
 #[async_trait::async_trait]
 pub trait PersonaRepository: Send + Sync {
+    /// Finds a persona by its ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `persona_id` - The ID of the persona to find
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Some(Persona))`: Persona found
+    /// - `Ok(None)`: Persona not found
+    /// - `Err(OrcsError)`: Error occurred during retrieval
+    async fn find_by_id(&self, persona_id: &str) -> Result<Option<Persona>>;
+
+    /// Saves a persona to storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `persona` - The persona to save
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())`: Persona saved successfully
+    /// - `Err(OrcsError)`: Error occurred during save
+    async fn save(&self, persona: &Persona) -> Result<()>;
+
+    /// Deletes a persona from storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `persona_id` - The ID of the persona to delete
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())`: Persona deleted successfully (or didn't exist)
+    /// - `Err(OrcsError)`: Error occurred during deletion
+    async fn delete(&self, persona_id: &str) -> Result<()>;
+
     /// Retrieves all personas from storage.
     ///
     /// # Returns

@@ -84,14 +84,17 @@ impl SessionRepository for AsyncDirSessionRepository {
         {
             Ok(session) => Ok(Some(session)),
             Err(e) => {
-                let orcs_err = e.into();
+                let orcs_err: orcs_core::OrcsError = e.into();
                 tracing::debug!(
                     "find_by_id error for session_id={}: {:?}, is_not_found={}",
                     session_id,
                     orcs_err,
                     orcs_core::OrcsError::is_not_found(&orcs_err)
                 );
-                if orcs_core::OrcsError::is_not_found(&orcs_err) {
+                // Check if it's a NotFound error or an IO error with "File not found" message
+                if orcs_err.is_not_found()
+                    || (orcs_err.is_io() && orcs_err.to_string().contains("File not found"))
+                {
                     Ok(None)
                 } else {
                     Err(orcs_err)
@@ -101,9 +104,19 @@ impl SessionRepository for AsyncDirSessionRepository {
     }
 
     async fn save(&self, session: &Session) -> Result<()> {
+        tracing::debug!(
+            "[AsyncDirSessionRepository] save() called: id={}, title={}, is_favorite={}",
+            session.id,
+            session.title,
+            session.is_favorite
+        );
         self.storage
             .save(Self::ENTITY_NAME, &session.id, session)
             .await?;
+        tracing::debug!(
+            "[AsyncDirSessionRepository] save() completed: id={}",
+            session.id
+        );
         Ok(())
     }
 
@@ -113,16 +126,37 @@ impl SessionRepository for AsyncDirSessionRepository {
     }
 
     async fn list_all(&self) -> Result<Vec<Session>> {
-        let mut sessions = self
+        let sessions_with_ids = self
             .storage
             .load_all::<Session>(Self::ENTITY_NAME)
-            .await?
+            .await?;
+
+        tracing::debug!(
+            "[AsyncDirSessionRepository] list_all() loaded {} sessions from storage",
+            sessions_with_ids.len()
+        );
+
+        let mut sessions: Vec<Session> = sessions_with_ids
             .into_iter()
-            .map(|(_id, session)| session)
-            .collect::<Vec<Session>>();
+            .map(|(file_id, session)| {
+                tracing::debug!(
+                    "[AsyncDirSessionRepository] Loaded session: file_id={}, session.id={}, title={}, is_favorite={}",
+                    file_id,
+                    session.id,
+                    session.title,
+                    session.is_favorite
+                );
+                session
+            })
+            .collect();
 
         // Sort by updated_at descending (most recent first)
         sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+
+        tracing::debug!(
+            "[AsyncDirSessionRepository] list_all() returning {} sessions",
+            sessions.len()
+        );
 
         Ok(sessions)
     }
@@ -165,6 +199,24 @@ mod tests {
 
     #[async_trait]
     impl PersonaRepository for MockPersonaRepository {
+        async fn find_by_id(&self, persona_id: &str) -> Result<Option<Persona>> {
+            Ok(self
+                .personas
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|p| p.id == persona_id)
+                .cloned())
+        }
+
+        async fn save(&self, _persona: &Persona) -> Result<()> {
+            Ok(())
+        }
+
+        async fn delete(&self, _persona_id: &str) -> Result<()> {
+            Ok(())
+        }
+
         async fn get_all(&self) -> Result<Vec<Persona>> {
             Ok(self.personas.lock().unwrap().clone())
         }

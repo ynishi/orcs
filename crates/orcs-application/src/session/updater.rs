@@ -41,6 +41,11 @@ impl SessionUpdater {
     where
         F: FnOnce(&mut Session) -> Result<()>,
     {
+        tracing::debug!(
+            "[SessionUpdater] update() called for session_id: {}",
+            session_id
+        );
+
         // Load the session from storage
         let mut session = self
             .repository
@@ -51,14 +56,31 @@ impl SessionUpdater {
                 id: session_id.to_string(),
             })?;
 
+        tracing::debug!(
+            "[SessionUpdater] Loaded session: id={}, title={}, is_favorite={}",
+            session.id,
+            session.title,
+            session.is_favorite
+        );
+
         // Apply the updater function
         updater(&mut session)?;
+
+        tracing::debug!(
+            "[SessionUpdater] After updater: id={}, title={}, is_favorite={}",
+            session.id,
+            session.title,
+            session.is_favorite
+        );
 
         // Update timestamp
         session.updated_at = chrono::Utc::now().to_rfc3339();
 
         // Save back to storage
+        tracing::debug!("[SessionUpdater] Saving session: id={}", session.id);
         self.repository.save(&session).await?;
+
+        tracing::debug!("[SessionUpdater] Session saved successfully: id={}", session.id);
 
         Ok(())
     }

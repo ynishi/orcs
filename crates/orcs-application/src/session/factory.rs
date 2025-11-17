@@ -1,6 +1,7 @@
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{AppMode, Session};
 use orcs_core::user::UserService;
+use orcs_infrastructure::user_service::load_root_config;
 use orcs_interaction::InteractionManager;
 use std::sync::Arc;
 
@@ -42,10 +43,16 @@ impl SessionFactory {
     ///
     /// A new InteractionManager instance.
     pub fn create_interaction_manager(&self, session_id: String) -> InteractionManager {
+        // Load EnvSettings from config
+        let env_settings = load_root_config()
+            .map(|config| config.env_settings)
+            .unwrap_or_default(); // Use default if config load fails
+
         InteractionManager::new_session(
             session_id,
             self.persona_repository.clone(),
             self.user_service.clone(),
+            env_settings,
         )
     }
 
@@ -59,10 +66,16 @@ impl SessionFactory {
     ///
     /// An InteractionManager instance restored from the session data.
     pub fn from_session(&self, session: Session) -> InteractionManager {
+        // Load EnvSettings from config
+        let env_settings = load_root_config()
+            .map(|config| config.env_settings)
+            .unwrap_or_default(); // Use default if config load fails
+
         InteractionManager::from_session(
             session,
             self.persona_repository.clone(),
             self.user_service.clone(),
+            env_settings,
         )
     }
 

@@ -14,6 +14,7 @@ use llm_toolkit::agent::persona::Persona as LlmPersona;
 use llm_toolkit::agent::{Agent, AgentError, Payload};
 use llm_toolkit::attachment::Attachment;
 use orcs_core::agent::build_enhanced_path;
+use orcs_core::config::EnvSettings;
 use orcs_core::persona::{Persona as PersonaDomain, PersonaBackend};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{
@@ -140,6 +141,7 @@ struct PersonaBackendAgent {
     backend: PersonaBackend,
     model_name: Option<String>,
     workspace_root: Arc<RwLock<Option<PathBuf>>>,
+    env_settings: Arc<RwLock<EnvSettings>>,
 }
 
 impl PersonaBackendAgent {
@@ -147,11 +149,13 @@ impl PersonaBackendAgent {
         backend: PersonaBackend,
         model_name: Option<String>,
         workspace_root: Arc<RwLock<Option<PathBuf>>>,
+        env_settings: Arc<RwLock<EnvSettings>>,
     ) -> Self {
         Self {
             backend,
             model_name,
             workspace_root,
+            env_settings,
         }
     }
 
@@ -192,8 +196,8 @@ impl PersonaBackendAgent {
 
                 // Set workspace root and enhanced PATH if provided
                 if let Some(workspace) = workspace_root {
-                    // TODO: Pass EnvSettings from config
-                    let enhanced_path = build_enhanced_path(&workspace, None);
+                    let env_settings = self.env_settings.read().await;
+                    let enhanced_path = build_enhanced_path(&workspace, Some(&*env_settings));
                     agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
                 }
                 // Apply model if specified
@@ -216,8 +220,8 @@ impl PersonaBackendAgent {
                 let mut agent = GeminiAgent::new();
                 // Set workspace root and enhanced PATH if provided
                 if let Some(workspace) = workspace_root {
-                    // TODO: Pass EnvSettings from config
-                    let enhanced_path = build_enhanced_path(&workspace, None);
+                    let env_settings = self.env_settings.read().await;
+                    let enhanced_path = build_enhanced_path(&workspace, Some(&*env_settings));
                     agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
                 }
                 // Apply model if specified
@@ -249,8 +253,8 @@ impl PersonaBackendAgent {
                 let mut agent = CodexAgent::new();
                 // Set workspace root and enhanced PATH if provided
                 if let Some(workspace) = workspace_root {
-                    // TODO: Pass EnvSettings from config
-                    let enhanced_path = build_enhanced_path(&workspace, None);
+                    let env_settings = self.env_settings.read().await;
+                    let enhanced_path = build_enhanced_path(&workspace, Some(&*env_settings));
                     agent = agent.with_cwd(workspace).with_env("PATH", enhanced_path);
                 }
                 // Apply model if specified
@@ -293,6 +297,7 @@ impl Agent for PersonaBackendAgent {
 fn agent_for_persona(
     persona: &PersonaDomain,
     workspace_root: Arc<RwLock<Option<PathBuf>>>,
+    env_settings: Arc<RwLock<EnvSettings>>,
 ) -> Box<dyn Agent<Output = String>> {
     use llm_toolkit::agent::chat::Chat;
     use llm_toolkit::agent::persona::ContextConfig;
@@ -301,6 +306,7 @@ fn agent_for_persona(
         persona.backend.clone(),
         persona.model_name.clone(),
         workspace_root,
+        env_settings,
     );
 
     let llm_persona = domain_to_llm_persona(persona);
@@ -378,6 +384,8 @@ pub struct InteractionManager {
     persona_repository: Arc<dyn PersonaRepository>,
     /// Service for retrieving user information
     user_service: Arc<dyn UserService>,
+    /// Environment settings for PATH configuration (CLI tools)
+    env_settings: Arc<RwLock<EnvSettings>>,
     /// Execution strategy for dialogue
     execution_strategy: Arc<RwLock<ExecutionModel>>,
     /// Active participant persona IDs (restored from session or populated dynamically)
@@ -404,10 +412,12 @@ impl InteractionManager {
     /// * `session_id` - Unique identifier for this session
     /// * `persona_repository` - Repository for accessing persona configurations
     /// * `user_service` - Service for retrieving user information
+    /// * `env_settings` - Environment settings for PATH configuration
     pub fn new_session(
         session_id: String,
         persona_repository: Arc<dyn PersonaRepository>,
         user_service: Arc<dyn UserService>,
+        env_settings: EnvSettings,
     ) -> Self {
         let mut persona_histories_map = HashMap::new();
 
@@ -431,6 +441,7 @@ impl InteractionManager {
             persona_histories: Arc::new(RwLock::new(persona_histories_map)),
             persona_repository,
             user_service,
+            env_settings: Arc::new(RwLock::new(env_settings)),
             execution_strategy: Arc::new(RwLock::new(ExecutionModel::Broadcast)),
             restored_participant_ids: Arc::new(RwLock::new(None)),
             system_messages: Arc::new(RwLock::new(Vec::new())),
@@ -449,6 +460,7 @@ impl InteractionManager {
     /// * `data` - The session data to restore
     /// * `persona_repository` - Repository for accessing persona configurations
     /// * `user_service` - Service for retrieving user information
+    /// * `env_settings` - Environment settings for PATH configuration
     ///
     /// # Note
     ///
@@ -458,6 +470,7 @@ impl InteractionManager {
         data: Session,
         persona_repository: Arc<dyn PersonaRepository>,
         user_service: Arc<dyn UserService>,
+        env_settings: EnvSettings,
     ) -> Self {
         let restored_ids = if data.active_participant_ids.is_empty() {
             None
@@ -475,6 +488,7 @@ impl InteractionManager {
             persona_histories: Arc::new(RwLock::new(data.persona_histories)),
             persona_repository,
             user_service,
+            env_settings: Arc::new(RwLock::new(env_settings)),
             execution_strategy: Arc::new(RwLock::new(data.execution_strategy)),
             restored_participant_ids: Arc::new(RwLock::new(restored_ids)),
             system_messages: Arc::new(RwLock::new(data.system_messages)),
@@ -652,7 +666,11 @@ impl InteractionManager {
 
         for persona in personas_to_add {
             let llm_persona = domain_to_llm_persona(&persona);
-            let agent = agent_for_persona(&persona, self.agent_workspace_root.clone());
+            let agent = agent_for_persona(
+                &persona,
+                self.agent_workspace_root.clone(),
+                self.env_settings.clone(),
+            );
             dialogue.add_agent(llm_persona, agent);
         }
 
@@ -855,7 +873,11 @@ impl InteractionManager {
         // Lock the dialogue and add participant
         let mut dialogue_guard = self.dialogue.lock().await;
         let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
-        let agent = agent_for_persona(&persona_config, self.agent_workspace_root.clone());
+        let agent = agent_for_persona(
+            &persona_config,
+            self.agent_workspace_root.clone(),
+            self.env_settings.clone(),
+        );
         dialogue.add_agent(persona, agent);
 
         // Update restored_participant_ids to persist across dialogue recreations

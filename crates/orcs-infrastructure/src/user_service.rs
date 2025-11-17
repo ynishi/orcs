@@ -2,6 +2,8 @@
 //!
 //! This module provides a UserService implementation that loads user information
 //! from the configuration file (~/.config/orcs/config.toml).
+//!
+//! Also provides helper functions to load RootConfig for accessing other settings like EnvSettings.
 
 use crate::dto::create_config_root_migrator;
 use crate::paths::{OrcsPaths, ServiceType};
@@ -157,5 +159,71 @@ mod tests {
         let second = service.get_user_name();
 
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn test_load_root_config() {
+        let result = load_root_config();
+
+        // Should either load successfully or create default
+        assert!(result.is_ok());
+
+        let config = result.unwrap();
+        assert!(!config.user_profile.nickname.is_empty());
+    }
+}
+
+/// Loads the complete RootConfig from config.toml.
+///
+/// This function is useful for accessing configuration settings like EnvSettings,
+/// ModelSettings, etc. from various parts of the application.
+///
+/// # Returns
+///
+/// Returns `Ok(RootConfig)` if successfully loaded or created with defaults.
+/// Returns `Err(String)` if an unrecoverable error occurs.
+///
+/// # Example
+///
+/// ```ignore
+/// use orcs_infrastructure::user_service::load_root_config;
+///
+/// let config = load_root_config().expect("Failed to load config");
+/// let env_settings = config.env_settings;
+/// ```
+pub fn load_root_config() -> Result<RootConfig, String> {
+    // Get config path
+    let config_path = OrcsPaths::new(None)
+        .get_path(ServiceType::Config)
+        .map_err(|e| e.to_string())?
+        .into_path_buf();
+
+    // Create FileStorage with migrator for ConfigRoot
+    let migrator = create_config_root_migrator();
+    let strategy = FileStorageStrategy::new()
+        .with_format(FormatStrategy::Toml)
+        .with_load_behavior(LoadBehavior::CreateIfMissing);
+
+    let mut storage = FileStorage::new(config_path.clone(), migrator, strategy)
+        .map_err(|e| format!("Failed to create FileStorage: {}", e))?;
+
+    // Query config_root
+    let configs: Vec<RootConfig> = storage
+        .query("config_root")
+        .map_err(|e| format!("Failed to query config_root: {}", e))?;
+
+    // If no config exists, create default and save it
+    if configs.is_empty() {
+        let default_config = RootConfig::default();
+        storage
+            .update_and_save("config_root", vec![default_config.clone()])
+            .map_err(|e| format!("Failed to save default config: {}", e))?;
+        Ok(default_config)
+    } else {
+        // Return the first config
+        configs
+            .into_iter()
+            .next()
+            .ok_or_else(|| "No config found after query".to_string())
     }
 }

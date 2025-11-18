@@ -1284,3 +1284,51 @@ pub async fn start_auto_chat(
 
     Ok(result.into())
 }
+
+// ============================================================================
+// Session Support Commands (Summary, ActionPlan)
+// ============================================================================
+
+/// Generates a summary from conversation thread content.
+#[tauri::command]
+pub async fn generate_summary(
+    thread_content: String,
+    session_id: String,
+    _state: State<'_, AppState>,
+) -> Result<String, String> {
+    use orcs_application::SessionSupportAgentService;
+
+    tracing::info!("[SessionSupport] Generating summary for session: {}", session_id);
+
+    let service = SessionSupportAgentService::new();
+    let summary = service
+        .generate_summary(&thread_content)
+        .await
+        .map_err(|e| format!("Failed to generate summary: {}", e))?;
+
+    tracing::info!("[SessionSupport] Summary generated successfully");
+
+    Ok(summary)
+}
+
+/// Generates an action plan from conversation thread content.
+#[tauri::command]
+pub async fn generate_action_plan(
+    thread_content: String,
+    session_id: String,
+    _state: State<'_, AppState>,
+) -> Result<String, String> {
+    use orcs_application::SessionSupportAgentService;
+
+    tracing::info!("[SessionSupport] Generating action plan for session: {}", session_id);
+
+    let service = SessionSupportAgentService::new();
+    let action_plan = service
+        .generate_action_plan(&thread_content)
+        .await
+        .map_err(|e| format!("Failed to generate action plan: {}", e))?;
+
+    tracing::info!("[SessionSupport] Action plan generated successfully");
+
+    Ok(action_plan)
+}

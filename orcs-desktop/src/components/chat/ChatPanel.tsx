@@ -18,7 +18,7 @@ import {
   Paper,
   Text,
 } from '@mantine/core';
-import { IconSettings } from '@tabler/icons-react';
+import { IconSettings, IconClipboardList, IconFileText } from '@tabler/icons-react';
 import { MessageItem } from './MessageItem';
 import { StatusBar } from './StatusBar';
 import { CommandSuggestions } from './CommandSuggestions';
@@ -189,6 +189,9 @@ export function ChatPanel({
   const [slashCommandModalOpened, setSlashCommandModalOpened] = useState(false);
   const [slashCommandDraft, setSlashCommandDraft] = useState<Partial<SlashCommand> | null>(null);
 
+  // Hover state for thread command icons
+  const [isMessageAreaHovered, setIsMessageAreaHovered] = useState(false);
+
   // Load AutoChat config from backend when tab changes
   useEffect(() => {
     const loadAutoChatConfig = async () => {
@@ -351,6 +354,142 @@ export function ChatPanel({
       .join('\n---\n\n');
   }, [tab.messages]);
 
+  // Handle generating summary from thread
+  const handleGenerateSummary = useCallback(async () => {
+    const threadContent = getThreadAsText();
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      // Persist system message for Summary generation request
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: '📝 Generating summary from conversation...',
+            messageType: 'info',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Set thinking state
+      setTabThinking(tab.id, true, 'Summary');
+
+      // Call backend to generate summary
+      const summary = await invoke<string>('generate_summary', {
+        threadContent,
+        sessionId: tab.sessionId,
+      });
+
+      // Persist AI response with summary
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: summary,
+            messageType: 'ai_response',
+            severity: 'info',
+          },
+        ],
+      });
+
+      notifications.show({
+        title: 'Success',
+        message: 'Summary generated successfully!',
+        color: 'green',
+      });
+    } catch (error) {
+      console.error('[ChatPanel] Failed to generate summary:', error);
+
+      // Persist error message
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: `❌ Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            messageType: 'error',
+            severity: 'error',
+          },
+        ],
+      }).catch((e: unknown) => console.error('[ChatPanel] Failed to persist error message:', e));
+
+      notifications.show({
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to generate summary',
+        color: 'red',
+      });
+    } finally {
+      setTabThinking(tab.id, false);
+    }
+  }, [getThreadAsText, tab.id, tab.sessionId, setTabThinking]);
+
+  // Handle generating action plan from thread
+  const handleGenerateActionPlan = useCallback(async () => {
+    const threadContent = getThreadAsText();
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      // Persist system message for ActionPlan generation request
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: '📋 Generating ActionPlan from conversation...',
+            messageType: 'info',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Set thinking state
+      setTabThinking(tab.id, true, 'ActionPlan');
+
+      // Call backend to generate action plan
+      const actionPlan = await invoke<string>('generate_action_plan', {
+        threadContent,
+        sessionId: tab.sessionId,
+      });
+
+      // Persist AI response with action plan
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: actionPlan,
+            messageType: 'ai_response',
+            severity: 'info',
+          },
+        ],
+      });
+
+      notifications.show({
+        title: 'Success',
+        message: 'ActionPlan generated successfully!',
+        color: 'green',
+      });
+    } catch (error) {
+      console.error('[ChatPanel] Failed to generate ActionPlan:', error);
+
+      // Persist error message
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: `❌ Failed to generate ActionPlan: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            messageType: 'error',
+            severity: 'error',
+          },
+        ],
+      }).catch((e: unknown) => console.error('[ChatPanel] Failed to persist error message:', e));
+
+      notifications.show({
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to generate ActionPlan',
+        color: 'red',
+      });
+    } finally {
+      setTabThinking(tab.id, false);
+    }
+  }, [getThreadAsText, tab.id, tab.sessionId, setTabThinking]);
+
   // Handle creating a slash command from a message
   const handleCreateSlashCommand = useCallback((_message: Message) => {
     const threadContent = getThreadAsText();
@@ -396,6 +535,8 @@ export function ChatPanel({
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
+        onMouseEnter={() => setIsMessageAreaHovered(true)}
+        onMouseLeave={() => setIsMessageAreaHovered(false)}
       >
         <ScrollArea h="100%" viewportRef={viewport}>
           <Stack gap="sm" p="md">
@@ -419,6 +560,61 @@ export function ChatPanel({
             )}
           </Stack>
         </ScrollArea>
+
+        {/* Thread command icons (bottom-right floating) - Show on hover */}
+        {tab.messages.length > 0 && isMessageAreaHovered && (
+          <Paper
+            shadow="md"
+            p={8}
+            style={{
+              position: 'absolute',
+              bottom: 16,
+              right: 16,
+              zIndex: 100,
+              borderRadius: 8,
+              transition: 'opacity 0.2s ease-in-out',
+            }}
+          >
+            <Group gap={4}>
+              <CopyButton value={getThreadAsText()}>
+                {({ copied, copy }) => (
+                  <Tooltip label={copied ? 'Copied!' : 'Copy Session'} withArrow>
+                    <ActionIcon
+                      color={copied ? 'teal' : 'gray'}
+                      variant="filled"
+                      onClick={copy}
+                      size="lg"
+                    >
+                      {copied ? '✓' : '📄'}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </CopyButton>
+
+              <Tooltip label="Generate Summary" withArrow>
+                <ActionIcon
+                  color="blue"
+                  variant="filled"
+                  onClick={handleGenerateSummary}
+                  size="lg"
+                >
+                  <IconFileText size={18} />
+                </ActionIcon>
+              </Tooltip>
+
+              <Tooltip label="Generate ActionPlan" withArrow>
+                <ActionIcon
+                  color="violet"
+                  variant="filled"
+                  onClick={handleGenerateActionPlan}
+                  size="lg"
+                >
+                  <IconClipboardList size={18} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          </Paper>
+        )}
 
         {tab.isDragging && (
           <Paper
@@ -532,21 +728,6 @@ export function ChatPanel({
                 {autoMode ? '⏹️' : '▶️'}
               </ActionIcon>
             </Tooltip>
-
-            <CopyButton value={getThreadAsText()}>
-              {({ copied, copy }) => (
-                <Tooltip label={copied ? 'Copied!' : 'Copy thread'}>
-                  <ActionIcon
-                    color={copied ? 'teal' : 'blue'}
-                    variant="light"
-                    onClick={copy}
-                    size="lg"
-                  >
-                    {copied ? '✓' : '📄'}
-                  </ActionIcon>
-                </Tooltip>
-              )}
-            </CopyButton>
           </Group>
         </Stack>
       </form>

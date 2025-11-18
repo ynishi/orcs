@@ -12,8 +12,7 @@ use version_migrate::{IntoDomain, MigratesTo, Versioned};
 
 use super::{AppStateDTO, UserProfileDTO, WorkspaceV1};
 use orcs_core::config::{
-    ClaudeModelConfig, EnvSettings, GeminiModelConfig, ModelSettings, OpenAIModelConfig,
-    RootConfig,
+    ClaudeModelConfig, EnvSettings, GeminiModelConfig, ModelSettings, OpenAIModelConfig, RootConfig,
 };
 
 // ============================================================================

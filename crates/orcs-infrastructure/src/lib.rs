@@ -29,6 +29,7 @@ pub mod async_dir_task_repository;
 pub mod async_dir_workspace_repository;
 pub mod dto;
 pub mod paths;
+pub mod search;
 pub mod secret_service;
 pub mod state_repository;
 pub mod storage_repository;

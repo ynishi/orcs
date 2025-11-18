@@ -493,6 +493,16 @@ const BUILT_IN_COMMANDS: &[(&str, BuiltInCommand)] = &[
         },
     ),
     (
+        "search",
+        BuiltInCommand {
+            usage: "/search <query> [scope:workspace|local|global]",
+            description: "Search workspace or local files for the provided query",
+            args: Some(
+                "Provide a query to search. Optionally set scope:workspace|local|global to control coverage",
+            ),
+        },
+    ),
+    (
         "mode",
         BuiltInCommand {
             usage: "/mode [normal|concise|brief|discussion]",

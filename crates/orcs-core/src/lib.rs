@@ -4,6 +4,7 @@ pub mod dialogue;
 pub mod error;
 pub mod persona;
 pub mod repository;
+pub mod search;
 pub mod secret;
 pub mod session;
 pub mod slash_command;

@@ -41,7 +41,7 @@ pub use config_root::{
 };
 
 // Re-export dialogue_preset DTOs and migrator
-pub use dialogue_preset::{create_dialogue_preset_migrator, DialoguePresetV1_0_0};
+pub use dialogue_preset::{DialoguePresetV1_0_0, create_dialogue_preset_migrator};
 
 // Re-export persona DTOs and migrator
 pub use persona::{

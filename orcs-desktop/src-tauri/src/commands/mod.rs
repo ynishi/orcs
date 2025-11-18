@@ -3,6 +3,7 @@ pub mod files;
 pub mod git;
 pub mod paths;
 pub mod personas;
+pub mod search;
 pub mod session;
 pub mod slash_commands;
 pub mod tasks;
@@ -93,5 +94,6 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         session::update_auto_chat_config,
         session::get_auto_chat_status,
         session::start_auto_chat,
+        search::execute_search,
     ]
 }

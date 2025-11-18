@@ -19,5 +19,5 @@ pub mod preset;
 pub mod repository;
 
 // Re-export public API
-pub use preset::{get_default_presets, DialoguePreset, PresetSource};
+pub use preset::{DialoguePreset, PresetSource, get_default_presets};
 pub use repository::DialoguePresetRepository;

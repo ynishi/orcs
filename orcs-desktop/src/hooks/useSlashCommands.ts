@@ -17,6 +17,7 @@ import type { StatusInfo } from '../types/status';
 import type { Workspace } from '../types/workspace';
 import type { UploadedFile } from '../types/workspace';
 import type { SlashCommand, ExpandedSlashCommand } from '../types/slash_command';
+import type { SearchResult, SearchScope as SearchScopeType } from '../types/search';
 
 export interface SlashCommandResult {
   nextInput: string | null;
@@ -476,6 +477,111 @@ Generate the BlueprintWorkflow now.`;
             );
             await saveCurrentSession();
             break;
+
+          case 'search': {
+            if (!parsed.args || parsed.args.length === 0) {
+              await handleAndPersistSystemMessage(
+                conversationMessage(
+                  'Usage: /search <query> [scope:workspace|local|global]\nExample: /search session.rs\nExample: /search scope:local agent.rs',
+                  'error'
+                ),
+                addMessage,
+                invoke
+              );
+              await saveCurrentSession();
+              break;
+            }
+
+            let scope: SearchScopeType = 'workspace';
+            const queryParts: string[] = [];
+            let invalidScope = false;
+
+            parsed.args.forEach((part) => {
+              const normalized = part.toLowerCase();
+              if (normalized.startsWith('scope:') || normalized.startsWith('scope=')) {
+                const [, rawValue = ''] = normalized.split(/[:=]/, 2);
+                if (rawValue === 'workspace' || rawValue === 'local' || rawValue === 'global') {
+                  scope = rawValue as SearchScopeType;
+                } else {
+                  invalidScope = true;
+                }
+              } else {
+                queryParts.push(part);
+              }
+            });
+
+            if (invalidScope) {
+              await handleAndPersistSystemMessage(
+                conversationMessage(
+                  'Invalid scope. Available scopes: workspace, local, global.',
+                  'error'
+                ),
+                addMessage,
+                invoke
+              );
+              await saveCurrentSession();
+              break;
+            }
+
+            if (queryParts.length === 0) {
+              await handleAndPersistSystemMessage(
+                conversationMessage('Please provide a search query after /search.', 'error'),
+                addMessage,
+                invoke
+              );
+              await saveCurrentSession();
+              break;
+            }
+
+            const query = queryParts.join(' ');
+            try {
+              const result = await invoke<SearchResult>('execute_search', {
+                request: {
+                  query,
+                  scope,
+                  filters: null,
+                },
+              });
+
+              const maxDisplay = 20;
+              const displayedItems = result.items.slice(0, maxDisplay);
+              const resultLines =
+                displayedItems.length > 0
+                  ? displayedItems
+                      .map((item) => {
+                        const location = item.line_number
+                          ? `${item.path}:${item.line_number}`
+                          : item.path;
+                        const snippet = item.content.trim();
+                        return `• ${location}\n  ${snippet}`;
+                      })
+                      .join('\n')
+                  : '_No matches found._';
+              const overflow =
+                result.total_matches > maxDisplay
+                  ? `\n…and ${result.total_matches - maxDisplay} more matches.`
+                  : '';
+
+              await handleAndPersistSystemMessage(
+                conversationMessage(
+                  `Search results for "${result.query}" (scope: ${result.scope})\n${resultLines}${overflow}`,
+                  'info',
+                  '🔍'
+                ),
+                addMessage,
+                invoke
+              );
+            } catch (error) {
+              await handleAndPersistSystemMessage(
+                conversationMessage(`Search failed: ${error}`, 'error', '❌'),
+                addMessage,
+                invoke
+              );
+            }
+
+            await saveCurrentSession();
+            break;
+          }
 
           case 'mode':
             if (parsed.args && parsed.args.length > 0) {

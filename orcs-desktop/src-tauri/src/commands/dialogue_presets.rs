@@ -5,7 +5,9 @@ use crate::app::AppState;
 
 /// Gets all dialogue presets (system + user)
 #[tauri::command]
-pub async fn get_dialogue_presets(state: State<'_, AppState>) -> Result<Vec<DialoguePreset>, String> {
+pub async fn get_dialogue_presets(
+    state: State<'_, AppState>,
+) -> Result<Vec<DialoguePreset>, String> {
     state
         .dialogue_preset_repository
         .get_all()
@@ -61,8 +63,12 @@ pub async fn apply_dialogue_preset(
         .ok_or("No active session")?;
 
     // Apply preset settings
-    manager.set_execution_strategy(preset.execution_strategy).await;
-    manager.set_conversation_mode(preset.conversation_mode).await;
+    manager
+        .set_execution_strategy(preset.execution_strategy)
+        .await;
+    manager
+        .set_conversation_mode(preset.conversation_mode)
+        .await;
 
     if let Some(style) = preset.talk_style {
         manager.set_talk_style(Some(style)).await;

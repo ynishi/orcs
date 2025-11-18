@@ -22,10 +22,12 @@
 //! with user-created presets from storage. System presets cannot be modified
 //! or deleted.
 
+use crate::OrcsPaths;
 use crate::dto::create_dialogue_preset_migrator;
 use crate::storage_repository::StorageRepository;
-use crate::OrcsPaths;
-use orcs_core::dialogue::{get_default_presets, DialoguePreset, DialoguePresetRepository, PresetSource};
+use orcs_core::dialogue::{
+    DialoguePreset, DialoguePresetRepository, PresetSource, get_default_presets,
+};
 use orcs_core::error::Result;
 use std::path::Path;
 use version_migrate::AsyncDirStorage;
@@ -74,7 +76,9 @@ impl AsyncDirDialoguePresetRepository {
 impl DialoguePresetRepository for AsyncDirDialoguePresetRepository {
     async fn find_by_id(&self, preset_id: &str) -> Result<Option<DialoguePreset>> {
         // Check system presets first
-        if let Some(system_preset) = get_default_presets().into_iter().find(|p| p.id == preset_id)
+        if let Some(system_preset) = get_default_presets()
+            .into_iter()
+            .find(|p| p.id == preset_id)
         {
             return Ok(Some(system_preset));
         }
@@ -251,10 +255,7 @@ mod tests {
 
         // Attempt to delete system preset should fail
         let result = repo.delete("preset-brainstorm").await;
-        assert!(
-            result.is_err(),
-            "Should not allow deleting system presets"
-        );
+        assert!(result.is_err(), "Should not allow deleting system presets");
     }
 
     #[tokio::test]
@@ -320,9 +321,7 @@ mod tests {
         );
 
         // Verify both types are included
-        let has_system = all_presets
-            .iter()
-            .any(|p| p.source == PresetSource::System);
+        let has_system = all_presets.iter().any(|p| p.source == PresetSource::System);
         let has_user = all_presets.iter().any(|p| p.source == PresetSource::User);
         assert!(has_system, "Should include system presets");
         assert!(has_user, "Should include user presets");

@@ -75,6 +75,17 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     examples: ['/files'],
   },
   {
+    name: 'search',
+    icon: '🔍',
+    description: 'Search files using ripgrep in the current or local workspace scope',
+    usage: '/search <query> [scope:workspace|local|global]',
+    examples: [
+      '/search useSlashCommands',
+      '/search scope:local session.rs',
+    ],
+    argsDescription: 'Provide a search query. Optionally prepend scope:workspace, scope:local, or scope:global to control where the search runs.',
+  },
+  {
     name: 'expert',
     icon: '🔶',
     description: 'Create an adhoc expert persona for immediate collaboration',

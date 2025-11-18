@@ -80,7 +80,10 @@ impl SessionUpdater {
         tracing::debug!("[SessionUpdater] Saving session: id={}", session.id);
         self.repository.save(&session).await?;
 
-        tracing::debug!("[SessionUpdater] Session saved successfully: id={}", session.id);
+        tracing::debug!(
+            "[SessionUpdater] Session saved successfully: id={}",
+            session.id
+        );
 
         Ok(())
     }

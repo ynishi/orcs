@@ -1,9 +1,9 @@
 //! Dialogue preset DTOs and migrations
 
-use serde::{Deserialize, Serialize};
-use version_migrate::{FromDomain, IntoDomain, Versioned};
 use orcs_core::dialogue::{DialoguePreset, PresetSource};
 use orcs_core::session::ConversationMode;
+use serde::{Deserialize, Serialize};
+use version_migrate::{FromDomain, IntoDomain, Versioned};
 
 /// Dialogue preset DTO V1.0.0
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
@@ -37,9 +37,7 @@ impl IntoDomain<DialoguePreset> for DialoguePresetV1_0_0 {
             execution_strategy: serde_json::from_str(&self.execution_strategy)
                 .unwrap_or(llm_toolkit::agent::dialogue::ExecutionModel::Broadcast),
             conversation_mode: self.conversation_mode,
-            talk_style: self
-                .talk_style
-                .and_then(|s| serde_json::from_str(&s).ok()),
+            talk_style: self.talk_style.and_then(|s| serde_json::from_str(&s).ok()),
             created_at: self.created_at,
             source: self.source,
         }

@@ -108,10 +108,7 @@ pub async fn get_personas(state: State<'_, AppState>) -> Result<Vec<Persona>, St
 
 /// Saves a single persona configuration
 #[tauri::command]
-pub async fn save_persona(
-    persona: Persona,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn save_persona(persona: Persona, state: State<'_, AppState>) -> Result<(), String> {
     state
         .persona_repository
         .save(&persona)
@@ -127,10 +124,7 @@ pub async fn save_persona(
 
 /// Deletes a persona by ID
 #[tauri::command]
-pub async fn delete_persona(
-    persona_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn delete_persona(persona_id: String, state: State<'_, AppState>) -> Result<(), String> {
     state
         .persona_repository
         .delete(&persona_id)

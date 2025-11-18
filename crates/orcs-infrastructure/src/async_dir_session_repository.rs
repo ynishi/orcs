@@ -126,10 +126,7 @@ impl SessionRepository for AsyncDirSessionRepository {
     }
 
     async fn list_all(&self) -> Result<Vec<Session>> {
-        let sessions_with_ids = self
-            .storage
-            .load_all::<Session>(Self::ENTITY_NAME)
-            .await?;
+        let sessions_with_ids = self.storage.load_all::<Session>(Self::ENTITY_NAME).await?;
 
         tracing::debug!(
             "[AsyncDirSessionRepository] list_all() loaded {} sessions from storage",

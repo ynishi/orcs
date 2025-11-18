@@ -2721,6 +2721,7 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "llm-toolkit",
+ "reqwest",
  "serde",
  "serde_json",
  "tempfile",

@@ -545,6 +545,7 @@ Generate the BlueprintWorkflow now.`;
 
               const maxDisplay = 20;
               const displayedItems = result.items.slice(0, maxDisplay);
+              const summaryText = result.summary ? `${result.summary.trim()}\n\n` : '';
               const resultLines =
                 displayedItems.length > 0
                   ? displayedItems
@@ -564,7 +565,7 @@ Generate the BlueprintWorkflow now.`;
 
               await handleAndPersistSystemMessage(
                 conversationMessage(
-                  `Search results for "${result.query}" (scope: ${result.scope})\n${resultLines}${overflow}`,
+                  `Search results for "${result.query}" (scope: ${result.scope})\n\n${summaryText}${resultLines}${overflow}`,
                   'info',
                   '🔍'
                 ),

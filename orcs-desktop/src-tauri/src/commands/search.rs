@@ -1,6 +1,10 @@
 //! Tauri commands for unified search functionality.
 
-use orcs_core::search::{SearchFilters, SearchResult, SearchScope, SearchService};
+use llm_toolkit::agent::{Agent, Payload};
+use orcs_core::agent::{WebSearchAgent, WebSearchReference};
+use orcs_core::search::{
+    SearchFilters, SearchResult, SearchResultItem, SearchScope, SearchService,
+};
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_infrastructure::search::RipgrepSearchService;
@@ -31,6 +35,10 @@ pub async fn execute_search(
     request: SearchRequest,
     state: State<'_, AppState>,
 ) -> Result<SearchResult, String> {
+    if request.scope == SearchScope::Global {
+        return execute_global_search(&request.query, state).await;
+    }
+
     tracing::info!("execute_search: Query: {}", request.query);
     tracing::info!("execute_search: Scope: {:?}", request.scope);
 
@@ -79,4 +87,69 @@ pub async fn execute_search(
     tracing::info!("execute_search: Found {} matches", result.total_matches);
 
     Ok(result)
+}
+
+async fn execute_global_search(
+    query: &str,
+    state: State<'_, AppState>,
+) -> Result<SearchResult, String> {
+    if query.trim().is_empty() {
+        return Err("Search query cannot be empty".to_string());
+    }
+
+    let secrets = state
+        .secret_service
+        .load_secrets()
+        .await
+        .map_err(|e| format!("Failed to load secrets: {e}"))?;
+
+    let gemini_config = secrets
+        .gemini
+        .ok_or_else(|| "Gemini configuration missing in secret.json".to_string())?;
+
+    if gemini_config.api_key.trim().is_empty() {
+        return Err("Gemini API key is not configured".to_string());
+    }
+
+    let agent = WebSearchAgent::new(gemini_config.api_key);
+    let payload: Payload = query.to_string().into();
+    let response = agent
+        .execute(payload)
+        .await
+        .map_err(|e| format!("WebSearch failed: {e}"))?;
+
+    let items: Vec<SearchResultItem> = response
+        .references
+        .iter()
+        .map(|reference| SearchResultItem {
+            path: reference.title.clone(),
+            line_number: None,
+            content: format_reference(reference),
+            context_before: None,
+            context_after: None,
+        })
+        .collect();
+
+    let mut result = SearchResult::new(query.to_string(), SearchScope::Global, items);
+    if !response.answer.trim().is_empty() {
+        result.summary = Some(response.answer);
+    }
+
+    Ok(result)
+}
+
+fn format_reference(reference: &WebSearchReference) -> String {
+    let mut lines = Vec::new();
+    if let Some(snippet) = &reference.snippet {
+        if !snippet.trim().is_empty() {
+            lines.push(snippet.trim().to_string());
+        }
+    }
+    lines.push(reference.url.clone());
+    if let Some(source) = &reference.source {
+        if !source.trim().is_empty() {
+            lines.push(format!("Source: {}", source));
+        }
+    }
+    lines.join("\n")
 }

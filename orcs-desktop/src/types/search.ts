@@ -20,5 +20,6 @@ export interface SearchResult {
   query: string;
   scope: SearchScope;
   items: SearchResultItem[];
+  summary?: string;
   total_matches: number;
 }

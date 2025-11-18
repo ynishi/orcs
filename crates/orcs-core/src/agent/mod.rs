@@ -20,7 +20,9 @@
 mod builder;
 mod config;
 mod env;
+mod web_search;
 
 pub use builder::AgentBuilder;
 pub use config::{AgentConfig, WorkspaceConfig};
 pub use env::build_enhanced_path;
+pub use web_search::{WebSearchAgent, WebSearchReference, WebSearchResponse};

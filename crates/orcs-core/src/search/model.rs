@@ -78,6 +78,10 @@ pub struct SearchResult {
     /// Search result items
     pub items: Vec<SearchResultItem>,
 
+    /// Optional summary/answer describing the results (used for global web search)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+
     /// Total number of matches (may be larger than items.len() if limited)
     pub total_matches: usize,
 }
@@ -89,6 +93,7 @@ impl SearchResult {
             query,
             scope,
             items: Vec::new(),
+            summary: None,
             total_matches: 0,
         }
     }
@@ -100,6 +105,7 @@ impl SearchResult {
             query,
             scope,
             items,
+            summary: None,
             total_matches,
         }
     }

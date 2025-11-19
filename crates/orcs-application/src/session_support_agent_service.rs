@@ -149,6 +149,65 @@ struct ActionPlanGenerationRequest {
     output_schema: String,
 }
 
+#[derive(Debug, Clone, Serialize, ToPrompt, Default)]
+#[prompt(
+    template = r#"Extract reusable expertise and patterns from this conversation for future use:
+
+{{ conversation }}
+
+Requirements:
+- Identify the core skill or knowledge demonstrated
+- Extract generalizable patterns and best practices
+- Create a reusable prompt template
+- Specify when and how to apply this expertise
+- List relevant technologies and concepts
+
+Focus on creating a reference that can be reused as a SlashCommand, Persona, or general knowledge base entry.
+
+Output format (Markdown):
+# 💡 [Skill/Expertise Name]
+
+## Overview
+
+[Brief description of what this expertise covers]
+
+## Core Concepts
+
+[Key concepts and patterns extracted from the conversation]
+
+## When to Use
+
+- [Use case 1]
+- [Use case 2]
+- [Use case 3]
+
+## Reusable Prompt Template
+
+```
+[Template with placeholders for reuse]
+```
+
+## Example Usage
+
+[Concrete example showing how to apply this expertise]
+
+## Related Technologies
+
+- [Technology 1]
+- [Technology 2]
+
+## Best Practices
+
+- [Practice 1]
+- [Practice 2]
+
+IMPORTANT: Output ONLY Markdown, no JSON or code blocks wrapping."#
+)]
+struct ExpertiseGenerationRequest {
+    /// The conversation content to extract expertise from
+    conversation: String,
+}
+
 /// Lightweight agent for generating conversation summaries using Gemini Flash API
 #[derive(llm_toolkit::Agent)]
 #[agent(
@@ -167,19 +226,31 @@ struct SummaryGeneratorAgent;
 )]
 struct ActionPlanGeneratorAgent;
 
+/// Lightweight agent for generating expertise from Gemini Flash API
+#[derive(llm_toolkit::Agent)]
+#[agent(
+    expertise = "Extract reusable expertise and patterns from conversations. Create generalizable knowledge for SlashCommands and Personas.",
+    output = "String",
+    default_inner = "orcs_interaction::GeminiApiAgent"
+)]
+struct ExpertiseGeneratorAgent;
+
 /// Service providing session support LLM utilities
 pub struct SessionSupportAgentService {
     summary_agent: SummaryGeneratorAgent,
     action_plan_agent: ActionPlanGeneratorAgent,
+    expertise_agent: ExpertiseGeneratorAgent,
 }
 
 impl SessionSupportAgentService {
     pub fn new() -> Self {
         let summary_agent = SummaryGeneratorAgent;
         let action_plan_agent = ActionPlanGeneratorAgent;
+        let expertise_agent = ExpertiseGeneratorAgent;
         Self {
             summary_agent,
             action_plan_agent,
+            expertise_agent,
         }
     }
 
@@ -266,6 +337,43 @@ impl SessionSupportAgentService {
         // Agent returns Markdown directly (output = "String")
         let markdown: String = self
             .action_plan_agent
+            .execute(prompt.as_str().into())
+            .await?;
+
+        Ok(markdown)
+    }
+
+    /// Generate expertise from conversation thread
+    ///
+    /// # Arguments
+    ///
+    /// * `thread_content` - The conversation thread to extract expertise from
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(String)` - Generated expertise in markdown format
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let expertise = service.generate_expertise(
+    ///     "[2024-01-01 10:00:00] User (user):\nHelp me debug API errors...\n---\n..."
+    /// ).await?;
+    /// ```
+    pub async fn generate_expertise(&self, thread_content: &str) -> Result<String> {
+        use llm_toolkit::prompt::ToPrompt;
+
+        // Create typed request with Jinja2 template
+        let request = ExpertiseGenerationRequest {
+            conversation: thread_content.to_string(),
+        };
+
+        // Generate prompt using ToPrompt derive
+        let prompt = request.to_prompt();
+
+        // Agent returns Markdown directly (output = "String")
+        let markdown: String = self
+            .expertise_agent
             .execute(prompt.as_str().into())
             .await?;
 

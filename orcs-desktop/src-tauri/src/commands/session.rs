@@ -1332,3 +1332,25 @@ pub async fn generate_action_plan(
 
     Ok(action_plan)
 }
+
+/// Generates expertise from conversation thread content.
+#[tauri::command]
+pub async fn generate_expertise(
+    thread_content: String,
+    session_id: String,
+    _state: State<'_, AppState>,
+) -> Result<String, String> {
+    use orcs_application::SessionSupportAgentService;
+
+    tracing::info!("[SessionSupport] Generating expertise for session: {}", session_id);
+
+    let service = SessionSupportAgentService::new();
+    let expertise = service
+        .generate_expertise(&thread_content)
+        .await
+        .map_err(|e| format!("Failed to generate expertise: {}", e))?;
+
+    tracing::info!("[SessionSupport] Expertise generated successfully");
+
+    Ok(expertise)
+}

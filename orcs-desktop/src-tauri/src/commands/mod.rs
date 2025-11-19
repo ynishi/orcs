@@ -96,6 +96,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         session::start_auto_chat,
         session::generate_summary,
         session::generate_action_plan,
+        session::generate_expertise,
         search::execute_search,
     ]
 }

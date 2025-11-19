@@ -18,7 +18,7 @@ import {
   Paper,
   Text,
 } from '@mantine/core';
-import { IconSettings, IconClipboardList, IconFileText } from '@tabler/icons-react';
+import { IconSettings, IconClipboardList, IconFileText, IconBulb } from '@tabler/icons-react';
 import { MessageItem } from './MessageItem';
 import { StatusBar } from './StatusBar';
 import { CommandSuggestions } from './CommandSuggestions';
@@ -490,6 +490,74 @@ export function ChatPanel({
     }
   }, [getThreadAsText, tab.id, tab.sessionId, setTabThinking]);
 
+  // Handle generating expertise from thread
+  const handleGenerateExpertise = useCallback(async () => {
+    const threadContent = getThreadAsText();
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      // Persist system message for Expertise generation request
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: '💡 Generating Expertise from conversation...',
+            messageType: 'info',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Set thinking state
+      setTabThinking(tab.id, true, 'Expertise');
+
+      // Call backend to generate expertise
+      const expertise = await invoke<string>('generate_expertise', {
+        threadContent,
+        sessionId: tab.sessionId,
+      });
+
+      // Persist AI response with expertise
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: expertise,
+            messageType: 'ai_response',
+            severity: 'info',
+          },
+        ],
+      });
+
+      notifications.show({
+        title: 'Success',
+        message: 'Expertise generated successfully!',
+        color: 'green',
+      });
+    } catch (error) {
+      console.error('[ChatPanel] Failed to generate Expertise:', error);
+
+      // Persist error message
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: `❌ Failed to generate Expertise: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            messageType: 'error',
+            severity: 'error',
+          },
+        ],
+      }).catch((e: unknown) => console.error('[ChatPanel] Failed to persist error message:', e));
+
+      notifications.show({
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to generate Expertise',
+        color: 'red',
+      });
+    } finally {
+      setTabThinking(tab.id, false);
+    }
+  }, [getThreadAsText, tab.id, tab.sessionId, setTabThinking]);
+
   // Handle creating a slash command from a message
   const handleCreateSlashCommand = useCallback((_message: Message) => {
     const threadContent = getThreadAsText();
@@ -610,6 +678,17 @@ export function ChatPanel({
                   size="lg"
                 >
                   <IconClipboardList size={18} />
+                </ActionIcon>
+              </Tooltip>
+
+              <Tooltip label="Generate Expertise" withArrow>
+                <ActionIcon
+                  color="yellow"
+                  variant="filled"
+                  onClick={handleGenerateExpertise}
+                  size="lg"
+                >
+                  <IconBulb size={18} />
                 </ActionIcon>
               </Tooltip>
             </Group>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor, Image, Stack } from '@mantine/core';
-import { IconDeviceFloppy, IconRocket, IconCommand } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRocket, IconCommand, IconUser } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Message, getMessageStyle } from '../../types/message';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
@@ -10,6 +10,7 @@ interface MessageItemProps {
   onSaveToWorkspace?: (message: Message) => Promise<void>;
   onExecuteAsTask?: (message: Message) => Promise<void>;
   onCreateSlashCommand?: (message: Message) => void;
+  onCreatePersona?: (message: Message) => void;
   workspaceRootPath?: string;
 }
 
@@ -99,7 +100,7 @@ function formatModelName(modelName: string | null | undefined): string | null {
   return modelName.slice(0, 20);
 }
 
-export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCreateSlashCommand, workspaceRootPath }: MessageItemProps) {
+export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCreateSlashCommand, onCreatePersona, workspaceRootPath }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -256,6 +257,19 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
                     </ActionIcon>
                   </Tooltip>
                 )}
+
+                {onCreatePersona && (
+                  <Tooltip label="Create Persona" withArrow>
+                    <ActionIcon
+                      color="pink"
+                      variant="subtle"
+                      onClick={() => onCreatePersona(message)}
+                      size="sm"
+                    >
+                      <IconUser size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
               </Group>
             )}
           </Group>
@@ -356,6 +370,19 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
                       size="sm"
                     >
                       <IconCommand size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+
+                {onCreatePersona && (
+                  <Tooltip label="Create Persona" withArrow>
+                    <ActionIcon
+                      color="pink"
+                      variant="subtle"
+                      onClick={() => onCreatePersona(message)}
+                      size="sm"
+                    >
+                      <IconUser size={16} />
                     </ActionIcon>
                   </Tooltip>
                 )}

@@ -89,6 +89,7 @@ interface MessageListProps {
   onSaveMessageToWorkspace: (message: Message) => Promise<void>;
   onExecuteAsTask: (message: Message) => Promise<void>;
   onCreateSlashCommand: (message: Message) => void;
+  onCreatePersona: (message: Message) => void;
   workspaceRootPath?: string;
 }
 
@@ -98,6 +99,7 @@ const MessageList = memo(
     onSaveMessageToWorkspace,
     onExecuteAsTask,
     onCreateSlashCommand,
+    onCreatePersona,
     workspaceRootPath,
   }: MessageListProps) => (
     <>
@@ -108,6 +110,7 @@ const MessageList = memo(
           onSaveToWorkspace={onSaveMessageToWorkspace}
           onExecuteAsTask={onExecuteAsTask}
           onCreateSlashCommand={onCreateSlashCommand}
+          onCreatePersona={onCreatePersona}
           workspaceRootPath={workspaceRootPath}
         />
       ))}
@@ -126,7 +129,8 @@ function onSaveExecHandlersEqual(
   return (
     prev.onSaveMessageToWorkspace === next.onSaveMessageToWorkspace &&
     prev.onExecuteAsTask === next.onExecuteAsTask &&
-    prev.onCreateSlashCommand === next.onCreateSlashCommand
+    prev.onCreateSlashCommand === next.onCreateSlashCommand &&
+    prev.onCreatePersona === next.onCreatePersona
   );
 }
 
@@ -569,6 +573,17 @@ export function ChatPanel({
     setSlashCommandModalOpened(true);
   }, [getThreadAsText]);
 
+  // Handle creating a persona from a message (same as slash command for now)
+  const handleCreatePersona = useCallback((_message: Message) => {
+    const threadContent = getThreadAsText();
+    setSlashCommandDraft({
+      type: 'prompt',
+      content: threadContent,
+      icon: '👤',
+    });
+    setSlashCommandModalOpened(true);
+  }, [getThreadAsText]);
+
   // Handle saving the new slash command
   const handleSaveSlashCommand = async (command: SlashCommand) => {
     try {
@@ -615,6 +630,7 @@ export function ChatPanel({
                 onSaveMessageToWorkspace={onSaveMessageToWorkspace}
                 onExecuteAsTask={onExecuteAsTask}
                 onCreateSlashCommand={handleCreateSlashCommand}
+                onCreatePersona={handleCreatePersona}
                 workspaceRootPath={workspace?.rootPath}
               />
             ) : (

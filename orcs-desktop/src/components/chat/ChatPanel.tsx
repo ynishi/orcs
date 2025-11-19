@@ -563,26 +563,24 @@ export function ChatPanel({
   }, [getThreadAsText, tab.id, tab.sessionId, setTabThinking]);
 
   // Handle creating a slash command from a message
-  const handleCreateSlashCommand = useCallback((_message: Message) => {
-    const threadContent = getThreadAsText();
+  const handleCreateSlashCommand = useCallback((message: Message) => {
     setSlashCommandDraft({
       type: 'prompt',
-      content: threadContent,
+      content: message.text,  // Use message content only, not entire thread
       icon: '⚡',
     });
     setSlashCommandModalOpened(true);
-  }, [getThreadAsText]);
+  }, []);
 
   // Handle creating a persona from a message (same as slash command for now)
-  const handleCreatePersona = useCallback((_message: Message) => {
-    const threadContent = getThreadAsText();
+  const handleCreatePersona = useCallback((message: Message) => {
     setSlashCommandDraft({
       type: 'prompt',
-      content: threadContent,
+      content: message.text,  // Use message content only, not entire thread
       icon: '👤',
     });
     setSlashCommandModalOpened(true);
-  }, [getThreadAsText]);
+  }, []);
 
   // Handle saving the new slash command
   const handleSaveSlashCommand = async (command: SlashCommand) => {

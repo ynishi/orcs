@@ -2,6 +2,38 @@
 //!
 //! This agent calls the Gemini REST API directly without CLI dependency.
 //! Configuration is loaded from secret.json
+//!
+//! # Gemini 3 Support
+//!
+//! This implementation supports Gemini 3 with thinking capabilities and Google Search.
+//!
+//! ## Basic Usage
+//!
+//! ```rust,no_run
+//! use orcs_interaction::gemini_api_agent::GeminiApiAgent;
+//! use llm_toolkit::agent::Agent;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Default Gemini 2.5 Flash
+//! let agent = GeminiApiAgent::try_from_env().await?;
+//! let response = agent.execute("Hello, world!".into()).await?;
+//!
+//! // Gemini 3 with thinking capabilities
+//! let agent_3 = GeminiApiAgent::try_gemini_3_from_env(false).await?;
+//! let response = agent_3.execute("Solve this complex problem...".into()).await?;
+//!
+//! // Gemini 3 with Google Search
+//! let agent_search = GeminiApiAgent::try_gemini_3_from_env(true).await?;
+//! let response = agent_search.execute("What's the latest news about AI?".into()).await?;
+//!
+//! // Custom configuration
+//! let custom_agent = GeminiApiAgent::try_from_env().await?
+//!     .with_model("gemini-3-pro-preview")
+//!     .with_thinking_level("HIGH")
+//!     .with_google_search(true);
+//! # Ok(())
+//! # }
+//! ```
 
 use async_trait::async_trait;
 use base64::Engine;
@@ -15,6 +47,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const DEFAULT_GEMINI_MODEL: &str = "gemini-2.5-flash";
+const GEMINI_3_PRO_MODEL: &str = "gemini-3-pro-preview";
 const BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /// Agent implementation that talks to the Gemini HTTP API.
@@ -24,6 +57,8 @@ pub struct GeminiApiAgent {
     api_key: String,
     model: String,
     system_instruction: Option<String>,
+    thinking_level: Option<String>,
+    enable_google_search: bool,
 }
 
 impl GeminiApiAgent {
@@ -34,6 +69,8 @@ impl GeminiApiAgent {
             api_key: api_key.into(),
             model: model.into(),
             system_instruction: None,
+            thinking_level: None,
+            enable_google_search: false,
         }
     }
 
@@ -59,6 +96,36 @@ impl GeminiApiAgent {
         Ok(Self::new(gemini_config.api_key, model))
     }
 
+    /// Creates a Gemini 3 agent with thinking capabilities from environment.
+    ///
+    /// This is a convenience method that:
+    /// - Loads API key from secret.json
+    /// - Sets model to gemini-3-pro-preview
+    /// - Enables HIGH thinking level
+    /// - Optionally enables Google Search tool
+    pub async fn try_gemini_3_from_env(enable_search: bool) -> Result<Self, AgentError> {
+        let service = SecretServiceImpl::default().map_err(|e| {
+            AgentError::ExecutionFailed(format!("Failed to initialize SecretService: {}", e))
+        })?;
+
+        let secret_config = service.load_secrets().await.map_err(|e| {
+            AgentError::ExecutionFailed(format!("Failed to load secret.json: {}", e))
+        })?;
+
+        let gemini_config = secret_config.gemini.ok_or_else(|| {
+            AgentError::ExecutionFailed("Gemini configuration not found in secret.json".to_string())
+        })?;
+
+        let mut agent = Self::new(gemini_config.api_key, GEMINI_3_PRO_MODEL)
+            .with_thinking_level("HIGH");
+
+        if enable_search {
+            agent = agent.with_google_search(true);
+        }
+
+        Ok(agent)
+    }
+
     /// Overrides the model after construction.
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
         self.model = model.into();
@@ -68,6 +135,19 @@ impl GeminiApiAgent {
     /// Adds a system instruction that will be sent alongside every request.
     pub fn with_system_instruction(mut self, instruction: impl Into<String>) -> Self {
         self.system_instruction = Some(instruction.into());
+        self
+    }
+
+    /// Sets the thinking level for Gemini 3+ models.
+    /// Valid values: "LOW", "MEDIUM", "HIGH"
+    pub fn with_thinking_level(mut self, level: impl Into<String>) -> Self {
+        self.thinking_level = Some(level.into());
+        self
+    }
+
+    /// Enables Google Search tool for the agent.
+    pub fn with_google_search(mut self, enable: bool) -> Self {
+        self.enable_google_search = enable;
         self
     }
 
@@ -178,20 +258,61 @@ impl Agent for GeminiApiAgent {
             }],
         });
 
+        let generation_config = self.thinking_level.as_ref().map(|level| GenerationConfig {
+            thinking_config: ThinkingConfig {
+                thinking_level: level.to_string(),
+            },
+        });
+
+        let tools = if self.enable_google_search {
+            Some(vec![Tool::GoogleSearch(GoogleSearchTool {})])
+        } else {
+            None
+        };
+
         let request = GenerateContentRequest {
             contents,
             system_instruction,
+            generation_config,
+            tools,
         };
         self.send_request(&request).await
     }
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct GenerateContentRequest {
     contents: Vec<Content>,
     #[serde(skip_serializing_if = "Option::is_none")]
     system_instruction: Option<Content>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    generation_config: Option<GenerationConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<Tool>>,
 }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GenerationConfig {
+    thinking_config: ThinkingConfig,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ThinkingConfig {
+    thinking_level: String,
+}
+
+#[derive(Serialize)]
+enum Tool {
+    #[serde(rename = "googleSearch")]
+    GoogleSearch(GoogleSearchTool),
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GoogleSearchTool {}
 
 #[derive(Serialize)]
 struct Content {

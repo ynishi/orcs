@@ -1,3 +1,5 @@
+import { GeminiOptions } from './agent';
+
 /**
  * Unified request model for creating a persona.
  * Matches Rust's CreatePersonaRequest exactly.
@@ -30,4 +32,7 @@ export interface CreatePersonaRequest {
 
   /** Optional base color for UI theming */
   base_color?: string;
+
+  /** Gemini-specific options (thinking level, Google Search) */
+  gemini_options?: GeminiOptions;
 }

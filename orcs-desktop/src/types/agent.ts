@@ -30,6 +30,14 @@ export interface PersonaInfo {
  */
 export type PersonaBackend = 'claude_cli' | 'claude_api' | 'gemini_cli' | 'gemini_api' | 'open_ai_api' | 'codex_cli';
 
+/**
+ * Gemini-specific options
+ */
+export interface GeminiOptions {
+  thinking_level?: string; // LOW, MEDIUM, HIGH
+  google_search?: boolean;
+}
+
 export interface PersonaConfig {
   id: string;
   name: string;
@@ -42,6 +50,7 @@ export interface PersonaConfig {
   model_name?: string;
   icon?: string;
   base_color?: string;
+  gemini_options?: GeminiOptions;
 }
 
 /**

@@ -14,9 +14,17 @@ const CLAUDE_MODEL_OPTIONS = [
 ];
 
 const GEMINI_MODEL_OPTIONS = [
+  { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview ⚡' },
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
   { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+];
+
+const THINKING_LEVEL_OPTIONS = [
+  { value: '', label: 'None (Default)' },
+  { value: 'LOW', label: 'Low' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'HIGH', label: 'High' },
 ];
 
 interface PersonaEditorModalProps {
@@ -44,6 +52,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
     model_name: undefined,
     icon: undefined,
     base_color: undefined,
+    gemini_options: undefined,
   });
 
   // Fetch backend options on mount
@@ -75,6 +84,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         model_name: persona.model_name,
         icon: persona.icon,
         base_color: persona.base_color,
+        gemini_options: persona.gemini_options,
       });
     } else {
       setFormData({
@@ -88,6 +98,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         model_name: undefined,
         icon: undefined,
         base_color: undefined,
+        gemini_options: undefined,
       });
     }
   }, [persona]);
@@ -113,6 +124,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         model_name: formData.model_name || undefined,
         icon: formData.icon || undefined,
         base_color: formData.base_color || undefined,
+        gemini_options: formData.gemini_options || undefined,
       };
 
       onSave(updatedPersona);
@@ -131,6 +143,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         model_name: formData.model_name || undefined,
         icon: formData.icon || undefined,
         base_color: formData.base_color || undefined,
+        gemini_options: formData.gemini_options || undefined,
       };
 
       // Call unified create_persona command
@@ -222,15 +235,46 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         )}
 
         {formData.backend === 'gemini_api' && (
-          <Select
-            label="Model"
-            placeholder="Select Gemini model"
-            description="Choose which Gemini model to use for this persona"
-            data={GEMINI_MODEL_OPTIONS}
-            value={formData.model_name || 'gemini-2.5-flash'}
-            onChange={(value) => setFormData({ ...formData, model_name: value || undefined })}
-            clearable
-          />
+          <>
+            <Select
+              label="Model"
+              placeholder="Select Gemini model"
+              description="Choose which Gemini model to use for this persona"
+              data={GEMINI_MODEL_OPTIONS}
+              value={formData.model_name || 'gemini-2.5-flash'}
+              onChange={(value) => setFormData({ ...formData, model_name: value || undefined })}
+              clearable
+            />
+
+            <Select
+              label="Thinking Level (Gemini 3+)"
+              placeholder="Select thinking level"
+              description="Higher thinking levels provide more detailed reasoning (Gemini 3 Pro only)"
+              data={THINKING_LEVEL_OPTIONS}
+              value={formData.gemini_options?.thinking_level || ''}
+              onChange={(value) => setFormData({
+                ...formData,
+                gemini_options: {
+                  ...formData.gemini_options,
+                  thinking_level: value || undefined,
+                }
+              })}
+              clearable
+            />
+
+            <Switch
+              label="Enable Google Search"
+              description="Allow this persona to use Google Search for up-to-date information"
+              checked={formData.gemini_options?.google_search || false}
+              onChange={(e) => setFormData({
+                ...formData,
+                gemini_options: {
+                  ...formData.gemini_options,
+                  google_search: e.currentTarget.checked,
+                }
+              })}
+            />
+          </>
         )}
 
         <Textarea

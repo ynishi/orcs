@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use version_migrate::{IntoDomain, MigratesTo, Versioned};
 
-use orcs_core::persona::{Persona, PersonaBackend, PersonaSource};
+use orcs_core::persona::{GeminiOptions, Persona, PersonaBackend, PersonaSource};
 
 /// Represents the source of a persona.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,6 +36,15 @@ impl Default for PersonaBackendDTO {
     fn default() -> Self {
         PersonaBackendDTO::ClaudeCli
     }
+}
+
+/// Gemini-specific options DTO
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GeminiOptionsDTO {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub google_search: Option<bool>,
 }
 
 /// Represents V1 of the persona config schema for serialization.
@@ -178,6 +187,44 @@ pub struct PersonaConfigV1_4_0 {
     pub base_color: Option<String>,
 }
 
+/// V1.5.0: Added gemini_options for Gemini 3 support (thinking level, Google Search)
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.5.0")]
+pub struct PersonaConfigV1_5_0 {
+    /// Unique persona identifier (UUID format).
+    pub id: String,
+    /// Display name of the persona.
+    pub name: String,
+    /// Role or title of the persona.
+    pub role: String,
+    /// Background description of the persona.
+    pub background: String,
+    /// Communication style of the persona.
+    pub communication_style: String,
+    /// Whether this persona is a default participant in new sessions.
+    #[serde(default)]
+    pub default_participant: bool,
+    /// Source of the persona (System or User).
+    #[serde(default)]
+    pub source: PersonaSourceDTO,
+    /// Backend to execute persona with (supports all 6 backends: ClaudeCli, ClaudeApi, GeminiCli, GeminiApi, OpenAiApi, CodexCli).
+    #[serde(default)]
+    pub backend: PersonaBackendDTO,
+    /// Model name for the backend (e.g., "claude-sonnet-4-5-20250929", "gemini-3-pro-preview")
+    /// If None, uses the backend's default model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_name: Option<String>,
+    /// Visual icon/emoji representing this persona (e.g., "🎨", "🔧", "📊")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Base color for UI theming (e.g., "#FF5733", "#3357FF")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_color: Option<String>,
+    /// Gemini-specific options (thinking level, Google Search)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gemini_options: Option<GeminiOptionsDTO>,
+}
+
 // ============================================================================
 // Migration implementations
 // ============================================================================
@@ -265,9 +312,49 @@ impl MigratesTo<PersonaConfigV1_4_0> for PersonaConfigV1_3_0 {
     }
 }
 
+/// Migration from PersonaConfigV1_4_0 to PersonaConfigV1_5_0.
+impl MigratesTo<PersonaConfigV1_5_0> for PersonaConfigV1_4_0 {
+    fn migrate(self) -> PersonaConfigV1_5_0 {
+        PersonaConfigV1_5_0 {
+            id: self.id,
+            name: self.name,
+            role: self.role,
+            background: self.background,
+            communication_style: self.communication_style,
+            default_participant: self.default_participant,
+            source: self.source,
+            backend: self.backend,
+            model_name: self.model_name,
+            icon: self.icon,
+            base_color: self.base_color,
+            gemini_options: None, // V1_4_0 doesn't have gemini_options field
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
+
+/// Convert GeminiOptionsDTO to domain model.
+impl From<GeminiOptionsDTO> for GeminiOptions {
+    fn from(dto: GeminiOptionsDTO) -> Self {
+        GeminiOptions {
+            thinking_level: dto.thinking_level,
+            google_search: dto.google_search,
+        }
+    }
+}
+
+/// Convert GeminiOptions to DTO.
+impl From<GeminiOptions> for GeminiOptionsDTO {
+    fn from(options: GeminiOptions) -> Self {
+        GeminiOptionsDTO {
+            thinking_level: options.thinking_level,
+            google_search: options.google_search,
+        }
+    }
+}
 
 /// Convert PersonaSourceDTO to domain model.
 impl From<PersonaSourceDTO> for PersonaSource {
@@ -317,14 +404,14 @@ impl From<PersonaBackend> for PersonaBackendDTO {
     }
 }
 
-/// Convert PersonaConfigV1_4_0 DTO to domain model.
-impl IntoDomain<Persona> for PersonaConfigV1_4_0 {
+/// Convert PersonaConfigV1_5_0 DTO to domain model.
+impl IntoDomain<Persona> for PersonaConfigV1_5_0 {
     fn into_domain(self) -> Persona {
         // Validate and fix ID if needed
         let id = if Uuid::parse_str(&self.id).is_ok() {
             self.id
         } else {
-            // Legacy data: V1.4.0 schema but non-UUID ID
+            // Legacy data: V1.5.0 schema but non-UUID ID
             generate_uuid_from_name(&self.name)
         };
 
@@ -340,14 +427,15 @@ impl IntoDomain<Persona> for PersonaConfigV1_4_0 {
             model_name: self.model_name,
             icon: self.icon,
             base_color: self.base_color,
+            gemini_options: self.gemini_options.map(Into::into),
         }
     }
 }
 
-/// Convert domain model to PersonaConfigV1_4_0 DTO for persistence.
-impl version_migrate::FromDomain<Persona> for PersonaConfigV1_4_0 {
+/// Convert domain model to PersonaConfigV1_5_0 DTO for persistence.
+impl version_migrate::FromDomain<Persona> for PersonaConfigV1_5_0 {
     fn from_domain(persona: Persona) -> Self {
-        PersonaConfigV1_4_0 {
+        PersonaConfigV1_5_0 {
             id: persona.id,
             name: persona.name,
             role: persona.role,
@@ -359,6 +447,7 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_4_0 {
             model_name: persona.model_name,
             icon: persona.icon,
             base_color: persona.base_color,
+            gemini_options: persona.gemini_options.map(Into::into),
         }
     }
 }
@@ -389,13 +478,14 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_4_0 {
 pub fn create_persona_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> V1.1.0 -> V1.2.0 -> V1.3.0 -> V1.4.0 -> Persona
+    // Register migration path: V1.0.0 -> V1.1.0 -> V1.2.0 -> V1.3.0 -> V1.4.0 -> V1.5.0 -> Persona
     let persona_path = version_migrate::Migrator::define("persona")
         .from::<PersonaConfigV1_0_0>()
         .step::<PersonaConfigV1_1_0>()
         .step::<PersonaConfigV1_2_0>()
         .step::<PersonaConfigV1_3_0>()
         .step::<PersonaConfigV1_4_0>()
+        .step::<PersonaConfigV1_5_0>()
         .into_with_save::<Persona>();
 
     migrator

@@ -140,6 +140,7 @@ pub enum StreamingDialogueTurnKind {
 struct PersonaBackendAgent {
     backend: PersonaBackend,
     model_name: Option<String>,
+    gemini_options: Option<orcs_core::persona::GeminiOptions>,
     workspace_root: Arc<RwLock<Option<PathBuf>>>,
     env_settings: Arc<RwLock<EnvSettings>>,
 }
@@ -148,12 +149,14 @@ impl PersonaBackendAgent {
     fn new(
         backend: PersonaBackend,
         model_name: Option<String>,
+        gemini_options: Option<orcs_core::persona::GeminiOptions>,
         workspace_root: Arc<RwLock<Option<PathBuf>>>,
         env_settings: Arc<RwLock<EnvSettings>>,
     ) -> Self {
         Self {
             backend,
             model_name,
+            gemini_options,
             workspace_root,
             env_settings,
         }
@@ -238,6 +241,17 @@ impl PersonaBackendAgent {
                     tracing::info!("[PersonaBackendAgent] Using Gemini model: {}", model_str);
                     agent = agent.with_model(model_str);
                 }
+                // Apply Gemini options if specified
+                if let Some(ref options) = self.gemini_options {
+                    if let Some(ref thinking_level) = options.thinking_level {
+                        tracing::info!("[PersonaBackendAgent] Setting Gemini thinking level: {}", thinking_level);
+                        agent = agent.with_thinking_level(thinking_level);
+                    }
+                    if let Some(google_search) = options.google_search {
+                        tracing::info!("[PersonaBackendAgent] Setting Gemini Google Search: {}", google_search);
+                        agent = agent.with_google_search(google_search);
+                    }
+                }
                 agent.execute(payload).await
             }
             PersonaBackend::OpenAiApi => {
@@ -305,6 +319,7 @@ fn agent_for_persona(
     let backend_agent = PersonaBackendAgent::new(
         persona.backend.clone(),
         persona.model_name.clone(),
+        persona.gemini_options.clone(),
         workspace_root,
         env_settings,
     );

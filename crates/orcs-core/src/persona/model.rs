@@ -198,6 +198,26 @@ impl Default for PersonaSource {
     }
 }
 
+/// Options specific to Gemini models (e.g., Gemini 3).
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+pub struct GeminiOptions {
+    /// Thinking level for Gemini 3+ models (LOW, MEDIUM, HIGH)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_level: Option<String>,
+    /// Enable Google Search tool
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub google_search: Option<bool>,
+}
+
+impl Default for GeminiOptions {
+    fn default() -> Self {
+        Self {
+            thinking_level: None,
+            google_search: None,
+        }
+    }
+}
+
 /// A persona representing an AI agent with specific characteristics and expertise.
 ///
 /// Personas define the behavior, expertise, and communication style of AI agents
@@ -235,6 +255,9 @@ pub struct Persona {
     /// Used for message background tinting and visual identification
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_color: Option<String>,
+    /// Gemini-specific options (thinking level, Google Search)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gemini_options: Option<GeminiOptions>,
 }
 
 #[cfg(test)]

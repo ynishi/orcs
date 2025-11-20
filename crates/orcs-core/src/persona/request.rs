@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{Persona, PersonaBackend, PersonaSource};
+use super::{GeminiOptions, Persona, PersonaBackend, PersonaSource};
 
 /// Request to create a new persona.
 ///
@@ -42,6 +42,10 @@ pub struct CreatePersonaRequest {
     /// Optional base color for UI theming
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base_color: Option<String>,
+
+    /// Gemini-specific options (thinking level, Google Search)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gemini_options: Option<GeminiOptions>,
 }
 
 impl CreatePersonaRequest {
@@ -86,6 +90,7 @@ impl CreatePersonaRequest {
             model_name: self.model_name,
             icon: self.icon,
             base_color: self.base_color,
+            gemini_options: self.gemini_options,
         }
     }
 
@@ -101,6 +106,7 @@ impl CreatePersonaRequest {
             model_name: persona.model_name.clone(),
             icon: persona.icon.clone(),
             base_color: persona.base_color.clone(),
+            gemini_options: persona.gemini_options.clone(),
         }
     }
 }
@@ -121,6 +127,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         assert!(req.validate().is_ok());
@@ -138,6 +145,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         assert!(req.validate().is_err());
@@ -155,6 +163,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         assert!(req.validate().is_err());
@@ -172,6 +181,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         let persona = req.into_persona();
@@ -192,6 +202,7 @@ mod tests {
             model_name: Some("claude-sonnet-4-5".to_string()),
             icon: Some("🎨".to_string()),
             base_color: Some("#FF5733".to_string()),
+            gemini_options: None,
         };
 
         let req = CreatePersonaRequest::from_persona(&persona);

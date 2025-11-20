@@ -21,6 +21,8 @@ import {
 import { IconSettings, IconClipboardList, IconFileText, IconBulb } from '@tabler/icons-react';
 import { MessageItem } from './MessageItem';
 import { StatusBar } from './StatusBar';
+import { AgentConfigSelector } from './AgentConfigSelector';
+import type { AgentConfig } from './AgentConfigSelector';
 import { CommandSuggestions } from './CommandSuggestions';
 import { AgentSuggestions } from './AgentSuggestions';
 import { ThinkingIndicator } from './ThinkingIndicator';
@@ -195,6 +197,16 @@ export function ChatPanel({
 
   // Hover state for thread command icons
   const [isMessageAreaHovered, setIsMessageAreaHovered] = useState(false);
+
+  // Agent configuration for Summary/ActionPlan/Expertise
+  const [agentConfig, setAgentConfig] = useState<AgentConfig>({
+    backend: 'gemini_api',
+    modelName: 'gemini-3-pro-preview',
+    geminiOptions: {
+      thinking_level: 'HIGH',
+      google_search: true,
+    },
+  });
 
   // Load AutoChat config from backend when tab changes
   useEffect(() => {
@@ -658,6 +670,12 @@ export function ChatPanel({
             }}
           >
             <Group gap={4}>
+              {/* Agent Configuration */}
+              <AgentConfigSelector
+                value={agentConfig}
+                onChange={setAgentConfig}
+              />
+
               <CopyButton value={getThreadAsText()}>
                 {({ copied, copy }) => (
                   <Tooltip label={copied ? 'Copied!' : 'Copy Session'} withArrow>

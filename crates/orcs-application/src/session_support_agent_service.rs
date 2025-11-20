@@ -254,6 +254,223 @@ impl SessionSupportAgentService {
         }
     }
 
+    /// Generate summary with custom agent configuration
+    ///
+    /// # Arguments
+    ///
+    /// * `thread_content` - The conversation thread to summarize
+    /// * `backend` - Backend type (e.g., "gemini_api", "claude_api", "open_ai_api")
+    /// * `model_name` - Optional model name override
+    /// * `gemini_thinking_level` - Optional Gemini thinking level (LOW/MEDIUM/HIGH)
+    /// * `gemini_google_search` - Optional Google Search enablement
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(String)` - Generated summary in markdown format
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let summary = service.generate_summary_with_config(
+    ///     thread_content,
+    ///     "gemini_api",
+    ///     Some("gemini-3-pro-preview"),
+    ///     Some("HIGH"),
+    ///     Some(true),
+    /// ).await?;
+    /// ```
+    pub async fn generate_summary_with_config(
+        thread_content: &str,
+        backend: &str,
+        model_name: Option<&str>,
+        gemini_thinking_level: Option<&str>,
+        gemini_google_search: Option<bool>,
+    ) -> Result<String> {
+        use llm_toolkit::agent::Agent;
+        use llm_toolkit::prompt::ToPrompt;
+        use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
+
+        // Create typed request
+        let request = SummaryGenerationRequest {
+            conversation: thread_content.to_string(),
+            output_schema: SummaryResponse::prompt_schema(),
+        };
+        let prompt = request.to_prompt();
+
+        // Execute with configured agent and parse JSON response
+        let response_str: String = match backend {
+            "gemini_api" => {
+                let mut agent = GeminiApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                if let Some(level) = gemini_thinking_level {
+                    agent = agent.with_thinking_level(level);
+                }
+                if let Some(search) = gemini_google_search {
+                    agent = agent.with_google_search(search);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            "claude_api" => {
+                let mut agent = ClaudeApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            "open_ai_api" => {
+                let mut agent = OpenAIApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported backend: {}. Supported: gemini_api, claude_api, open_ai_api",
+                    backend
+                ))
+            }
+        };
+
+        // Parse JSON response
+        let response: SummaryResponse = serde_json::from_str(&response_str)
+            .map_err(|e| anyhow::anyhow!("Failed to parse summary response: {}", e))?;
+
+        // Format response as markdown
+        let mut markdown = format!("# 📝 Conversation Summary\n\n{}\n", response.summary);
+
+        if let Some(key_points) = response.key_points {
+            markdown.push_str("\n## Key Points\n\n");
+            for point in key_points {
+                markdown.push_str(&format!("- {}\n", point));
+            }
+        }
+
+        if let Some(next_actions) = response.next_actions {
+            markdown.push_str("\n## Suggested Next Actions\n\n");
+            for (idx, action) in next_actions.iter().enumerate() {
+                markdown.push_str(&format!("{}. {}\n", idx + 1, action));
+            }
+        }
+
+        Ok(markdown)
+    }
+
+    /// Generate action plan with custom agent configuration
+    pub async fn generate_action_plan_with_config(
+        thread_content: &str,
+        backend: &str,
+        model_name: Option<&str>,
+        gemini_thinking_level: Option<&str>,
+        gemini_google_search: Option<bool>,
+    ) -> Result<String> {
+        use llm_toolkit::agent::Agent;
+        use llm_toolkit::prompt::ToPrompt;
+        use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
+
+        let request = ActionPlanGenerationRequest {
+            conversation: thread_content.to_string(),
+            output_schema: ActionPlanResponse::prompt_schema(),
+        };
+        let prompt = request.to_prompt();
+
+        let markdown: String = match backend {
+            "gemini_api" => {
+                let mut agent = GeminiApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                if let Some(level) = gemini_thinking_level {
+                    agent = agent.with_thinking_level(level);
+                }
+                if let Some(search) = gemini_google_search {
+                    agent = agent.with_google_search(search);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            "claude_api" => {
+                let mut agent = ClaudeApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            "open_ai_api" => {
+                let mut agent = OpenAIApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported backend: {}. Supported: gemini_api, claude_api, open_ai_api",
+                    backend
+                ))
+            }
+        };
+
+        Ok(markdown)
+    }
+
+    /// Generate expertise with custom agent configuration
+    pub async fn generate_expertise_with_config(
+        thread_content: &str,
+        backend: &str,
+        model_name: Option<&str>,
+        gemini_thinking_level: Option<&str>,
+        gemini_google_search: Option<bool>,
+    ) -> Result<String> {
+        use llm_toolkit::agent::Agent;
+        use llm_toolkit::prompt::ToPrompt;
+        use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
+
+        let request = ExpertiseGenerationRequest {
+            conversation: thread_content.to_string(),
+        };
+        let prompt = request.to_prompt();
+
+        let markdown: String = match backend {
+            "gemini_api" => {
+                let mut agent = GeminiApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                if let Some(level) = gemini_thinking_level {
+                    agent = agent.with_thinking_level(level);
+                }
+                if let Some(search) = gemini_google_search {
+                    agent = agent.with_google_search(search);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            "claude_api" => {
+                let mut agent = ClaudeApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            "open_ai_api" => {
+                let mut agent = OpenAIApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported backend: {}. Supported: gemini_api, claude_api, open_ai_api",
+                    backend
+                ))
+            }
+        };
+
+        Ok(markdown)
+    }
+
     /// Generate summary from conversation thread
     ///
     /// # Arguments

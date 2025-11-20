@@ -33,6 +33,28 @@ pub struct PersistedSystemMessage {
     pub severity: Option<String>,
 }
 
+/// Agent configuration for runtime backend/model selection
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentConfig {
+    /// Backend type (gemini_api, claude_api, open_ai_api, etc.)
+    pub backend: String,
+    /// Model name (optional, uses default if not specified)
+    pub model_name: Option<String>,
+    /// Gemini-specific options
+    pub gemini_options: Option<GeminiOptions>,
+}
+
+/// Gemini-specific options
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeminiOptions {
+    /// Thinking level: LOW, MEDIUM, HIGH
+    pub thinking_level: Option<String>,
+    /// Enable Google Search integration
+    pub google_search: Option<bool>,
+}
+
 /// Serializable version of InteractionResult for Tauri IPC
 #[derive(Serialize)]
 #[serde(tag = "type", content = "data")]
@@ -1294,17 +1316,32 @@ pub async fn start_auto_chat(
 pub async fn generate_summary(
     thread_content: String,
     session_id: String,
+    agent_config: Option<AgentConfig>,
     _state: State<'_, AppState>,
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
-    tracing::info!("[SessionSupport] Generating summary for session: {}", session_id);
+    tracing::info!("[SessionSupport] Generating summary for session: {} with config: {:?}", session_id, agent_config);
 
-    let service = SessionSupportAgentService::new();
-    let summary = service
-        .generate_summary(&thread_content)
+    let summary = if let Some(config) = agent_config {
+        // Use custom agent configuration
+        SessionSupportAgentService::generate_summary_with_config(
+            &thread_content,
+            &config.backend,
+            config.model_name.as_deref(),
+            config.gemini_options.as_ref().and_then(|opts| opts.thinking_level.as_deref()),
+            config.gemini_options.as_ref().and_then(|opts| opts.google_search),
+        )
         .await
-        .map_err(|e| format!("Failed to generate summary: {}", e))?;
+        .map_err(|e| format!("Failed to generate summary: {}", e))?
+    } else {
+        // Use default agent
+        let service = SessionSupportAgentService::new();
+        service
+            .generate_summary(&thread_content)
+            .await
+            .map_err(|e| format!("Failed to generate summary: {}", e))?
+    };
 
     tracing::info!("[SessionSupport] Summary generated successfully");
 
@@ -1316,17 +1353,32 @@ pub async fn generate_summary(
 pub async fn generate_action_plan(
     thread_content: String,
     session_id: String,
+    agent_config: Option<AgentConfig>,
     _state: State<'_, AppState>,
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
-    tracing::info!("[SessionSupport] Generating action plan for session: {}", session_id);
+    tracing::info!("[SessionSupport] Generating action plan for session: {} with config: {:?}", session_id, agent_config);
 
-    let service = SessionSupportAgentService::new();
-    let action_plan = service
-        .generate_action_plan(&thread_content)
+    let action_plan = if let Some(config) = agent_config {
+        // Use custom agent configuration
+        SessionSupportAgentService::generate_action_plan_with_config(
+            &thread_content,
+            &config.backend,
+            config.model_name.as_deref(),
+            config.gemini_options.as_ref().and_then(|opts| opts.thinking_level.as_deref()),
+            config.gemini_options.as_ref().and_then(|opts| opts.google_search),
+        )
         .await
-        .map_err(|e| format!("Failed to generate action plan: {}", e))?;
+        .map_err(|e| format!("Failed to generate action plan: {}", e))?
+    } else {
+        // Use default agent
+        let service = SessionSupportAgentService::new();
+        service
+            .generate_action_plan(&thread_content)
+            .await
+            .map_err(|e| format!("Failed to generate action plan: {}", e))?
+    };
 
     tracing::info!("[SessionSupport] Action plan generated successfully");
 
@@ -1338,17 +1390,32 @@ pub async fn generate_action_plan(
 pub async fn generate_expertise(
     thread_content: String,
     session_id: String,
+    agent_config: Option<AgentConfig>,
     _state: State<'_, AppState>,
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
-    tracing::info!("[SessionSupport] Generating expertise for session: {}", session_id);
+    tracing::info!("[SessionSupport] Generating expertise for session: {} with config: {:?}", session_id, agent_config);
 
-    let service = SessionSupportAgentService::new();
-    let expertise = service
-        .generate_expertise(&thread_content)
+    let expertise = if let Some(config) = agent_config {
+        // Use custom agent configuration
+        SessionSupportAgentService::generate_expertise_with_config(
+            &thread_content,
+            &config.backend,
+            config.model_name.as_deref(),
+            config.gemini_options.as_ref().and_then(|opts| opts.thinking_level.as_deref()),
+            config.gemini_options.as_ref().and_then(|opts| opts.google_search),
+        )
         .await
-        .map_err(|e| format!("Failed to generate expertise: {}", e))?;
+        .map_err(|e| format!("Failed to generate expertise: {}", e))?
+    } else {
+        // Use default agent
+        let service = SessionSupportAgentService::new();
+        service
+            .generate_expertise(&thread_content)
+            .await
+            .map_err(|e| format!("Failed to generate expertise: {}", e))?
+    };
 
     tracing::info!("[SessionSupport] Expertise generated successfully");
 

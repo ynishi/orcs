@@ -95,6 +95,10 @@ impl FromDomain<ExecutionModel> for ExecutionStrategyV2_0_0 {
             ExecutionModel::Mentioned { strategy } => ExecutionStrategyV2_0_0::Mentioned {
                 strategy: serde_json::to_string(&strategy).ok(),
             },
+            // New variants in llm-toolkit - map to closest existing strategy
+            ExecutionModel::OrderedSequential(_) => ExecutionStrategyV2_0_0::Sequential,
+            ExecutionModel::OrderedBroadcast(_) => ExecutionStrategyV2_0_0::Broadcast,
+            ExecutionModel::Moderator => ExecutionStrategyV2_0_0::Broadcast,
         }
     }
 }

@@ -3,9 +3,10 @@ pub mod gemini_api_agent;
 pub mod local_agents;
 pub mod openai_api_agent;
 
-use crate::claude_api_agent::ClaudeApiAgent;
-use crate::gemini_api_agent::GeminiApiAgent;
-use crate::openai_api_agent::OpenAIApiAgent;
+// Re-export API agents for external use
+pub use crate::claude_api_agent::ClaudeApiAgent;
+pub use crate::gemini_api_agent::GeminiApiAgent;
+pub use crate::openai_api_agent::OpenAIApiAgent;
 use llm_toolkit::agent::dialogue::{
     Dialogue, DialogueTurn, ExecutionModel, ReactionStrategy, Speaker, TalkStyle,
 };
@@ -607,7 +608,7 @@ impl InteractionManager {
             return Ok(());
         }
 
-        let strategy_model = *self.execution_strategy.read().await;
+        let strategy_model = self.execution_strategy.read().await.clone();
 
         // Rebuild dialogue history from persona_histories
         let history_turns = self.rebuild_dialogue_history().await;
@@ -620,6 +621,10 @@ impl InteractionManager {
             ExecutionModel::Sequential => Dialogue::sequential(),
             ExecutionModel::Broadcast => Dialogue::broadcast(),
             ExecutionModel::Mentioned { .. } => Dialogue::mentioned(),
+            // New variants - map to closest existing strategy
+            ExecutionModel::OrderedSequential(_) => Dialogue::sequential(),
+            ExecutionModel::OrderedBroadcast(_) => Dialogue::broadcast(),
+            ExecutionModel::Moderator => Dialogue::broadcast(),
         };
 
         // Apply context settings
@@ -706,7 +711,7 @@ impl InteractionManager {
     pub async fn to_session(&self, app_mode: AppMode, workspace_id: String) -> Session {
         let persona_histories = self.persona_histories.read().await.clone();
         let title = self.title.read().await.clone();
-        let execution_strategy = *self.execution_strategy.read().await;
+        let execution_strategy = self.execution_strategy.read().await.clone();
         let system_messages = self.system_messages.read().await.clone();
 
         // Use the first default participant as current_persona_id
@@ -1056,6 +1061,10 @@ impl InteractionManager {
             ExecutionModel::Broadcast => "Broadcast",
             ExecutionModel::Sequential => "Sequential",
             ExecutionModel::Mentioned { .. } => "Mentioned",
+            // New variants
+            ExecutionModel::OrderedSequential(_) => "Ordered Sequential",
+            ExecutionModel::OrderedBroadcast(_) => "Ordered Broadcast",
+            ExecutionModel::Moderator => "Moderator",
         };
         let system_msg = ConversationMessage {
             role: MessageRole::System,
@@ -1078,7 +1087,7 @@ impl InteractionManager {
 
     /// Gets the current execution strategy.
     pub async fn get_execution_strategy(&self) -> ExecutionModel {
-        *self.execution_strategy.read().await
+        self.execution_strategy.read().await.clone()
     }
 
     /// Sets the conversation mode for controlling dialogue verbosity.

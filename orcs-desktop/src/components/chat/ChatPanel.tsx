@@ -395,6 +395,11 @@ export function ChatPanel({
       const summary = await invoke<string>('generate_summary', {
         threadContent,
         sessionId: tab.sessionId,
+        agentConfig: {
+          backend: agentConfig.backend,
+          modelName: agentConfig.modelName,
+          geminiOptions: agentConfig.geminiOptions,
+        },
       });
 
       // Persist AI response with summary
@@ -436,7 +441,7 @@ export function ChatPanel({
     } finally {
       setTabThinking(tab.id, false);
     }
-  }, [getThreadAsText, tab.id, tab.sessionId, setTabThinking]);
+  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking]);
 
   // Handle generating action plan from thread
   const handleGenerateActionPlan = useCallback(async () => {
@@ -463,6 +468,11 @@ export function ChatPanel({
       const actionPlan = await invoke<string>('generate_action_plan', {
         threadContent,
         sessionId: tab.sessionId,
+        agentConfig: {
+          backend: agentConfig.backend,
+          modelName: agentConfig.modelName,
+          geminiOptions: agentConfig.geminiOptions,
+        },
       });
 
       // Persist AI response with action plan
@@ -504,7 +514,7 @@ export function ChatPanel({
     } finally {
       setTabThinking(tab.id, false);
     }
-  }, [getThreadAsText, tab.id, tab.sessionId, setTabThinking]);
+  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking]);
 
   // Handle generating expertise from thread
   const handleGenerateExpertise = useCallback(async () => {
@@ -531,6 +541,11 @@ export function ChatPanel({
       const expertise = await invoke<string>('generate_expertise', {
         threadContent,
         sessionId: tab.sessionId,
+        agentConfig: {
+          backend: agentConfig.backend,
+          modelName: agentConfig.modelName,
+          geminiOptions: agentConfig.geminiOptions,
+        },
       });
 
       // Persist AI response with expertise
@@ -572,7 +587,7 @@ export function ChatPanel({
     } finally {
       setTabThinking(tab.id, false);
     }
-  }, [getThreadAsText, tab.id, tab.sessionId, setTabThinking]);
+  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking]);
 
   // Handle creating a slash command from a message
   const handleCreateSlashCommand = useCallback((message: Message) => {

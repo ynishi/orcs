@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Stack, Button, Group, Text, ScrollArea, ActionIcon, Modal, TextInput, Select, Tooltip } from '@mantine/core';
-import { IconPlus, IconTrash, IconStar } from '@tabler/icons-react';
+import { Stack, Button, Group, Text, ScrollArea, ActionIcon, Modal, TextInput, Select, Tooltip, Badge } from '@mantine/core';
+import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { notifications } from '@mantine/notifications';
 import type { DialoguePreset } from '../../types/conversation';
@@ -16,7 +16,7 @@ export function DialoguePresetList() {
     description: '',
     execution_strategy: 'broadcast',
     conversation_mode: 'normal',
-    talk_style: 'brainstorm',
+    talk_style: 'Brainstorm',
   });
 
   const loadPresets = async () => {
@@ -78,7 +78,7 @@ export function DialoguePresetList() {
         description: '',
         execution_strategy: 'broadcast',
         conversation_mode: 'normal',
-        talk_style: 'brainstorm',
+        talk_style: 'Brainstorm',
       });
 
       await loadPresets();
@@ -130,31 +130,10 @@ export function DialoguePresetList() {
 
       <ScrollArea style={{ flex: 1 }}>
         <Stack gap="xs">
-          {/* System Presets */}
-          <Text size="sm" c="dimmed" fw={600}>System Presets</Text>
-          {presets.filter(p => p.source === 'system').map((preset) => (
-            <Group key={preset.id} gap="xs" p="xs" style={{
-              borderRadius: 4,
-              border: '1px solid #e0e0e0',
-              backgroundColor: '#f8f9fa'
-            }}>
-              {preset.icon && <Text size="lg">{preset.icon}</Text>}
-              <Stack gap={0} style={{ flex: 1 }}>
-                <Group gap="xs">
-                  <Text size="sm" fw={600}>{preset.name}</Text>
-                  <IconStar size={14} color="gold" />
-                </Group>
-                {preset.description && (
-                  <Text size="xs" c="dimmed">{preset.description}</Text>
-                )}
-              </Stack>
-            </Group>
-          ))}
-
           {/* User Presets */}
           {presets.filter(p => p.source === 'user').length > 0 && (
             <>
-              <Text size="sm" c="dimmed" fw={600} mt="md">User Presets</Text>
+              <Text size="sm" c="dimmed" fw={600}>User Presets</Text>
               {presets.filter(p => p.source === 'user').map((preset) => (
                 <Group key={preset.id} gap="xs" p="xs" style={{
                   borderRadius: 4,
@@ -178,6 +157,27 @@ export function DialoguePresetList() {
               ))}
             </>
           )}
+
+          {/* System Presets */}
+          <Text size="sm" c="dimmed" fw={600} mt={presets.filter(p => p.source === 'user').length > 0 ? "md" : undefined}>System Presets</Text>
+          {presets.filter(p => p.source === 'system').map((preset) => (
+            <Group key={preset.id} gap="xs" p="xs" style={{
+              borderRadius: 4,
+              border: '1px solid #e0e0e0',
+              backgroundColor: '#f8f9fa'
+            }}>
+              {preset.icon && <Text size="lg">{preset.icon}</Text>}
+              <Stack gap={0} style={{ flex: 1 }}>
+                <Group gap="xs">
+                  <Text size="sm" fw={600}>{preset.name}</Text>
+                  <Badge size="xs" variant="light" color="blue">System</Badge>
+                </Group>
+                {preset.description && (
+                  <Text size="xs" c="dimmed">{preset.description}</Text>
+                )}
+              </Stack>
+            </Group>
+          ))}
 
           {presets.length === 0 && !loading && (
             <Text size="sm" c="dimmed" ta="center" mt="md">
@@ -220,7 +220,7 @@ export function DialoguePresetList() {
             label="Talk Style"
             data={TALK_STYLES.map(s => ({ value: s.value, label: s.label }))}
             value={newPreset.talk_style}
-            onChange={(value) => setNewPreset({ ...newPreset, talk_style: value || 'brainstorm' })}
+            onChange={(value) => setNewPreset({ ...newPreset, talk_style: value || 'Brainstorm' })}
             required
           />
 

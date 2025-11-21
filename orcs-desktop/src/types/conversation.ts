@@ -39,8 +39,9 @@ export const CONVERSATION_MODES: ConversationModeOption[] = [
 
 /**
  * Talk Style definitions
+ * IMPORTANT: Must match Rust TalkStyle enum variants exactly (PascalCase)
  */
-export type TalkStyleType = 'brainstorm' | 'casual' | 'decision_making' | 'debate' | 'problem_solving' | 'review' | 'planning';
+export type TalkStyleType = 'Brainstorm' | 'Casual' | 'DecisionMaking' | 'Debate' | 'ProblemSolving' | 'Review' | 'Planning';
 
 export interface TalkStyleOption {
   value: TalkStyleType;
@@ -54,43 +55,43 @@ export const DEFAULT_STYLE_LABEL: string = '通常';
 
 export const TALK_STYLES: TalkStyleOption[] = [
   {
-    value: 'brainstorm',
+    value: 'Brainstorm',
     label: 'ブレインストーミング',
     icon: '💡',
     description: 'Brainstorming session',
   },
   {
-    value: 'casual',
+    value: 'Casual',
     label: 'カジュアル',
     icon: '☕',
     description: 'Casual conversation',
   },
   {
-    value: 'decision_making',
+    value: 'DecisionMaking',
     label: '意思決定',
     icon: '🎯',
     description: 'Decision making',
   },
   {
-    value: 'debate',
+    value: 'Debate',
     label: '議論',
     icon: '⚖️',
     description: 'Debate style',
   },
   {
-    value: 'problem_solving',
+    value: 'ProblemSolving',
     label: '問題解決',
     icon: '🔧',
     description: 'Problem solving',
   },
   {
-    value: 'review',
+    value: 'Review',
     label: 'レビュー',
     icon: '🔍',
     description: 'Review session',
   },
   {
-    value: 'planning',
+    value: 'Planning',
     label: '計画',
     icon: '📋',
     description: 'Planning session',

@@ -20,6 +20,7 @@ use crate::session::ConversationMode;
 /// Enables automatic TypeScript generation:
 /// `export type TalkStyleType = 'Brainstorm' | 'Casual' | 'DecisionMaking' | ...`
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
+#[schema_bridge(string_conversion)]
 pub enum TalkStyleType {
     /// Brainstorming session - creative, exploratory, building on ideas.
     Brainstorm,
@@ -244,5 +245,44 @@ mod tests {
         let converted: PresetSourceType = orig.clone().into();
         let back: PresetSource = converted.into();
         assert_eq!(orig, back);
+    }
+
+    #[test]
+    fn test_talk_style_type_string_conversion() {
+        use std::str::FromStr;
+
+        // Test ToString
+        assert_eq!(TalkStyleType::Brainstorm.to_string(), "Brainstorm");
+        assert_eq!(TalkStyleType::Casual.to_string(), "Casual");
+        assert_eq!(TalkStyleType::Planning.to_string(), "Planning");
+
+        // Test FromStr
+        assert_eq!(
+            TalkStyleType::from_str("Brainstorm").unwrap(),
+            TalkStyleType::Brainstorm
+        );
+        assert_eq!(
+            TalkStyleType::from_str("Casual").unwrap(),
+            TalkStyleType::Casual
+        );
+        assert_eq!(
+            TalkStyleType::from_str("Planning").unwrap(),
+            TalkStyleType::Planning
+        );
+
+        // Test roundtrip
+        for variant in [
+            TalkStyleType::Brainstorm,
+            TalkStyleType::Casual,
+            TalkStyleType::DecisionMaking,
+            TalkStyleType::Debate,
+            TalkStyleType::ProblemSolving,
+            TalkStyleType::Review,
+            TalkStyleType::Planning,
+        ] {
+            let s = variant.to_string();
+            let parsed = TalkStyleType::from_str(&s).unwrap();
+            assert_eq!(variant, parsed);
+        }
     }
 }

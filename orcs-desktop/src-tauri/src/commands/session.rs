@@ -16,22 +16,6 @@ use tokio::process::Command;
 
 use crate::app::AppState;
 
-/// Helper: Convert String -> TalkStyle via schema type
-fn parse_talk_style(s: &str) -> Result<TalkStyle, String> {
-    let style_type: TalkStyleType = serde_json::from_str(&format!("\"{}\"", s))
-        .map_err(|_| format!("Unknown talk style: {}", s))?;
-    Ok(TalkStyle::from(style_type))
-}
-
-/// Helper: Convert TalkStyle -> String via schema type
-fn serialize_talk_style(style: TalkStyle) -> String {
-    let style_type = TalkStyleType::from(style);
-    serde_json::to_string(&style_type)
-        .unwrap()
-        .trim_matches('"')
-        .to_string()
-}
-
 /// Serializable version of DialogueMessage for Tauri IPC
 #[derive(Serialize, Clone)]
 pub struct SerializableDialogueMessage {
@@ -893,7 +877,15 @@ pub async fn set_talk_style(
         .await
         .ok_or("No active session")?;
 
-    let talk_style = style.map(|s| parse_talk_style(&s)).transpose()?;
+    // Parse TalkStyle using schema-bridge v0.2 string_conversion
+    let talk_style = style
+        .map(|s| {
+            use std::str::FromStr;
+            TalkStyleType::from_str(&s)
+                .map(|style_type| TalkStyle::from(style_type))
+                .map_err(|_e| format!("Unknown talk style: {}", s))
+        })
+        .transpose()?;
 
     manager.set_talk_style(talk_style).await;
 
@@ -913,7 +905,8 @@ pub async fn get_talk_style(state: State<'_, AppState>) -> Result<Option<String>
         .ok_or("No active session")?;
 
     let style = manager.get_talk_style().await;
-    let style_str = style.map(serialize_talk_style);
+    // Serialize TalkStyle using schema-bridge v0.2 string_conversion
+    let style_str = style.map(|s| TalkStyleType::from(s).to_string());
 
     Ok(style_str)
 }

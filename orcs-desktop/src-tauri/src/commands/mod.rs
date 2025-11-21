@@ -44,6 +44,8 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         session::add_participant,
         session::remove_participant,
         session::get_active_participants,
+        session::toggle_mute,
+        session::get_mute_status,
         session::set_execution_strategy,
         session::get_execution_strategy,
         session::set_conversation_mode,

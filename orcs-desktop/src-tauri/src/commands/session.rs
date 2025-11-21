@@ -757,6 +757,36 @@ pub async fn get_active_participants(state: State<'_, AppState>) -> Result<Vec<S
     manager.get_active_participants().await
 }
 
+/// Toggles mute status for the active session and returns the new value
+#[tauri::command]
+pub async fn toggle_mute(state: State<'_, AppState>) -> Result<bool, String> {
+    let manager = state
+        .session_usecase
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let is_muted = manager.toggle_mute().await;
+
+    // Save session
+    let app_mode = state.app_mode.lock().await.clone();
+    let _ = state.session_usecase.save_active_session(app_mode).await;
+
+    Ok(is_muted)
+}
+
+/// Gets the mute status for the active session
+#[tauri::command]
+pub async fn get_mute_status(state: State<'_, AppState>) -> Result<bool, String> {
+    let manager = state
+        .session_usecase
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    Ok(manager.is_muted().await)
+}
+
 /// Sets the execution strategy for the active session
 #[tauri::command]
 pub async fn set_execution_strategy(

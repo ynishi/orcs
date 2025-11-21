@@ -26,6 +26,7 @@ export interface Session {
   is_archived?: boolean; // Whether this session is archived (hidden by default)
   sort_order?: number; // Manual sort order (optional, for custom ordering within favorites)
   auto_chat_config?: AutoChatConfig; // AutoChat configuration (None means disabled)
+  is_muted?: boolean; // Whether AI responses are muted (messages recorded only)
 }
 
 /**

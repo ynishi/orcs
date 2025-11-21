@@ -122,6 +122,9 @@ pub struct Session {
     /// AutoChat configuration (None means AutoChat is disabled)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_chat_config: Option<AutoChatConfig>,
+    /// Whether this session is muted (AI won't respond to messages)
+    #[serde(default)]
+    pub is_muted: bool,
 }
 
 fn default_execution_strategy() -> ExecutionModel {

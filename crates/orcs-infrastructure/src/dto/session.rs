@@ -931,6 +931,73 @@ pub struct SessionV4_1_0 {
     pub auto_chat_config: Option<AutoChatConfig>,
 }
 
+/// V4.2.0: Added is_muted for memo mode
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Versioned)]
+#[versioned(version = "4.2.0")]
+pub struct SessionV4_2_0 {
+    /// Unique session identifier
+    pub id: String,
+    /// Human-readable session title
+    pub title: String,
+    /// Timestamp when the session was created (ISO 8601 format)
+    pub created_at: String,
+    /// Timestamp when the session was last updated (ISO 8601 format)
+    pub updated_at: String,
+    /// The currently active persona ID
+    pub current_persona_id: String,
+    /// Conversation history for each persona
+    pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
+    /// Current application mode
+    pub app_mode: AppMode,
+    /// Workspace ID - all sessions must be associated with a workspace
+    pub workspace_id: String,
+    /// Active participant persona IDs
+    #[serde(default)]
+    pub active_participant_ids: Vec<String>,
+    /// Execution strategy (now using ExecutionModel enum)
+    #[serde(default = "default_execution_strategy_v2_0_0")]
+    pub execution_strategy: ExecutionStrategyV2_0_0,
+    /// System messages (join/leave notifications, etc.)
+    #[serde(default)]
+    pub system_messages: Vec<ConversationMessage>,
+    /// Participant persona ID to name mapping for display
+    #[serde(default)]
+    pub participants: HashMap<String, String>,
+    /// Participant persona ID to icon mapping for display
+    #[serde(default)]
+    pub participant_icons: HashMap<String, String>,
+    /// Participant persona ID to base color mapping for UI theming
+    #[serde(default)]
+    pub participant_colors: HashMap<String, String>,
+    /// Participant persona ID to backend mapping (e.g., "claude_api", "gemini_cli")
+    #[serde(default)]
+    pub participant_backends: HashMap<String, String>,
+    /// Participant persona ID to model name mapping (e.g., "claude-sonnet-4-5-20250929")
+    #[serde(default)]
+    pub participant_models: HashMap<String, String>,
+    /// Conversation mode (controls verbosity and style)
+    #[serde(default)]
+    pub conversation_mode: ConversationMode,
+    /// Talk style for dialogue context (Brainstorm, Debate, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub talk_style: Option<TalkStyle>,
+    /// Whether this session is marked as favorite (pinned to top)
+    #[serde(default)]
+    pub is_favorite: bool,
+    /// Whether this session is archived (hidden by default)
+    #[serde(default)]
+    pub is_archived: bool,
+    /// Manual sort order (optional, for custom ordering within favorites)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<i32>,
+    /// AutoChat configuration (None means AutoChat is disabled)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_chat_config: Option<AutoChatConfig>,
+    /// Whether this session is muted (AI won't respond to messages)
+    #[serde(default)]
+    pub is_muted: bool,
+}
+
 fn default_execution_strategy() -> String {
     "broadcast".to_string()
 }
@@ -1396,12 +1463,44 @@ impl MigratesTo<SessionV4_1_0> for SessionV4_0_0 {
     }
 }
 
+/// Migration from SessionV4_1_0 to SessionV4_2_0.
+/// Adds is_muted field for memo mode (default: false)
+impl MigratesTo<SessionV4_2_0> for SessionV4_1_0 {
+    fn migrate(self) -> SessionV4_2_0 {
+        SessionV4_2_0 {
+            id: self.id,
+            title: self.title,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            current_persona_id: self.current_persona_id,
+            persona_histories: self.persona_histories,
+            app_mode: self.app_mode,
+            workspace_id: self.workspace_id,
+            active_participant_ids: self.active_participant_ids,
+            execution_strategy: self.execution_strategy,
+            system_messages: self.system_messages,
+            participants: self.participants,
+            participant_icons: self.participant_icons,
+            participant_colors: self.participant_colors,
+            participant_backends: self.participant_backends,
+            participant_models: self.participant_models,
+            conversation_mode: self.conversation_mode,
+            talk_style: self.talk_style,
+            is_favorite: self.is_favorite,
+            is_archived: self.is_archived,
+            sort_order: self.sort_order,
+            auto_chat_config: self.auto_chat_config,
+            is_muted: false, // Default to unmuted
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
 
-/// Convert SessionV4_1_0 DTO to domain model.
-impl IntoDomain<Session> for SessionV4_1_0 {
+/// Convert SessionV4_2_0 DTO to domain model.
+impl IntoDomain<Session> for SessionV4_2_0 {
     fn into_domain(self) -> Session {
         Session {
             id: self.id,
@@ -1431,12 +1530,13 @@ impl IntoDomain<Session> for SessionV4_1_0 {
             is_archived: self.is_archived,
             sort_order: self.sort_order,
             auto_chat_config: self.auto_chat_config,
+            is_muted: self.is_muted,
         }
     }
 }
 
-/// Convert domain model to SessionV4_1_0 DTO for persistence.
-impl version_migrate::FromDomain<Session> for SessionV4_1_0 {
+/// Convert domain model to SessionV4_2_0 DTO for persistence.
+impl version_migrate::FromDomain<Session> for SessionV4_2_0 {
     fn from_domain(session: Session) -> Self {
         let Session {
             id,
@@ -1461,9 +1561,10 @@ impl version_migrate::FromDomain<Session> for SessionV4_1_0 {
             is_archived,
             sort_order,
             auto_chat_config,
+            is_muted,
         } = session;
 
-        SessionV4_1_0 {
+        SessionV4_2_0 {
             id,
             title,
             created_at,
@@ -1490,6 +1591,7 @@ impl version_migrate::FromDomain<Session> for SessionV4_1_0 {
             is_archived,
             sort_order,
             auto_chat_config,
+            is_muted,
         }
     }
 }
@@ -1523,7 +1625,8 @@ impl version_migrate::FromDomain<Session> for SessionV4_1_0 {
 /// - V3.3.0 → V3.4.0: Adds `participant_backends` and `participant_models` fields
 /// - V3.4.0 → V4.0.0: Changes execution_strategy to ExecutionStrategyV2_0_0 enum
 /// - V4.0.0 → V4.1.0: Fixes participant_models to avoid TOML null errors
-/// - V4.1.0 → Session: Converts DTO to domain model
+/// - V4.1.0 → V4.2.0: Adds `is_muted` field for memo mode
+/// - V4.2.0 → Session: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -1534,7 +1637,7 @@ impl version_migrate::FromDomain<Session> for SessionV4_1_0 {
 pub fn create_session_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> ... -> V4.0.0 -> V4.1.0 -> Session
+    // Register migration path: V1.0.0 -> ... -> V4.0.0 -> V4.1.0 -> V4.2.0 -> Session
     let session_path = version_migrate::Migrator::define("session")
         .from::<SessionV1_0_0>()
         .step::<SessionV1_1_0>()
@@ -1555,6 +1658,7 @@ pub fn create_session_migrator() -> version_migrate::Migrator {
         .step::<SessionV3_4_0>()
         .step::<SessionV4_0_0>()
         .step::<SessionV4_1_0>()
+        .step::<SessionV4_2_0>()
         .into_with_save::<Session>();
 
     migrator

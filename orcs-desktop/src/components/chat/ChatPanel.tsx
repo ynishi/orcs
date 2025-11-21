@@ -191,6 +191,9 @@ export function ChatPanel({
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
   const [autoChatConfig, setAutoChatConfig] = useState<AutoChatConfig | null>(null);
 
+  // Mute state
+  const [isMuted, setIsMuted] = useState(false);
+
   // SlashCommand creation state
   const [slashCommandModalOpened, setSlashCommandModalOpened] = useState(false);
   const [slashCommandDraft, setSlashCommandDraft] = useState<Partial<SlashCommand> | null>(null);
@@ -250,6 +253,22 @@ export function ChatPanel({
     loadAutoChatConfig();
   }, [tab.sessionId]); // Reload when tab changes
 
+  // Load mute status from backend when tab changes
+  useEffect(() => {
+    const loadMuteStatus = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const status = await invoke<boolean>('get_mute_status');
+        setIsMuted(status);
+      } catch (error) {
+        console.error('[ChatPanel] Failed to load mute status:', error);
+        setIsMuted(false);
+      }
+    };
+
+    loadMuteStatus();
+  }, [tab.sessionId]);
+
   const handleSaveAutoChatConfig = async (config: AutoChatConfig) => {
     setAutoChatConfig(config);
 
@@ -263,6 +282,30 @@ export function ChatPanel({
     } catch (error) {
       console.error('[ChatPanel] Failed to save AutoChat config:', error);
       // TODO: Show error notification to user
+    }
+  };
+
+  // Handle mute toggle
+  const handleToggleMute = async () => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const newMuteStatus = await invoke<boolean>('toggle_mute');
+      setIsMuted(newMuteStatus);
+
+      notifications.show({
+        title: newMuteStatus ? 'Session Muted' : 'Session Unmuted',
+        message: newMuteStatus
+          ? 'AI responses are disabled. Messages will be recorded only.'
+          : 'AI responses are enabled.',
+        color: newMuteStatus ? 'gray' : 'green',
+      });
+    } catch (error) {
+      console.error('[ChatPanel] Failed to toggle mute:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to toggle mute status',
+        color: 'red',
+      });
     }
   };
 
@@ -664,7 +707,7 @@ export function ChatPanel({
                 <Text size="sm">{tab.messages.length} messages (tab inactive)</Text>
               </Box>
             )}
-            {tab.isAiThinking && activeParticipantIds.length > 0 && (
+            {tab.isAiThinking && activeParticipantIds.length > 0 && !isMuted && (
               <ThinkingIndicator personaName={tab.thinkingPersona} />
             )}
           </Stack>
@@ -841,6 +884,17 @@ export function ChatPanel({
                 size="lg"
               >
                 <IconSettings size={18} />
+              </ActionIcon>
+            </Tooltip>
+
+            <Tooltip label={isMuted ? 'Unmute (Enable AI)' : 'Mute (Disable AI)'}>
+              <ActionIcon
+                color={isMuted ? 'gray' : 'blue'}
+                variant={isMuted ? 'filled' : 'light'}
+                onClick={handleToggleMute}
+                size="lg"
+              >
+                {isMuted ? '🔇' : '🔊'}
               </ActionIcon>
             </Tooltip>
 

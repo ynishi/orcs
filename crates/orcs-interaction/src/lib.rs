@@ -418,6 +418,8 @@ pub struct InteractionManager {
     auto_chat_iteration: Arc<RwLock<Option<u32>>>,
     /// Optional prompt extension appended to system prompt
     prompt_extension: Arc<RwLock<Option<String>>>,
+    /// Whether this session is muted (AI won't respond to messages)
+    is_muted: Arc<RwLock<bool>>,
 }
 
 impl InteractionManager {
@@ -466,6 +468,7 @@ impl InteractionManager {
             auto_chat_config: Arc::new(RwLock::new(None)),
             auto_chat_iteration: Arc::new(RwLock::new(None)),
             prompt_extension: Arc::new(RwLock::new(None)),
+            is_muted: Arc::new(RwLock::new(false)),
         }
     }
 
@@ -513,6 +516,7 @@ impl InteractionManager {
             auto_chat_config: Arc::new(RwLock::new(data.auto_chat_config)),
             auto_chat_iteration: Arc::new(RwLock::new(None)), // Never running when restored from disk
             prompt_extension: Arc::new(RwLock::new(None)),
+            is_muted: Arc::new(RwLock::new(data.is_muted)),
         }
     }
 
@@ -784,6 +788,7 @@ impl InteractionManager {
         let conversation_mode = self.conversation_mode.read().await.clone();
         let talk_style = self.talk_style.read().await.clone();
         let auto_chat_config = self.auto_chat_config.read().await.clone();
+        let is_muted = self.is_muted.read().await.clone();
 
         Session {
             id: self.session_id.clone(),
@@ -808,6 +813,7 @@ impl InteractionManager {
             is_archived: false,
             sort_order: None,
             auto_chat_config,
+            is_muted,
         }
     }
 
@@ -1213,6 +1219,23 @@ impl InteractionManager {
     /// The dialogue will be recreated with the latest settings on the next interaction.
     pub async fn invalidate_dialogue(&self) {
         *self.dialogue.lock().await = None;
+    }
+
+    /// Toggles mute status and returns the new value.
+    pub async fn toggle_mute(&self) -> bool {
+        let mut is_muted = self.is_muted.write().await;
+        *is_muted = !*is_muted;
+        *is_muted
+    }
+
+    /// Gets the current mute status.
+    pub async fn is_muted(&self) -> bool {
+        *self.is_muted.read().await
+    }
+
+    /// Sets the mute status.
+    pub async fn set_mute(&self, muted: bool) {
+        *self.is_muted.write().await = muted;
     }
 
     /// Handles user input based on the current application mode.

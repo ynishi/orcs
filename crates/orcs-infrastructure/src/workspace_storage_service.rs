@@ -873,6 +873,11 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    /// Helper function to cleanup workspace after test
+    async fn cleanup_workspace(manager: &FileSystemWorkspaceManager, workspace_id: &str) {
+        let _ = manager.delete_workspace(workspace_id).await;
+    }
+
     #[tokio::test]
     async fn test_new_creates_root_pathectory() {
         let temp_dir = TempDir::new().unwrap();
@@ -915,6 +920,9 @@ mod tests {
         assert_eq!(workspace.root_path, repo_path);
         assert!(workspace.resources.uploaded_files.is_empty());
         assert!(workspace.resources.temp_files.is_empty());
+
+        // Cleanup
+        cleanup_workspace(&manager, &workspace.id).await;
     }
 
     #[tokio::test]
@@ -936,6 +944,9 @@ mod tests {
 
         assert_eq!(workspace1.id, workspace2.id);
         assert_eq!(workspace1.name, workspace2.name);
+
+        // Cleanup
+        cleanup_workspace(&manager, &workspace1.id).await;
     }
 
     #[tokio::test]
@@ -967,6 +978,9 @@ mod tests {
         let retrieved = manager.get_workspace(&workspace.id).await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().id, workspace.id);
+
+        // Cleanup
+        cleanup_workspace(&manager, &workspace.id).await;
     }
 
     #[tokio::test]
@@ -1015,6 +1029,9 @@ mod tests {
             updated_workspace.resources.uploaded_files[0].name,
             uploaded_file.name
         );
+
+        // Cleanup
+        cleanup_workspace(&manager, &workspace.id).await;
     }
 
     #[tokio::test]
@@ -1068,6 +1085,9 @@ mod tests {
             updated_workspace.resources.temp_files[0].path,
             temp_file.path
         );
+
+        // Cleanup
+        cleanup_workspace(&manager, &workspace.id).await;
     }
 
     #[tokio::test]
@@ -1115,6 +1135,9 @@ mod tests {
             updated_workspace.resources.uploaded_files[0].name,
             uploaded_file.name
         );
+
+        // Cleanup
+        cleanup_workspace(&manager, &workspace.id).await;
     }
 
     #[tokio::test]
@@ -1145,6 +1168,9 @@ mod tests {
 
         // Verify the content matches
         assert_eq!(content, test_content);
+
+        // Cleanup
+        cleanup_workspace(&manager, &workspace.id).await;
     }
 
     #[tokio::test]
@@ -1191,5 +1217,8 @@ mod tests {
             }
             _ => panic!("Expected Security error, got: {:?}", error),
         }
+
+        // Cleanup
+        cleanup_workspace(&manager, &workspace.id).await;
     }
 }

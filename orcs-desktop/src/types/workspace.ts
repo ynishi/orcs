@@ -27,6 +27,10 @@ export interface UploadedFile {
   author?: string;
   /** Whether this file is archived (hidden by default) */
   isArchived: boolean;
+  /** Whether this file is marked as favorite (pinned to top) */
+  isFavorite: boolean;
+  /** Manual sort order (optional, for custom ordering within favorites) */
+  sortOrder?: number;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton, Tooltip, Switch } from '@mantine/core';
-import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive } from '@tabler/icons-react';
+import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
 import { useState, useMemo } from 'react';
@@ -14,9 +14,11 @@ interface FileListProps {
   onGoToSession?: (file: UploadedFile) => void;
   onNewSessionWithFile?: (file: UploadedFile) => void;
   onToggleArchive?: (file: UploadedFile) => void;
+  onToggleFavorite?: (file: UploadedFile) => void;
+  onMoveSortOrder?: (fileId: string, direction: 'up' | 'down') => void;
 }
 
-export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession, onNewSessionWithFile, onToggleArchive }: FileListProps) {
+export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession, onNewSessionWithFile, onToggleArchive, onToggleFavorite, onMoveSortOrder }: FileListProps) {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
@@ -151,7 +153,21 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
         return a.isArchived ? 1 : -1;
       }
 
-      // 2. それ以外はuploadedAtで降順
+      // 2. Favoriteは常に上
+      if (a.isFavorite !== b.isFavorite) {
+        return a.isFavorite ? -1 : 1;
+      }
+
+      // 3. Favorite内では、sort_orderがあればそれを優先
+      if (a.isFavorite && b.isFavorite) {
+        if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+          return a.sortOrder - b.sortOrder;
+        }
+        if (a.sortOrder !== undefined) return -1;
+        if (b.sortOrder !== undefined) return 1;
+      }
+
+      // 4. それ以外はuploadedAtで降順
       return b.uploadedAt - a.uploadedAt;
     });
   }, [files]);
@@ -162,6 +178,18 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
       ? sortedFiles
       : sortedFiles.filter(f => !f.isArchived);
   }, [sortedFiles, showArchived]);
+
+  // カテゴリ別ファイル（メモ化）- SessionListパターン
+  const { favoriteFiles, recentFiles, archivedFiles } = useMemo(() => {
+    return {
+      favoriteFiles: visibleFiles.filter(f => f.isFavorite && !f.isArchived),
+      recentFiles: visibleFiles.filter(f => !f.isFavorite && !f.isArchived),
+      archivedFiles: visibleFiles.filter(f => f.isArchived),
+    };
+  }, [visibleFiles]);
+
+  // Favoriteファイルの数を数える（UP/DOWNボタンの表示判定用）
+  const favoriteFilesCount = favoriteFiles.length;
 
   // ファイルレンダリング関数（SessionListパターン）
   const renderFile = (file: UploadedFile) => {
@@ -228,8 +256,27 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
               borderBottom: '1px solid var(--mantine-color-gray-3)',
             }}
           >
-            {/* ファイルアイコン（左寄せ） */}
-            <Text size="lg">{getFileIcon(file)}</Text>
+            {/* Left group: ファイルアイコン + Favorite */}
+            <Group gap="xs">
+              <Text size="lg">{getFileIcon(file)}</Text>
+
+              {/* Favoriteボタン */}
+              {onToggleFavorite && (
+                <Tooltip label={file.isFavorite ? "Remove from favorites" : "Add to favorites"} withArrow>
+                  <ActionIcon
+                    size="sm"
+                    color={file.isFavorite ? "yellow" : "gray"}
+                    variant="subtle"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleFavorite(file);
+                    }}
+                  >
+                    {file.isFavorite ? <IconStar size={16} fill="currentColor" /> : <IconStar size={16} />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </Group>
 
             {/* コンテキストメニュー */}
             <Menu position="bottom-end" withinPortal>
@@ -305,6 +352,25 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
                 >
                   Rename
                 </Menu.Item>
+
+                {/* Move Up/Down (favoriteファイルが2つ以上ある場合のみ) */}
+                {file.isFavorite && onMoveSortOrder && favoriteFilesCount >= 2 && (
+                  <>
+                    <Menu.Item
+                      leftSection={<IconArrowUp size={14} />}
+                      onClick={() => onMoveSortOrder(file.id, 'up')}
+                    >
+                      Move Up
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<IconArrowDown size={14} />}
+                      onClick={() => onMoveSortOrder(file.id, 'down')}
+                    >
+                      Move Down
+                    </Menu.Item>
+                    <Menu.Divider />
+                  </>
+                )}
 
                 {/* Archive/Unarchive */}
                 <Menu.Item
@@ -407,9 +473,52 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
       </Group>
 
       {/* ファイルリスト */}
-      <ScrollArea style={{ flex: 1 }} px="sm">
-        <Stack gap={4}>
-          {visibleFiles.map(renderFile)}
+      <ScrollArea style={{ flex: 1 }} px="sm" type="auto">
+        <Stack gap="md">
+          {/* Favoritesセクション */}
+          {favoriteFiles.length > 0 && (
+            <Box>
+              <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
+                FAVORITES
+              </Text>
+              <Stack gap={4}>
+                {favoriteFiles.map(renderFile)}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Recentセクション */}
+          {recentFiles.length > 0 && (
+            <Box>
+              <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
+                RECENT
+              </Text>
+              <Stack gap={4}>
+                {recentFiles.map(renderFile)}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Archivedセクション */}
+          {showArchived && archivedFiles.length > 0 && (
+            <Box>
+              <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
+                ARCHIVED
+              </Text>
+              <Stack gap={4}>
+                {archivedFiles.map(renderFile)}
+              </Stack>
+            </Box>
+          )}
+
+          {/* 空の状態 */}
+          {files.length === 0 && (
+            <Box p="md" style={{ textAlign: 'center' }}>
+              <Text size="sm" c="dimmed">
+                No files yet
+              </Text>
+            </Box>
+          )}
         </Stack>
       </ScrollArea>
 

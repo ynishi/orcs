@@ -9,7 +9,7 @@ use orcs_core::workspace::{
     ProjectContext, SessionWorkspace, TempFile, Workspace, WorkspaceResources,
 };
 
-use super::uploaded_file::UploadedFileV1_2_0;
+use super::uploaded_file::UploadedFileV1_4_0;
 
 /// Represents a temporary file created during operations (DTO V1).
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
@@ -54,7 +54,7 @@ pub struct ProjectContextV1 {
 pub struct WorkspaceResourcesV1 {
     /// Files uploaded by the user or system
     #[serde(default)]
-    pub uploaded_files: Vec<UploadedFileV1_2_0>,
+    pub uploaded_files: Vec<UploadedFileV1_4_0>,
     /// Temporary files created during session operations
     #[serde(default)]
     pub temp_files: Vec<TempFileV1>,
@@ -111,6 +111,32 @@ pub struct WorkspaceV1_2_0 {
     /// Root directory path of the project
     pub root_path: PathBuf,
     /// Collection of all workspace resources
+    pub resources: WorkspaceResourcesV1,
+    /// Project-specific context and metadata
+    pub project_context: ProjectContextV1,
+    /// Last accessed timestamp (UNIX timestamp in seconds)
+    #[serde(default)]
+    pub last_accessed: i64,
+    /// Whether this workspace is marked as favorite
+    #[serde(default)]
+    pub is_favorite: bool,
+    /// ID of the last active session in this workspace
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_active_session_id: Option<String>,
+}
+
+/// Represents a project-level workspace (DTO V1.3.0).
+/// Updated to support UploadedFile V1.4.0 (is_favorite, sort_order).
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.3.0")]
+pub struct WorkspaceV1_3_0 {
+    /// Unique identifier for the workspace
+    pub id: String,
+    /// Name of the workspace (typically derived from project name)
+    pub name: String,
+    /// Root directory path of the project
+    pub root_path: PathBuf,
+    /// Collection of all workspace resources (with UploadedFile V1.4.0)
     pub resources: WorkspaceResourcesV1,
     /// Project-specific context and metadata
     pub project_context: ProjectContextV1,
@@ -219,7 +245,7 @@ impl From<&WorkspaceResources> for WorkspaceResourcesV1 {
             uploaded_files: resources
                 .uploaded_files
                 .iter()
-                .map(UploadedFileV1_2_0::from)
+                .map(UploadedFileV1_4_0::from)
                 .collect(),
             temp_files: resources.temp_files.iter().map(TempFileV1::from).collect(),
         }
@@ -259,6 +285,24 @@ impl version_migrate::MigratesTo<WorkspaceV1_2_0> for WorkspaceV1_1_0 {
             last_accessed: self.last_accessed,
             is_favorite: self.is_favorite,
             last_active_session_id: None, // Default: no previous active session
+        }
+    }
+}
+
+/// Migration from WorkspaceV1_2_0 to WorkspaceV1_3_0.
+/// Updated to support UploadedFile V1.4.0 with is_favorite and sort_order.
+/// This migration is transparent as the UploadedFile migration is handled automatically.
+impl version_migrate::MigratesTo<WorkspaceV1_3_0> for WorkspaceV1_2_0 {
+    fn migrate(self) -> WorkspaceV1_3_0 {
+        WorkspaceV1_3_0 {
+            id: self.id,
+            name: self.name,
+            root_path: self.root_path,
+            resources: self.resources,
+            project_context: self.project_context,
+            last_accessed: self.last_accessed,
+            is_favorite: self.is_favorite,
+            last_active_session_id: self.last_active_session_id,
         }
     }
 }
@@ -307,6 +351,25 @@ impl IntoDomain<Workspace> for WorkspaceV1_1_0 {
 
 /// Convert WorkspaceV1_2_0 DTO to domain model.
 impl IntoDomain<Workspace> for WorkspaceV1_2_0 {
+    fn into_domain(self) -> Workspace {
+        Workspace {
+            id: self.id,
+            name: self.name,
+            root_path: self.root_path,
+            // workspace_dir is calculated from workspace_id, not stored in DTO
+            // The caller (load_workspace) must set this field after conversion
+            workspace_dir: PathBuf::new(),
+            resources: self.resources.into_domain(),
+            project_context: self.project_context.into_domain(),
+            last_accessed: self.last_accessed,
+            is_favorite: self.is_favorite,
+            last_active_session_id: self.last_active_session_id,
+        }
+    }
+}
+
+/// Convert WorkspaceV1_3_0 DTO to domain model.
+impl IntoDomain<Workspace> for WorkspaceV1_3_0 {
     fn into_domain(self) -> Workspace {
         Workspace {
             id: self.id,
@@ -385,6 +448,37 @@ impl From<&Workspace> for WorkspaceV1_2_0 {
 impl FromDomain<Workspace> for WorkspaceV1_2_0 {
     fn from_domain(domain: Workspace) -> Self {
         WorkspaceV1_2_0 {
+            id: domain.id,
+            name: domain.name,
+            root_path: domain.root_path,
+            resources: WorkspaceResourcesV1::from(&domain.resources),
+            project_context: ProjectContextV1::from(&domain.project_context),
+            last_accessed: domain.last_accessed,
+            is_favorite: domain.is_favorite,
+            last_active_session_id: domain.last_active_session_id,
+        }
+    }
+}
+
+/// Convert domain model to WorkspaceV1_3_0 DTO for persistence.
+impl From<&Workspace> for WorkspaceV1_3_0 {
+    fn from(workspace: &Workspace) -> Self {
+        WorkspaceV1_3_0 {
+            id: workspace.id.clone(),
+            name: workspace.name.clone(),
+            root_path: workspace.root_path.clone(),
+            resources: WorkspaceResourcesV1::from(&workspace.resources),
+            project_context: ProjectContextV1::from(&workspace.project_context),
+            last_accessed: workspace.last_accessed,
+            is_favorite: workspace.is_favorite,
+            last_active_session_id: workspace.last_active_session_id.clone(),
+        }
+    }
+}
+
+impl FromDomain<Workspace> for WorkspaceV1_3_0 {
+    fn from_domain(domain: Workspace) -> Self {
+        WorkspaceV1_3_0 {
             id: domain.id,
             name: domain.name,
             root_path: domain.root_path,
@@ -485,13 +579,15 @@ pub fn create_workspace_resources_migrator() -> version_migrate::Migrator {
 ///
 /// - V1.0.0 → V1.1.0: Added last_accessed and is_favorite fields
 /// - V1.1.0 → V1.2.0: Added last_active_session_id field
-/// - V1.2.0 → Workspace: Converts DTO to domain model
+/// - V1.2.0 → V1.3.0: Updated to support UploadedFile V1.4.0 (is_favorite, sort_order)
+/// - V1.3.0 → Workspace: Converts DTO to domain model
 pub fn create_workspace_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
     let path = version_migrate::Migrator::define("workspace")
         .from::<WorkspaceV1>()
         .step::<WorkspaceV1_1_0>()
         .step::<WorkspaceV1_2_0>()
+        .step::<WorkspaceV1_3_0>()
         .into_with_save::<Workspace>();
     // into_with_save() で登録
     migrator

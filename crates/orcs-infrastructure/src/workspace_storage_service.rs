@@ -344,6 +344,8 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
             message_timestamp: None,
             author: None,
             is_archived: false,
+            is_favorite: false,
+            sort_order: None,
         };
 
         // Add to workspace's uploaded_files list
@@ -424,6 +426,8 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
             message_timestamp,
             author,
             is_archived: false,
+            is_favorite: false,
+            sort_order: None,
         };
 
         // Add to workspace's uploaded_files list
@@ -555,6 +559,124 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
 
         // Toggle the archive status
         file.is_archived = !file.is_archived;
+
+        // Save the updated workspace metadata
+        self.save_workspace(&workspace).await?;
+
+        Ok(())
+    }
+
+    async fn toggle_file_favorite(&self, workspace_id: &str, file_id: &str) -> Result<()> {
+        // Load existing workspace metadata
+        let mut workspace = self.load_workspace(workspace_id).await?;
+
+        // Find the file index first
+        let file_idx = workspace
+            .resources
+            .uploaded_files
+            .iter()
+            .position(|f| f.id == file_id)
+            .ok_or_else(|| {
+                OrcsError::io(format!("File with ID '{}' not found in workspace", file_id))
+            })?;
+
+        // Toggle the favorite status
+        let file = &mut workspace.resources.uploaded_files[file_idx];
+        file.is_favorite = !file.is_favorite;
+
+        // If toggling to favorite and no sort_order exists, assign one
+        let needs_sort_order = file.is_favorite && file.sort_order.is_none();
+
+        if needs_sort_order {
+            // Find the maximum sort_order among favorited files
+            let max_sort_order = workspace
+                .resources
+                .uploaded_files
+                .iter()
+                .filter(|f| f.is_favorite && f.sort_order.is_some())
+                .filter_map(|f| f.sort_order)
+                .max()
+                .unwrap_or(-1);
+            workspace.resources.uploaded_files[file_idx].sort_order = Some(max_sort_order + 1);
+        }
+
+        // Save the updated workspace metadata
+        self.save_workspace(&workspace).await?;
+
+        Ok(())
+    }
+
+    async fn move_file_sort_order(
+        &self,
+        workspace_id: &str,
+        file_id: &str,
+        direction: &str,
+    ) -> Result<()> {
+        // Load existing workspace metadata
+        let mut workspace = self.load_workspace(workspace_id).await?;
+
+        // Find the target file
+        let target_idx = workspace
+            .resources
+            .uploaded_files
+            .iter()
+            .position(|f| f.id == file_id)
+            .ok_or_else(|| {
+                OrcsError::io(format!("File with ID '{}' not found in workspace", file_id))
+            })?;
+
+        // Ensure the file is favorited
+        if !workspace.resources.uploaded_files[target_idx].is_favorite {
+            return Err(OrcsError::io(
+                "Cannot move sort order of non-favorited file".to_string(),
+            ));
+        }
+
+        // Get all favorite files with their indices and sort_orders
+        let mut favorite_files: Vec<(usize, &UploadedFile)> = workspace
+            .resources
+            .uploaded_files
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| f.is_favorite)
+            .collect();
+
+        // Sort by sort_order (None values go to the end)
+        favorite_files.sort_by(|(_, a), (_, b)| {
+            match (a.sort_order, b.sort_order) {
+                (Some(a_order), Some(b_order)) => a_order.cmp(&b_order),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+        });
+
+        // Find the position of the target file in the sorted list
+        let sorted_pos = favorite_files
+            .iter()
+            .position(|(idx, _)| *idx == target_idx)
+            .unwrap();
+
+        // Determine the swap target based on direction
+        let swap_pos = match direction {
+            "up" if sorted_pos > 0 => sorted_pos - 1,
+            "down" if sorted_pos < favorite_files.len() - 1 => sorted_pos + 1,
+            _ => return Ok(()), // No-op if at boundary or invalid direction
+        };
+
+        // Swap sort_order values
+        let target_file_idx = favorite_files[sorted_pos].0;
+        let swap_file_idx = favorite_files[swap_pos].0;
+
+        let target_order = workspace.resources.uploaded_files[target_file_idx]
+            .sort_order
+            .unwrap_or(sorted_pos as i32);
+        let swap_order = workspace.resources.uploaded_files[swap_file_idx]
+            .sort_order
+            .unwrap_or(swap_pos as i32);
+
+        workspace.resources.uploaded_files[target_file_idx].sort_order = Some(swap_order);
+        workspace.resources.uploaded_files[swap_file_idx].sort_order = Some(target_order);
 
         // Save the updated workspace metadata
         self.save_workspace(&workspace).await?;

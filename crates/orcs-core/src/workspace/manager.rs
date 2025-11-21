@@ -164,6 +164,43 @@ pub trait WorkspaceStorageService: Send + Sync {
     /// - The update operation fails
     async fn toggle_file_archive(&self, workspace_id: &str, file_id: &str) -> Result<()>;
 
+    /// Toggles the favorite status of a file in a workspace.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace
+    /// * `file_id` - The ID of the file to toggle
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The file does not exist
+    /// - The update operation fails
+    async fn toggle_file_favorite(&self, workspace_id: &str, file_id: &str) -> Result<()>;
+
+    /// Moves a file's sort order within the favorited files list.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace
+    /// * `file_id` - The ID of the file to move
+    /// * `direction` - The direction to move ("up" or "down")
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The file does not exist
+    /// - The file is not favorited
+    /// - The update operation fails
+    async fn move_file_sort_order(
+        &self,
+        workspace_id: &str,
+        file_id: &str,
+        direction: &str,
+    ) -> Result<()>;
+
     /// Creates a temporary file associated with a session and workspace.
     ///
     /// Temporary files are typically used for intermediate data during a session

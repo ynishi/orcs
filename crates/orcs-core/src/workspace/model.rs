@@ -58,6 +58,12 @@ pub struct UploadedFile {
     /// Whether this file is archived (hidden by default)
     #[serde(default)]
     pub is_archived: bool,
+    /// Whether this file is marked as favorite (pinned to top)
+    #[serde(default)]
+    pub is_favorite: bool,
+    /// Manual sort order (optional, for custom ordering within favorites)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<i32>,
 }
 
 /// Project-specific context and metadata.

@@ -33,6 +33,8 @@ interface RawUploadedFile {
   message_timestamp?: string;
   author?: string;
   is_archived: boolean;
+  is_favorite: boolean;
+  sort_order?: number;
 }
 
 interface RawWorkspace {
@@ -79,6 +81,8 @@ function convertWorkspace(raw: RawWorkspace): Workspace {
         messageTimestamp: file.message_timestamp,
         author: file.author,
         isArchived: file.is_archived,
+        isFavorite: file.is_favorite,
+        sortOrder: file.sort_order,
       })),
       tempFiles: raw.resources.temp_files.map(file => ({
         id: file.id,
@@ -136,12 +140,12 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           messageTimestamp: file.message_timestamp,
           author: file.author,
           isArchived: file.is_archived,
+          isFavorite: file.is_favorite,
+          sortOrder: file.sort_order,
         }));
 
-        // Sort by upload time (most recent first)
-        const sortedFiles = convertedFiles.sort((a, b) => b.uploadedAt - a.uploadedAt);
-
-        setFiles(sortedFiles);
+        // Sorting is handled in FileList component
+        setFiles(convertedFiles);
       } catch (fileError) {
         console.error('Failed to list workspace files:', fileError);
         setFiles([]);

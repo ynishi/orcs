@@ -133,6 +133,41 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
     }
   };
 
+  // Handle toggling favorite status
+  const handleToggleFavorite = async (file: UploadedFile) => {
+    if (!workspace) return;
+
+    try {
+      await invoke('toggle_workspace_file_favorite', {
+        workspaceId: workspace.id,
+        fileId: file.id,
+      });
+
+      // Refresh the file list
+      await refreshWorkspaceState();
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err);
+    }
+  };
+
+  // Handle moving sort order
+  const handleMoveSortOrder = async (fileId: string, direction: 'up' | 'down') => {
+    if (!workspace) return;
+
+    try {
+      await invoke('move_workspace_file_sort_order', {
+        workspaceId: workspace.id,
+        fileId: fileId,
+        direction: direction,
+      });
+
+      // Refresh the file list
+      await refreshWorkspaceState();
+    } catch (err) {
+      console.error('Failed to move sort order:', err);
+    }
+  };
+
   // Handle navigating to session
   const handleGoToSession = (file: UploadedFile) => {
     if (file.sessionId) {
@@ -349,6 +384,8 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
           onGoToSession={handleGoToSession}
           onNewSessionWithFile={handleNewSessionWithFile}
           onToggleArchive={toggleFileArchive}
+          onToggleFavorite={handleToggleFavorite}
+          onMoveSortOrder={handleMoveSortOrder}
         />
       </ScrollArea>
     </Stack>

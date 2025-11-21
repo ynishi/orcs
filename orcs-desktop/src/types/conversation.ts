@@ -1,7 +1,13 @@
 /**
- * Conversation Mode definitions
+ * Type definitions auto-generated from Rust code
  */
-export type ConversationModeType = 'normal' | 'concise' | 'brief' | 'discussion';
+import type {
+  ConversationModeType,
+  TalkStyleType,
+  ExecutionModelType as ExecutionStrategyType,
+  PresetSourceType as PresetSource,
+} from './generated/schema';
+export type { ConversationModeType, TalkStyleType, ExecutionStrategyType, PresetSource };
 
 export interface ConversationModeOption {
   value: ConversationModeType;
@@ -36,12 +42,6 @@ export const CONVERSATION_MODES: ConversationModeOption[] = [
     description: 'Discussion mode',
   },
 ];
-
-/**
- * Talk Style definitions
- * IMPORTANT: Must match Rust TalkStyle enum variants exactly (PascalCase)
- */
-export type TalkStyleType = 'Brainstorm' | 'Casual' | 'DecisionMaking' | 'Debate' | 'ProblemSolving' | 'Review' | 'Planning';
 
 export interface TalkStyleOption {
   value: TalkStyleType;
@@ -106,11 +106,6 @@ export function getTalkStyleOption(style: TalkStyleType): TalkStyleOption | unde
   return TALK_STYLES.find(s => s.value === style);
 }
 
-/**
- * Execution Strategy definitions
- */
-export type ExecutionStrategyType = 'broadcast' | 'sequential' | 'mentioned';
-
 export interface ExecutionStrategyOption {
   value: ExecutionStrategyType;
   label: string;
@@ -146,8 +141,6 @@ export function getExecutionStrategyOption(strategy: ExecutionStrategyType): Exe
 /**
  * Dialogue Preset definitions
  */
-export type PresetSource = 'system' | 'user';
-
 export interface DialoguePreset {
   id: string;
   name: string;

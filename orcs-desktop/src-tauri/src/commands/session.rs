@@ -2,6 +2,7 @@ use std::time::SystemTime;
 
 use llm_toolkit::ToPrompt;
 use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
+use orcs_core::schema::TalkStyleType;
 use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
     PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent,
@@ -14,6 +15,22 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::process::Command;
 
 use crate::app::AppState;
+
+/// Helper: Convert String -> TalkStyle via schema type
+fn parse_talk_style(s: &str) -> Result<TalkStyle, String> {
+    let style_type: TalkStyleType = serde_json::from_str(&format!("\"{}\"", s))
+        .map_err(|_| format!("Unknown talk style: {}", s))?;
+    Ok(TalkStyle::from(style_type))
+}
+
+/// Helper: Convert TalkStyle -> String via schema type
+fn serialize_talk_style(style: TalkStyle) -> String {
+    let style_type = TalkStyleType::from(style);
+    serde_json::to_string(&style_type)
+        .unwrap()
+        .trim_matches('"')
+        .to_string()
+}
 
 /// Serializable version of DialogueMessage for Tauri IPC
 #[derive(Serialize, Clone)]
@@ -876,20 +893,7 @@ pub async fn set_talk_style(
         .await
         .ok_or("No active session")?;
 
-    let talk_style = if let Some(s) = style {
-        match s.as_str() {
-            "brainstorm" => Some(TalkStyle::Brainstorm),
-            "casual" => Some(TalkStyle::Casual),
-            "decision_making" => Some(TalkStyle::DecisionMaking),
-            "debate" => Some(TalkStyle::Debate),
-            "problem_solving" => Some(TalkStyle::ProblemSolving),
-            "review" => Some(TalkStyle::Review),
-            "planning" => Some(TalkStyle::Planning),
-            _ => return Err(format!("Unknown talk style: {}", s)),
-        }
-    } else {
-        None
-    };
+    let talk_style = style.map(|s| parse_talk_style(&s)).transpose()?;
 
     manager.set_talk_style(talk_style).await;
 
@@ -909,18 +913,7 @@ pub async fn get_talk_style(state: State<'_, AppState>) -> Result<Option<String>
         .ok_or("No active session")?;
 
     let style = manager.get_talk_style().await;
-    let style_str = style.map(|s| {
-        match s {
-            TalkStyle::Brainstorm => "brainstorm",
-            TalkStyle::Casual => "casual",
-            TalkStyle::DecisionMaking => "decision_making",
-            TalkStyle::Debate => "debate",
-            TalkStyle::ProblemSolving => "problem_solving",
-            TalkStyle::Review => "review",
-            TalkStyle::Planning => "planning",
-        }
-        .to_string()
-    });
+    let style_str = style.map(serialize_talk_style);
 
     Ok(style_str)
 }

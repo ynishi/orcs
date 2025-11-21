@@ -2722,6 +2722,7 @@ dependencies = [
  "dirs 5.0.1",
  "llm-toolkit",
  "reqwest",
+ "schema-bridge",
  "serde",
  "serde_json",
  "tempfile",
@@ -3598,6 +3599,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "891d81b926048e76efe18581bf793546b4c0eaf8448d72be8de2bbee5fd166e1"
 dependencies = [
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "schema-bridge"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f3b5953dbfa074e91d4b02712172808ba36c4171571086a30e3c6217d0ee764"
+dependencies = [
+ "schema-bridge-core",
+ "schema-bridge-macro",
+ "serde",
+]
+
+[[package]]
+name = "schema-bridge-core"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf3a23834e4119a2fe0cff2e96b002142937c878fbd34ed21ff2e1d81734e43d"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schema-bridge-macro"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "816ec31ac8124b750fd2e01b83a89f8c1443507bc14b02d4d67998e3320a4325"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.108",
 ]
 
 [[package]]

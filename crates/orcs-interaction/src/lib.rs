@@ -1109,6 +1109,7 @@ impl InteractionManager {
     pub async fn set_conversation_mode(&self, mode: ConversationMode) {
         // Record system message for mode change
         let mode_str = match mode {
+            ConversationMode::Detailed => "詳細",
             ConversationMode::Normal => "通常",
             ConversationMode::Concise => "簡潔 (300文字)",
             ConversationMode::Brief => "極簡潔 (150文字)",

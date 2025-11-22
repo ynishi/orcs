@@ -856,6 +856,7 @@ pub async fn get_conversation_mode(state: State<'_, AppState>) -> Result<String,
 
     let mode = manager.get_conversation_mode().await;
     let mode_str = match mode {
+        ConversationMode::Detailed => "detailed",
         ConversationMode::Normal => "normal",
         ConversationMode::Concise => "concise",
         ConversationMode::Brief => "brief",

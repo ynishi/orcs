@@ -109,10 +109,12 @@ impl From<ExecutionModelType> for ExecutionModel {
 ///
 /// Mirrors `crate::session::ConversationMode` for schema generation.
 /// Enables automatic TypeScript generation:
-/// `export type ConversationModeType = 'Normal' | 'Concise' | 'Brief' | 'Discussion'`
+/// `export type ConversationModeType = 'Detailed' | 'Normal' | 'Concise' | 'Brief' | 'Discussion'`
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
 #[serde(rename_all = "snake_case")]
 pub enum ConversationModeType {
+    /// Detailed mode - comprehensive responses with thorough explanations.
+    Detailed,
     /// Normal mode - no special constraints (default).
     Normal,
     /// Concise mode - responses should be under 300 characters.
@@ -126,6 +128,7 @@ pub enum ConversationModeType {
 impl From<ConversationMode> for ConversationModeType {
     fn from(value: ConversationMode) -> Self {
         match value {
+            ConversationMode::Detailed => Self::Detailed,
             ConversationMode::Normal => Self::Normal,
             ConversationMode::Concise => Self::Concise,
             ConversationMode::Brief => Self::Brief,
@@ -137,6 +140,7 @@ impl From<ConversationMode> for ConversationModeType {
 impl From<ConversationModeType> for ConversationMode {
     fn from(value: ConversationModeType) -> Self {
         match value {
+            ConversationModeType::Detailed => Self::Detailed,
             ConversationModeType::Normal => Self::Normal,
             ConversationModeType::Concise => Self::Concise,
             ConversationModeType::Brief => Self::Brief,

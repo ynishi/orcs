@@ -18,6 +18,12 @@ export interface ConversationModeOption {
 
 export const CONVERSATION_MODES: ConversationModeOption[] = [
   {
+    value: 'detailed',
+    label: '詳細',
+    icon: '📖',
+    description: 'Detailed mode (comprehensive explanations)',
+  },
+  {
     value: 'normal',
     label: '通常',
     icon: '🗨️',

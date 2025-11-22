@@ -1,0 +1,22 @@
+[package]
+name = "orcs-cli"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[[bin]]
+name = "orcs"
+path = "src/main.rs"
+
+[dependencies]
+orcs-core = { path = "../orcs-core" }
+clap = { version = "4.5", features = ["derive"] }
+schema-bridge = { workspace = true }
+anyhow = { workspace = true }

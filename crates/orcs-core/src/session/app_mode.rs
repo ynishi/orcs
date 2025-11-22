@@ -36,6 +36,10 @@ pub enum AppMode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ConversationMode {
+    /// Detailed mode - comprehensive responses with thorough explanations.
+    /// Agents provide in-depth analysis and detailed reasoning.
+    Detailed,
+
     /// Normal mode - no special constraints (default).
     #[default]
     Normal,
@@ -57,6 +61,9 @@ impl ConversationMode {
     /// Returns the system instruction for this mode, if any.
     pub fn system_instruction(&self) -> Option<&'static str> {
         match self {
+            Self::Detailed => Some(
+                "詳細モード: 包括的な説明と深い分析を提供。背景、理由、影響を含めて詳しく回答。",
+            ),
             Self::Normal => None,
             Self::Concise => Some(
                 "重要: 応答は簡潔に300文字以内で。他の参加者が既に述べた内容は繰り返さない。新しい視点のみ追加。",

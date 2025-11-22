@@ -3603,9 +3603,9 @@ dependencies = [
 
 [[package]]
 name = "schema-bridge"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3b5953dbfa074e91d4b02712172808ba36c4171571086a30e3c6217d0ee764"
+checksum = "381793ab64c87da9f585212c360a791ef1f35f1f59f76583d782ba6c39bb5069"
 dependencies = [
  "schema-bridge-core",
  "schema-bridge-macro",
@@ -3614,9 +3614,9 @@ dependencies = [
 
 [[package]]
 name = "schema-bridge-core"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf3a23834e4119a2fe0cff2e96b002142937c878fbd34ed21ff2e1d81734e43d"
+checksum = "306c75db44bd7c99f096759079b318df2666bbbbed4a5f4c3a55b54ad7845e64"
 dependencies = [
  "serde",
  "serde_json",
@@ -3624,9 +3624,9 @@ dependencies = [
 
 [[package]]
 name = "schema-bridge-macro"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "816ec31ac8124b750fd2e01b83a89f8c1443507bc14b02d4d67998e3320a4325"
+checksum = "30a72ef36e2c6ac9db2828fd801487a06cea9f9994302912ad6479f2f6d50c86"
 dependencies = [
  "proc-macro2",
  "quote",

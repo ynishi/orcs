@@ -4,7 +4,7 @@
 CARGO := cargo
 
 # Phony targets are not files. This prevents conflicts with files of the same name.
-.PHONY: all build run check test fmt clippy clean
+.PHONY: all build run check test fmt clippy clean schema-generate dev tauri
 
 # The default target executed when you run `make`.
 all: build
@@ -37,13 +37,30 @@ clippy:
 clean:
 	$(CARGO) clean
 
+# Generate TypeScript type definitions from Rust schemas.
+schema-generate:
+	$(CARGO) run --bin orcs -- schema generate
+
+# Run the Tauri desktop application in development mode.
+dev:
+	cd orcs-desktop && npm run tauri dev
+
+# Build the Tauri desktop application.
+tauri:
+	cd orcs-desktop && npm run tauri build
+
 help:
 	@echo "Available commands:"
-	@echo "  make all      - Build the project (default)"
-	@echo "  make build    - Build the project"
-	@echo "  make run      - Run the application"
-	@echo "  make check    - Check the code for errors"
-	@echo "  make test     - Run all tests"
-	@echo "  make fmt      - Format the code"
-	@echo "  make clippy   - Lint the code"
-	@echo "  make clean    - Clean build artifacts"
+	@echo "  make all             - Build the project (default)"
+	@echo "  make build           - Build the project"
+	@echo "  make run             - Run the application"
+	@echo "  make check           - Check the code for errors"
+	@echo "  make test            - Run all tests"
+	@echo "  make fmt             - Format the code"
+	@echo "  make clippy          - Lint the code"
+	@echo "  make clean           - Clean build artifacts"
+	@echo ""
+	@echo "Development tools:"
+	@echo "  make schema-generate - Generate TypeScript types from Rust schemas"
+	@echo "  make dev             - Run Tauri app in development mode"
+	@echo "  make tauri           - Build Tauri desktop application"

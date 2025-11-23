@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use orcs_core::schema::{
     ConversationModeType, ExecutionModelType, PresetSourceType, TalkStyleType,
 };
+use orcs_core::state::model::AppState;
 use schema_bridge::{export_types, SchemaBridge};
 use std::env;
 use std::path::PathBuf;
@@ -35,7 +36,8 @@ pub fn generate() -> Result<()> {
         TalkStyleType,
         ExecutionModelType,
         ConversationModeType,
-        PresetSourceType
+        PresetSourceType,
+        AppState
     )?;
 
     println!(" TypeScript types generated successfully!");

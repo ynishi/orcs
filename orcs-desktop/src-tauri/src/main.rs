@@ -58,6 +58,7 @@ fn main() {
     tauri::async_runtime::block_on(async move {
         let bootstrap = app::bootstrap(event_tx.clone()).await;
         let session_usecase_for_setup = bootstrap.app_state.session_usecase.clone();
+        let app_state_service_for_setup = bootstrap.app_state.app_state_service.clone();
 
         tauri::Builder::default()
             .plugin(tauri_plugin_opener::init())
@@ -83,8 +84,23 @@ fn main() {
 
                 let handle = app.handle().clone();
                 let session_usecase_for_setup = session_usecase_for_setup.clone();
+                let app_state_service_clone = app_state_service_for_setup.clone();
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+                    // Emit app-state:snapshot for initial sync
+                    use orcs_core::state::repository::StateRepository;
+                    match app_state_service_clone.get_state().await {
+                        Ok(app_state) => {
+                            tracing::info!("[Startup] Emitting app-state:snapshot");
+                            if let Err(e) = handle.emit("app-state:snapshot", &app_state) {
+                                tracing::error!("[Startup] Failed to emit app-state:snapshot: {}", e);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("[Startup] Failed to get app state: {}", e);
+                        }
+                    }
 
                     if let Some(session_mgr) = session_usecase_for_setup.active_session().await {
                         let app_mode_locked = AppMode::Idle;

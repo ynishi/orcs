@@ -8,3 +8,5 @@ export type ConversationModeType = 'detailed' | 'normal' | 'concise' | 'brief' |
 
 export type PresetSourceType = 'system' | 'user';
 
+export type AppState = { last_selected_workspace_id: string | null; default_workspace_id: string; active_session_id: string | null; };
+

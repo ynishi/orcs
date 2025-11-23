@@ -1,3 +1,4 @@
+pub mod app_state;
 pub mod dialogue_presets;
 pub mod files;
 pub mod git;
@@ -102,5 +103,10 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         session::generate_action_plan,
         session::generate_expertise,
         search::execute_search,
+        app_state::get_app_state_snapshot,
+        app_state::set_last_selected_workspace,
+        app_state::clear_last_selected_workspace,
+        app_state::set_active_session_in_app_state,
+        app_state::clear_active_session_in_app_state,
     ]
 }

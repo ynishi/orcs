@@ -45,6 +45,8 @@ import { useSlashCommands } from "./hooks/useSlashCommands";
 import { Tabs } from "@mantine/core";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import type { SessionEvent } from "./types/session_event";
+import { useAppStateStore } from "./stores/appStateStore";
+import type { AppState as RustAppState } from "./types/generated/schema";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -97,6 +99,16 @@ function App() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { workspace, allWorkspaces, files: workspaceFiles, refresh: refreshWorkspace, refreshWorkspaces, switchWorkspace: switchWorkspaceBackend } = useWorkspace();
   const [includeWorkspaceInPrompt, setIncludeWorkspaceInPrompt] = useState<boolean>(false);
+
+  // AppState Store (Rust SSOT)
+  const initializeAppState = useAppStateStore((state: { initialize: () => Promise<void> }) => state.initialize);
+
+  // Initialize AppState Store on mount
+  useEffect(() => {
+    initializeAppState().catch((error: unknown) => {
+      console.error('[App] Failed to initialize AppState store:', error);
+    });
+  }, [initializeAppState]);
 
   // タブ管理
   const {

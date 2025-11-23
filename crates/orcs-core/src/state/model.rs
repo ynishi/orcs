@@ -2,6 +2,7 @@
 //!
 //! Contains domain models for application-level state that persists across sessions.
 
+use schema_bridge::SchemaBridge;
 use serde::{Deserialize, Serialize};
 use version_migrate::DeriveQueryable as Queryable;
 
@@ -26,8 +27,9 @@ pub const PLACEHOLDER_DEFAULT_WORKSPACE_ID: &str = "___default_workspace_placeho
 ///   This is used to restore the workspace on application startup.
 /// * `default_workspace_id` - The ID of the system's default workspace (~/orcs).
 ///   This is a fallback workspace that is always available.
-#[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable, SchemaBridge)]
 #[queryable(entity = "app_state")]
+#[serde(rename_all = "camelCase")]
 pub struct AppState {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.

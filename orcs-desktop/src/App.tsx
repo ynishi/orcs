@@ -97,6 +97,12 @@ function App() {
   // Get currentSessionId from appStateStore (SSOT)
   const { appState } = useAppStateStore();
   const currentSessionId = appState?.active_session_id ?? null;
+  const isAppStateLoaded = useAppStateStore((state) => state.isLoaded);
+
+  // Get tab management actions from appStateStore
+  const openBackendTab = useAppStateStore((state) => state.openTab);
+  const closeBackendTab = useAppStateStore((state) => state.closeTab);
+  const setActiveBackendTab = useAppStateStore((state) => state.setActiveTab);
 
   // ワークスペース管理
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -140,6 +146,7 @@ function App() {
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const workspaceSwitchingRef = useRef(false);
+  const tabsRestoredRef = useRef(false);
 
   // メッセージを追加するヘルパー関数（early definition for useRef/useSlashCommands）
   const addMessage = useCallback((type: MessageType, author: string, text: string, attachments?: import('./types/message').AttachedFile[]) => {
@@ -163,6 +170,25 @@ function App() {
     addMessageToTab(activeTabId, newMessage);
   }, [personas, activeTabId, addMessageToTab]);
 
+  // タブクローズヘルパー: バックエンドタブとローカルタブを両方閉じる
+  const closeTabWithBackend = useCallback(async (tabId: string) => {
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab) return;
+
+    // Close backend tab first
+    const backendTab = appState?.open_tabs.find((t) => t.session_id === tab.sessionId);
+    if (backendTab) {
+      try {
+        await closeBackendTab(backendTab.id);
+      } catch (err) {
+        console.error('[App] Failed to close backend tab:', err);
+      }
+    }
+
+    // Close local TabContext tab
+    closeTab(tabId);
+  }, [tabs, appState, closeBackendTab, closeTab]);
+
   // キーボードショートカット for タブ操作
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -176,10 +202,10 @@ function App() {
         if (activeTab) {
           if (activeTab.isDirty) {
             if (window.confirm(`"${activeTab.title}" has unsaved changes. Close anyway?`)) {
-              closeTab(activeTabId);
+              void closeTabWithBackend(activeTabId);
             }
           } else {
-            closeTab(activeTabId);
+            void closeTabWithBackend(activeTabId);
           }
         }
       }
@@ -212,7 +238,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tabs, activeTabId, closeTab, switchToTab]);
+  }, [tabs, activeTabId, switchToTab, closeTabWithBackend]);
 
   const activeTabScrollKey = useMemo(() => {
     const activeTab = tabs.find(t => t.id === activeTabId);
@@ -608,6 +634,159 @@ function App() {
   }, [currentSessionId, sessionsLoading, userNickname, personas, workspace, openTab, getTabBySessionId]);
   // Note: `sessions` removed from deps to avoid unnecessary re-renders
   // We only use sessions.find() inside, which is called on-demand
+
+  // Restore tabs from backend on app startup (Phase 2)
+  useEffect(() => {
+    const restoreTabsFromBackend = async () => {
+      // Skip if already restored
+      if (tabsRestoredRef.current) {
+        return;
+      }
+
+      // Skip if appState not loaded
+      if (!isAppStateLoaded || !appState) {
+        return;
+      }
+
+      // Skip if sessions not loaded
+      if (sessionsLoading) {
+        return;
+      }
+
+      // Skip if workspace not loaded
+      if (!workspace) {
+        return;
+      }
+
+      // Skip if no tabs to restore (initial app launch)
+      if (appState.open_tabs.length === 0) {
+        tabsRestoredRef.current = true;
+        return;
+      }
+
+      // Sort tabs by order
+      const sortedTabs = [...appState.open_tabs].sort((a, b) => a.order - b.order);
+
+      for (const backendTab of sortedTabs) {
+        // Check if tab already exists in TabContext
+        const existingTab = getTabBySessionId(backendTab.session_id);
+        if (existingTab) {
+          continue;
+        }
+
+        // Find session for this tab
+        const session = sessions.find((s) => s.id === backendTab.session_id);
+        if (!session) {
+          continue;
+        }
+
+        // Load messages with preview data
+        let restoredMessages = convertSessionToMessages(session, userNickname);
+
+        // Load preview data for attached files BEFORE opening tab
+        try {
+          restoredMessages = await Promise.all(
+            restoredMessages.map(async (message) => {
+              if (message.attachments && message.attachments.length > 0) {
+                const updatedAttachments = await Promise.all(
+                  message.attachments.map(async (attachment) => {
+                    if (attachment.data) return attachment; // Already has data
+
+                    try {
+                      const previewData = await invoke<{
+                        name: string;
+                        path: string;
+                        mime_type: string;
+                        size: number;
+                        data: string;
+                      }>('get_file_preview_data', {
+                        filePath: attachment.path,
+                      });
+
+                      return {
+                        name: previewData.name,
+                        path: previewData.path,
+                        mimeType: previewData.mime_type,
+                        size: previewData.size,
+                        data: previewData.data,
+                      };
+                    } catch (error) {
+                      console.error('[App] Failed to load preview data:', attachment.path, error);
+                      return attachment; // Keep original if failed
+                    }
+                  })
+                );
+                return { ...message, attachments: updatedAttachments };
+              }
+              return message;
+            })
+          );
+        } catch (error) {
+          console.error('[App] Error loading preview data during tab restoration:', error);
+        }
+
+        // Open tab (don't auto-switch to avoid interfering with active_tab_id restoration)
+        openTab(session, restoredMessages, backendTab.workspace_id, false);
+      }
+
+      // Activate the tab that was active before app restart
+      if (appState.active_tab_id) {
+        const activeBackendTab = appState.open_tabs.find((t) => t.id === appState.active_tab_id);
+        if (activeBackendTab) {
+          // Find local tab by session_id (since local tab IDs are different from backend tab IDs)
+          const localTab = getTabBySessionId(activeBackendTab.session_id);
+          if (localTab) {
+            switchToTab(localTab.id);
+          }
+        }
+      }
+
+      tabsRestoredRef.current = true;
+    };
+
+    restoreTabsFromBackend();
+  }, [
+    isAppStateLoaded,
+    appState,
+    sessionsLoading,
+    sessions,
+    workspace,
+    userNickname,
+    openTab,
+    getTabBySessionId,
+    switchToTab,
+  ]);
+
+  // Declarative tab management: Sync currentSessionId with backend tab state (Phase 2)
+  useEffect(() => {
+    const syncBackendTabState = async () => {
+      // Skip if no active session or workspace, or appState not loaded
+      if (!currentSessionId || !workspace || !appState) {
+        return;
+      }
+
+      // Check if backend already has a tab for this session
+      const backendTab = appState.open_tabs.find((t) => t.session_id === currentSessionId);
+
+      if (!backendTab) {
+        // Backend doesn't have tab for this session, create it
+        try {
+          await openBackendTab(currentSessionId, workspace.id);
+        } catch (error) {
+          console.error('[App] Failed to create backend tab:', error);
+        }
+      } else if (appState.active_tab_id !== backendTab.id) {
+        // Backend has tab but it's not active, activate it
+        try {
+          await setActiveBackendTab(backendTab.id);
+        } catch (error) {
+          console.error('[App] Failed to activate backend tab:', error);
+        }
+      }
+    };
+
+    syncBackendTabState();
+  }, [currentSessionId, workspace, appState, openBackendTab, setActiveBackendTab]);
 
   const refreshCustomCommands = useCallback(async () => {
     try {
@@ -1724,7 +1903,7 @@ function App() {
       // タブも閉じる
       const tab = tabs.find(t => t.sessionId === sessionId);
       if (tab) {
-        closeTab(tab.id);
+        await closeTabWithBackend(tab.id);
       }
 
       // Show toast notification
@@ -2135,20 +2314,12 @@ function App() {
                   const tab = tabs.find(t => t.id === value);
                   if (!tab) return;
 
-                  console.log('[App] Tab switched:', {
-                    tabId: value.substring(0, 8),
-                    sessionId: tab.sessionId.substring(0, 8),
-                    workspaceId: tab.workspaceId.substring(0, 8),
-                    currentWorkspace: workspace?.id.substring(0, 8),
-                  });
-
                   // 1. タブを切り替え
                   switchToTab(value);
 
                   // 2. バックエンドのセッションも切り替え
                   try {
                     await switchSession(tab.sessionId);
-                    console.log('[App] Backend session switched');
                   } catch (err) {
                     console.error('[App] Failed to switch backend session:', err);
                     notifications.show({
@@ -2161,16 +2332,8 @@ function App() {
 
                   // 3. Workspace切り替え（必要な場合のみ）
                   if (tab.workspaceId !== workspace?.id) {
-                    console.log('[App] Workspace differs, switching...', {
-                      from: workspace?.id.substring(0, 8),
-                      to: tab.workspaceId.substring(0, 8),
-                    });
-
                     try {
                       await switchWorkspaceBackend(tab.sessionId, tab.workspaceId);
-                      console.log('[App] Workspace switched, workspace-switched event will fire');
-                      // ↑ 内部で 'workspace-switched' イベント発火
-                      // ↓ 既存リスナー（L461-536）で全体同期
                     } catch (err) {
                       console.error('[App] Failed to switch workspace:', err);
                       notifications.show({
@@ -2179,8 +2342,6 @@ function App() {
                         color: 'red',
                       });
                     }
-                  } else {
-                    console.log('[App] Same workspace, no switch needed');
                   }
                 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
@@ -2214,18 +2375,11 @@ function App() {
                                 e.currentTarget.style.color = '#868e96';
                               }}
                               onClick={async (e) => {
-                                console.log('[App] CloseButton clicked:', {
-                                  tabId: tab.id,
-                                  title: tab.title,
-                                  isDirty: tab.isDirty,
-                                  visibleTabsCount: visibleTabs.length,
-                                });
                                 e.stopPropagation();
 
                                 // 未保存の場合は確認
                                 if (tab.isDirty) {
                                   if (!window.confirm(`"${tab.title}" has unsaved changes. Close anyway?`)) {
-                                    console.log('[App] User cancelled close');
                                     return;
                                   }
                                 }
@@ -2237,20 +2391,12 @@ function App() {
                                 // 2. ActiveSessionのタブを閉じる場合
                                 const isClosingActiveSession = closingTab.sessionId === currentSessionId;
 
-                                console.log('[App] Calling closeTab for', tab.id, {
-                                  isClosingActiveSession,
-                                  currentSessionId: currentSessionId?.substring(0, 8),
-                                  closingSessionId: closingTab.sessionId.substring(0, 8),
-                                });
-
                                 // 3. ActiveSessionだった場合、次のSessionを選択
                                 if (isClosingActiveSession && workspace) {
                                   // 4a. 現在のWorkspace内の残りSession取得
                                   const remainingSessions = sessions.filter(
                                     s => s.workspace_id === workspace.id && s.id !== closingTab.sessionId
                                   );
-
-                                  console.log('[App] Remaining sessions in workspace:', remainingSessions.length);
 
                                   if (remainingSessions.length > 0) {
                                     // 4b. 更新日時が直近のSessionを選択
@@ -2259,8 +2405,6 @@ function App() {
                                     );
                                     const nextSession = sortedSessions[0];
 
-                                    console.log('[App] Switching to next session:', nextSession.id.substring(0, 8), nextSession.title);
-
                                     try {
                                       // 4c. Backend Session切り替え
                                       await switchSession(nextSession.id);
@@ -2268,28 +2412,24 @@ function App() {
                                       // 4d. 次のSessionのTabを開く（既に開いていればフォーカス）
                                       // openTab()は既存タブがあれば更新してフォーカス、なければ新規作成
                                       const messages = convertSessionToMessages(nextSession, userNickname);
-                                      const newTabId = openTab(nextSession, messages, workspace.id, true);
-
-                                      console.log('[App] Successfully switched to next session, tab:', newTabId.substring(0, 8));
+                                      openTab(nextSession, messages, workspace.id, true);
 
                                       // 4e. 古いタブを閉じる（次のSessionに切り替え後）
-                                      closeTab(tab.id);
+                                      await closeTabWithBackend(tab.id);
                                     } catch (err) {
                                       console.error('[App] Failed to switch to next session:', err);
                                     }
                                   } else {
                                     // 4e. Workspace内にSessionがない場合、新規作成
-                                    console.log('[App] No remaining sessions, creating new session');
                                     try {
                                       await createSession(workspace?.id);
-                                      console.log('[App] New session created');
                                     } catch (err) {
                                       console.error('[App] Failed to create new session:', err);
                                     }
                                   }
                                 } else {
                                   // 非ActiveSessionのTab Closeの場合、単純に閉じる
-                                  closeTab(tab.id);
+                                  await closeTabWithBackend(tab.id);
                                 }
                               }}
                             />

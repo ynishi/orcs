@@ -8,7 +8,7 @@ use chrono::Local;
 use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID};
 use orcs_execution::tracing_layer::OrchestratorEvent;
 use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
 fn main() {
@@ -119,6 +119,30 @@ fn main() {
                 });
 
                 Ok(())
+            })
+            .on_window_event(move |window, event| {
+                if let tauri::WindowEvent::Destroyed = event {
+                    tracing::info!("[Shutdown] Window destroyed, saving app state...");
+                    let app_state_service = window.state::<app::AppState>();
+                    let service = app_state_service.app_state_service.clone();
+
+                    // Save state synchronously on shutdown
+                    tauri::async_runtime::block_on(async move {
+                        use orcs_core::state::repository::StateRepository;
+                        match service.get_state().await {
+                            Ok(state) => {
+                                if let Err(e) = service.save_state(state).await {
+                                    tracing::error!("[Shutdown] Failed to save app state: {}", e);
+                                } else {
+                                    tracing::info!("[Shutdown] App state saved successfully");
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("[Shutdown] Failed to get app state: {}", e);
+                            }
+                        }
+                    });
+                }
             })
             .run(tauri::generate_context!())
             .expect("error while running tauri application");

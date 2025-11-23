@@ -119,3 +119,109 @@ pub async fn clear_active_session_in_app_state(
 
     Ok(())
 }
+// ============================================================================
+// Tab management commands
+// ============================================================================
+
+/// Opens a tab for the given session. If a tab for this session already exists,
+/// returns the existing tab ID and sets it as active. Otherwise creates a new tab.
+#[tauri::command]
+pub async fn open_tab(
+    session_id: String,
+    workspace_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let tab_id = state
+        .app_state_service
+        .open_tab(session_id, workspace_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let updated_state = state
+        .app_state_service
+        .get_state()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    app.emit("app-state:update", &updated_state)
+        .map_err(|e| format!("Failed to emit app-state:update: {}", e))?;
+
+    Ok(tab_id)
+}
+
+/// Closes a tab by its ID.
+#[tauri::command]
+pub async fn close_tab(
+    tab_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .app_state_service
+        .close_tab(tab_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let updated_state = state
+        .app_state_service
+        .get_state()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    app.emit("app-state:update", &updated_state)
+        .map_err(|e| format!("Failed to emit app-state:update: {}", e))?;
+
+    Ok(())
+}
+
+/// Sets the active tab by its ID.
+#[tauri::command]
+pub async fn set_active_tab(
+    tab_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .app_state_service
+        .set_active_tab(tab_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let updated_state = state
+        .app_state_service
+        .get_state()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    app.emit("app-state:update", &updated_state)
+        .map_err(|e| format!("Failed to emit app-state:update: {}", e))?;
+
+    Ok(())
+}
+
+/// Reorders tabs by moving a tab from one index to another.
+#[tauri::command]
+pub async fn reorder_tabs(
+    from_index: usize,
+    to_index: usize,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .app_state_service
+        .reorder_tabs(from_index, to_index)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let updated_state = state
+        .app_state_service
+        .get_state()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    app.emit("app-state:update", &updated_state)
+        .map_err(|e| format!("Failed to emit app-state:update: {}", e))?;
+
+    Ok(())
+}

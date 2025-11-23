@@ -8,5 +8,19 @@ export type ConversationModeType = 'detailed' | 'normal' | 'concise' | 'brief' |
 
 export type PresetSourceType = 'system' | 'user';
 
-export type AppState = { last_selected_workspace_id: string | null; default_workspace_id: string; active_session_id: string | null; };
+export type OpenTab = {
+  id: string;
+  session_id: string;
+  workspace_id: string;
+  last_accessed_at: number;
+  order: number;
+};
+
+export type AppState = {
+  last_selected_workspace_id: string | null;
+  default_workspace_id: string | null;
+  active_session_id: string | null;
+  open_tabs: OpenTab[];
+  active_tab_id: string | null;
+};
 

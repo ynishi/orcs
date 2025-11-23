@@ -6,10 +6,11 @@
 use crate::dto::create_app_state_migrator;
 use crate::paths::{OrcsPaths, ServiceType};
 use orcs_core::error::{OrcsError, Result};
-use orcs_core::state::model::AppState;
+use orcs_core::state::model::{AppState, OpenTab};
 use orcs_core::state::repository::StateRepository;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 use version_migrate::{FileStorage, FileStorageStrategy, FormatStrategy, LoadBehavior};
 
 /// Service for managing application state.
@@ -173,6 +174,154 @@ impl StateRepository for StateRepositoryImpl {
 
     async fn get_state(&self) -> Result<AppState> {
         Ok(self.state.lock().await.clone())
+    }
+
+    // Tab management methods
+    async fn get_open_tabs(&self) -> Vec<OpenTab> {
+        let state = self.state.lock().await;
+        state.open_tabs.clone()
+    }
+
+    async fn get_active_tab_id(&self) -> Option<String> {
+        let state = self.state.lock().await;
+        state.active_tab_id.clone()
+    }
+
+    async fn open_tab(&self, session_id: String, workspace_id: String) -> Result<String> {
+        let mut state = self.state.lock().await.clone();
+
+        // Check if tab for this session already exists
+        if let Some(existing_tab) = state
+            .open_tabs
+            .iter()
+            .find(|tab| tab.session_id == session_id)
+        {
+            // Update last_accessed_at and set as active
+            let tab_id = existing_tab.id.clone();
+            state.open_tabs.iter_mut().for_each(|tab| {
+                if tab.id == tab_id {
+                    tab.last_accessed_at = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i32;
+                }
+            });
+            state.active_tab_id = Some(tab_id.clone());
+            let cloned_state = state.clone();
+            drop(state);
+            self.save_state(cloned_state).await?;
+            return Ok(tab_id);
+        }
+
+        // Create new tab
+        let tab_id = Uuid::new_v4().to_string();
+        let new_tab = OpenTab {
+            id: tab_id.clone(),
+            session_id,
+            workspace_id,
+            last_accessed_at: (std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i32),
+            order: state.open_tabs.len() as i32,
+        };
+
+        state.open_tabs.push(new_tab);
+        state.active_tab_id = Some(tab_id.clone());
+        let cloned_state = state.clone();
+        drop(state);
+        self.save_state(cloned_state).await?;
+        Ok(tab_id)
+    }
+
+    async fn close_tab(&self, tab_id: String) -> Result<()> {
+        let mut state = self.state.lock().await.clone();
+
+        // Find tab index
+        let tab_index = state
+            .open_tabs
+            .iter()
+            .position(|tab| tab.id == tab_id)
+            .ok_or_else(|| OrcsError::not_found("Tab", &tab_id))?;
+
+        // Remove tab
+        state.open_tabs.remove(tab_index);
+
+        // If active tab was closed, set next tab as active
+        if state.active_tab_id.as_ref() == Some(&tab_id) {
+            state.active_tab_id = if !state.open_tabs.is_empty() {
+                let next_index = tab_index.min(state.open_tabs.len() - 1);
+                Some(state.open_tabs[next_index].id.clone())
+            } else {
+                None
+            };
+        }
+
+        // Reorder remaining tabs
+        for (i, tab) in state.open_tabs.iter_mut().enumerate() {
+            tab.order = i as i32;
+        }
+
+        let cloned_state = state.clone();
+        drop(state);
+        self.save_state(cloned_state).await
+    }
+
+    async fn set_active_tab(&self, tab_id: String) -> Result<()> {
+        let mut state = self.state.lock().await.clone();
+
+        // Verify tab exists
+        if !state.open_tabs.iter().any(|tab| tab.id == tab_id) {
+            return Err(OrcsError::not_found("Tab", &tab_id));
+        }
+
+        // Update last_accessed_at
+        state.open_tabs.iter_mut().for_each(|tab| {
+            if tab.id == tab_id {
+                tab.last_accessed_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as i32;
+            }
+        });
+
+        state.active_tab_id = Some(tab_id);
+
+        // Memory-only update (no disk write)
+        // Will be saved on app shutdown or when important operation occurs
+        self.update_state_in_memory(state).await;
+        Ok(())
+    }
+
+    async fn reorder_tabs(&self, from_index: usize, to_index: usize) -> Result<()> {
+        let mut state = self.state.lock().await.clone();
+
+        if from_index >= state.open_tabs.len() || to_index >= state.open_tabs.len() {
+            return Err(OrcsError::internal(format!(
+                "Invalid tab indices: from={}, to={}, len={}",
+                from_index,
+                to_index,
+                state.open_tabs.len()
+            )));
+        }
+
+        let tab = state.open_tabs.remove(from_index);
+        state.open_tabs.insert(to_index, tab);
+
+        // Update order field
+        for (i, tab) in state.open_tabs.iter_mut().enumerate() {
+            tab.order = i as i32;
+        }
+
+        // Memory-only update (no disk write)
+        // Will be saved on app shutdown or when important operation occurs
+        self.update_state_in_memory(state).await;
+        Ok(())
+    }
+
+    async fn update_state_in_memory(&self, state: AppState) {
+        let mut state_lock = self.state.lock().await;
+        *state_lock = state;
     }
 }
 

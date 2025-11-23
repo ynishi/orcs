@@ -108,5 +108,9 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         app_state::clear_last_selected_workspace,
         app_state::set_active_session_in_app_state,
         app_state::clear_active_session_in_app_state,
+        app_state::open_tab,
+        app_state::close_tab,
+        app_state::set_active_tab,
+        app_state::reorder_tabs,
     ]
 }

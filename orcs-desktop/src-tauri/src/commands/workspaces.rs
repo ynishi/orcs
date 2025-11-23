@@ -92,6 +92,7 @@ pub async fn create_workspace(
 #[tauri::command]
 pub async fn create_workspace_with_session(
     root_path: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
     println!(
@@ -113,6 +114,12 @@ pub async fn create_workspace_with_session(
         "[Backend] Successfully created workspace {} and session {}",
         workspace.id, session.id
     );
+
+    // Emit app-state:update event for SSOT synchronization
+    use orcs_core::state::repository::StateRepository;
+    if let Ok(app_state) = state.app_state_service.get_state().await {
+        let _ = app.emit("app-state:update", &app_state);
+    }
 
     // Return both workspace and session as JSON
     Ok(serde_json::json!({
@@ -162,6 +169,21 @@ pub async fn switch_workspace(
         .map_err(|e| e.to_string())?;
 
     println!("[Backend] workspace-switched event emitted");
+
+    // Emit app-state:update event for SSOT synchronization
+    use orcs_core::state::repository::StateRepository;
+    match state.app_state_service.get_state().await {
+        Ok(app_state) => {
+            if let Err(e) = app.emit("app-state:update", &app_state) {
+                println!("[Backend] Failed to emit app-state:update: {}", e);
+            } else {
+                println!("[Backend] app-state:update event emitted");
+            }
+        }
+        Err(e) => {
+            println!("[Backend] Failed to get app state: {}", e);
+        }
+    }
 
     Ok(())
 }

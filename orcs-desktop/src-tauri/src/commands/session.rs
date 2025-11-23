@@ -105,6 +105,7 @@ impl From<InteractionResult> for SerializableInteractionResult {
 #[tauri::command]
 pub async fn create_session(
     workspace_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Session, String> {
     let session = state
@@ -114,6 +115,12 @@ pub async fn create_session(
         .map_err(|e| e.to_string())?;
 
     *state.app_mode.lock().await = AppMode::Idle;
+
+    // Emit app-state:update event for SSOT synchronization
+    use orcs_core::state::repository::StateRepository;
+    if let Ok(app_state) = state.app_state_service.get_state().await {
+        let _ = app.emit("app-state:update", &app_state);
+    }
 
     Ok(session)
 }
@@ -162,6 +169,7 @@ pub async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, S
 #[tauri::command]
 pub async fn switch_session(
     session_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Session, String> {
     let session = state
@@ -171,6 +179,12 @@ pub async fn switch_session(
         .map_err(|e| e.to_string())?;
 
     *state.app_mode.lock().await = session.app_mode.clone();
+
+    // Emit app-state:update event for SSOT synchronization
+    use orcs_core::state::repository::StateRepository;
+    if let Ok(app_state) = state.app_state_service.get_state().await {
+        let _ = app.emit("app-state:update", &app_state);
+    }
 
     Ok(session)
 }

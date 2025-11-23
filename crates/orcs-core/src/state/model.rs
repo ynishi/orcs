@@ -11,6 +11,7 @@ use version_migrate::DeriveQueryable as Queryable;
 /// Tabs are views of sessions. This struct tracks which sessions are currently
 /// open as tabs, their display order, and when they were last accessed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
 pub struct OpenTab {
     /// Unique tab identifier (UUID format)
     pub id: String,
@@ -47,6 +48,7 @@ pub struct OpenTab {
 /// * `active_tab_id` - The ID of the currently active tab.
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable, SchemaBridge)]
 #[queryable(entity = "app_state")]
+#[serde(rename_all = "camelCase")]
 pub struct AppState {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.

@@ -81,6 +81,7 @@ pub struct AppStateV1_3 {
 
 /// Open tab DTO for V1.4.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct OpenTabDTO {
     pub id: String,
     pub session_id: String,
@@ -118,8 +119,39 @@ pub struct AppStateV1_4 {
     pub active_tab_id: Option<String>,
 }
 
+/// Application state configuration V1.5.0.
+///
+/// Migrated to camelCase for JSON serialization to match TypeScript conventions.
+/// This ensures consistency between Rust persistence and TypeScript API.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.5.0")]
+#[serde(rename_all = "camelCase")]
+pub struct AppStateV1_5 {
+    /// ID of the last selected workspace.
+    /// This is used to restore the workspace on application startup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_selected_workspace_id: Option<String>,
+
+    /// ID of the default system workspace (~/orcs).
+    /// None if not yet initialized.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_workspace_id: Option<String>,
+
+    /// ID of the currently active session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_session_id: Option<String>,
+
+    /// List of currently open tabs.
+    #[serde(default)]
+    pub open_tabs: Vec<OpenTabDTO>,
+
+    /// ID of the currently active tab.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_tab_id: Option<String>,
+}
+
 /// Type alias for the latest AppState version.
-pub type AppStateDTO = AppStateV1_4;
+pub type AppStateDTO = AppStateV1_5;
 
 impl Default for AppStateV1_0 {
     fn default() -> Self {
@@ -159,6 +191,18 @@ impl Default for AppStateV1_3 {
 }
 
 impl Default for AppStateV1_4 {
+    fn default() -> Self {
+        Self {
+            last_selected_workspace_id: None,
+            default_workspace_id: None,
+            active_session_id: None,
+            open_tabs: Vec::new(),
+            active_tab_id: None,
+        }
+    }
+}
+
+impl Default for AppStateV1_5 {
     fn default() -> Self {
         Self {
             last_selected_workspace_id: None,
@@ -219,6 +263,20 @@ impl version_migrate::MigratesTo<AppStateV1_4> for AppStateV1_3 {
             active_session_id: self.active_session_id,
             open_tabs: Vec::new(), // Default: no tabs open
             active_tab_id: None,   // Default: no active tab
+        }
+    }
+}
+
+/// Migration from AppStateV1_4 to AppStateV1_5.
+/// Simple copy - migrating to camelCase serialization format.
+impl version_migrate::MigratesTo<AppStateV1_5> for AppStateV1_4 {
+    fn migrate(self) -> AppStateV1_5 {
+        AppStateV1_5 {
+            last_selected_workspace_id: self.last_selected_workspace_id,
+            default_workspace_id: self.default_workspace_id,
+            active_session_id: self.active_session_id,
+            open_tabs: self.open_tabs,
+            active_tab_id: self.active_tab_id,
         }
     }
 }
@@ -350,6 +408,32 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_4 {
     }
 }
 
+/// Convert AppStateV1_5 DTO to domain model.
+impl IntoDomain<AppState> for AppStateV1_5 {
+    fn into_domain(self) -> AppState {
+        AppState {
+            last_selected_workspace_id: self.last_selected_workspace_id,
+            default_workspace_id: self.default_workspace_id,
+            active_session_id: self.active_session_id,
+            open_tabs: self.open_tabs.into_iter().map(Into::into).collect(),
+            active_tab_id: self.active_tab_id,
+        }
+    }
+}
+
+/// Convert domain model to AppStateV1_5 DTO for persistence.
+impl version_migrate::FromDomain<AppState> for AppStateV1_5 {
+    fn from_domain(state: AppState) -> Self {
+        AppStateV1_5 {
+            last_selected_workspace_id: state.last_selected_workspace_id,
+            default_workspace_id: state.default_workspace_id,
+            active_session_id: state.active_session_id,
+            open_tabs: state.open_tabs.into_iter().map(Into::into).collect(),
+            active_tab_id: state.active_tab_id,
+        }
+    }
+}
+
 // ============================================================================
 // Migrator factory
 // ============================================================================
@@ -364,7 +448,8 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_4 {
 /// - V1.1 → V1.2: Adds `active_session_id` field with default value (None)
 /// - V1.2 → V1.3: Reverts default_workspace_id back to optional
 /// - V1.3 → V1.4: Adds `open_tabs` and `active_tab_id` for tab management
-/// - V1.4 → AppState: Converts DTO to domain model
+/// - V1.4 → V1.5: Migrates to camelCase serialization format
+/// - V1.5 → AppState: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -375,13 +460,14 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_4 {
 pub fn create_app_state_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0 -> V1.1 -> V1.2 -> V1.3 -> V1.4 -> AppState
+    // Register migration path: V1.0 -> V1.1 -> V1.2 -> V1.3 -> V1.4 -> V1.5 -> AppState
     let app_state_path = version_migrate::Migrator::define("app_state")
         .from::<AppStateV1_0>()
         .step::<AppStateV1_1>()
         .step::<AppStateV1_2>()
         .step::<AppStateV1_3>()
         .step::<AppStateV1_4>()
+        .step::<AppStateV1_5>()
         .into_with_save::<AppState>();
 
     migrator

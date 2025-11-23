@@ -26,10 +26,10 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
 
   // Computed values from stores (Phase 4)
   const workspace = useMemo(() => {
-    const workspaceId = appState?.last_selected_workspace_id;
+    const workspaceId = appState?.lastSelectedWorkspaceId;
     if (!workspaceId) return null;
     return workspaces.get(workspaceId) || null;
-  }, [appState?.last_selected_workspace_id, workspaces]);
+  }, [appState?.lastSelectedWorkspaceId, workspaces]);
 
   const allWorkspaces = useMemo(() => {
     return Array.from(workspaces.values()).sort((a, b) => {

@@ -97,7 +97,7 @@ function App() {
 
   // Get currentSessionId from appStateStore (SSOT)
   const { appState } = useAppStateStore();
-  const currentSessionId = appState?.active_session_id ?? null;
+  const currentSessionId = appState?.activeSessionId ?? null;
   const isAppStateLoaded = useAppStateStore((state) => state.isLoaded);
 
   // Get tab management actions from appStateStore
@@ -159,7 +159,7 @@ function App() {
 
       try {
         // Get active session (required for switchWorkspace)
-        const activeSessionId = appState.active_session_id;
+        const activeSessionId = appState.activeSessionId;
         if (!activeSessionId) {
           workspaceRestoredRef.current = true;
           return;
@@ -234,7 +234,7 @@ function App() {
     if (!tab) return;
 
     // Close backend tab first
-    const backendTab = appState?.open_tabs.find((t) => t.session_id === tab.sessionId);
+    const backendTab = appState?.openTabs.find((t) => t.sessionId === tab.sessionId);
     if (backendTab) {
       try {
         await closeBackendTab(backendTab.id);
@@ -717,23 +717,23 @@ function App() {
       }
 
       // Skip if no tabs to restore (initial app launch)
-      if (appState.open_tabs.length === 0) {
+      if (appState.openTabs.length === 0) {
         tabsRestoredRef.current = true;
         return;
       }
 
       // Sort tabs by order
-      const sortedTabs = [...appState.open_tabs].sort((a, b) => a.order - b.order);
+      const sortedTabs = [...appState.openTabs].sort((a, b) => a.order - b.order);
 
       for (const backendTab of sortedTabs) {
         // Check if tab already exists in TabContext
-        const existingTab = getTabBySessionId(backendTab.session_id);
+        const existingTab = getTabBySessionId(backendTab.sessionId);
         if (existingTab) {
           continue;
         }
 
         // Find session for this tab
-        const session = sessions.find((s) => s.id === backendTab.session_id);
+        const session = sessions.find((s) => s.id === backendTab.sessionId);
         if (!session) {
           continue;
         }
@@ -784,15 +784,15 @@ function App() {
         }
 
         // Open tab (don't auto-switch to avoid interfering with active_tab_id restoration)
-        openTab(session, restoredMessages, backendTab.workspace_id, false);
+        openTab(session, restoredMessages, backendTab.workspaceId, false);
       }
 
       // Activate the tab that was active before app restart
-      if (appState.active_tab_id) {
-        const activeBackendTab = appState.open_tabs.find((t) => t.id === appState.active_tab_id);
+      if (appState.activeTabId) {
+        const activeBackendTab = appState.openTabs.find((t) => t.id === appState.activeTabId);
         if (activeBackendTab) {
           // Find local tab by session_id (since local tab IDs are different from backend tab IDs)
-          const localTab = getTabBySessionId(activeBackendTab.session_id);
+          const localTab = getTabBySessionId(activeBackendTab.sessionId);
           if (localTab) {
             switchToTab(localTab.id);
           }
@@ -824,7 +824,7 @@ function App() {
       }
 
       // Check if backend already has a tab for this session
-      const backendTab = appState.open_tabs.find((t) => t.session_id === currentSessionId);
+      const backendTab = appState.openTabs.find((t) => t.sessionId === currentSessionId);
 
       if (!backendTab) {
         // Backend doesn't have tab for this session, create it
@@ -833,7 +833,7 @@ function App() {
         } catch (error) {
           console.error('[App] Failed to create backend tab:', error);
         }
-      } else if (appState.active_tab_id !== backendTab.id) {
+      } else if (appState.activeTabId !== backendTab.id) {
         // Backend has tab but it's not active, activate it
         try {
           await setActiveBackendTab(backendTab.id);

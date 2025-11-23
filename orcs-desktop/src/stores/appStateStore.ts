@@ -59,7 +59,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
     // Optimistic update
     const current = get().appState;
     if (current) {
-      set({ appState: { ...current, last_selected_workspace_id: workspaceId } });
+      set({ appState: { ...current, lastSelectedWorkspaceId: workspaceId } });
     }
 
     try {
@@ -80,7 +80,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
 
     const current = get().appState;
     if (current) {
-      set({ appState: { ...current, last_selected_workspace_id: null } });
+      set({ appState: { ...current, lastSelectedWorkspaceId: null } });
     }
 
     try {
@@ -99,7 +99,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
 
     const current = get().appState;
     if (current) {
-      set({ appState: { ...current, active_session_id: sessionId } });
+      set({ appState: { ...current, activeSessionId: sessionId } });
     }
 
     try {
@@ -118,7 +118,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
 
     const current = get().appState;
     if (current) {
-      set({ appState: { ...current, active_session_id: null } });
+      set({ appState: { ...current, activeSessionId: null } });
     }
 
     try {
@@ -168,10 +168,10 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
       set({
         appState: {
           ...current,
-          active_tab_id: tabId,
-          open_tabs: current.open_tabs.map((tab) =>
+          activeTabId: tabId,
+          openTabs: current.openTabs.map((tab) =>
             tab.id === tabId
-              ? { ...tab, last_accessed_at: Math.floor(Date.now() / 1000) }
+              ? { ...tab, lastAccessedAt: Math.floor(Date.now() / 1000) }
               : tab
           ),
         },
@@ -197,7 +197,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
     // Optimistic update for better UX
     const current = get().appState;
     if (current) {
-      const newTabs = [...current.open_tabs];
+      const newTabs = [...current.openTabs];
       const [movedTab] = newTabs.splice(fromIndex, 1);
       newTabs.splice(toIndex, 0, movedTab);
 
@@ -210,7 +210,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
       set({
         appState: {
           ...current,
-          open_tabs: reorderedTabs,
+          openTabs: reorderedTabs,
         },
       });
     }

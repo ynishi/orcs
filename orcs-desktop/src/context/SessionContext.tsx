@@ -96,7 +96,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
       try {
         // Get current session ID from appStateStore
         const appState = useAppStateStore.getState().appState;
-        const currentSessionId = appState?.active_session_id ?? null;
+        const currentSessionId = appState?.activeSessionId ?? null;
 
         await invoke('delete_session', { sessionId });
 

@@ -165,13 +165,25 @@ pub async fn switch_workspace(
         workspace_id
     );
 
+    // Save last selected workspace for app restart restoration (Phase 3)
+    use orcs_core::state::repository::StateRepository;
+    if let Err(e) = state
+        .app_state_service
+        .set_last_selected_workspace(workspace_id.clone())
+        .await
+    {
+        println!(
+            "[Backend] Failed to save last_selected_workspace: {}",
+            e
+        );
+    }
+
     app.emit("workspace-switched", &workspace_id)
         .map_err(|e| e.to_string())?;
 
     println!("[Backend] workspace-switched event emitted");
 
     // Emit app-state:update event for SSOT synchronization
-    use orcs_core::state::repository::StateRepository;
     match state.app_state_service.get_state().await {
         Ok(app_state) => {
             if let Err(e) = app.emit("app-state:update", &app_state) {

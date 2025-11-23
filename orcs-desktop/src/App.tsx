@@ -119,6 +119,52 @@ function App() {
     });
   }, [initializeAppState]);
 
+  // Restore last selected workspace on app startup (Phase 3)
+  useEffect(() => {
+    const restoreLastWorkspace = async () => {
+      // Skip if already restored
+      if (workspaceRestoredRef.current) {
+        return;
+      }
+
+      // Skip if appState not loaded
+      if (!isAppStateLoaded || !appState) {
+        return;
+      }
+
+      // Skip if no last selected workspace (initial app launch)
+      if (!appState.last_selected_workspace_id) {
+        workspaceRestoredRef.current = true;
+        return;
+      }
+
+      // Skip if current workspace already matches
+      if (workspace && workspace.id === appState.last_selected_workspace_id) {
+        workspaceRestoredRef.current = true;
+        return;
+      }
+
+      const lastWorkspaceId = appState.last_selected_workspace_id;
+
+      try {
+        // Get active session (required for switchWorkspace)
+        const activeSessionId = appState.active_session_id;
+        if (!activeSessionId) {
+          workspaceRestoredRef.current = true;
+          return;
+        }
+
+        await switchWorkspaceBackend(activeSessionId, lastWorkspaceId);
+      } catch (error) {
+        console.error('[App] Failed to restore last workspace:', error);
+      }
+
+      workspaceRestoredRef.current = true;
+    };
+
+    restoreLastWorkspace();
+  }, [isAppStateLoaded, appState, workspace, switchWorkspaceBackend]);
+
   // タブ管理
   const {
     tabs,
@@ -146,6 +192,7 @@ function App() {
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const workspaceSwitchingRef = useRef(false);
+  const workspaceRestoredRef = useRef(false);
   const tabsRestoredRef = useRef(false);
 
   // メッセージを追加するヘルパー関数（early definition for useRef/useSlashCommands）

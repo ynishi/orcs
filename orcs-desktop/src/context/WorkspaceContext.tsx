@@ -1,19 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { notifications } from '@mantine/notifications';
 import type { Workspace, UploadedFile } from '../types/workspace';
+import { useAppStateStore } from '../stores/appStateStore';
+import { useWorkspaceStore } from '../stores/workspaceStore';
 
 export interface WorkspaceContextValue {
   workspace: Workspace | null;
   allWorkspaces: Workspace[];
   files: UploadedFile[];
-  isLoading: boolean;
-  error: string | null;
-  refresh: () => Promise<void>;
   switchWorkspace: (sessionId: string, workspaceId: string) => Promise<void>;
   toggleFavorite: (workspaceId: string) => Promise<void>;
   toggleFileArchive: (file: UploadedFile) => Promise<void>;
-  refreshWorkspaces: () => Promise<void>;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
@@ -22,193 +20,49 @@ interface WorkspaceProviderProps {
   children: ReactNode;
 }
 
-interface RawUploadedFile {
-  id: string;
-  name: string;
-  path: string;
-  mime_type: string;
-  size: number;
-  uploaded_at: number;
-  session_id?: string;
-  message_timestamp?: string;
-  author?: string;
-  is_archived: boolean;
-  is_favorite: boolean;
-  sort_order?: number;
-}
-
-interface RawWorkspace {
-  id: string;
-  name: string;
-  root_path: string;
-  workspace_dir: string;
-  resources: {
-    uploaded_files: RawUploadedFile[];
-    temp_files: Array<{
-      id: string;
-      path: string;
-      purpose: string;
-      created_at: number;
-      auto_delete: boolean;
-    }>;
-  };
-  project_context: {
-    languages: string[];
-    build_system?: string;
-    description?: string;
-    repository_url?: string;
-    metadata: Record<string, string>;
-  };
-  last_accessed: number;
-  is_favorite: boolean;
-}
-
-function convertWorkspace(raw: RawWorkspace): Workspace {
-  return {
-    id: raw.id,
-    name: raw.name,
-    rootPath: raw.root_path,
-    workspaceDir: raw.workspace_dir,
-    resources: {
-      uploadedFiles: raw.resources.uploaded_files.map(file => ({
-        id: file.id,
-        name: file.name,
-        path: file.path,
-        mimeType: file.mime_type,
-        size: file.size,
-        uploadedAt: file.uploaded_at,
-        sessionId: file.session_id,
-        messageTimestamp: file.message_timestamp,
-        author: file.author,
-        isArchived: file.is_archived,
-        isFavorite: file.is_favorite,
-        sortOrder: file.sort_order,
-      })),
-      tempFiles: raw.resources.temp_files.map(file => ({
-        id: file.id,
-        path: file.path,
-        purpose: file.purpose,
-        createdAt: file.created_at,
-        autoDelete: file.auto_delete,
-      })),
-    },
-    projectContext: {
-      languages: raw.project_context.languages,
-      buildSystem: raw.project_context.build_system,
-      description: raw.project_context.description,
-      repositoryUrl: raw.project_context.repository_url,
-      metadata: raw.project_context.metadata,
-    },
-    lastAccessed: raw.last_accessed,
-    isFavorite: raw.is_favorite,
-  };
-}
-
 export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const workspaceIdRef = useRef<string | null>(null);
-  const isFetchingAllRef = useRef(false);
-  const pendingFetchRef = useRef<Promise<RawWorkspace[]> | null>(null);
+  const { appState } = useAppStateStore();
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
 
-  const fetchWorkspace = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  // Computed values from stores (Phase 4)
+  const workspace = useMemo(() => {
+    const workspaceId = appState?.last_selected_workspace_id;
+    if (!workspaceId) return null;
+    return workspaces.get(workspaceId) || null;
+  }, [appState?.last_selected_workspace_id, workspaces]);
 
-    try {
-      const rawWorkspace = await invoke<RawWorkspace>('get_current_workspace');
-      const convertedWorkspace = convertWorkspace(rawWorkspace);
-      workspaceIdRef.current = convertedWorkspace.id;
-      setWorkspace(convertedWorkspace);
+  const allWorkspaces = useMemo(() => {
+    return Array.from(workspaces.values()).sort((a, b) => {
+      // Sort by: favorite first, then by last_accessed desc
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      return b.lastAccessed - a.lastAccessed;
+    });
+  }, [workspaces]);
 
-      try {
-        const rawFiles = await invoke<RawUploadedFile[]>('list_workspace_files', {
-          workspaceId: convertedWorkspace.id,
-        });
-
-        const convertedFiles: UploadedFile[] = rawFiles.map((file: RawUploadedFile) => ({
-          id: file.id,
-          name: file.name,
-          path: file.path,
-          mimeType: file.mime_type,
-          size: file.size,
-          uploadedAt: file.uploaded_at,
-          sessionId: file.session_id,
-          messageTimestamp: file.message_timestamp,
-          author: file.author,
-          isArchived: file.is_archived,
-          isFavorite: file.is_favorite,
-          sortOrder: file.sort_order,
-        }));
-
-        // Sorting is handled in FileList component
-        setFiles(convertedFiles);
-      } catch (fileError) {
-        console.error('Failed to list workspace files:', fileError);
-        setFiles([]);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(errorMessage);
-      setWorkspace(null);
-      setFiles([]);
-      console.error('Failed to fetch workspace:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const fetchAllWorkspaces = useCallback(async () => {
-    try {
-      if (isFetchingAllRef.current && pendingFetchRef.current) {
-        const rawWorkspaces = await pendingFetchRef.current;
-        const converted = rawWorkspaces.map(convertWorkspace);
-        setAllWorkspaces(converted);
-        return;
-      }
-
-      isFetchingAllRef.current = true;
-      pendingFetchRef.current = invoke<RawWorkspace[]>('list_workspaces');
-
-      const rawWorkspaces = await pendingFetchRef.current;
-      const converted = rawWorkspaces.map(convertWorkspace);
-      setAllWorkspaces(converted);
-    } catch (err) {
-      console.error('[useWorkspace] Failed to fetch all workspaces:', err);
-    } finally {
-      isFetchingAllRef.current = false;
-      pendingFetchRef.current = null;
-    }
-  }, []);
+  const files = useMemo(() => {
+    return workspace?.resources.uploadedFiles || [];
+  }, [workspace]);
 
   const switchWorkspace = useCallback(async (sessionId: string, workspaceId: string) => {
     try {
       await invoke('switch_workspace', { sessionId, workspaceId });
-      // The workspace-switched event triggers refresh via listener.
+      // Event-driven update via workspace:update event
     } catch (err) {
       console.error('Failed to switch workspace:', err);
       throw err;
     }
   }, []);
 
-  const toggleFavorite = useCallback(
-    async (workspaceId: string) => {
-      try {
-        await invoke('toggle_favorite_workspace', { workspaceId });
-        await fetchAllWorkspaces();
-        if (workspaceIdRef.current === workspaceId) {
-          await fetchWorkspace();
-        }
-      } catch (err) {
-        console.error('Failed to toggle favorite:', err);
-        throw err;
-      }
-    },
-    [fetchAllWorkspaces, fetchWorkspace],
-  );
+  const toggleFavorite = useCallback(async (workspaceId: string) => {
+    try {
+      await invoke('toggle_favorite_workspace', { workspaceId });
+      // Event-driven update via workspace:update event
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err);
+      throw err;
+    }
+  }, []);
 
   const toggleFileArchive = useCallback(
     async (file: UploadedFile) => {
@@ -220,9 +74,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           fileId: file.id,
         });
 
-        // Refresh files
-        await fetchWorkspace();
-
+        // Event-driven update via workspace:update event
         notifications.show({
           title: file.isArchived ? 'File Unarchived' : 'File Archived',
           message: `${file.name} has been ${file.isArchived ? 'unarchived' : 'archived'}`,
@@ -236,52 +88,19 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         });
       }
     },
-    [workspace, fetchWorkspace],
+    [workspace],
   );
-
-  useEffect(() => {
-    fetchWorkspace();
-    fetchAllWorkspaces();
-  }, [fetchWorkspace, fetchAllWorkspaces]);
-
-  useEffect(() => {
-    let unlistenFiles: (() => void) | undefined;
-    let canceled = false;
-
-    (async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      if (canceled) return;
-
-      unlistenFiles = await listen<string>('workspace-files-changed', async (event) => {
-        if (event.payload && workspaceIdRef.current && event.payload !== workspaceIdRef.current) {
-          return;
-        }
-        await fetchWorkspace();
-      });
-    })();
-
-    return () => {
-      canceled = true;
-      if (unlistenFiles) {
-        unlistenFiles();
-      }
-    };
-  }, [fetchWorkspace]);
 
   const value = useMemo<WorkspaceContextValue>(
     () => ({
       workspace,
       allWorkspaces,
       files,
-      isLoading,
-      error,
-      refresh: fetchWorkspace,
       switchWorkspace,
       toggleFavorite,
       toggleFileArchive,
-      refreshWorkspaces: fetchAllWorkspaces,
     }),
-    [workspace, allWorkspaces, files, isLoading, error, fetchWorkspace, switchWorkspace, toggleFavorite, toggleFileArchive, fetchAllWorkspaces],
+    [workspace, allWorkspaces, files, switchWorkspace, toggleFavorite, toggleFileArchive],
   );
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

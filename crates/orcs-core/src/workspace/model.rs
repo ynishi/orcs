@@ -4,6 +4,7 @@ use std::path::PathBuf;
 /// Represents a project-level workspace containing all resources and context
 /// associated with a specific project.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Workspace {
     /// Unique identifier for the workspace
     pub id: String,

@@ -1,8 +1,7 @@
-import { Stack, Text, Loader, Center, Alert, ActionIcon, Group, Tooltip, Switch, ScrollArea, Box } from '@mantine/core';
+import { Stack, Text, ActionIcon, Group, Tooltip, Switch, ScrollArea, Box, Center } from '@mantine/core';
 import { IconPlus, IconFolder, IconTerminal } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { useCallback } from 'react';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { FileList } from '../files/FileList';
 import { UploadedFile } from '../../types/workspace';
@@ -13,19 +12,13 @@ interface WorkspacePanelProps {
   onToggleIncludeInPrompt?: (value: boolean) => void;
   onGoToSession?: (sessionId: string, messageTimestamp?: string) => void;
   onNewSessionWithFile?: (file: File) => void;
-  onRefresh?: () => Promise<void>;
 }
 
-export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession, onNewSessionWithFile, onRefresh }: WorkspacePanelProps) {
-  const { workspace, files, isLoading, error, refresh, toggleFileArchive } = useWorkspace();
+export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession, onNewSessionWithFile }: WorkspacePanelProps) {
+  const { workspace, files, toggleFileArchive } = useWorkspace();
 
-  // Keep local list in sync and notify parent consumers when provided
-  const refreshWorkspaceState = useCallback(async () => {
-    await refresh();
-    if (onRefresh) {
-      await onRefresh();
-    }
-  }, [refresh, onRefresh]);
+  // Phase 4: No need to manually refresh - event-driven via workspace:update
+  // onRefresh prop kept for backward compatibility but not used
 
   // Handle file upload from file input
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,8 +48,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
         });
       }
 
-      // Refresh the file list
-      await refreshWorkspaceState();
+      // Phase 4: No need to refresh - event-driven via workspace:update
 
       // Clear the input so the same file can be selected again
       e.target.value = '';
@@ -109,8 +101,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
         newName: newName,
       });
 
-      // Refresh the file list
-      await refreshWorkspaceState();
+      // Phase 4: No need to refresh - event-driven via workspace:update
     } catch (err) {
       console.error('Failed to rename file:', err);
     }
@@ -126,8 +117,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
         fileId: file.id,
       });
 
-      // Refresh the file list
-      await refreshWorkspaceState();
+      // Phase 4: No need to refresh - event-driven via workspace:update
     } catch (err) {
       console.error('Failed to delete file:', err);
     }
@@ -143,8 +133,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
         fileId: file.id,
       });
 
-      // Refresh the file list
-      await refreshWorkspaceState();
+      // Phase 4: No need to refresh - event-driven via workspace:update
     } catch (err) {
       console.error('Failed to toggle favorite:', err);
     }
@@ -161,8 +150,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
         direction: direction,
       });
 
-      // Refresh the file list
-      await refreshWorkspaceState();
+      // Phase 4: No need to refresh - event-driven via workspace:update
     } catch (err) {
       console.error('Failed to move sort order:', err);
     }
@@ -223,28 +211,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
     }
   };
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <Center p="xl">
-        <Stack align="center" gap="md">
-          <Loader size="sm" />
-          <Text size="sm" c="dimmed">
-            Loading workspace...
-          </Text>
-        </Stack>
-      </Center>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <Alert color="red" title="Error loading workspace" m="md">
-        <Text size="sm">{error}</Text>
-      </Alert>
-    );
-  }
+  // Phase 4: No loading/error states - workspace data comes from event-driven store
 
   // No files state
   if (files.length === 0) {

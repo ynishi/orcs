@@ -70,6 +70,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         workspaces::create_workspace,
         workspaces::create_workspace_with_session,
         workspaces::list_workspaces,
+        workspaces::get_workspaces_snapshot,
         workspaces::switch_workspace,
         workspaces::toggle_favorite_workspace,
         workspaces::delete_workspace,

@@ -41,7 +41,7 @@ interface WorkspaceSwitcherProps {
  * - Visual indication of current workspace
  */
 export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
-  const { workspace, allWorkspaces, switchWorkspace, toggleFavorite, refreshWorkspaces, refresh } = useWorkspace();
+  const { workspace, allWorkspaces, switchWorkspace, toggleFavorite } = useWorkspace();
   const { refreshSessions } = useSession();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -101,16 +101,10 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
       const result = await invoke('create_workspace_with_session', { rootPath: selected });
       console.log('[Workspace] Created workspace and session:', result);
 
-      // Refresh all workspaces list
-      console.log('[Workspace] Refreshing workspace list...');
-      await refreshWorkspaces();
-
+      // Phase 4: No need to refresh manually - event-driven via workspace:update
       // Refresh sessions list to show the new/restored session in the sidebar
       console.log('[Workspace] Refreshing sessions list...');
       await refreshSessions();
-
-      // Also refresh current workspace
-      await refresh();
 
       // Wait a bit for React state to update and log the result
       setTimeout(() => {
@@ -163,13 +157,7 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
         color: 'green',
       });
 
-      // Refresh workspace list
-      await refreshWorkspaces();
-
-      // If deleted current workspace, refresh to switch to another
-      if (workspaceId === workspace?.id) {
-        await refresh();
-      }
+      // Phase 4: No need to refresh manually - event-driven via workspace:update and workspace:delete
     } catch (error) {
       console.error('Failed to delete workspace:', error);
       notifications.show({

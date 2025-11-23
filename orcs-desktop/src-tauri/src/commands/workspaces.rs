@@ -115,6 +115,11 @@ pub async fn create_workspace_with_session(
         workspace.id, session.id
     );
 
+    // Emit workspace:update event (Phase 4)
+    if let Err(e) = app.emit("workspace:update", &workspace) {
+        println!("[Backend] Failed to emit workspace:update: {}", e);
+    }
+
     // Emit app-state:update event for SSOT synchronization
     use orcs_core::state::repository::StateRepository;
     if let Ok(app_state) = state.app_state_service.get_state().await {
@@ -131,6 +136,18 @@ pub async fn create_workspace_with_session(
 /// Lists all registered workspaces
 #[tauri::command]
 pub async fn list_workspaces(state: State<'_, AppState>) -> Result<Vec<Workspace>, String> {
+    state
+        .workspace_storage_service
+        .list_all_workspaces()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Gets all workspaces snapshot for initial load (Phase 4)
+#[tauri::command]
+pub async fn get_workspaces_snapshot(
+    state: State<'_, AppState>,
+) -> Result<Vec<Workspace>, String> {
     state
         .workspace_storage_service
         .list_all_workspaces()
@@ -204,19 +221,35 @@ pub async fn switch_workspace(
 #[tauri::command]
 pub async fn toggle_favorite_workspace(
     workspace_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
         .workspace_storage_service
         .toggle_favorite(&workspace_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // Get updated workspace and emit event (Phase 4)
+    if let Some(workspace) = state
+        .workspace_storage_service
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Err(e) = app.emit("workspace:update", &workspace) {
+            println!("[Backend] Failed to emit workspace:update: {}", e);
+        }
+    }
+
+    Ok(())
 }
 
 /// Deletes a workspace
 #[tauri::command]
 pub async fn delete_workspace(
     workspace_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     println!(
@@ -232,6 +265,11 @@ pub async fn delete_workspace(
             println!("[Backend] Failed to delete workspace: {}", e);
             e.to_string()
         })?;
+
+    // Emit workspace:delete event (Phase 4)
+    if let Err(e) = app.emit("workspace:delete", serde_json::json!({ "id": workspace_id })) {
+        println!("[Backend] Failed to emit workspace:delete: {}", e);
+    }
 
     println!("[Backend] Successfully deleted workspace {}", workspace_id);
     Ok(())
@@ -295,13 +333,22 @@ pub async fn upload_file_from_bytes(
         .await
         .map_err(|e| e.to_string())?;
 
-    app.emit("workspace-files-changed", &workspace_id)
-        .map_err(|e| e.to_string())?;
-
-    tracing::info!(
-        "upload_file_from_bytes: Emitted workspace-files-changed event for workspace: {}",
-        workspace_id
-    );
+    // Get updated workspace and emit event (Phase 4)
+    if let Some(workspace) = state
+        .workspace_storage_service
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Err(e) = app.emit("workspace:update", &workspace) {
+            tracing::error!("Failed to emit workspace:update: {}", e);
+        } else {
+            tracing::info!(
+                "upload_file_from_bytes: Emitted workspace:update event for workspace: {}",
+                workspace_id
+            );
+        }
+    }
 
     Ok(result)
 }
@@ -311,13 +358,28 @@ pub async fn upload_file_from_bytes(
 pub async fn delete_file_from_workspace(
     workspace_id: String,
     file_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
         .workspace_storage_service
         .delete_file_from_workspace(&workspace_id, &file_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // Get updated workspace and emit event (Phase 4)
+    if let Some(workspace) = state
+        .workspace_storage_service
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Err(e) = app.emit("workspace:update", &workspace) {
+            tracing::error!("Failed to emit workspace:update: {}", e);
+        }
+    }
+
+    Ok(())
 }
 
 /// Renames a file in a workspace
@@ -326,13 +388,28 @@ pub async fn rename_file_in_workspace(
     workspace_id: String,
     file_id: String,
     new_name: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UploadedFile, String> {
-    state
+    let result = state
         .workspace_storage_service
         .rename_file_in_workspace(&workspace_id, &file_id, &new_name)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // Get updated workspace and emit event (Phase 4)
+    if let Some(workspace) = state
+        .workspace_storage_service
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Err(e) = app.emit("workspace:update", &workspace) {
+            tracing::error!("Failed to emit workspace:update: {}", e);
+        }
+    }
+
+    Ok(result)
 }
 
 /// Toggles the archive status of a file in a workspace
@@ -340,13 +417,28 @@ pub async fn rename_file_in_workspace(
 pub async fn toggle_workspace_file_archive(
     workspace_id: String,
     file_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
         .workspace_storage_service
         .toggle_file_archive(&workspace_id, &file_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // Get updated workspace and emit event (Phase 4)
+    if let Some(workspace) = state
+        .workspace_storage_service
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Err(e) = app.emit("workspace:update", &workspace) {
+            tracing::error!("Failed to emit workspace:update: {}", e);
+        }
+    }
+
+    Ok(())
 }
 
 /// Toggles the favorite status of a file in a workspace
@@ -354,13 +446,28 @@ pub async fn toggle_workspace_file_archive(
 pub async fn toggle_workspace_file_favorite(
     workspace_id: String,
     file_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
         .workspace_storage_service
         .toggle_file_favorite(&workspace_id, &file_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // Get updated workspace and emit event (Phase 4)
+    if let Some(workspace) = state
+        .workspace_storage_service
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Err(e) = app.emit("workspace:update", &workspace) {
+            tracing::error!("Failed to emit workspace:update: {}", e);
+        }
+    }
+
+    Ok(())
 }
 
 /// Moves a file's sort order within favorited files
@@ -369,11 +476,26 @@ pub async fn move_workspace_file_sort_order(
     workspace_id: String,
     file_id: String,
     direction: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
         .workspace_storage_service
         .move_file_sort_order(&workspace_id, &file_id, &direction)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // Get updated workspace and emit event (Phase 4)
+    if let Some(workspace) = state
+        .workspace_storage_service
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Err(e) = app.emit("workspace:update", &workspace) {
+            tracing::error!("Failed to emit workspace:update: {}", e);
+        }
+    }
+
+    Ok(())
 }

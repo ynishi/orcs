@@ -41,7 +41,6 @@ interface NavbarProps {
   onToggleIncludeWorkspaceInPrompt?: (value: boolean) => void;
   onGoToSession?: (sessionId: string, messageTimestamp?: string) => void;
   onNewSessionWithFile?: (file: File) => void;
-  onRefreshWorkspace?: () => Promise<void>;
 
   // Common
   onMessage: (type: MessageType, author: string, text: string) => void;
@@ -84,7 +83,6 @@ export function Navbar({
   onToggleIncludeWorkspaceInPrompt,
   onGoToSession,
   onNewSessionWithFile,
-  onRefreshWorkspace,
   onMessage,
   onSlashCommandsUpdated,
   onRunSlashCommand,
@@ -191,7 +189,6 @@ export function Navbar({
               onToggleIncludeInPrompt={onToggleIncludeWorkspaceInPrompt}
               onGoToSession={onGoToSession}
               onNewSessionWithFile={onNewSessionWithFile}
-              onRefresh={onRefreshWorkspace}
             />
           )}
 

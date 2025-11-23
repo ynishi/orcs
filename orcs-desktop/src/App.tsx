@@ -46,6 +46,7 @@ import { Tabs } from "@mantine/core";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import type { SessionEvent } from "./types/session_event";
 import { useAppStateStore } from "./stores/appStateStore";
+import { useWorkspaceStore } from "./stores/workspaceStore";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -104,13 +105,16 @@ function App() {
   const closeBackendTab = useAppStateStore((state) => state.closeTab);
   const setActiveBackendTab = useAppStateStore((state) => state.setActiveTab);
 
-  // ワークスペース管理
+  // ワークスペース管理 (Phase 4: simplified - no more refresh functions)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { workspace, allWorkspaces, files: workspaceFiles, refresh: refreshWorkspace, refreshWorkspaces, switchWorkspace: switchWorkspaceBackend } = useWorkspace();
+  const { workspace, allWorkspaces, files: workspaceFiles, switchWorkspace: switchWorkspaceBackend } = useWorkspace();
   const [includeWorkspaceInPrompt, setIncludeWorkspaceInPrompt] = useState<boolean>(false);
 
   // AppState Store (Rust SSOT)
   const initializeAppState = useAppStateStore((state: { initialize: () => Promise<void> }) => state.initialize);
+
+  // Workspace Store (Rust SSOT - Phase 4)
+  const initializeWorkspace = useWorkspaceStore((state) => state.initialize);
 
   // Initialize AppState Store on mount
   useEffect(() => {
@@ -118,6 +122,13 @@ function App() {
       console.error('[App] Failed to initialize AppState store:', error);
     });
   }, [initializeAppState]);
+
+  // Initialize Workspace Store on mount (Phase 4)
+  useEffect(() => {
+    initializeWorkspace().catch((error: unknown) => {
+      console.error('[App] Failed to initialize Workspace store:', error);
+    });
+  }, [initializeWorkspace]);
 
   // Restore last selected workspace on app startup (Phase 3)
   useEffect(() => {
@@ -1075,11 +1086,8 @@ function App() {
       workspaceSwitchingRef.current = true;
 
       try {
-        console.log('[App] workspace-switched event received, refreshing workspace and Git info');
-        console.log('[App] Calling refreshWorkspace...');
-        await refreshWorkspace();
-        console.log('[App] Calling refreshWorkspaces...');
-        await refreshWorkspaces();
+        console.log('[App] workspace-switched event received, refreshing Git info');
+        // Phase 4: No need to refresh workspace manually - event-driven via workspace:update
 
         // Refresh session list (workspace-specific sessions)
         console.log('[App] Refreshing sessions...');
@@ -1144,7 +1152,7 @@ function App() {
         unlistenFn();
       }
     };
-  }, [refreshWorkspace, refreshWorkspaces, refreshSessions, switchWorkspaceTabs, openTab, switchToTab, getTabBySessionId, userNickname]);
+  }, [refreshSessions, switchWorkspaceTabs, openTab, switchToTab, getTabBySessionId, userNickname]);
 
   // 現在のアクティブタブの入力値を取得（メモ化）
   const activeTabInput = useMemo(() => {
@@ -1733,8 +1741,7 @@ function App() {
         author: message.author,
       });
 
-      // ワークスペースのファイルリストを更新
-      await refreshWorkspace();
+      // Phase 4: No need to refresh workspace manually - event-driven via workspace:update
 
       // Add system message to chat history and persist to session
       await handleAndPersistSystemMessage(
@@ -1853,8 +1860,7 @@ function App() {
         messageTimestamp: task.created_at,
       });
 
-      // ワークスペースのファイルリストを更新
-      await refreshWorkspace();
+      // Phase 4: No need to refresh workspace manually - event-driven via workspace:update
 
       // Toast notification
       notifications.show({
@@ -2268,7 +2274,6 @@ function App() {
           onToggleIncludeWorkspaceInPrompt={setIncludeWorkspaceInPrompt}
           onGoToSession={handleGoToSessionFromFile}
           onNewSessionWithFile={handleNewSessionWithFile}
-          onRefreshWorkspace={refreshWorkspace}
           onMessage={addMessage}
           onSlashCommandsUpdated={refreshCustomCommands}
           onRunSlashCommand={handleRunSlashCommand}

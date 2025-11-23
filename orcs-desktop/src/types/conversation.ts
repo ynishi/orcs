@@ -132,12 +132,13 @@ export const EXECUTION_STRATEGIES: ExecutionStrategyOption[] = [
     icon: '➡️',
     description: 'Send one by one',
   },
-  {
-    value: 'mentioned',
-    label: 'Mentioned',
-    icon: '👤',
-    description: 'Send to @mentioned only',
-  },
+  // TODO: Implement 'mentioned' strategy in Rust backend
+  // {
+  //   value: 'mentioned',
+  //   label: 'Mentioned',
+  //   icon: '👤',
+  //   description: 'Send to @mentioned only',
+  // },
 ];
 
 export function getExecutionStrategyOption(strategy: ExecutionStrategyType): ExecutionStrategyOption | undefined {

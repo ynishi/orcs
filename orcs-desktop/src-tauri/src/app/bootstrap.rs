@@ -10,7 +10,7 @@ use orcs_core::{
     secret::SecretService,
     session::{AppMode, PLACEHOLDER_WORKSPACE_ID},
     slash_command::SlashCommandRepository,
-    state::{model::PLACEHOLDER_DEFAULT_WORKSPACE_ID, repository::StateRepository},
+    state::repository::StateRepository,
     task::TaskRepository,
     user::UserService,
     workspace::manager::WorkspaceStorageService,
@@ -48,17 +48,14 @@ async fn ensure_default_workspace(
     // 1. Check existing default_workspace_id
     let current_default_id = app_state_service.get_default_workspace().await;
 
-    // Skip if it's not a placeholder and the workspace exists
-    if current_default_id != PLACEHOLDER_DEFAULT_WORKSPACE_ID {
-        if let Ok(Some(_)) = workspace_storage_service
-            .get_workspace(&current_default_id)
-            .await
-        {
+    // Skip if it exists and the workspace is valid
+    if let Some(workspace_id) = current_default_id {
+        if let Ok(Some(_)) = workspace_storage_service.get_workspace(&workspace_id).await {
             tracing::info!(
                 "[Bootstrap] Using existing default workspace: {}",
-                current_default_id
+                workspace_id
             );
-            return Ok(current_default_id);
+            return Ok(workspace_id);
         }
     }
 

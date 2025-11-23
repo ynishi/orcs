@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use version_migrate::{IntoDomain, Versioned};
 
-use orcs_core::state::model::{AppState, PLACEHOLDER_DEFAULT_WORKSPACE_ID};
+use orcs_core::state::model::AppState;
 
 /// Application state configuration V1.0.0 (initial version).
 ///
@@ -59,8 +59,8 @@ pub struct AppStateV1_2 {
 
 /// Application state configuration V1.3.0.
 ///
-/// Made default_workspace_id field required.
-/// The default workspace (~/orcs) is now mandatory and always initialized.
+/// Reverted default_workspace_id back to optional.
+/// Using placeholder pattern was a bad practice - if a value can be invalid, it should be Option.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.3.0")]
 pub struct AppStateV1_3 {
@@ -70,9 +70,9 @@ pub struct AppStateV1_3 {
     pub last_selected_workspace_id: Option<String>,
 
     /// ID of the default system workspace (~/orcs).
-    /// This is a fallback workspace that is always available.
-    /// Must be initialized during bootstrap.
-    pub default_workspace_id: String,
+    /// None if not yet initialized.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_workspace_id: Option<String>,
 
     /// ID of the currently active session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -113,7 +113,7 @@ impl Default for AppStateV1_3 {
     fn default() -> Self {
         Self {
             last_selected_workspace_id: None,
-            default_workspace_id: PLACEHOLDER_DEFAULT_WORKSPACE_ID.to_string(),
+            default_workspace_id: None,
             active_session_id: None,
         }
     }
@@ -147,14 +147,12 @@ impl version_migrate::MigratesTo<AppStateV1_2> for AppStateV1_1 {
 }
 
 /// Migration from AppStateV1_2 to AppStateV1_3.
-/// Makes default_workspace_id required by setting placeholder if None.
+/// Simple copy - both versions now have the same structure.
 impl version_migrate::MigratesTo<AppStateV1_3> for AppStateV1_2 {
     fn migrate(self) -> AppStateV1_3 {
         AppStateV1_3 {
             last_selected_workspace_id: self.last_selected_workspace_id,
-            default_workspace_id: self
-                .default_workspace_id
-                .unwrap_or_else(|| PLACEHOLDER_DEFAULT_WORKSPACE_ID.to_string()),
+            default_workspace_id: self.default_workspace_id,
             active_session_id: self.active_session_id,
         }
     }
@@ -169,9 +167,7 @@ impl IntoDomain<AppState> for AppStateV1_1 {
     fn into_domain(self) -> AppState {
         AppState {
             last_selected_workspace_id: self.last_selected_workspace_id,
-            default_workspace_id: self
-                .default_workspace_id
-                .unwrap_or_else(|| PLACEHOLDER_DEFAULT_WORKSPACE_ID.to_string()),
+            default_workspace_id: self.default_workspace_id,
             active_session_id: None,
         }
     }
@@ -182,7 +178,7 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_1 {
     fn from_domain(state: AppState) -> Self {
         AppStateV1_1 {
             last_selected_workspace_id: state.last_selected_workspace_id,
-            default_workspace_id: Some(state.default_workspace_id),
+            default_workspace_id: state.default_workspace_id,
         }
     }
 }
@@ -192,9 +188,7 @@ impl IntoDomain<AppState> for AppStateV1_2 {
     fn into_domain(self) -> AppState {
         AppState {
             last_selected_workspace_id: self.last_selected_workspace_id,
-            default_workspace_id: self
-                .default_workspace_id
-                .unwrap_or_else(|| PLACEHOLDER_DEFAULT_WORKSPACE_ID.to_string()),
+            default_workspace_id: self.default_workspace_id,
             active_session_id: self.active_session_id,
         }
     }
@@ -205,7 +199,7 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_2 {
     fn from_domain(state: AppState) -> Self {
         AppStateV1_2 {
             last_selected_workspace_id: state.last_selected_workspace_id,
-            default_workspace_id: Some(state.default_workspace_id),
+            default_workspace_id: state.default_workspace_id,
             active_session_id: state.active_session_id,
         }
     }

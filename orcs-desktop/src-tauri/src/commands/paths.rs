@@ -144,6 +144,9 @@ pub async fn get_default_workspace_path() -> Result<String, String> {
 pub async fn get_default_workspace_id(
     state: tauri::State<'_, crate::app::AppState>,
 ) -> Result<String, String> {
-    let workspace_id = state.app_state_service.get_default_workspace().await;
-    Ok(workspace_id)
+    state
+        .app_state_service
+        .get_default_workspace()
+        .await
+        .ok_or_else(|| "Default workspace not initialized".to_string())
 }

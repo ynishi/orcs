@@ -46,7 +46,6 @@ import { Tabs } from "@mantine/core";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import type { SessionEvent } from "./types/session_event";
 import { useAppStateStore } from "./stores/appStateStore";
-import type { AppState as RustAppState } from "./types/generated/schema";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -85,7 +84,7 @@ function App() {
   // セッション管理をカスタムフックに切り替え
   const {
     sessions,
-    currentSessionId,
+    // currentSessionId removed - use appStateStore
     loading: sessionsLoading,
     createSession,
     switchSession,
@@ -94,6 +93,10 @@ function App() {
     saveCurrentSession,
     refreshSessions,
   } = useSessions();
+
+  // Get currentSessionId from appStateStore (SSOT)
+  const { appState } = useAppStateStore();
+  const currentSessionId = appState?.active_session_id ?? null;
 
   // ワークスペース管理
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

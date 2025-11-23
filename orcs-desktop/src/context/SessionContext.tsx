@@ -1,10 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { Session } from '../types/session';
+import { useAppStateStore } from '../stores/appStateStore';
 
 export interface SessionContextValue {
   sessions: Session[];
-  currentSessionId: string | null;
+  // currentSessionId removed - use useAppStateStore().appState?.activeSessionId
   loading: boolean;
   error: string | null;
   createSession: (workspaceId?: string) => Promise<string>;
@@ -23,7 +24,7 @@ interface SessionProviderProps {
 
 export function SessionProvider({ children }: SessionProviderProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  // currentSessionId removed - use useAppStateStore().appState?.activeSessionId
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,12 +36,8 @@ export function SessionProvider({ children }: SessionProviderProps) {
       const sessionList = await invoke<Session[]>('list_sessions');
       setSessions(sessionList);
 
-      const activeSession = await invoke<Session | null>('get_active_session');
-      if (activeSession) {
-        setCurrentSessionId(activeSession.id);
-      } else {
-        setCurrentSessionId(null);
-      }
+      // activeSessionId is managed by appStateStore (SSOT)
+      // get_active_session invoke removed - appStateStore already has it
     } catch (err) {
       console.error('Failed to load sessions:', err);
       setError(String(err));
@@ -55,11 +52,18 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
   const createSession = useCallback(async (workspaceId?: string): Promise<string> => {
     try {
-      // If workspace_id not provided, get default workspace_id
-      const finalWorkspaceId = workspaceId || await invoke<string>('get_default_workspace_id');
+      // If workspace_id not provided, get from appStateStore
+      const appState = useAppStateStore.getState().appState;
+      const finalWorkspaceId = workspaceId || appState?.default_workspace_id;
+
+      if (!finalWorkspaceId) {
+        throw new Error('No default workspace available');
+      }
 
       const newSession = await invoke<Session>('create_session', { workspaceId: finalWorkspaceId });
-      setCurrentSessionId(newSession.id);
+      // setCurrentSessionId removed - Rust emits app-state:update event
+      // appStateStore automatically updates activeSessionId
+
       // Add new session to local sessions array instead of reloading all sessions
       setSessions((prev) => [...prev, newSession]);
       return newSession.id;
@@ -73,7 +77,8 @@ export function SessionProvider({ children }: SessionProviderProps) {
     async (sessionId: string): Promise<Session> => {
       try {
         const session = await invoke<Session>('switch_session', { sessionId });
-        setCurrentSessionId(sessionId);
+        // setCurrentSessionId removed - Rust emits app-state:update event
+        // appStateStore automatically updates activeSessionId
         // Note: loadSessions() removed here to avoid unnecessary re-fetching
         // Tab switching should use cached session data
         // Updated session data (e.g., updated_at) will be reflected on next refresh
@@ -89,6 +94,10 @@ export function SessionProvider({ children }: SessionProviderProps) {
   const deleteSession = useCallback(
     async (sessionId: string) => {
       try {
+        // Get current session ID from appStateStore
+        const appState = useAppStateStore.getState().appState;
+        const currentSessionId = appState?.active_session_id ?? null;
+
         await invoke('delete_session', { sessionId });
 
         const remainingSessions = sessions.filter((s) => s.id !== sessionId);
@@ -101,9 +110,10 @@ export function SessionProvider({ children }: SessionProviderProps) {
             const nextIndex = Math.min(Math.max(currentIndex, 0), remainingSessions.length - 1);
             const nextSession = remainingSessions[nextIndex];
             await invoke('switch_session', { sessionId: nextSession.id });
-            setCurrentSessionId(nextSession.id);
+            // setCurrentSessionId removed - Rust emits app-state:update event
           } else {
-            setCurrentSessionId(null);
+            // No sessions left - create new one
+            // activeSessionId will be updated by create_session event
             await createSession();
           }
         }
@@ -112,7 +122,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
         throw new Error(`Failed to delete session: ${err}`);
       }
     },
-    [currentSessionId, sessions, createSession],
+    [sessions, createSession],
   );
 
   const renameSession = useCallback(async (sessionId: string, newTitle: string) => {
@@ -142,7 +152,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
   const value = useMemo<SessionContextValue>(
     () => ({
       sessions,
-      currentSessionId,
+      // currentSessionId removed - use useAppStateStore().appState?.activeSessionId
       loading,
       error,
       createSession,
@@ -154,7 +164,6 @@ export function SessionProvider({ children }: SessionProviderProps) {
     }),
     [
       sessions,
-      currentSessionId,
       loading,
       error,
       createSession,

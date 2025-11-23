@@ -53,7 +53,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
     // Optimistic update
     const current = get().appState;
     if (current) {
-      set({ appState: { ...current, lastSelectedWorkspaceId: workspaceId } });
+      set({ appState: { ...current, last_selected_workspace_id: workspaceId } });
     }
 
     try {
@@ -74,7 +74,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
 
     const current = get().appState;
     if (current) {
-      set({ appState: { ...current, lastSelectedWorkspaceId: null } });
+      set({ appState: { ...current, last_selected_workspace_id: null } });
     }
 
     try {
@@ -93,7 +93,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
 
     const current = get().appState;
     if (current) {
-      set({ appState: { ...current, activeSessionId: sessionId } });
+      set({ appState: { ...current, active_session_id: sessionId } });
     }
 
     try {
@@ -112,7 +112,7 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
 
     const current = get().appState;
     if (current) {
-      set({ appState: { ...current, activeSessionId: null } });
+      set({ appState: { ...current, active_session_id: null } });
     }
 
     try {

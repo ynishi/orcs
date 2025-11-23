@@ -91,7 +91,8 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
    * 新規タブを開く（既に開いている場合はフォーカス）
    */
   const openTab = useCallback((session: Session, messages: Message[], workspaceId: string, switchToTab: boolean = true): string => {
-    let tabId: string;
+    let tabId: string = '';
+    let isExistingTab = false;
 
     setTabs((prev) => {
       // 既に同じセッションのタブが開いているか確認
@@ -100,6 +101,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       if (existingTab) {
         // 既存タブを更新
         tabId = existingTab.id;
+        isExistingTab = true;
         return prev.map((tab) =>
           tab.id === existingTab.id
             ? { ...tab, messages, title: session.title, lastAccessedAt: Date.now() }
@@ -141,11 +143,15 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     });
 
     // setTabs()の外で setActiveTabId() を呼ぶことで、確実に更新を反映
+    // 既存タブの場合もswitchToTabがtrueならアクティブにする
     if (switchToTab) {
-      setActiveTabId(tabId!);
+      setActiveTabId(tabId);
+      if (isExistingTab) {
+        console.log('[TabContext] Switched to existing tab:', tabId);
+      }
     }
 
-    return tabId!;
+    return tabId;
   }, []);
 
   /**

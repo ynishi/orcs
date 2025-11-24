@@ -685,7 +685,7 @@ function App() {
             _updateTabMessages(existingTab.id, restoredMessages);
           } else {
             // Tab doesn't exist, create it
-            await openTab(activeSession.id, workspace.id, activeSession.title, restoredMessages);
+            openTab(activeSession, restoredMessages, workspace.id);
           }
         }
 
@@ -754,7 +754,7 @@ function App() {
         }
 
         // Initialize UI state with title first (from lightweight session)
-        initializeTabUIState(backendTab.id, session.title, []);
+        initializeTabUIState(backendTab.id, backendTab.sessionId, backendTab.workspaceId, session.title, []);
 
         // Only load full session data for the active tab
         const isActiveTab = appState.activeTabId === backendTab.id;
@@ -960,7 +960,7 @@ function App() {
             if (!existingTab) {
               // タブがなければ開く
               const restoredMessages = convertSessionToMessages(activeSession, userNickname);
-              await openTab(activeSession.id, updatedWorkspace.id, activeSession.title, restoredMessages);
+              openTab(activeSession, restoredMessages, updatedWorkspace.id);
               console.log('[App] Opened tab for active session after workspace switch');
             } else {
               // 既にタブがあればフォーカス
@@ -1486,7 +1486,7 @@ function App() {
       const restoredMessages = convertSessionToMessages(fullSession, userNickname);
 
       // 4. Open tab
-      const tabId = await openTab(newSession.id, workspace.id, fullSession.title, restoredMessages);
+      const tabId = openTab(fullSession, restoredMessages, workspace.id);
       console.log('[handleNewSessionWithFile] Opened tab:', tabId);
 
       // 5. Attach file to the newly created tab
@@ -1788,7 +1788,7 @@ function App() {
       });
 
       // 4. タブを開く
-      await openTab(session.id, session.workspaceId, fullSession.title, restoredMessages);
+      openTab(fullSession, restoredMessages, session.workspaceId);
 
       // Show toast notification
       notifications.show({
@@ -2290,7 +2290,7 @@ function App() {
 
                                       // 4d. タブを開く
                                       const messages = convertSessionToMessages(nextSession, userNickname);
-                                      await openTab(nextSession.id, workspace.id, nextSession.title, messages);
+                                      openTab(nextSession, messages, workspace.id);
 
                                       // 4f. 古いタブを閉じる（次のSessionに切り替え後）
                                       await closeTab(tab.id);

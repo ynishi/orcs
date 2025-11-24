@@ -41,6 +41,7 @@ export interface TabContextValue {
   
   // タブ操作
   openTab: (session: Session, messages: Message[], workspaceId: string, switchToTab?: boolean) => string; // 新規タブを開く。既に開いている場合はフォーカス
+  initializeTabUIState: (tabId: string, sessionId: string, workspaceId: string, title: string, messages: Message[]) => void; // 既存のタブIDでタブUI状態を初期化（Backend復元用）
   closeTab: (tabId: string) => void; // タブを閉じる
   switchTab: (tabId: string) => void; // タブを切り替える
   switchWorkspace: (workspaceId: string) => void; // Workspace切り替え時にタブを切り替える
@@ -167,6 +168,73 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     }
 
     return tabId;
+  }, []);
+
+  /**
+   * 既存のタブIDでタブUI状態を初期化（Backend復元用）
+   * - openTabと異なり、新しいIDを生成せずバックエンドから取得したIDをそのまま使用
+   * - 主にアプリ起動時のタブ復元で使用
+   */
+  const initializeTabUIState = useCallback((
+    tabId: string,
+    sessionId: string,
+    workspaceId: string,
+    title: string,
+    messages: Message[]
+  ) => {
+    console.log('[TabContext] initializeTabUIState called:', {
+      tabId: tabId.substring(0, 8),
+      sessionId: sessionId.substring(0, 8),
+      workspaceId: workspaceId.substring(0, 8),
+      title,
+      messagesCount: messages.length,
+    });
+
+    setTabs((prev) => {
+      // 既に同じIDのタブが存在する場合は更新
+      const existingTab = prev.find((tab) => tab.id === tabId);
+
+      if (existingTab) {
+        console.log('[TabContext] Updating existing tab UI state:', tabId.substring(0, 8));
+        return prev.map((tab) =>
+          tab.id === tabId
+            ? { ...tab, sessionId, workspaceId, title, messages, lastAccessedAt: Date.now() }
+            : tab
+        );
+      }
+
+      // 新規タブとして作成（デフォルト値で初期化）
+      console.log('[TabContext] Creating new tab with preset ID:', tabId.substring(0, 8));
+      const newTab: SessionTab = {
+        // セッション情報
+        id: tabId,
+        sessionId,
+        workspaceId,
+        title,
+
+        // メッセージ関連
+        messages,
+
+        // 入力フォーム状態
+        input: '',
+        attachedFiles: [],
+
+        // UI状態
+        isDragging: false,
+        isAiThinking: false,
+        thinkingPersona: 'AI',
+
+        // AutoChat状態
+        autoMode: false,
+        autoChatIteration: null,
+
+        // メタデータ
+        isDirty: false,
+        lastAccessedAt: Date.now(),
+      };
+
+      return [...prev, newTab];
+    });
   }, []);
 
   /**
@@ -429,9 +497,10 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     () => ({
       tabs,
       activeTabId,
-      
+
       // タブ操作
       openTab,
+      initializeTabUIState,
       closeTab,
       switchTab,
       switchWorkspace,
@@ -470,6 +539,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       tabs,
       activeTabId,
       openTab,
+      initializeTabUIState,
       closeTab,
       switchTab,
       switchWorkspace,

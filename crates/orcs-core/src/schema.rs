@@ -68,12 +68,12 @@ impl From<TalkStyleType> for TalkStyle {
 
 /// Execution strategy for multi-agent dialogue.
 ///
-/// Simplified version of `llm_toolkit::agent::dialogue::ExecutionModel` for schema generation.
+/// Anti-Corruption Layer for `llm_toolkit::agent::dialogue::ExecutionModel`.
 /// Enables automatic TypeScript generation:
-/// `export type ExecutionModelType = 'broadcast' | 'sequential'`
+/// `export type ExecutionModelType = 'broadcast' | 'sequential' | 'mentioned'`
 ///
-/// Note: This is a simplified view. Complex variants like OrderedSequential, OrderedBroadcast,
-/// Mentioned, and Moderator are mapped to their base types.
+/// Note: Complex variants like OrderedSequential, OrderedBroadcast, and Moderator
+/// are mapped to their base types. Mentioned variant uses default strategy internally.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionModelType {
@@ -81,6 +81,8 @@ pub enum ExecutionModelType {
     Broadcast,
     /// Participants execute sequentially, with output chained as input.
     Sequential,
+    /// Only @mentioned participants respond to messages.
+    Mentioned,
 }
 
 impl From<ExecutionModel> for ExecutionModelType {
@@ -90,7 +92,7 @@ impl From<ExecutionModel> for ExecutionModelType {
             ExecutionModel::OrderedBroadcast(_) => Self::Broadcast,
             ExecutionModel::Sequential => Self::Sequential,
             ExecutionModel::OrderedSequential(_) => Self::Sequential,
-            ExecutionModel::Mentioned { .. } => Self::Broadcast,
+            ExecutionModel::Mentioned { .. } => Self::Mentioned,
             ExecutionModel::Moderator => Self::Broadcast,
         }
     }
@@ -101,6 +103,9 @@ impl From<ExecutionModelType> for ExecutionModel {
         match value {
             ExecutionModelType::Broadcast => Self::Broadcast,
             ExecutionModelType::Sequential => Self::Sequential,
+            ExecutionModelType::Mentioned => Self::Mentioned {
+                strategy: Default::default(),
+            },
         }
     }
 }

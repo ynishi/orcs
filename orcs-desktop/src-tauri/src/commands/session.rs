@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use llm_toolkit::ToPrompt;
 use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
-use orcs_core::schema::TalkStyleType;
+use orcs_core::schema::{ExecutionModelType, TalkStyleType};
 use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
     PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent,
@@ -805,7 +805,7 @@ pub async fn get_mute_status(state: State<'_, AppState>) -> Result<bool, String>
 /// Sets the execution strategy for the active session
 #[tauri::command]
 pub async fn set_execution_strategy(
-    strategy: ExecutionModel,
+    strategy: ExecutionModelType,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let manager = state
@@ -814,7 +814,9 @@ pub async fn set_execution_strategy(
         .await
         .ok_or("No active session")?;
 
-    manager.set_execution_strategy(strategy).await;
+    // Convert ExecutionModelType (Anti-Corruption Layer) to ExecutionModel (llm-toolkit)
+    let execution_model: ExecutionModel = strategy.into();
+    manager.set_execution_strategy(execution_model).await;
 
     let app_mode = state.app_mode.lock().await.clone();
     let _ = state.session_usecase.save_active_session(app_mode).await;
@@ -824,14 +826,16 @@ pub async fn set_execution_strategy(
 
 /// Gets the current execution strategy for the active session
 #[tauri::command]
-pub async fn get_execution_strategy(state: State<'_, AppState>) -> Result<ExecutionModel, String> {
+pub async fn get_execution_strategy(state: State<'_, AppState>) -> Result<ExecutionModelType, String> {
     let manager = state
         .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
 
-    Ok(manager.get_execution_strategy().await)
+    // Convert ExecutionModel (llm-toolkit) to ExecutionModelType (Anti-Corruption Layer)
+    let execution_model = manager.get_execution_strategy().await;
+    Ok(execution_model.into())
 }
 
 /// Sets the conversation mode for the active session

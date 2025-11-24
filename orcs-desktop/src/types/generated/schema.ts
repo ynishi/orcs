@@ -2,7 +2,7 @@
 
 export type TalkStyleType = 'Brainstorm' | 'Casual' | 'DecisionMaking' | 'Debate' | 'ProblemSolving' | 'Review' | 'Planning';
 
-export type ExecutionModelType = 'broadcast' | 'sequential';
+export type ExecutionModelType = 'broadcast' | 'sequential' | 'mentioned';
 
 export type ConversationModeType = 'detailed' | 'normal' | 'concise' | 'brief' | 'discussion';
 

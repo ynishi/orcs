@@ -212,7 +212,13 @@ export function ChatPanel({
   });
 
   // Load AutoChat config from backend when tab changes
+  // Only load for active tab to avoid Session ID mismatch errors
   useEffect(() => {
+    if (!isActive) {
+      // Skip loading for inactive tabs
+      return;
+    }
+
     const loadAutoChatConfig = async () => {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
@@ -251,10 +257,15 @@ export function ChatPanel({
     };
 
     loadAutoChatConfig();
-  }, [tab.sessionId]); // Reload when tab changes
+  }, [tab.sessionId, isActive]); // Reload when tab changes or becomes active
 
   // Load mute status from backend when tab changes
+  // Only load for active tab to reduce unnecessary backend calls
   useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
     const loadMuteStatus = async () => {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
@@ -267,7 +278,7 @@ export function ChatPanel({
     };
 
     loadMuteStatus();
-  }, [tab.sessionId]);
+  }, [tab.sessionId, isActive]);
 
   const handleSaveAutoChatConfig = async (config: AutoChatConfig) => {
     setAutoChatConfig(config);

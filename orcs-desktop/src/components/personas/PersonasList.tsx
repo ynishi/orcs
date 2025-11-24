@@ -22,6 +22,7 @@ interface PersonasListProps {
   onStrategyChange?: (strategy: string) => void;
   onConversationModeChange?: (mode: string) => void;
   onTalkStyleChange?: (style: string | null) => void;
+  onToggleParticipant?: (personaId: string, isActive: boolean) => Promise<void>;
   onMessage?: (type: MessageType, author: string, text: string) => void;
   personas?: PersonaConfig[];
   activeParticipantIds?: string[];
@@ -36,6 +37,7 @@ export function PersonasList({
   onStrategyChange,
   onConversationModeChange,
   onTalkStyleChange,
+  onToggleParticipant,
   onMessage,
   personas: propsPersonas,
   activeParticipantIds: propsActiveParticipantIds,
@@ -136,6 +138,17 @@ export function PersonasList({
   }, [propsExecutionStrategy]);
 
   const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
+    // If onToggleParticipant provided (from App.tsx via sessionSettingsStore), use it
+    if (onToggleParticipant) {
+      try {
+        await onToggleParticipant(personaId, isChecked);
+      } catch (error) {
+        console.error('Failed to toggle participant:', error);
+      }
+      return;
+    }
+
+    // Otherwise fallback to direct backend call (backwards compatibility)
     try {
       const persona = personas.find(p => p.id === personaId);
       if (!persona) return;

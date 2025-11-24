@@ -58,6 +58,7 @@ interface NavbarProps {
   talkStyle?: string | null;
   onRefreshPersonas?: () => Promise<void>;
   onRefreshSessions?: () => Promise<void>;
+  onToggleParticipant?: (personaId: string, isActive: boolean) => Promise<void>;
 }
 
 export function Navbar({
@@ -96,6 +97,7 @@ export function Navbar({
   talkStyle,
   onRefreshPersonas,
   onRefreshSessions,
+  onToggleParticipant,
 }: NavbarProps) {
   const [activeTab, setActiveTab] = useState<'sessions' | 'workspace' | 'tasks' | 'personas' | 'commands' | 'presets'>('sessions');
 
@@ -219,6 +221,7 @@ export function Navbar({
               talkStyle={talkStyle}
               onRefresh={onRefreshPersonas}
               onRefreshSessions={onRefreshSessions}
+              onToggleParticipant={onToggleParticipant}
             />
           )}
 

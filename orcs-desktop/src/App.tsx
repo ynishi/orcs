@@ -2112,6 +2112,7 @@ function App() {
           onConversationModeChange={handleConversationModeChange}
           onTalkStyleChange={handleTalkStyleChange}
           onStrategyChange={handleStrategyChange}
+          onToggleParticipant={handleToggleParticipant}
           personas={personas}
           activeParticipantIds={activeParticipantIds}
           executionStrategy={executionStrategy}

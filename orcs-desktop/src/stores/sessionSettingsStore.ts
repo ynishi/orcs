@@ -9,6 +9,7 @@ import type { PersonaConfig } from '../types/agent';
 import type { MessageType } from '../types/message';
 import { changeTalkStyle } from '../services/talkStyleService';
 import { changeConversationMode } from '../services/conversationModeService';
+import { changeExecutionStrategy } from '../services/executionStrategyService';
 
 export type MessageCallback = (type: MessageType, author: string, text: string) => void;
 
@@ -114,9 +115,23 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     }
   },
 
-  updateExecutionStrategy: async (strategy: string, _addMessage: MessageCallback) => {
-    // To be implemented
+  updateExecutionStrategy: async (strategy: string, addMessage: MessageCallback) => {
     console.log('[SessionSettingsStore] updateExecutionStrategy called:', strategy);
+
+    // Optimistic update
+    const currentStrategy = get().executionStrategy;
+    set({ executionStrategy: strategy });
+
+    try {
+      // Delegate to service layer
+      await changeExecutionStrategy(strategy, { invoke, addMessage });
+      console.log('[SessionSettingsStore] ExecutionStrategy updated successfully');
+    } catch (error) {
+      console.error('[SessionSettingsStore] Failed to update ExecutionStrategy:', error);
+      // Revert optimistic update
+      set({ executionStrategy: currentStrategy });
+      throw error;
+    }
   },
 
   toggleParticipant: async (personaId: string, isActive: boolean, _addMessage: MessageCallback) => {

@@ -33,7 +33,6 @@ import { parseCommand, extractSlashCommands } from "./utils/commandParser";
 import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention, normalizeMentionsInText } from "./utils/mentionParser";
 import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
-import { changeExecutionStrategy } from "./services/executionStrategyService";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages } from "./types/session";
@@ -86,7 +85,6 @@ function App() {
     repo_name: null,
   });
   const [customCommands, setCustomCommands] = useState<SlashCommand[]>([]);
-  const [executionStrategy, setExecutionStrategy] = useState<string>('sequential');
   const [personas, setPersonas] = useState<import('./types/agent').PersonaConfig[]>([]);
   const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
   const [dialoguePresets, setDialoguePresets] = useState<import('./types/conversation').DialoguePreset[]>([]);
@@ -124,8 +122,10 @@ function App() {
   const {
     talkStyle,
     conversationMode,
+    executionStrategy,
     updateTalkStyle,
     updateConversationMode,
+    updateExecutionStrategy,
     loadSettings: loadSessionSettings,
   } = useSessionSettingsStore();
 
@@ -686,10 +686,7 @@ function App() {
           }
         }
 
-        // Restore execution strategy from session
-        if (activeSession.executionStrategy) {
-          setExecutionStrategy(activeSession.executionStrategy);
-        }
+        // Note: executionStrategy is loaded via sessionSettingsStore in loadSessionSettings useEffect
       } catch (error) {
         console.error('[App] Failed to load active session messages:', error);
       }
@@ -1976,11 +1973,8 @@ function App() {
 
 
   const handleStrategyChange = async (strategy: string) => {
-    // Update local state
-    setExecutionStrategy(strategy);
-
-    // Delegate to service layer
-    await changeExecutionStrategy(strategy, { invoke, addMessage });
+    // Delegate to Store (which handles service layer)
+    await updateExecutionStrategy(strategy, addMessage);
   };
 
   const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
@@ -2024,9 +2018,8 @@ function App() {
       // Find the preset to show success message
       const preset = dialoguePresets.find(p => p.id === presetId);
       if (preset) {
-        // Update local state immediately for better UX
-        setExecutionStrategy(preset.executionStrategy);
-        // Note: conversationMode & talkStyle are managed by Store, reload settings to reflect preset changes
+        // Note: conversationMode, talkStyle, executionStrategy are managed by Store
+        // Reload settings to reflect preset changes
         await loadSessionSettings(currentSessionId || '');
 
         await handleAndPersistSystemMessage(

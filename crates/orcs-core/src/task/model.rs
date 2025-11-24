@@ -4,6 +4,7 @@
 //! task execution (e.g., Coding, batch processing) in the application's domain layer.
 
 use llm_toolkit::orchestrator::StrategyMap;
+use schema_bridge::SchemaBridge;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -12,7 +13,7 @@ use version_migrate::DeriveQueryable as Queryable;
 /// Represents the current status of a task in the orchestration system.
 ///
 /// Tasks progress through these states as they are processed by the system.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
 pub enum TaskStatus {
     /// The task has been created but is not yet running.
     Pending,
@@ -137,6 +138,7 @@ pub enum ExecutionMessage {
 
 /// Information about a single step in task execution.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StepInfo {
     /// Step identifier (e.g., "step_1", "analysis")
     pub id: String,
@@ -209,7 +211,15 @@ pub struct ExecutionDetails {
 /// This represents a completed or in-progress task execution that can be
 /// persisted and displayed in the UI. Unlike `TaskContext` which is a
 /// temporary execution context, `Task` is the permanent historical record.
+///
+/// # TypeScript Type Generation
+///
+/// Use `TaskType` from `crate::schema` for TypeScript type generation.
+/// This domain model cannot directly use `SchemaBridge` due to:
+/// - `execution_details: Option<ExecutionDetails>` contains `serde_json::Value`
+/// - `strategy`, `journal_log` are large JSON strings not needed in frontend
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
+#[serde(rename_all = "camelCase")]
 #[queryable(entity = "task")]
 pub struct Task {
     /// Unique task identifier (UUID format)
@@ -230,11 +240,11 @@ pub struct Task {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<String>,
     /// Number of steps executed
-    pub steps_executed: u32,
+    pub steps_executed: i32,
     /// Number of steps skipped
-    pub steps_skipped: u32,
+    pub steps_skipped: i32,
     /// Number of context keys generated
-    pub context_keys: u32,
+    pub context_keys: i32,
     /// Error message if task failed
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,

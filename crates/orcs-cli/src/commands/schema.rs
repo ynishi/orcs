@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use orcs_core::schema::{
     ConversationModeType, ExecutionModelType, PresetSourceType, SessionType, TalkStyleType,
+    TaskStatus, TaskType,
 };
 use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMessage, ConversationMode, ErrorSeverity,
@@ -72,6 +73,10 @@ pub fn generate() -> Result<()> {
 
     // Session metadata type (excludes persona_histories and system_messages)
     types.push(("SessionType", SessionType::to_ts()));
+
+    // Task types
+    types.push(("TaskType", TaskType::to_ts()));
+    types.push(("TaskStatus", TaskStatus::to_ts()));
 
     // Write to file
     let mut content = String::from("// Auto-generated TypeScript types from Rust using schema-bridge\n");

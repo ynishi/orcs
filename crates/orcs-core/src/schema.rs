@@ -306,6 +306,56 @@ impl From<SessionType> for crate::session::Session {
     }
 }
 
+/// Task metadata for TypeScript type generation.
+///
+/// This is a simplified view of `crate::task::Task` that excludes complex fields
+/// like `execution_details` (contains serde_json::Value), `strategy`, and `journal_log`.
+///
+/// # Relationship with Domain Model
+///
+/// - **Domain Model**: `crate::task::Task` - Full entity with execution details
+/// - **DTO Layer**: DTO types in `orcs_infrastructure::dto::task`
+/// - **Schema Type**: `TaskType` - TypeScript generation (this type)
+///
+/// # Fields Excluded
+///
+/// - `execution_details: Option<ExecutionDetails>` - Contains serde_json::Value
+/// - `strategy: Option<String>` - Large JSON string not needed in frontend
+/// - `journal_log: Option<String>` - Execution trace not needed in frontend
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskType {
+    /// Unique task identifier (UUID format)
+    pub id: String,
+    /// Session ID where this task was executed
+    pub session_id: String,
+    /// Task title (shortened from description)
+    pub title: String,
+    /// Full task description/request
+    pub description: String,
+    /// Current task status
+    pub status: TaskStatus,
+    /// Timestamp when task was created (ISO 8601 format)
+    pub created_at: String,
+    /// Timestamp when task was last updated (ISO 8601 format)
+    pub updated_at: String,
+    /// Timestamp when task completed (ISO 8601 format)
+    pub completed_at: Option<String>,
+    /// Number of steps executed
+    pub steps_executed: i32,
+    /// Number of steps skipped
+    pub steps_skipped: i32,
+    /// Number of context keys generated
+    pub context_keys: i32,
+    /// Error message if task failed
+    pub error: Option<String>,
+    /// Result summary text
+    pub result: Option<String>,
+}
+
+// Re-export TaskStatus from task module for TypeScript generation
+pub use crate::task::TaskStatus;
+
 #[cfg(test)]
 mod tests {
     use super::*;

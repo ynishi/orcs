@@ -91,6 +91,7 @@ fn domain_to_llm_persona(persona: &PersonaDomain) -> LlmPersona {
 /// { "type": "Error", "session_id": "...", "timestamp": "...", "message": "..." }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StreamingDialogueTurn {
     /// The session ID this turn belongs to (for multi-tab support)
     pub session_id: String,

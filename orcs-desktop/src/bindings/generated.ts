@@ -46,3 +46,7 @@ export type TempFile = { id: string; path: string; purpose: string; createdAt: n
 
 export type SessionType = { id: string; title: string; createdAt: string; updatedAt: string; currentPersonaId: string; workspaceId: string; activeParticipantIds: string[]; executionStrategy: 'broadcast' | 'sequential'; participants: Record<string, string>; participantIcons: Record<string, string>; participantColors: Record<string, string>; participantBackends: Record<string, string>; participantModels: Record<string, string>; conversationMode: 'detailed' | 'normal' | 'concise' | 'brief' | 'discussion'; talkStyle: 'Brainstorm' | 'Casual' | 'DecisionMaking' | 'Debate' | 'ProblemSolving' | 'Review' | 'Planning' | null; isFavorite: boolean; isArchived: boolean; sortOrder: number | null; isMuted: boolean; };
 
+export type TaskType = { id: string; sessionId: string; title: string; description: string; status: 'Pending' | 'Running' | 'Completed' | 'Failed'; createdAt: string; updatedAt: string; completedAt: string | null; stepsExecuted: number; stepsSkipped: number; contextKeys: number; error: string | null; result: string | null; };
+
+export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
+

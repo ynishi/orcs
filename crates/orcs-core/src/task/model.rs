@@ -218,6 +218,16 @@ pub struct ExecutionDetails {
 /// This domain model cannot directly use `SchemaBridge` due to:
 /// - `execution_details: Option<ExecutionDetails>` contains `serde_json::Value`
 /// - `strategy`, `journal_log` are large JSON strings not needed in frontend
+///
+/// # JSON Serialization Format
+///
+/// This domain model uses `#[serde(rename_all = "camelCase")]` for Tauri IPC communication.
+/// **IMPORTANT**: The DTO layer (`TaskV1_1_0`) does NOT use camelCase and remains snake_case
+/// for backward compatibility with existing saved task files (`~/.orcs/tasks/*.json`).
+///
+/// - **Tauri IPC** (this struct): Serialized as camelCase for TypeScript frontend
+/// - **Disk persistence** (DTO): Serialized as snake_case for file compatibility
+/// - **DTO version**: No version bump needed when changing domain serialization format
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
 #[serde(rename_all = "camelCase")]
 #[queryable(entity = "task")]

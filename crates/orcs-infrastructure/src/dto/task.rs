@@ -158,11 +158,11 @@ pub struct TaskV1_0_0 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<String>,
     /// Number of steps executed.
-    pub steps_executed: u32,
+    pub steps_executed: i32,
     /// Number of steps skipped.
-    pub steps_skipped: u32,
+    pub steps_skipped: i32,
     /// Number of context keys generated.
-    pub context_keys: u32,
+    pub context_keys: i32,
     /// Error message if task failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -175,6 +175,17 @@ pub struct TaskV1_0_0 {
 }
 
 /// V1.1.0: Added strategy and journal_log fields for ParallelOrchestrator integration.
+///
+/// # JSON Serialization Format
+///
+/// This DTO uses **snake_case** for disk persistence (saved to `~/.orcs/tasks/*.json`).
+/// **IMPORTANT**: Do NOT add `#[serde(rename_all = "camelCase")]` to this DTO.
+///
+/// The domain model (`orcs_core::task::Task`) uses camelCase for Tauri IPC,
+/// but this DTO must remain snake_case for backward compatibility with existing saved files.
+///
+/// - **This DTO**: snake_case for disk persistence (backward compatible)
+/// - **Domain model**: camelCase for Tauri IPC (TypeScript frontend)
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.1.0")]
 pub struct TaskV1_1_0 {
@@ -196,11 +207,11 @@ pub struct TaskV1_1_0 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<String>,
     /// Number of steps executed.
-    pub steps_executed: u32,
+    pub steps_executed: i32,
     /// Number of steps skipped.
-    pub steps_skipped: u32,
+    pub steps_skipped: i32,
     /// Number of context keys generated.
-    pub context_keys: u32,
+    pub context_keys: i32,
     /// Error message if task failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,

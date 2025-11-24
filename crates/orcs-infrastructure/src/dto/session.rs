@@ -961,6 +961,18 @@ pub struct SessionV4_1_0 {
 /// # Migration Path
 ///
 /// See `orcs_core::session::Session` RustDoc for full migration plan to internal types.
+///
+/// # JSON Serialization Format
+///
+/// This DTO uses **snake_case** for disk persistence (saved to `~/.orcs/sessions/*.json`).
+/// **IMPORTANT**: Do NOT add `#[serde(rename_all = "camelCase")]` to this DTO.
+///
+/// The domain model (`orcs_core::session::Session`) uses camelCase for Tauri IPC,
+/// but this DTO must remain snake_case for backward compatibility with existing saved files.
+///
+/// - **This DTO**: snake_case for disk persistence (backward compatible)
+/// - **Domain model**: camelCase for Tauri IPC (TypeScript frontend)
+/// - **No version bump needed**: Domain serialization format changes don't affect DTO version
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Versioned)]
 #[versioned(version = "4.2.0")]
 pub struct SessionV4_2_0 {

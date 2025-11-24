@@ -153,10 +153,10 @@ export interface DialoguePreset {
   name: string;
   icon?: string;
   description?: string;
-  execution_strategy: ExecutionStrategyType;
-  conversation_mode: ConversationModeType;
-  talk_style?: TalkStyleType;
-  created_at: string;
+  executionStrategy: ExecutionStrategyType; // was execution_strategy
+  conversationMode: ConversationModeType; // was conversation_mode
+  talkStyle?: TalkStyleType; // was talk_style
+  createdAt: string; // was created_at
   source: PresetSource;
 }
 
@@ -171,7 +171,7 @@ export function matchesPreset(
 ): boolean {
   return (
     preset.executionStrategy === executionStrategy &&
-    preset.conversation_mode === conversationMode &&
-    (preset.talk_style || null) === talkStyle
+    preset.conversationMode === conversationMode &&
+    (preset.talkStyle || null) === talkStyle
   );
 }

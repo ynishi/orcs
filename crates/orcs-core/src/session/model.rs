@@ -89,7 +89,18 @@ pub enum StopCondition {
 ///
 /// The DTO layer (`SessionV4_2_0`) handles conversion between Session and persistence format,
 /// isolating the domain model from external crate changes.
+///
+/// # JSON Serialization Format
+///
+/// This domain model uses `#[serde(rename_all = "camelCase")]` for Tauri IPC communication.
+/// **IMPORTANT**: The DTO layer (`SessionV4_2_0`) does NOT use camelCase and remains snake_case
+/// for backward compatibility with existing saved session files (`~/.orcs/sessions/*.json`).
+///
+/// - **Tauri IPC** (this struct): Serialized as camelCase for TypeScript frontend
+/// - **Disk persistence** (DTO): Serialized as snake_case for file compatibility
+/// - **DTO version**: No version bump needed when changing domain serialization format
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Session {
     /// Unique session identifier (UUID format)
     pub id: String,

@@ -15,6 +15,10 @@ use serde::{Deserialize, Serialize};
 use version_migrate::DeriveQueryable as Queryable;
 
 /// Source of a dialogue preset (system-provided or user-created).
+///
+/// # JSON Serialization Format
+///
+/// Uses `#[serde(rename_all = "snake_case")]` to serialize as "system" or "user".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PresetSource {
@@ -35,7 +39,16 @@ impl Default for PresetSource {
 /// Presets define the behavior of multi-agent conversations by bundling
 /// execution strategy, conversation mode, and talk style into a single
 /// named configuration that can be applied to sessions.
+///
+/// # JSON Serialization Format
+///
+/// This domain model uses `#[serde(rename_all = "camelCase")]` for Tauri IPC communication.
+/// Dialogue presets are stored in `~/.orcs/dialogue_presets/*.json` with snake_case fields.
+///
+/// - **Tauri IPC** (this struct): Serialized as camelCase for TypeScript frontend
+/// - **Disk persistence**: Currently no DTO layer, saved directly (needs migration if DTO added)
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
+#[serde(rename_all = "camelCase")]
 #[queryable(entity = "dialogue_preset")]
 pub struct DialoguePreset {
     /// Unique identifier (UUID format)

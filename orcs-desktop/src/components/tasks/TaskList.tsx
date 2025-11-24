@@ -37,7 +37,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
       })
     : tasks;
 
-  const activeTasks = filteredTasks.filter(t => t.status === 'Running' || t.status === 'Pending' || t.status === 'Planning');
+  const activeTasks = filteredTasks.filter(t => t.status === 'Running' || t.status === 'Pending');
   const completedTasks = filteredTasks.filter(t => t.status === 'Completed');
   const failedTasks = filteredTasks.filter(t => t.status === 'Failed');
 
@@ -45,7 +45,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
     try {
       let output = `# Task: ${task.title}\n\n`;
       output += `Status: ${task.status}\n`;
-      output += `Steps executed: ${task.steps_executed}\n`;
+      output += `Steps executed: ${task.stepsExecuted}\n`;
       output += `Created: ${new Date(task.createdAt).toLocaleString()}\n`;
       output += `Updated: ${new Date(task.updatedAt).toLocaleString()}\n\n`;
 
@@ -57,9 +57,9 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
         output += `## Error\n${task.error}\n\n`;
       }
 
-      if (task.execution_details?.context) {
+      if (task.executionDetails?.context) {
         output += `## Execution Context\n`;
-        const context = task.execution_details.context;
+        const context = task.executionDetails.context;
         for (const [key, value] of Object.entries(context)) {
           output += `\n### ${key}\n`;
           if (typeof value === 'string') {
@@ -116,10 +116,10 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
   };
 
   const handleDownloadJournalLog = (task: Task) => {
-    if (!task.journal_log) return;
+    if (!task.journalLog) return;
 
     try {
-      const blob = new Blob([task.journal_log], { type: 'text/plain' });
+      const blob = new Blob([task.journalLog], { type: 'text/plain' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -213,7 +213,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
           )}
 
           {/* JournalLogダウンロードボタン */}
-          {task.journal_log && (
+          {task.journalLog && (
             <Tooltip label="Download Journal Log" withArrow>
               <ActionIcon
                 size="sm"
@@ -266,7 +266,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
             <Box style={{ flex: 1, minWidth: 0 }}>
               <Text
                 size="sm"
-                fw={task.status === 'Running' || task.status === 'Planning' ? 600 : 400}
+                fw={task.status === 'Running' || task.status === 'Pending' ? 600 : 400}
                 style={{
                   textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
                   color: task.status === 'Completed' ? '#868e96' : task.status === 'Failed' ? '#fa5252' : undefined,
@@ -276,7 +276,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
               </Text>
 
               {/* Planning状態の表示 */}
-              {task.status === 'Planning' && (
+              {task.status === 'Pending' && (
                 <Box mt={4} p={4} style={{ backgroundColor: '#e3fafc', borderRadius: '4px' }}>
                   <Text size="xs" c="cyan" fw={500}>
                     📋 Generating execution strategy...
@@ -288,24 +288,24 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
               {true && progress && (
                 <Box mt={4} p={4} style={{ backgroundColor: '#e7f5ff', borderRadius: '4px' }}>
                   <Stack gap={2}>
-                    {progress.current_wave !== undefined && (
+                    {progress.currentWave !== undefined && (
                       <Text size="xs" c="blue" fw={500}>
-                        Wave {progress.current_wave}
+                        Wave {progress.currentWave}
                       </Text>
                     )}
-                    {progress.current_step && (
+                    {progress.currentStep && (
                       <Text size="xs" c="dimmed">
-                        Step: {progress.current_step}
+                        Step: {progress.currentStep}
                       </Text>
                     )}
-                    {progress.current_agent && (
+                    {progress.currentAgent && (
                       <Text size="xs" c="dimmed">
-                        Agent: {progress.current_agent}
+                        Agent: {progress.currentAgent}
                       </Text>
                     )}
-                    {progress.last_message && (
+                    {progress.lastMessage && (
                       <Text size="xs" c="dimmed" lineClamp={1}>
-                        {progress.last_message}
+                        {progress.lastMessage}
                       </Text>
                     )}
                   </Stack>
@@ -314,14 +314,13 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
 
               <Group gap="xs" mt={4}>
                 {/* Status Badge for active tasks */}
-                {(task.status === 'Pending' || task.status === 'Planning' || task.status === 'Running') && (
+                {(task.status === 'Pending' || task.status === 'Running') && (
                   <>
                     <Badge
                       size="xs"
                       variant="dot"
                       color={
                         task.status === 'Pending' ? 'gray' :
-                        task.status === 'Planning' ? 'cyan' :
                         'blue'
                       }
                     >
@@ -341,13 +340,13 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
                 )}
 
                 {/* Progress display: show live progress for running tasks */}
-                {task.status === 'Running' && progress?.current_wave !== undefined ? (
+                {task.status === 'Running' && progress?.currentWave !== undefined ? (
                   <Text size="xs" c="blue" fw={500}>
-                    Wave {progress.current_wave}
+                    Wave {progress.currentWave}
                   </Text>
                 ) : (
                   <Text size="xs" c="dimmed">
-                    {task.steps_executed} {task.steps_executed === 1 ? 'step' : 'steps'}
+                    {task.stepsExecuted} {task.stepsExecuted === 1 ? 'step' : 'steps'}
                   </Text>
                 )}
 

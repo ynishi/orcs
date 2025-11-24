@@ -5,9 +5,11 @@ export type MessageType = 'user' | 'ai' | 'system' | 'error' | 'command' | 'task
 
 /**
  * Streaming dialogue turn from Rust backend
+ *
+ * Note: Rust uses #[serde(rename_all = "camelCase")] so fields are camelCase
  */
 export type StreamingDialogueTurn = {
-  session_id: string;
+  sessionId: string; // was session_id
   timestamp: string;
 } & StreamingDialogueTurnKind;
 
@@ -26,12 +28,12 @@ export type StreamingDialogueTurnKind =
     }
   | {
       type: 'AutoChatProgress';
-      current_iteration: number;
-      max_iterations: number;
+      currentIteration: number; // was current_iteration
+      maxIterations: number; // was max_iterations
     }
   | {
       type: 'AutoChatComplete';
-      total_iterations: number;
+      totalIterations: number; // was total_iterations
     };
 
 /**

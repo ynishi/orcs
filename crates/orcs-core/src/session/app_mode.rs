@@ -7,7 +7,13 @@ use serde::{Deserialize, Serialize};
 ///
 /// Plans are generated when the system needs to propose a series of steps
 /// and wait for user approval before proceeding with execution.
+///
+/// # JSON Serialization Format
+///
+/// Uses `#[serde(rename_all = "camelCase")]` for TypeScript type generation
+/// via `SchemaBridge` and Tauri IPC communication.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
 pub struct Plan {
     /// The individual steps that make up this plan.
     pub steps: Vec<String>,

@@ -315,9 +315,9 @@ impl TaskExecutor {
         // Update task record with result
         let completed_at = Utc::now().to_rfc3339();
         task.updated_at = completed_at.clone();
-        task.steps_executed = result.steps_executed as u32;
-        task.steps_skipped = result.steps_skipped as u32;
-        task.context_keys = result.context.keys().len() as u32;
+        task.steps_executed = result.steps_executed as i32;
+        task.steps_skipped = result.steps_skipped as i32;
+        task.context_keys = result.context.keys().len() as i32;
 
         if result.success {
             task.status = TaskStatus::Completed;

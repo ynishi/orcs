@@ -2150,9 +2150,9 @@ function App() {
       const preset = dialoguePresets.find(p => p.id === presetId);
       if (preset) {
         // Update local state immediately for better UX
-        setExecutionStrategy(preset.execution_strategy);
-        setConversationMode(preset.conversation_mode);
-        setTalkStyle(preset.talk_style || null);
+        setExecutionStrategy(preset.executionStrategy);
+        setConversationMode(preset.conversationMode);
+        setTalkStyle(preset.talkStyle || null);
 
         await handleAndPersistSystemMessage(
           conversationMessage(`プリセット「${preset.name}」を適用しました`, 'success'),

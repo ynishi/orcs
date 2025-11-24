@@ -200,7 +200,7 @@ const isMessageType = (value?: string): value is MessageType =>
   typeof value === 'string' && (KNOWN_MESSAGE_TYPES as string[]).includes(value);
 
 function resolveMessageType(msg: ConversationMessage): MessageType {
-  const metadataType = msg.metadata?.systemMessageType;
+  const metadataType = msg.metadata?.systemMessageType ?? undefined;
   if (isMessageType(metadataType)) {
     return metadataType;
   }

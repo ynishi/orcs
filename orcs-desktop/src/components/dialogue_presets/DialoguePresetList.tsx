@@ -14,9 +14,9 @@ export function DialoguePresetList() {
     name: '',
     icon: '',
     description: '',
-    execution_strategy: 'broadcast',
-    conversation_mode: 'normal',
-    talk_style: 'Brainstorm',
+    executionStrategy: 'broadcast',
+    conversationMode: 'normal',
+    talkStyle: 'Brainstorm',
   });
 
   const loadPresets = async () => {
@@ -56,10 +56,10 @@ export function DialoguePresetList() {
         name: newPreset.name,
         icon: newPreset.icon || undefined,
         description: newPreset.description || undefined,
-        execution_strategy: newPreset.executionStrategy as any,
-        conversation_mode: newPreset.conversation_mode as any,
-        talk_style: newPreset.talk_style as any,
-        created_at: new Date().toISOString(),
+        executionStrategy: newPreset.executionStrategy as any,
+        conversationMode: newPreset.conversationMode as any,
+        talkStyle: newPreset.talkStyle as any,
+        createdAt: new Date().toISOString(),
         source: 'user',
       };
 
@@ -76,9 +76,9 @@ export function DialoguePresetList() {
         name: '',
         icon: '',
         description: '',
-        execution_strategy: 'broadcast',
-        conversation_mode: 'normal',
-        talk_style: 'Brainstorm',
+        executionStrategy: 'broadcast',
+        conversationMode: 'normal',
+        talkStyle: 'Brainstorm',
       });
 
       await loadPresets();
@@ -219,8 +219,8 @@ export function DialoguePresetList() {
           <Select
             label="Talk Style"
             data={TALK_STYLES.map(s => ({ value: s.value, label: s.label }))}
-            value={newPreset.talk_style}
-            onChange={(value) => setNewPreset({ ...newPreset, talk_style: value || 'Brainstorm' })}
+            value={newPreset.talkStyle}
+            onChange={(value) => setNewPreset({ ...newPreset, talkStyle: value || 'Brainstorm' })}
             required
           />
 
@@ -228,15 +228,15 @@ export function DialoguePresetList() {
             label="Execution Strategy"
             data={EXECUTION_STRATEGIES.map(s => ({ value: s.value, label: s.label }))}
             value={newPreset.executionStrategy}
-            onChange={(value) => setNewPreset({ ...newPreset, execution_strategy: value || 'broadcast' })}
+            onChange={(value) => setNewPreset({ ...newPreset, executionStrategy: value || 'broadcast' })}
             required
           />
 
           <Select
             label="Conversation Mode"
             data={CONVERSATION_MODES.map(m => ({ value: m.value, label: m.label }))}
-            value={newPreset.conversation_mode}
-            onChange={(value) => setNewPreset({ ...newPreset, conversation_mode: value || 'normal' })}
+            value={newPreset.conversationMode}
+            onChange={(value) => setNewPreset({ ...newPreset, conversationMode: value || 'normal' })}
             required
           />
 

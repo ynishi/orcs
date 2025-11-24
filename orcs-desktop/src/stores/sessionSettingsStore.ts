@@ -53,28 +53,45 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
 
     console.log('[SessionSettingsStore] Loading settings for session:', sessionId);
 
+    // Load settings individually with fallback to defaults
+    let mode = 'normal';
+    let style: string | null = null;
+    let personas: PersonaConfig[] = [];
+    let activeIds: string[] = [];
+
     try {
-      // Load all settings from backend
-      const [mode, style, personas, activeIds] = await Promise.all([
-        invoke<string>('get_conversation_mode'),
-        invoke<string | null>('get_talk_style'),
-        invoke<PersonaConfig[]>('get_personas'),
-        invoke<string[]>('get_active_participants'),
-      ]);
-
-      set({
-        conversationMode: mode,
-        talkStyle: style,
-        personas,
-        activeParticipantIds: activeIds,
-        isLoaded: true,
-      });
-
-      console.log('[SessionSettingsStore] Settings loaded successfully');
+      mode = await invoke<string>('get_conversation_mode');
     } catch (error) {
-      console.error('[SessionSettingsStore] Failed to load settings:', error);
-      throw error;
+      console.warn('[SessionSettingsStore] Failed to load conversation mode, using default:', error);
     }
+
+    try {
+      style = await invoke<string | null>('get_talk_style');
+    } catch (error) {
+      console.warn('[SessionSettingsStore] Failed to load talk style, using default:', error);
+    }
+
+    try {
+      personas = await invoke<PersonaConfig[]>('get_personas');
+    } catch (error) {
+      console.warn('[SessionSettingsStore] Failed to load personas, using empty list:', error);
+    }
+
+    try {
+      activeIds = await invoke<string[]>('get_active_participants');
+    } catch (error) {
+      console.warn('[SessionSettingsStore] Failed to load active participants, using empty list:', error);
+    }
+
+    set({
+      conversationMode: mode,
+      talkStyle: style,
+      personas,
+      activeParticipantIds: activeIds,
+      isLoaded: true,
+    });
+
+    console.log('[SessionSettingsStore] Settings loaded (with fallbacks if needed)');
   },
 
   updateTalkStyle: async (style: string | null, addMessage: MessageCallback) => {

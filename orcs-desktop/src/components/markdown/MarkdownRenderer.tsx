@@ -40,6 +40,7 @@ function renderTextWithMentions(text: string): (string | React.ReactElement)[] {
     parts.push(
       <Badge
         key={key++}
+        component="span"
         size="sm"
         variant="light"
         color="blue"

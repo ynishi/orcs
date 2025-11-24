@@ -38,6 +38,7 @@ function renderTextWithMentions(text: string) {
     parts.push(
       <Badge
         key={key++}
+        component="span"
         size="sm"
         variant="light"
         color="green"
@@ -187,7 +188,7 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
                 <Stack gap="xs" mt="md">
                   {message.attachments.map((attachment, index) => (
                     <Box key={index}>
-                      {attachment.mimeType.startsWith('image/') && attachment.data ? (
+                      {attachment.mimeType?.startsWith('image/') && attachment.data ? (
                         <Box>
                           <Image
                             src={`data:${attachment.mimeType};base64,${attachment.data}`}
@@ -416,7 +417,7 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
             <Stack gap="xs" mt="md">
               {message.attachments.map((attachment, index) => (
                 <Box key={index}>
-                  {attachment.mimeType.startsWith('image/') && attachment.data ? (
+                  {attachment.mimeType?.startsWith('image/') && attachment.data ? (
                     <Box>
                       <Image
                         src={`data:${attachment.mimeType};base64,${attachment.data}`}

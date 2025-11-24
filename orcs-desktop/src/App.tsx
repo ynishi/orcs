@@ -11,7 +11,6 @@ import {
   AppShell,
   Burger,
   Badge,
-  CloseButton,
   Paper,
   Loader,
   ActionIcon,
@@ -485,13 +484,13 @@ function App() {
             break;
 
           case 'AutoChatProgress':
-            console.log('[STREAM] AutoChat progress:', turn.current_iteration, '/', turn.max_iterations);
+            console.log('[STREAM] AutoChat progress:', turn.currentIteration, '/', turn.maxIterations);
             // Update TabContext AutoChat iteration state
             // TODO: Implement setTabAutoChatIteration call here
             break;
 
           case 'AutoChatComplete':
-            console.log('[STREAM] AutoChat completed:', turn.total_iterations, 'iterations');
+            console.log('[STREAM] AutoChat completed:', turn.totalIterations, 'iterations');
             // Turn off AutoChat mode
             setAutoMode(false);
 
@@ -503,7 +502,7 @@ function App() {
               id: `${Date.now()}-${Math.random()}`,
               type: 'system',
               author: 'System',
-              text: `AutoChat completed after ${turn.total_iterations} iterations.`,
+              text: `AutoChat completed after ${turn.totalIterations} iterations.`,
               timestamp: new Date(),
             };
 
@@ -640,7 +639,7 @@ function App() {
                       const previewData = await invoke<{
                         name: string;
                         path: string;
-                        mime_type: string;
+                        mimeType: string;
                         size: number;
                         data: string;
                       }>("get_file_preview_data", {
@@ -754,7 +753,7 @@ function App() {
                       const previewData = await invoke<{
                         name: string;
                         path: string;
-                        mime_type: string;
+                        mimeType: string;
                         size: number;
                         data: string;
                       }>('get_file_preview_data', {
@@ -973,20 +972,20 @@ function App() {
 
             // Build updated task from event fields
             const updatedTask: Task = {
-              id: payload.fields.task_id,
-              session_id: payload.fields.sessionId,
+              id: payload.fields.taskId,
+              sessionId: payload.fields.sessionId,
               title: payload.fields.title || '',
               description: payload.fields.description || '',
               status: payload.fields.status as TaskStatus,
-              created_at: payload.fields.createdAt,
-              updated_at: payload.fields.updatedAt,
-              completed_at: payload.fields.completed_at,
-              steps_executed: payload.fields.steps_executed || 0,
-              steps_skipped: payload.fields.steps_skipped || 0,
-              context_keys: payload.fields.context_keys || 0,
+              createdAt: payload.fields.createdAt,
+              updatedAt: payload.fields.updatedAt,
+              completedAt: payload.fields.completedAt,
+              stepsExecuted: payload.fields.stepsExecuted || 0,
+              stepsSkipped: payload.fields.stepsSkipped || 0,
+              contextKeys: payload.fields.contextKeys || 0,
               error: payload.fields.error,
               result: payload.fields.result,
-              execution_details: payload.fields.execution_details,
+              executionDetails: payload.fields.executionDetails,
             };
 
             if (existingIndex >= 0) {
@@ -1029,12 +1028,12 @@ function App() {
           setTaskProgress((prev) => {
             const next = new Map(prev);
             const progress: TaskProgress = {
-              task_id: taskId,
-              current_wave: payload.fields?.wave_number,
-              current_step: payload.fields?.step_id,
-              current_agent: payload.fields?.agent,
-              last_message: payload.message,
-              last_updated: Date.now(),
+              taskId: taskId,
+              currentWave: payload.fields?.wave_number,
+              currentStep: payload.fields?.step_id,
+              currentAgent: payload.fields?.agent,
+              lastMessage: payload.message,
+              lastUpdated: Date.now(),
             };
             next.set(taskId, progress);
             return next;
@@ -1049,12 +1048,12 @@ function App() {
           setTaskProgress((prev) => {
             const next = new Map(prev);
             const progress: TaskProgress = {
-              task_id: runningTask.id,
-              current_wave: payload.fields?.wave_number,
-              current_step: payload.fields?.step_id,
-              current_agent: payload.fields?.agent,
-              last_message: payload.message,
-              last_updated: Date.now(),
+              taskId: runningTask.id,
+              currentWave: payload.fields?.wave_number,
+              currentStep: payload.fields?.step_id,
+              currentAgent: payload.fields?.agent,
+              lastMessage: payload.message,
+              lastUpdated: Date.now(),
             };
             next.set(runningTask.id, progress);
             return next;
@@ -1321,7 +1320,7 @@ function App() {
                 const previewData = await invoke<{
                   name: string;
                   path: string;
-                  mime_type: string;
+                  mimeType: string;
                   size: number;
                   data: string;
                 }>("get_file_preview_data", {
@@ -1815,11 +1814,11 @@ function App() {
       content += `**Status:** ${task.status}\n`;
       content += `**Created:** ${new Date(task.createdAt).toLocaleString()}\n`;
       content += `**Updated:** ${new Date(task.updatedAt).toLocaleString()}\n`;
-      if (task.completed_at) {
-        content += `**Completed:** ${new Date(task.completed_at).toLocaleString()}\n`;
+      if (task.completedAt) {
+        content += `**Completed:** ${new Date(task.completedAt).toLocaleString()}\n`;
       }
-      content += `**Steps Executed:** ${task.steps_executed}\n`;
-      content += `**Steps Skipped:** ${task.steps_skipped}\n\n`;
+      content += `**Steps Executed:** ${task.stepsExecuted}\n`;
+      content += `**Steps Skipped:** ${task.stepsSkipped}\n\n`;
 
       content += `## Description\n\n${task.description}\n\n`;
 
@@ -1831,9 +1830,9 @@ function App() {
         content += `## Error\n\n${task.error}\n\n`;
       }
 
-      if (task.execution_details?.context) {
+      if (task.executionDetails?.context) {
         content += `## Execution Context\n\n`;
-        for (const [key, value] of Object.entries(task.execution_details.context)) {
+        for (const [key, value] of Object.entries(task.executionDetails.context)) {
           content += `### ${key}\n\n`;
           if (typeof value === 'string') {
             content += `\`\`\`\n${value}\n\`\`\`\n\n`;
@@ -2151,7 +2150,7 @@ function App() {
       const preset = dialoguePresets.find(p => p.id === presetId);
       if (preset) {
         // Update local state immediately for better UX
-        setExecutionStrategy(preset.executionStrategy);
+        setExecutionStrategy(preset.execution_strategy);
         setConversationMode(preset.conversation_mode);
         setTalkStyle(preset.talk_style || null);
 
@@ -2412,11 +2411,18 @@ function App() {
                       leftSection={tab.isDirty ? '●' : undefined}
                         rightSection={
                           visibleTabs.length > 1 ? (
-                            <CloseButton
-                              size="xs"
-                              aria-label="Close tab"
+                            <Box
+                              component="span"
                               style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '4px',
                                 color: '#868e96',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.1s, color 0.1s',
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor = '#dee2e6';
@@ -2484,7 +2490,9 @@ function App() {
                                   await closeTabWithBackend(tab.id);
                                 }
                               }}
-                            />
+                            >
+                              ✕
+                            </Box>
                           ) : undefined
                         }
                     >

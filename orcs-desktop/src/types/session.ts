@@ -168,15 +168,15 @@ export function generateSessionTitle(firstMessage: string): string {
  * AppModeがIdleかどうか判定
  */
 export function isIdleMode(mode: AppMode): boolean {
-  return mode === 'Idle';
+  return mode.type === 'Idle';
 }
 
 /**
  * AppModeからPlanを取得（AwaitingConfirmationの場合）
  */
 export function getPlan(mode: AppMode): Plan | null {
-  if (mode === 'AwaitingConfirmation') {
-    return mode; // AppMode is now a string literal
+  if (mode.type === 'AwaitingConfirmation') {
+    return mode.data.plan;
   }
   return null;
 }

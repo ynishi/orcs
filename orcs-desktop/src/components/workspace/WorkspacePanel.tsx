@@ -159,7 +159,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
   // Handle navigating to session
   const handleGoToSession = (file: UploadedFile) => {
     if (file.sessionId) {
-      onGoToSession?.(file.sessionId, file.messageTimestamp);
+      onGoToSession?.(file.sessionId, file.messageTimestamp ?? undefined);
     }
   };
 

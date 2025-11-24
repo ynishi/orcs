@@ -170,7 +170,7 @@ export function matchesPreset(
   talkStyle: string | null
 ): boolean {
   return (
-    preset.execution_strategy === executionStrategy &&
+    preset.executionStrategy === executionStrategy &&
     preset.conversation_mode === conversationMode &&
     (preset.talk_style || null) === talkStyle
   );

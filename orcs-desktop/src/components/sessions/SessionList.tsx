@@ -52,10 +52,10 @@ export function SessionList({
 
     return sessions.filter(s => {
       // workspace_idがnullまたはundefinedのSessionは除外
-      if (!s.workspace_id) {
+      if (!s.workspaceId) {
         return false;
       }
-      return s.workspace_id === currentWorkspaceId;
+      return s.workspaceId === currentWorkspaceId;
     });
   }, [sessions, filterByWorkspace, currentWorkspaceId]);
 
@@ -63,22 +63,22 @@ export function SessionList({
   const sortedSessions = useMemo(() => {
     return [...filteredSessions].sort((a, b) => {
       // 1. Archivedは常に最後
-      if (a.is_archived !== b.is_archived) {
-        return a.is_archived ? 1 : -1;
+      if (a.isArchived !== b.isArchived) {
+        return a.isArchived ? 1 : -1;
       }
 
       // 2. Favoriteは常に上
-      if (a.is_favorite !== b.is_favorite) {
-        return a.is_favorite ? -1 : 1;
+      if (a.isFavorite !== b.isFavorite) {
+        return a.isFavorite ? -1 : 1;
       }
 
       // 3. Favorite内では、sort_orderがあればそれを優先
-      if (a.is_favorite && b.is_favorite) {
-        if (a.sort_order !== undefined && b.sort_order !== undefined) {
-          return a.sort_order - b.sort_order;
+      if (a.isFavorite && b.isFavorite) {
+        if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+          return a.sortOrder - b.sortOrder;
         }
-        if (a.sort_order !== undefined) return -1;
-        if (b.sort_order !== undefined) return 1;
+        if (a.sortOrder !== undefined) return -1;
+        if (b.sortOrder !== undefined) return 1;
       }
 
       // 4. それ以外はupdated_atで降順
@@ -90,15 +90,15 @@ export function SessionList({
   const visibleSessions = useMemo(() => {
     return showArchived
       ? sortedSessions
-      : sortedSessions.filter(s => !s.is_archived);
+      : sortedSessions.filter(s => !s.isArchived);
   }, [sortedSessions, showArchived]);
 
   // カテゴリ別セッション（メモ化）
   const { favoriteSessions, recentSessions, archivedSessions } = useMemo(() => {
     return {
-      favoriteSessions: visibleSessions.filter(s => s.is_favorite && !s.is_archived),
-      recentSessions: visibleSessions.filter(s => !s.is_favorite && !s.is_archived),
-      archivedSessions: visibleSessions.filter(s => s.is_archived),
+      favoriteSessions: visibleSessions.filter(s => s.isFavorite && !s.isArchived),
+      recentSessions: visibleSessions.filter(s => !s.isFavorite && !s.isArchived),
+      archivedSessions: visibleSessions.filter(s => s.isArchived),
     };
   }, [visibleSessions]);
 
@@ -155,13 +155,13 @@ export function SessionList({
     // 背景色の決定：選択中 > Archived > デフォルト
     const getBackgroundColor = () => {
       if (session.id === currentSessionId) return '#e7f5ff';
-      if (session.is_archived) return '#fafafa';
+      if (session.isArchived) return '#fafafa';
       return 'white';
     };
 
     const getHeaderBackgroundColor = () => {
       if (session.id === currentSessionId) return '#d0ebff';
-      if (session.is_archived) return '#f0f0f0';
+      if (session.isArchived) return '#f0f0f0';
       return '#f8f9fa';
     };
 
@@ -175,7 +175,7 @@ export function SessionList({
         transition: 'all 0.15s ease',
         cursor: 'pointer',
         overflow: 'hidden',
-        opacity: session.is_archived ? 0.85 : 1,
+        opacity: session.isArchived ? 0.85 : 1,
       }}
     >
       {editingSessionId === session.id ? (
@@ -211,10 +211,10 @@ export function SessionList({
             }}
           >
             {/* Favoriteボタン */}
-            <Tooltip label={session.is_favorite ? "Remove from favorites" : "Add to favorites"} withArrow>
+            <Tooltip label={session.isFavorite ? "Remove from favorites" : "Add to favorites"} withArrow>
               <ActionIcon
                 size="sm"
-                color={session.is_favorite ? "yellow" : "gray"}
+                color={session.isFavorite ? "yellow" : "gray"}
                 variant="subtle"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -222,7 +222,7 @@ export function SessionList({
                 }}
                 style={{ flexShrink: 0 }}
               >
-                {session.is_favorite ? "⭐" : "☆"}
+                {session.isFavorite ? "⭐" : "☆"}
               </ActionIcon>
             </Tooltip>
 
@@ -242,7 +242,7 @@ export function SessionList({
 
               <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
                 {/* UP/DOWN（Favoriteが2個以上ある場合のみ表示） */}
-                {session.is_favorite && onMoveSortOrder && favoriteSessionsCount >= 2 && (
+                {session.isFavorite && onMoveSortOrder && favoriteSessionsCount >= 2 && (
                   <>
                     <Menu.Item
                       leftSection={<IconArrowUp size={14} />}
@@ -276,7 +276,7 @@ export function SessionList({
                   leftSection={<IconArchive size={14} />}
                   onClick={() => onToggleArchive?.(session.id)}
                 >
-                  {session.is_archived ? 'Unarchive' : 'Archive'}
+                  {session.isArchived ? 'Unarchive' : 'Archive'}
                 </Menu.Item>
 
                 <Menu.Divider />
@@ -312,10 +312,10 @@ export function SessionList({
                   {session.title}
                 </Text>
                 <Group gap="xs" mt={4}>
-                  {getWorkspaceName(session.workspace_id) && (
+                  {getWorkspaceName(session.workspaceId) && (
                     <>
                       <Badge size="xs" variant="light" color="blue" style={{ textTransform: 'none' }}>
-                        {getWorkspaceName(session.workspace_id)}
+                        {getWorkspaceName(session.workspaceId)}
                       </Badge>
                       <Text size="xs" c="dimmed">
                         •
@@ -331,7 +331,7 @@ export function SessionList({
                   <Text size="xs" c="dimmed">
                     {formatDate(getLastActive(session))}
                   </Text>
-                  {session.is_archived && (
+                  {session.isArchived && (
                     <>
                       <Text size="xs" c="dimmed">
                         •

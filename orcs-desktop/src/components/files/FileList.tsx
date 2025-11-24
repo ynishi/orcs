@@ -160,11 +160,11 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
 
       // 3. Favorite内では、sort_orderがあればそれを優先
       if (a.isFavorite && b.isFavorite) {
-        if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+        if (a.sortOrder != null && b.sortOrder != null) {
           return a.sortOrder - b.sortOrder;
         }
-        if (a.sortOrder !== undefined) return -1;
-        if (b.sortOrder !== undefined) return 1;
+        if (a.sortOrder != null) return -1;
+        if (b.sortOrder != null) return 1;
       }
 
       // 4. それ以外はuploadedAtで降順

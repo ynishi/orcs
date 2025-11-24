@@ -389,15 +389,15 @@ function App() {
         const turn = event.payload;
 
         // Find the tab for this session_id
-        const targetTab = getTabBySessionIdRef.current(turn.session_id);
+        const targetTab = getTabBySessionIdRef.current(turn.sessionId);
 
         if (!targetTab) {
-          console.log(`[STREAM] Ignoring message for session ${turn.session_id} - no tab found`);
+          console.log(`[STREAM] Ignoring message for session ${turn.sessionId} - no tab found`);
           return;
         }
 
-        const isActiveSession = turn.session_id === currentSessionIdRef.current;
-        console.log('[STREAM] Event received:', turn.type, 'for session:', turn.session_id.substring(0, 8), 'active:', isActiveSession);
+        const isActiveSession = turn.sessionId === currentSessionIdRef.current;
+        console.log('[STREAM] Event received:', turn.type, 'for session:', turn.sessionId.substring(0, 8), 'active:', isActiveSession);
 
         // Handle different turn types
         switch (turn.type) {
@@ -425,7 +425,7 @@ function App() {
             // Agent responses can themselves issue SlashCommands. Detect and execute them
             if (
               !isSystemMessage &&
-              turn.session_id === currentSessionIdRef.current &&
+              turn.sessionId === currentSessionIdRef.current &&
               handleSlashCommandRef.current
             ) {
               const detectedCommands = extractSlashCommands(turn.content);
@@ -480,7 +480,7 @@ function App() {
           }
 
           case 'Final':
-            console.log('[STREAM] Streaming completed for session:', turn.session_id.substring(0, 8));
+            console.log('[STREAM] Streaming completed for session:', turn.sessionId.substring(0, 8));
             // Final turn just indicates completion, no action needed
             break;
 
@@ -600,11 +600,11 @@ function App() {
         }
 
         // Enrich participant_icons from current personas if missing
-        if (!activeSession.participant_icons || Object.keys(activeSession.participant_icons).length === 0) {
-          activeSession.participant_icons = {};
+        if (!activeSession.participantIcons || Object.keys(activeSession.participantIcons).length === 0) {
+          activeSession.participantIcons = {};
           personas.forEach(persona => {
             if (persona.icon && activeSession.participants[persona.id]) {
-              activeSession.participant_icons[persona.id] = persona.icon;
+              activeSession.participantIcons[persona.id] = persona.icon;
             }
           });
         }
@@ -650,7 +650,7 @@ function App() {
                       return {
                         name: previewData.name,
                         path: previewData.path,
-                        mimeType: previewData.mime_type,
+                        mimeType: previewData.mimeType,
                         size: previewData.size,
                         data: previewData.data,
                       };
@@ -680,8 +680,8 @@ function App() {
         }
 
         // Restore execution strategy from session
-        if (activeSession.execution_strategy) {
-          setExecutionStrategy(activeSession.execution_strategy);
+        if (activeSession.executionStrategy) {
+          setExecutionStrategy(activeSession.executionStrategy);
         }
       } catch (error) {
         console.error('[App] Failed to load active session messages:', error);
@@ -764,7 +764,7 @@ function App() {
                       return {
                         name: previewData.name,
                         path: previewData.path,
-                        mimeType: previewData.mime_type,
+                        mimeType: previewData.mimeType,
                         size: previewData.size,
                         data: previewData.data,
                       };
@@ -974,12 +974,12 @@ function App() {
             // Build updated task from event fields
             const updatedTask: Task = {
               id: payload.fields.task_id,
-              session_id: payload.fields.session_id,
+              session_id: payload.fields.sessionId,
               title: payload.fields.title || '',
               description: payload.fields.description || '',
               status: payload.fields.status as TaskStatus,
-              created_at: payload.fields.created_at,
-              updated_at: payload.fields.updated_at,
+              created_at: payload.fields.createdAt,
+              updated_at: payload.fields.updatedAt,
               completed_at: payload.fields.completed_at,
               steps_executed: payload.fields.steps_executed || 0,
               steps_skipped: payload.fields.steps_skipped || 0,
@@ -1331,7 +1331,7 @@ function App() {
                 attachedFileData.push({
                   name: previewData.name,
                   path: previewData.path,
-                  mimeType: previewData.mime_type,
+                  mimeType: previewData.mimeType,
                   size: previewData.size,
                   data: previewData.data,
                 });
@@ -1806,15 +1806,15 @@ function App() {
   const handleSaveTaskToWorkspace = async (task: Task) => {
     try {
       // ファイル名を生成（タイムスタンプ + タスクタイトル）
-      const timestamp = new Date(task.created_at).toISOString().replace(/[:.]/g, '-');
+      const timestamp = new Date(task.createdAt).toISOString().replace(/[:.]/g, '-');
       const sanitizedTitle = task.title.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
       const filename = `task_${timestamp}_${sanitizedTitle}.md`;
 
       // タスク内容をMarkdown形式で整形
       let content = `# Task: ${task.title}\n\n`;
       content += `**Status:** ${task.status}\n`;
-      content += `**Created:** ${new Date(task.created_at).toLocaleString()}\n`;
-      content += `**Updated:** ${new Date(task.updated_at).toLocaleString()}\n`;
+      content += `**Created:** ${new Date(task.createdAt).toLocaleString()}\n`;
+      content += `**Updated:** ${new Date(task.updatedAt).toLocaleString()}\n`;
       if (task.completed_at) {
         content += `**Completed:** ${new Date(task.completed_at).toLocaleString()}\n`;
       }
@@ -1856,8 +1856,8 @@ function App() {
         workspaceId: workspace.id,
         filename: filename,
         fileData: fileData,
-        sessionId: task.session_id,
-        messageTimestamp: task.created_at,
+        sessionId: task.sessionId,
+        messageTimestamp: task.createdAt,
       });
 
       // Phase 4: No need to refresh workspace manually - event-driven via workspace:update
@@ -1912,14 +1912,14 @@ function App() {
     try {
       console.log('[App] Session selected:', {
         sessionId: session.id.substring(0, 8),
-        workspaceId: session.workspace_id.substring(0, 8),
+        workspaceId: session.workspaceId.substring(0, 8),
         currentWorkspace: workspace?.id.substring(0, 8),
       });
 
       // 1. Workspace切り替え（必要なら）
-      if (session.workspace_id !== workspace?.id) {
+      if (session.workspaceId !== workspace?.id) {
         console.log('[App] Switching workspace for session...');
-        await switchWorkspaceBackend(session.id, session.workspace_id);
+        await switchWorkspaceBackend(session.id, session.workspaceId);
         // ↑ 'workspace-switched' イベント発火 → 既存リスナーで全体同期
       }
 
@@ -1929,8 +1929,8 @@ function App() {
       // 3. メッセージ履歴を復元
       const restoredMessages = convertSessionToMessages(fullSession, userNickname);
 
-      // 4. タブを開く（session.workspace_idを使用）
-      openTab(fullSession, restoredMessages, session.workspace_id);
+      // 4. タブを開く（session.workspaceIdを使用）
+      openTab(fullSession, restoredMessages, session.workspaceId);
 
       // Show toast notification
       notifications.show({
@@ -2023,14 +2023,14 @@ function App() {
     try {
       // Get current session list (filtered to favorites only)
       const favoriteSessions = sessions
-        .filter(s => s.is_favorite && !s.is_archived)
+        .filter(s => s.isFavorite && !s.isArchived)
         .sort((a, b) => {
-          if (a.sort_order !== undefined && b.sort_order !== undefined) {
-            return a.sort_order - b.sort_order;
+          if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+            return a.sortOrder - b.sortOrder;
           }
-          if (a.sort_order !== undefined) return -1;
-          if (b.sort_order !== undefined) return 1;
-          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+          if (a.sortOrder !== undefined) return -1;
+          if (b.sortOrder !== undefined) return 1;
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
         });
 
       const currentIndex = favoriteSessions.findIndex(s => s.id === sessionId);
@@ -2151,7 +2151,7 @@ function App() {
       const preset = dialoguePresets.find(p => p.id === presetId);
       if (preset) {
         // Update local state immediately for better UX
-        setExecutionStrategy(preset.execution_strategy);
+        setExecutionStrategy(preset.executionStrategy);
         setConversationMode(preset.conversation_mode);
         setTalkStyle(preset.talk_style || null);
 
@@ -2447,13 +2447,13 @@ function App() {
                                 if (isClosingActiveSession && workspace) {
                                   // 4a. 現在のWorkspace内の残りSession取得
                                   const remainingSessions = sessions.filter(
-                                    s => s.workspace_id === workspace.id && s.id !== closingTab.sessionId
+                                    s => s.workspaceId === workspace.id && s.id !== closingTab.sessionId
                                   );
 
                                   if (remainingSessions.length > 0) {
                                     // 4b. 更新日時が直近のSessionを選択
                                     const sortedSessions = [...remainingSessions].sort(
-                                      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                                      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
                                     );
                                     const nextSession = sortedSessions[0];
 

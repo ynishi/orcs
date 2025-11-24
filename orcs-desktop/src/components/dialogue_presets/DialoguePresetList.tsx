@@ -56,7 +56,7 @@ export function DialoguePresetList() {
         name: newPreset.name,
         icon: newPreset.icon || undefined,
         description: newPreset.description || undefined,
-        execution_strategy: newPreset.execution_strategy as any,
+        execution_strategy: newPreset.executionStrategy as any,
         conversation_mode: newPreset.conversation_mode as any,
         talk_style: newPreset.talk_style as any,
         created_at: new Date().toISOString(),
@@ -227,7 +227,7 @@ export function DialoguePresetList() {
           <Select
             label="Execution Strategy"
             data={EXECUTION_STRATEGIES.map(s => ({ value: s.value, label: s.label }))}
-            value={newPreset.execution_strategy}
+            value={newPreset.executionStrategy}
             onChange={(value) => setNewPreset({ ...newPreset, execution_strategy: value || 'broadcast' })}
             required
           />

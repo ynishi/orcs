@@ -24,9 +24,9 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
   // Get workspace info for a task
   const getTaskWorkspace = (task: Task): Workspace | undefined => {
     if (!sessions || !workspaces) return undefined;
-    const session = sessions.find(s => s.id === task.session_id);
+    const session = sessions.find(s => s.id === task.sessionId);
     if (!session) return undefined;
-    return workspaces.find(w => w.id === session.workspace_id);
+    return workspaces.find(w => w.id === session.workspaceId);
   };
 
   // Filter tasks by workspace if enabled
@@ -46,8 +46,8 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
       let output = `# Task: ${task.title}\n\n`;
       output += `Status: ${task.status}\n`;
       output += `Steps executed: ${task.steps_executed}\n`;
-      output += `Created: ${new Date(task.created_at).toLocaleString()}\n`;
-      output += `Updated: ${new Date(task.updated_at).toLocaleString()}\n\n`;
+      output += `Created: ${new Date(task.createdAt).toLocaleString()}\n`;
+      output += `Updated: ${new Date(task.updatedAt).toLocaleString()}\n\n`;
 
       if (task.result) {
         output += `## Summary\n${task.result}\n\n`;
@@ -353,7 +353,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
 
                 <Text size="xs" c="dimmed">•</Text>
                 <Text size="xs" c="dimmed">
-                  {formatDate(task.updated_at)}
+                  {formatDate(task.updatedAt)}
                 </Text>
               </Group>
             </Box>

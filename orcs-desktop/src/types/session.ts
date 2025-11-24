@@ -1,87 +1,64 @@
+// Re-export generated types from schema
+export type {
+  ConversationMessage,
+  MessageMetadata,
+  MessageRole,
+  Plan,
+  ConversationMode,
+  AutoChatConfig,
+  StopCondition,
+  SessionType,
+} from '../bindings/generated';
 
 import type { Message, MessageType } from './message';
+import type { ConversationMessage, MessageMetadata, Plan, AutoChatConfig } from '../bindings/generated';
 
 /**
- * セッション（会話履歴）
- * Matches Rust's SessionData structure exactly
- */
-export interface Session {
-  id: string;
-  title: string;
-  created_at: string; // ISO 8601 timestamp
-  updated_at: string; // ISO 8601 timestamp
-  current_persona_id: string;
-  persona_histories: Record<string, ConversationMessage[]>;
-  app_mode: AppMode;
-  workspace_id: string; // All sessions must be associated with a workspace
-  active_participant_ids: string[]; // Active participants
-  execution_strategy: string; // "broadcast" or "sequential"
-  system_messages: ConversationMessage[]; // System messages (join/leave events, etc.)
-  participants: Record<string, string>; // Persona ID -> name mapping
-  participant_icons: Record<string, string>; // Persona ID -> icon mapping
-  participant_colors: Record<string, string>; // Persona ID -> base color mapping for UI theming
-  participant_backends?: Record<string, string>; // Persona ID -> backend (e.g., "claude_api", "gemini_cli")
-  participant_models?: Record<string, string | null>; // Persona ID -> model name (e.g., "claude-sonnet-4-5-20250929")
-  is_favorite?: boolean; // Whether this session is marked as favorite (pinned to top)
-  is_archived?: boolean; // Whether this session is archived (hidden by default)
-  sort_order?: number; // Manual sort order (optional, for custom ordering within favorites)
-  auto_chat_config?: AutoChatConfig; // AutoChat configuration (None means disabled)
-  is_muted?: boolean; // Whether AI responses are muted (messages recorded only)
-}
-
-/**
- * AutoChat configuration
- * Matches Rust's AutoChatConfig
- */
-export interface AutoChatConfig {
-  max_iterations: number; // Maximum number of dialogue iterations
-  stop_condition: StopCondition; // Stop condition strategy
-  web_search_enabled: boolean; // Enable WebSearch during auto-chat
-}
-
-/**
- * Stop condition for AutoChat mode
- * Matches Rust's StopCondition enum
- */
-export type StopCondition = 'iteration_count' | 'user_interrupt';
-
-/**
- * 会話履歴メタデータ
- * Mirrors Rust's MessageMetadata
- */
-export interface ConversationMessageMetadata {
-  system_event_type?: string;
-  error_severity?: 'critical' | 'warning' | 'info';
-  system_message_type?: MessageType;
-  include_in_dialogue?: boolean;
-}
-
-/**
- * 会話履歴の1メッセージ
- * Matches Rust's ConversationMessage
- */
-export interface ConversationMessage {
-  role: 'User' | 'Assistant' | 'System';
-  content: string;
-  timestamp: string; // ISO 8601 timestamp
-  metadata?: ConversationMessageMetadata;
-  attachments?: string[]; // Attached file paths in workspace
-}
-
-/**
- * アプリケーションモード
- * Matches Rust's AppMode enum with #[serde(tag = "type", content = "data")]
+ * Application mode for session state management.
+ *
+ * Note: This is manually defined because schema-bridge doesn't support
+ * Rust's `#[serde(tag = "type", content = "data")]` tagged enums yet.
  */
 export type AppMode =
   | { type: 'Idle' }
   | { type: 'AwaitingConfirmation'; data: { plan: Plan } };
 
 /**
- * プラン
+ * Full Session interface with persona_histories and system_messages.
+ * Extends SessionType from generated types.
+ *
+ * Note: SessionType (from Rust) excludes persona_histories due to schema-bridge limitations.
+ * This interface adds the missing fields for frontend use.
  */
-export interface Plan {
-  steps: string[];
+export interface Session {
+  id: string;
+  title: string;
+  createdAt: string; // ISO 8601 timestamp (was created_at)
+  updatedAt: string; // ISO 8601 timestamp (was updated_at)
+  currentPersonaId: string; // was current_persona_id
+  personaHistories: Record<string, ConversationMessage[]>; // was persona_histories
+  appMode: AppMode; // was app_mode
+  workspaceId: string; // was workspace_id
+  activeParticipantIds: string[]; // was active_participant_ids
+  executionStrategy: string; // "broadcast" or "sequential" (was execution_strategy)
+  systemMessages: ConversationMessage[]; // was system_messages
+  participants: Record<string, string>;
+  participantIcons: Record<string, string>; // was participant_icons
+  participantColors: Record<string, string>; // was participant_colors
+  participantBackends?: Record<string, string>; // was participant_backends
+  participantModels?: Record<string, string | null>; // was participant_models
+  isFavorite?: boolean; // was is_favorite
+  isArchived?: boolean; // was is_archived
+  sortOrder?: number; // was sort_order
+  autoChatConfig?: AutoChatConfig; // was auto_chat_config
+  isMuted?: boolean; // was is_muted
 }
+
+/**
+ * Conversation message metadata (alias for backward compatibility)
+ * @deprecated Use MessageMetadata from generated types
+ */
+export type ConversationMessageMetadata = MessageMetadata;
 
 // ============================================================================
 // UI用のヘルパー関数
@@ -91,10 +68,10 @@ export interface Plan {
  * セッションの総メッセージ数を取得
  */
 export function getMessageCount(session: Session): number {
-  if (!session || !session.persona_histories) {
+  if (!session || !session.personaHistories) {
     return 0;
   }
-  return Object.values(session.persona_histories)
+  return Object.values(session.personaHistories)
     .flat()
     .length;
 }
@@ -103,14 +80,14 @@ export function getMessageCount(session: Session): number {
  * セッション作成日時をDateオブジェクトで取得
  */
 export function getCreatedAt(session: Session): Date {
-  return new Date(session.created_at);
+  return new Date(session.createdAt);
 }
 
 /**
  * セッション最終更新日時をDateオブジェクトで取得
  */
 export function getLastActive(session: Session): Date {
-  return new Date(session.updated_at);
+  return new Date(session.updatedAt);
 }
 
 /**
@@ -126,10 +103,10 @@ export function sortSessionsByLastActive(sessions: Session[]): Session[] {
  * 現在のPersona IDの会話履歴を取得
  */
 export function getCurrentPersonaMessages(session: Session): ConversationMessage[] {
-  if (!session || !session.persona_histories || !session.current_persona_id) {
+  if (!session || !session.personaHistories || !session.currentPersonaId) {
     return [];
   }
-  return session.persona_histories[session.current_persona_id] || [];
+  return session.personaHistories[session.currentPersonaId] || [];
 }
 
 /**
@@ -150,18 +127,18 @@ export function getAllMessagesWithAuthors(session: Session): MessageWithAuthor[]
 
   const messagesWithAuthors: MessageWithAuthor[] = [];
 
-  // persona_historiesから取得
-  if (session.persona_histories) {
-    for (const [personaId, messages] of Object.entries(session.persona_histories)) {
+  // personaHistoriesから取得
+  if (session.personaHistories) {
+    for (const [personaId, messages] of Object.entries(session.personaHistories)) {
       for (const msg of messages) {
         messagesWithAuthors.push({ message: msg, authorId: personaId });
       }
     }
   }
 
-  // system_messagesから取得
-  if (session.system_messages) {
-    for (const msg of session.system_messages) {
+  // systemMessagesから取得
+  if (session.systemMessages) {
+    for (const msg of session.systemMessages) {
       messagesWithAuthors.push({ message: msg, authorId: 'System' });
     }
   }
@@ -191,15 +168,15 @@ export function generateSessionTitle(firstMessage: string): string {
  * AppModeがIdleかどうか判定
  */
 export function isIdleMode(mode: AppMode): boolean {
-  return mode.type === 'Idle';
+  return mode === 'Idle';
 }
 
 /**
  * AppModeからPlanを取得（AwaitingConfirmationの場合）
  */
 export function getPlan(mode: AppMode): Plan | null {
-  if (mode.type === 'AwaitingConfirmation') {
-    return mode.data.plan;
+  if (mode === 'AwaitingConfirmation') {
+    return mode; // AppMode is now a string literal
   }
   return null;
 }
@@ -223,7 +200,7 @@ const isMessageType = (value?: string): value is MessageType =>
   typeof value === 'string' && (KNOWN_MESSAGE_TYPES as string[]).includes(value);
 
 function resolveMessageType(msg: ConversationMessage): MessageType {
-  const metadataType = msg.metadata?.system_message_type;
+  const metadataType = msg.metadata?.systemMessageType;
   if (isMessageType(metadataType)) {
     return metadataType;
   }
@@ -236,7 +213,7 @@ function resolveMessageType(msg: ConversationMessage): MessageType {
     return 'ai';
   }
 
-  if (msg.metadata?.error_severity === 'critical') {
+  if (msg.metadata?.errorSeverity === 'critical') {
     return 'error';
   }
 
@@ -343,10 +320,10 @@ export function convertSessionToMessages(session: Session, userNickname: string 
       item.message,
       item.authorId,
       session.participants || {},
-      session.participant_icons || {},
-      session.participant_colors || {},
-      session.participant_backends || {},
-      session.participant_models || {},
+      session.participantIcons || {},
+      session.participantColors || {},
+      session.participantBackends || {},
+      session.participantModels || {},
       userNickname
     )
   );

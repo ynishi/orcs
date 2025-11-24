@@ -42,6 +42,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       // Listen to update events
       await listen<Workspace>('workspace:update', (event) => {
         console.log('[WorkspaceStore] Received update:', event.payload.id);
+        console.log('[WorkspaceStore] 📁 Uploaded files count:', event.payload.resources?.uploadedFiles?.length || 0);
+        console.log('[WorkspaceStore] 📁 Uploaded files:', event.payload.resources?.uploadedFiles);
         set((state) => {
           const newMap = new Map(state.workspaces);
           newMap.set(event.payload.id, event.payload);

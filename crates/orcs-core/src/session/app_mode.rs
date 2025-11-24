@@ -1,12 +1,13 @@
 //! Application mode types for session state management.
 
+use schema_bridge::SchemaBridge;
 use serde::{Deserialize, Serialize};
 
 /// Represents a proposed plan of action for user confirmation.
 ///
 /// Plans are generated when the system needs to propose a series of steps
 /// and wait for user approval before proceeding with execution.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
 pub struct Plan {
     /// The individual steps that make up this plan.
     pub steps: Vec<String>,
@@ -16,7 +17,7 @@ pub struct Plan {
 ///
 /// This tracks whether the session is in normal chat mode or waiting for
 /// human-in-the-loop (HIL) confirmation of a proposed plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
 #[serde(tag = "type", content = "data")]
 pub enum AppMode {
     /// The application is waiting for user input in a normal chat mode.
@@ -33,7 +34,7 @@ pub enum AppMode {
 /// This mode affects how AI agents respond to each other, preventing the
 /// "escalation" problem where each agent tries to be more verbose than
 /// the previous one.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, SchemaBridge)]
 #[serde(rename_all = "snake_case")]
 pub enum ConversationMode {
     /// Detailed mode - comprehensive responses with thorough explanations.

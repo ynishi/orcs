@@ -3,11 +3,12 @@
 //! This module contains types for representing messages in a conversation,
 //! including roles and message content.
 
+use schema_bridge::SchemaBridge;
 use serde::{Deserialize, Serialize};
 use version_migrate::DeriveQueryable as Queryable;
 
 /// Represents the role of a message in a conversation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
 pub enum MessageRole {
     /// Message from the user.
     User,
@@ -18,7 +19,7 @@ pub enum MessageRole {
 }
 
 /// Type of system event being recorded.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
 #[serde(rename_all = "snake_case")]
 pub enum SystemEventType {
     /// A participant joined the conversation.
@@ -36,7 +37,7 @@ pub enum SystemEventType {
 }
 
 /// Severity level for error messages.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorSeverity {
     /// Critical error - show in thread + toast.
@@ -52,7 +53,7 @@ pub enum ErrorSeverity {
 /// This provides additional context about the message that helps
 /// the frontend determine how to display it and helps agents
 /// understand the conversation context.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, SchemaBridge)]
 pub struct MessageMetadata {
     /// For System messages: the type of system event.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -83,7 +84,7 @@ fn default_true() -> bool {
 ///
 /// Version 2 adds metadata field for extended information.
 /// Version 3 adds attachments field for file attachments.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Queryable)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Queryable, SchemaBridge)]
 #[queryable(entity = "conversation_message")]
 pub struct ConversationMessage {
     /// The role of the message sender.

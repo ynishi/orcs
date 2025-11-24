@@ -54,6 +54,7 @@ pub enum ErrorSeverity {
 /// the frontend determine how to display it and helps agents
 /// understand the conversation context.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
 pub struct MessageMetadata {
     /// For System messages: the type of system event.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -85,6 +86,7 @@ fn default_true() -> bool {
 /// Version 2 adds metadata field for extended information.
 /// Version 3 adds attachments field for file attachments.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Queryable, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
 #[queryable(entity = "conversation_message")]
 pub struct ConversationMessage {
     /// The role of the message sender.

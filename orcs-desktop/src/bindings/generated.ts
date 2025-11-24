@@ -20,9 +20,9 @@ export type SystemEventType = 'participant_joined' | 'participant_left' | 'execu
 
 export type ErrorSeverity = 'critical' | 'warning' | 'info';
 
-export type MessageMetadata = { system_event_type: 'participant_joined' | 'participant_left' | 'execution_strategy_changed' | 'mode_changed' | 'workspace_switched' | 'notification' | null; error_severity: 'critical' | 'warning' | 'info' | null; system_message_type: string | null; include_in_dialogue: boolean; };
+export type MessageMetadata = { systemEventType: 'participant_joined' | 'participant_left' | 'execution_strategy_changed' | 'mode_changed' | 'workspace_switched' | 'notification' | null; errorSeverity: 'critical' | 'warning' | 'info' | null; systemMessageType: string | null; includeInDialogue: boolean; };
 
-export type ConversationMessage = { role: 'User' | 'Assistant' | 'System'; content: string; timestamp: string; metadata: { system_event_type: 'participant_joined' | 'participant_left' | 'execution_strategy_changed' | 'mode_changed' | 'workspace_switched' | 'notification' | null; error_severity: 'critical' | 'warning' | 'info' | null; system_message_type: string | null; include_in_dialogue: boolean; }; attachments: string[]; };
+export type ConversationMessage = { role: 'User' | 'Assistant' | 'System'; content: string; timestamp: string; metadata: { systemEventType: 'participant_joined' | 'participant_left' | 'execution_strategy_changed' | 'mode_changed' | 'workspace_switched' | 'notification' | null; errorSeverity: 'critical' | 'warning' | 'info' | null; systemMessageType: string | null; includeInDialogue: boolean; }; attachments: string[]; };
 
 export type Plan = { steps: string[]; };
 
@@ -34,15 +34,15 @@ export type AutoChatConfig = { max_iterations: number; stop_condition: 'iteratio
 
 export type StopCondition = 'iteration_count' | 'user_interrupt';
 
-export type Workspace = { id: string; name: string; rootPath: string; workspaceDir: string; resources: { uploaded_files: { id: string; name: string; path: string; mime_type: string; size: number; uploaded_at: number; session_id: string | null; message_timestamp: string | null; author: string | null; is_archived: boolean; is_favorite: boolean; sort_order: number | null; }[]; temp_files: { id: string; path: string; purpose: string; created_at: number; auto_delete: boolean; }[]; }; projectContext: { languages: string[]; build_system: string | null; description: string | null; repository_url: string | null; metadata: Record<string, string>; }; lastAccessed: number; isFavorite: boolean; lastActiveSessionId: string | null; };
+export type Workspace = { id: string; name: string; rootPath: string; workspaceDir: string; resources: { uploadedFiles: { id: string; name: string; path: string; mimeType: string; size: number; uploadedAt: number; sessionId: string | null; messageTimestamp: string | null; author: string | null; isArchived: boolean; isFavorite: boolean; sortOrder: number | null; }[]; tempFiles: { id: string; path: string; purpose: string; createdAt: number; autoDelete: boolean; }[]; }; projectContext: { languages: string[]; buildSystem: string | null; description: string | null; repositoryUrl: string | null; metadata: Record<string, string>; }; lastAccessed: number; isFavorite: boolean; lastActiveSessionId: string | null; };
 
-export type WorkspaceResources = { uploaded_files: { id: string; name: string; path: string; mime_type: string; size: number; uploaded_at: number; session_id: string | null; message_timestamp: string | null; author: string | null; is_archived: boolean; is_favorite: boolean; sort_order: number | null; }[]; temp_files: { id: string; path: string; purpose: string; created_at: number; auto_delete: boolean; }[]; };
+export type WorkspaceResources = { uploadedFiles: { id: string; name: string; path: string; mimeType: string; size: number; uploadedAt: number; sessionId: string | null; messageTimestamp: string | null; author: string | null; isArchived: boolean; isFavorite: boolean; sortOrder: number | null; }[]; tempFiles: { id: string; path: string; purpose: string; createdAt: number; autoDelete: boolean; }[]; };
 
-export type UploadedFile = { id: string; name: string; path: string; mime_type: string; size: number; uploaded_at: number; session_id: string | null; message_timestamp: string | null; author: string | null; is_archived: boolean; is_favorite: boolean; sort_order: number | null; };
+export type UploadedFile = { id: string; name: string; path: string; mimeType: string; size: number; uploadedAt: number; sessionId: string | null; messageTimestamp: string | null; author: string | null; isArchived: boolean; isFavorite: boolean; sortOrder: number | null; };
 
-export type ProjectContext = { languages: string[]; build_system: string | null; description: string | null; repository_url: string | null; metadata: Record<string, string>; };
+export type ProjectContext = { languages: string[]; buildSystem: string | null; description: string | null; repositoryUrl: string | null; metadata: Record<string, string>; };
 
-export type TempFile = { id: string; path: string; purpose: string; created_at: number; auto_delete: boolean; };
+export type TempFile = { id: string; path: string; purpose: string; createdAt: number; autoDelete: boolean; };
 
 export type SessionType = { id: string; title: string; createdAt: string; updatedAt: string; currentPersonaId: string; workspaceId: string; activeParticipantIds: string[]; executionStrategy: 'broadcast' | 'sequential'; participants: Record<string, string>; participantIcons: Record<string, string>; participantColors: Record<string, string>; participantBackends: Record<string, string>; participantModels: Record<string, string>; conversationMode: 'detailed' | 'normal' | 'concise' | 'brief' | 'discussion'; talkStyle: 'Brainstorm' | 'Casual' | 'DecisionMaking' | 'Debate' | 'ProblemSolving' | 'Review' | 'Planning' | null; isFavorite: boolean; isArchived: boolean; sortOrder: number | null; isMuted: boolean; };
 

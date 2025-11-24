@@ -29,6 +29,7 @@ pub struct Workspace {
 
 /// Collection of all resources managed within a workspace.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceResources {
     /// Files uploaded by the user or system
     pub uploaded_files: Vec<UploadedFile>,
@@ -38,6 +39,7 @@ pub struct WorkspaceResources {
 
 /// Represents a file uploaded to the workspace.
 #[derive(Debug, Clone, Serialize, Deserialize, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
 pub struct UploadedFile {
     /// Unique identifier for the uploaded file
     pub id: String,
@@ -70,6 +72,7 @@ pub struct UploadedFile {
 
 /// Project-specific context and metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectContext {
     /// Programming languages detected in the project
     pub languages: Vec<String>,
@@ -96,6 +99,7 @@ pub struct SessionWorkspace {
 
 /// Represents a temporary file created during operations.
 #[derive(Debug, Clone, Serialize, Deserialize, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
 pub struct TempFile {
     /// Unique identifier for the temp file
     pub id: String,

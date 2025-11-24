@@ -5,7 +5,6 @@
 
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import type { PersonaConfig } from '../types/agent';
 import type { MessageType } from '../types/message';
 import { changeTalkStyle } from '../services/talkStyleService';
 import { changeConversationMode } from '../services/conversationModeService';
@@ -18,7 +17,6 @@ export interface SessionSettingsStore {
   conversationMode: string;
   talkStyle: string | null;
   executionStrategy: string;
-  personas: PersonaConfig[];
   activeParticipantIds: string[];
   isLoaded: boolean;
 
@@ -27,12 +25,8 @@ export interface SessionSettingsStore {
   updateTalkStyle: (style: string | null, addMessage: MessageCallback) => Promise<void>;
   updateConversationMode: (mode: string, addMessage: MessageCallback) => Promise<void>;
   updateExecutionStrategy: (strategy: string, addMessage: MessageCallback) => Promise<void>;
-  toggleParticipant: (personaId: string, isActive: boolean, addMessage: MessageCallback) => Promise<void>;
-  refreshPersonas: () => Promise<void>;
-
-  // Getters
-  getPersonaById: (personaId: string) => PersonaConfig | undefined;
-  getActivePersonas: () => PersonaConfig[];
+  toggleParticipant: (personaId: string, isActive: boolean, personaName: string, addMessage: MessageCallback) => Promise<void>;
+  refreshActiveParticipants: () => Promise<void>;
 }
 
 export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) => ({
@@ -40,7 +34,6 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
   conversationMode: 'normal',
   talkStyle: null,
   executionStrategy: 'sequential',
-  personas: [],
   activeParticipantIds: [],
   isLoaded: false,
 
@@ -56,7 +49,6 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     // Load settings individually with fallback to defaults
     let mode = 'normal';
     let style: string | null = null;
-    let personas: PersonaConfig[] = [];
     let activeIds: string[] = [];
 
     try {
@@ -72,12 +64,6 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     }
 
     try {
-      personas = await invoke<PersonaConfig[]>('get_personas');
-    } catch (error) {
-      console.warn('[SessionSettingsStore] Failed to load personas, using empty list:', error);
-    }
-
-    try {
       activeIds = await invoke<string[]>('get_active_participants');
     } catch (error) {
       console.warn('[SessionSettingsStore] Failed to load active participants, using empty list:', error);
@@ -86,7 +72,6 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     set({
       conversationMode: mode,
       talkStyle: style,
-      personas,
       activeParticipantIds: activeIds,
       isLoaded: true,
     });
@@ -151,26 +136,20 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     }
   },
 
-  toggleParticipant: async (personaId: string, isActive: boolean, addMessage: MessageCallback) => {
+  toggleParticipant: async (personaId: string, isActive: boolean, personaName: string, addMessage: MessageCallback) => {
     console.log('[SessionSettingsStore] toggleParticipant called:', personaId, isActive);
-
-    const persona = get().personas.find(p => p.id === personaId);
-    if (!persona) {
-      console.error('[SessionSettingsStore] Persona not found:', personaId);
-      return;
-    }
 
     try {
       if (isActive) {
         await invoke('add_participant', { personaId });
-        addMessage('system', 'System', `${persona.name} が会話に参加しました`);
+        addMessage('system', 'System', `${personaName} が会話に参加しました`);
       } else {
         await invoke('remove_participant', { personaId });
-        addMessage('system', 'System', `${persona.name} が会話から退出しました`);
+        addMessage('system', 'System', `${personaName} が会話から退出しました`);
       }
 
       // Refresh to update active participant list
-      await get().refreshPersonas();
+      await get().refreshActiveParticipants();
       console.log('[SessionSettingsStore] Participant toggled successfully');
     } catch (error) {
       console.error('[SessionSettingsStore] Failed to toggle participant:', error);
@@ -179,31 +158,18 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     }
   },
 
-  refreshPersonas: async () => {
+  refreshActiveParticipants: async () => {
     try {
-      const personas = await invoke<PersonaConfig[]>('get_personas');
       const activeIds = await invoke<string[]>('get_active_participants');
 
       set({
-        personas,
         activeParticipantIds: activeIds,
       });
 
-      console.log('[SessionSettingsStore] Personas refreshed');
+      console.log('[SessionSettingsStore] Active participants refreshed');
     } catch (error) {
-      console.error('[SessionSettingsStore] Failed to refresh personas:', error);
+      console.error('[SessionSettingsStore] Failed to refresh active participants:', error);
       throw error;
     }
-  },
-
-  // Getters
-  getPersonaById: (personaId: string) => {
-    const state = get();
-    return state.personas.find(p => p.id === personaId);
-  },
-
-  getActivePersonas: () => {
-    const state = get();
-    return state.personas.filter(p => state.activeParticipantIds.includes(p.id));
   },
 }));

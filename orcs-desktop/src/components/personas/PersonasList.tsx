@@ -7,6 +7,7 @@ import { PersonaEditorModal } from './PersonaEditorModal';
 import { handleAndPersistSystemMessage, conversationMessage } from '../../utils/systemMessage';
 import { CONVERSATION_MODES, DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, TALK_STYLES, EXECUTION_STRATEGIES } from '../../types/conversation';
 import { MessageType } from '../../types/message';
+import { usePersonaStore } from '../../stores/personaStore';
 
 const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
   claude_cli: 'Claude CLI',
@@ -44,6 +45,9 @@ export function PersonasList({
   onRefresh,
   onRefreshSessions,
 }: PersonasListProps) {
+  // Use personaStore for save operations
+  const { savePersonaConfigs, saveAdhocPersona } = usePersonaStore();
+
   // Use props if provided, otherwise maintain local state for backwards compatibility
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfig[]>([]);
   const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
@@ -182,13 +186,13 @@ export function PersonasList({
   // Helper function to save and reload
   const saveAndReload = async (updatedConfigs: PersonaConfig[]) => {
     try {
-      await invoke('save_persona_configs', { configs: updatedConfigs });
+      // Use personaStore to save
+      await savePersonaConfigs(updatedConfigs);
 
-      // Refresh using callback if provided, otherwise fetch locally
+      // personaStore automatically updates its state, so onRefresh is optional now
+      // Keep onRefresh call for any additional UI updates if needed
       if (onRefresh) {
         await onRefresh();
-      } else {
-        await fetchPersonas();
       }
 
       onMessage && await handleAndPersistSystemMessage(
@@ -293,7 +297,8 @@ export function PersonasList({
                 size="sm"
                 onClick={async () => {
                   try {
-                    await invoke('save_adhoc_persona', { personaId: persona.id });
+                    // Use personaStore to save adhoc persona
+                    await saveAdhocPersona(persona.id);
 
                     // Persist success message to session
                     await invoke('append_system_messages', {
@@ -304,7 +309,7 @@ export function PersonasList({
                       }]
                     });
 
-                    if (onRefresh) await onRefresh();
+                    // personaStore automatically reloads personas after save
                     if (onRefreshSessions) await onRefreshSessions();
                   } catch (error) {
                     console.error('Failed to save adhoc persona:', error);

@@ -45,6 +45,7 @@ import type { SessionEvent } from "./types/session_event";
 import { useAppStateStore } from "./stores/appStateStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useSessionSettingsStore } from "./stores/sessionSettingsStore";
+import { usePersonaStore } from "./stores/personaStore";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -121,16 +122,21 @@ function App() {
     talkStyle,
     conversationMode,
     executionStrategy,
-    personas,
     activeParticipantIds,
     isLoaded: sessionSettingsLoaded,
     updateTalkStyle,
     updateConversationMode,
     updateExecutionStrategy,
     toggleParticipant,
-    refreshPersonas,
+    refreshActiveParticipants,
     loadSettings: loadSessionSettings,
   } = useSessionSettingsStore();
+
+  // Persona Store (Rust SSOT)
+  const {
+    personas,
+    loadPersonas,
+  } = usePersonaStore();
 
   // Initialize AppState Store on mount
   useEffect(() => {
@@ -152,6 +158,13 @@ function App() {
       console.error('[App] Failed to initialize Task store:', error);
     });
   }, [initializeTaskStore]);
+
+  // Initialize Persona Store on mount
+  useEffect(() => {
+    loadPersonas().catch((error: unknown) => {
+      console.error('[App] Failed to load personas:', error);
+    });
+  }, [loadPersonas]);
 
   // Restore last selected workspace on app startup (Phase 3)
   useEffect(() => {
@@ -1061,7 +1074,7 @@ function App() {
         updateTabInput(activeTabId, value);
       }
     },
-    refreshPersonas,
+    refreshPersonas: loadPersonas,
     refreshSessions,
   });
 
@@ -1951,8 +1964,15 @@ function App() {
   };
 
   const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
+    // Get persona name from personaStore
+    const persona = personas.find(p => p.id === personaId);
+    if (!persona) {
+      console.error('[App] Persona not found:', personaId);
+      return;
+    }
+
     // Delegate to Store
-    await toggleParticipant(personaId, isChecked, addMessage);
+    await toggleParticipant(personaId, isChecked, persona.name, addMessage);
   };
 
   const handleApplyPreset = async (presetId: string) => {
@@ -2011,7 +2031,7 @@ function App() {
           await invoke('add_participant', { personaId: persona.id });
           addMessage('system', 'System', `${persona.name} が参加しました`);
           // Refresh participants list to update active participant IDs
-          await refreshPersonas();
+          await refreshActiveParticipants();
         } catch (error) {
           console.error(`Failed to add participant ${persona.name}:`, error);
         }
@@ -2097,7 +2117,7 @@ function App() {
           executionStrategy={executionStrategy}
           conversationMode={conversationMode}
           talkStyle={talkStyle}
-          onRefreshPersonas={refreshPersonas}
+          onRefreshPersonas={loadPersonas}
           onRefreshSessions={refreshSessions}
         />
       </AppShell.Navbar>

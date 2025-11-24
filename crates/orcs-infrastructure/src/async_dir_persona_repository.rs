@@ -149,6 +149,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         // Save
@@ -180,6 +181,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         let persona2 = Persona {
@@ -194,6 +196,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         // Save multiple
@@ -241,6 +244,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         // Save persona
@@ -275,6 +279,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         // Save
@@ -306,6 +311,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         // Save original
@@ -343,6 +349,7 @@ mod tests {
             model_name: None,
             icon: None,
             base_color: None,
+            gemini_options: None,
         };
 
         // Save

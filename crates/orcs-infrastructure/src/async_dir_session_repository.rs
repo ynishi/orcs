@@ -189,6 +189,7 @@ mod tests {
                     model_name: None,
                     icon: None,
                     base_color: None,
+                    gemini_options: None,
                 }]),
             }
         }
@@ -268,6 +269,7 @@ mod tests {
             is_archived: false,
             sort_order: None,
             auto_chat_config: None,
+            is_muted: false,
         }
     }
 

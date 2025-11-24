@@ -54,7 +54,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
     try {
       // If workspace_id not provided, get from appStateStore
       const appState = useAppStateStore.getState().appState;
-      const finalWorkspaceId = workspaceId || appState?.default_workspace_id;
+      const finalWorkspaceId = workspaceId || appState?.defaultWorkspaceId;
 
       if (!finalWorkspaceId) {
         throw new Error('No default workspace available');

@@ -144,18 +144,18 @@ function App() {
       }
 
       // Skip if no last selected workspace (initial app launch)
-      if (!appState.last_selected_workspace_id) {
+      if (!appState.lastSelectedWorkspaceId) {
         workspaceRestoredRef.current = true;
         return;
       }
 
       // Skip if current workspace already matches
-      if (workspace && workspace.id === appState.last_selected_workspace_id) {
+      if (workspace && workspace.id === appState.lastSelectedWorkspaceId) {
         workspaceRestoredRef.current = true;
         return;
       }
 
-      const lastWorkspaceId = appState.last_selected_workspace_id;
+      const lastWorkspaceId = appState.lastSelectedWorkspaceId;
 
       try {
         // Get active session (required for switchWorkspace)

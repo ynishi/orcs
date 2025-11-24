@@ -1924,9 +1924,24 @@ function App() {
 
       // 2. セッションを切り替え（バックエンドで履歴付きSessionDataを取得）
       const fullSession = await switchSession(session.id);
+      console.log('[App] switchSession result:', {
+        sessionId: fullSession.id.substring(0, 8),
+        hasPersonaHistories: !!fullSession.personaHistories,
+        personaHistoriesKeys: fullSession.personaHistories ? Object.keys(fullSession.personaHistories) : [],
+        hasSystemMessages: !!fullSession.systemMessages,
+        systemMessagesCount: fullSession.systemMessages?.length || 0,
+      });
 
       // 3. メッセージ履歴を復元
       const restoredMessages = convertSessionToMessages(fullSession, userNickname);
+      console.log('[App] convertSessionToMessages result:', {
+        messagesCount: restoredMessages.length,
+        firstMessage: restoredMessages[0] ? {
+          id: restoredMessages[0].id,
+          type: restoredMessages[0].type,
+          author: restoredMessages[0].author,
+        } : null,
+      });
 
       // 4. タブを開く（session.workspaceIdを使用）
       openTab(fullSession, restoredMessages, session.workspaceId);

@@ -16,6 +16,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         session::create_session,
         session::create_config_session,
         session::list_sessions,
+        tasks::get_tasks_snapshot,
         tasks::list_tasks,
         tasks::delete_task,
         personas::create_adhoc_persona,

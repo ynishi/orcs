@@ -21,9 +21,10 @@ import { useDisclosure } from '@mantine/hooks';
 import "./App.css";
 import { Message, MessageType, StreamingDialogueTurn } from "./types/message";
 import { StatusInfo, getDefaultStatus } from "./types/status";
-import { Task, TaskProgress, TaskStatus } from "./types/task";
+import { Task } from "./types/task";
 import { Agent } from "./types/agent";
 import { Session } from "./types/session";
+import { useTaskStore } from "./stores/taskStore";
 import { GitInfo } from "./types/git";
 import { Navbar } from "./components/navigation/Navbar";
 import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
@@ -64,8 +65,20 @@ function App() {
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [taskProgress, setTaskProgress] = useState<Map<string, TaskProgress>>(new Map());
+
+  // Task Store
+  const {
+    initialize: initializeTaskStore,
+    refreshTasks,
+    deleteTask: deleteTaskFromStore,
+    tasks: tasksMap,
+    taskProgress: taskProgressMap,
+  } = useTaskStore();
+
+  // Convert Map to Array for ChatPanel compatibility
+  const tasks = Array.from(tasksMap.values());
+  const taskProgress = taskProgressMap;
+
   const [userNickname, setUserNickname] = useState<string>('You');
   const [userProfile, setUserProfile] = useState<{ nickname: string; background: string } | null>(null);
   const [gitInfo, setGitInfo] = useState<GitInfo>({
@@ -99,11 +112,6 @@ function App() {
   const currentSessionId = appState?.activeSessionId ?? null;
   const isAppStateLoaded = useAppStateStore((state) => state.isLoaded);
 
-  // Get tab management actions from appStateStore
-  const openBackendTab = useAppStateStore((state) => state.openTab);
-  const closeBackendTab = useAppStateStore((state) => state.closeTab);
-  const setActiveBackendTab = useAppStateStore((state) => state.setActiveTab);
-
   // ワークスペース管理 (Phase 4: simplified - no more refresh functions)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { workspace, allWorkspaces, files: workspaceFiles, switchWorkspace: switchWorkspaceBackend } = useWorkspace();
@@ -128,6 +136,13 @@ function App() {
       console.error('[App] Failed to initialize Workspace store:', error);
     });
   }, [initializeWorkspace]);
+
+  // Initialize Task Store on mount
+  useEffect(() => {
+    initializeTaskStore().catch((error: unknown) => {
+      console.error('[App] Failed to initialize Task store:', error);
+    });
+  }, [initializeTaskStore]);
 
   // Restore last selected workspace on app startup (Phase 3)
   useEffect(() => {
@@ -183,6 +198,7 @@ function App() {
     closeTab,
     switchTab: switchToTab,
     switchWorkspace: switchWorkspaceTabs,
+    initializeTabUIState,
     updateTabTitle,
     updateTabMessages: _updateTabMessages,
     addMessageToTab,
@@ -227,25 +243,6 @@ function App() {
     addMessageToTab(activeTabId, newMessage);
   }, [personas, activeTabId, addMessageToTab]);
 
-  // タブクローズヘルパー: バックエンドタブとローカルタブを両方閉じる
-  const closeTabWithBackend = useCallback(async (tabId: string) => {
-    const tab = tabs.find(t => t.id === tabId);
-    if (!tab) return;
-
-    // Close backend tab first
-    const backendTab = appState?.openTabs.find((t) => t.sessionId === tab.sessionId);
-    if (backendTab) {
-      try {
-        await closeBackendTab(backendTab.id);
-      } catch (err) {
-        console.error('[App] Failed to close backend tab:', err);
-      }
-    }
-
-    // Close local TabContext tab
-    closeTab(tabId);
-  }, [tabs, appState, closeBackendTab, closeTab]);
-
   // キーボードショートカット for タブ操作
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -259,10 +256,10 @@ function App() {
         if (activeTab) {
           if (activeTab.isDirty) {
             if (window.confirm(`"${activeTab.title}" has unsaved changes. Close anyway?`)) {
-              void closeTabWithBackend(activeTabId);
+              void closeTab(activeTabId);
             }
           } else {
-            void closeTabWithBackend(activeTabId);
+            void closeTab(activeTabId);
           }
         }
       }
@@ -295,7 +292,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tabs, activeTabId, switchToTab, closeTabWithBackend]);
+  }, [tabs, activeTabId, switchToTab, closeTab]);
 
   const activeTabScrollKey = useMemo(() => {
     const activeTab = tabs.find(t => t.id === activeTabId);
@@ -611,15 +608,23 @@ function App() {
         // Check if tab already exists
         const existingTab = getTabBySessionId(currentSessionId);
 
-        // If tab exists, check if messages need preview data
+        // If tab exists, check if messages are empty or need preview data
         if (existingTab) {
-          const needsPreviewData = existingTab.messages.some(msg =>
-            msg.attachments && msg.attachments.length > 0 &&
-            msg.attachments.some(att => !att.data)
-          );
+          // If messages are empty, we need to load them
+          if (existingTab.messages.length === 0) {
+            console.log('[App] Tab exists but messages are empty, loading...');
+            // Continue to load messages
+          } else {
+            // Messages exist, check if they need preview data
+            const needsPreviewData = existingTab.messages.some(msg =>
+              msg.attachments && msg.attachments.length > 0 &&
+              msg.attachments.some(att => !att.data)
+            );
 
-          if (!needsPreviewData) {
-            return;
+            if (!needsPreviewData) {
+              console.log('[App] Tab exists with messages, no preview data needed');
+              return;
+            }
           }
         }
 
@@ -675,7 +680,19 @@ function App() {
 
         // Open or update tab with preview data
         if (workspace) {
-          openTab(activeSession, restoredMessages, workspace.id, true);
+          if (existingTab) {
+            // Tab exists, update messages and title
+            console.log('[App] Updating existing tab with messages:', {
+              tabId: existingTab.id.substring(0, 8),
+              title: activeSession.title,
+              messagesCount: restoredMessages.length,
+            });
+            updateTabTitle(existingTab.id, activeSession.title);
+            _updateTabMessages(existingTab.id, restoredMessages);
+          } else {
+            // Tab doesn't exist, create it
+            await openTab(activeSession.id, workspace.id, activeSession.title, restoredMessages);
+          }
         }
 
         // Restore execution strategy from session
@@ -721,24 +738,59 @@ function App() {
         return;
       }
 
+      console.log('[App] Restoring tabs from backend...', {
+        tabsCount: appState.openTabs.length,
+      });
+
       // Sort tabs by order
       const sortedTabs = [...appState.openTabs].sort((a, b) => a.order - b.order);
 
       for (const backendTab of sortedTabs) {
-        // Check if tab already exists in TabContext
-        const existingTab = getTabBySessionId(backendTab.sessionId);
-        if (existingTab) {
-          continue;
-        }
-
         // Find session for this tab
         const session = sessions.find((s) => s.id === backendTab.sessionId);
         if (!session) {
+          console.warn('[App] Session not found for tab:', backendTab.sessionId);
           continue;
         }
 
-        // Load messages with preview data
-        let restoredMessages = convertSessionToMessages(session, userNickname);
+        // Check if tab already exists in TabContext
+        const existingTab = getTabBySessionId(backendTab.sessionId);
+        if (existingTab) {
+          // Update title for existing tab (may have been created with empty title)
+          updateTabTitle(existingTab.id, session.title);
+          continue;
+        }
+
+        // Initialize UI state with title first (from lightweight session)
+        initializeTabUIState(backendTab.id, session.title, []);
+
+        // Only load full session data for the active tab
+        const isActiveTab = appState.activeTabId === backendTab.id;
+        if (!isActiveTab) {
+          console.log('[App] Initialized non-active tab with title only:', {
+            tabId: backendTab.id.substring(0, 8),
+            title: session.title,
+          });
+          continue;
+        }
+
+        // Get full session data with personaHistories (needed for convertSessionToMessages)
+        let fullSession;
+        try {
+          fullSession = await invoke<Session>('get_session', { sessionId: backendTab.sessionId });
+        } catch (error) {
+          console.error('[App] Failed to load full session data:', error);
+          continue;
+        }
+
+        // Load messages with preview data for active tab
+        let restoredMessages = convertSessionToMessages(fullSession, userNickname);
+        console.log('[App] Restored messages for active tab:', {
+          tabId: backendTab.id.substring(0, 8),
+          sessionId: backendTab.sessionId.substring(0, 8),
+          title: fullSession.title,
+          messagesCount: restoredMessages.length,
+        });
 
         // Load preview data for attached files BEFORE opening tab
         try {
@@ -782,8 +834,12 @@ function App() {
           console.error('[App] Error loading preview data during tab restoration:', error);
         }
 
-        // Open tab (don't auto-switch to avoid interfering with active_tab_id restoration)
-        openTab(session, restoredMessages, backendTab.workspaceId, false);
+        // Update messages for the already-initialized active tab
+        console.log('[App] Updating active tab with messages:', {
+          tabId: backendTab.id.substring(0, 8),
+          messagesCount: restoredMessages.length,
+        });
+        _updateTabMessages(backendTab.id, restoredMessages);
       }
 
       // Activate the tab that was active before app restart
@@ -809,41 +865,11 @@ function App() {
     sessions,
     workspace,
     userNickname,
-    openTab,
+    initializeTabUIState,
+    updateTabTitle,
     getTabBySessionId,
     switchToTab,
   ]);
-
-  // Declarative tab management: Sync currentSessionId with backend tab state (Phase 2)
-  useEffect(() => {
-    const syncBackendTabState = async () => {
-      // Skip if no active session or workspace, or appState not loaded
-      if (!currentSessionId || !workspace || !appState) {
-        return;
-      }
-
-      // Check if backend already has a tab for this session
-      const backendTab = appState.openTabs.find((t) => t.sessionId === currentSessionId);
-
-      if (!backendTab) {
-        // Backend doesn't have tab for this session, create it
-        try {
-          await openBackendTab(currentSessionId, workspace.id);
-        } catch (error) {
-          console.error('[App] Failed to create backend tab:', error);
-        }
-      } else if (appState.activeTabId !== backendTab.id) {
-        // Backend has tab but it's not active, activate it
-        try {
-          await setActiveBackendTab(backendTab.id);
-        } catch (error) {
-          console.error('[App] Failed to activate backend tab:', error);
-        }
-      }
-    };
-
-    syncBackendTabState();
-  }, [currentSessionId, workspace, appState, openBackendTab, setActiveBackendTab]);
 
   const refreshCustomCommands = useCallback(async () => {
     try {
@@ -923,154 +949,6 @@ function App() {
     initializeSession();
   }, [sessionsLoading, workspace, sessions.length, createSession]);
 
-  // Load tasks
-  const refreshTasks = useCallback(async () => {
-    try {
-      const tasksList = await invoke<Task[]>('list_tasks');
-      setTasks(tasksList);
-      console.log('[App] Loaded tasks:', tasksList.length);
-    } catch (error) {
-      console.error('Failed to load tasks:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshTasks();
-  }, [refreshTasks]);
-
-  // Listen for task events (real-time task status updates)
-  useEffect(() => {
-    console.log('[App] Setting up task-event listener');
-    let unlistenFn: (() => void) | null = null;
-
-    (async () => {
-      unlistenFn = await listen<any>('task-event', async (event) => {
-      const payload = event.payload;
-
-      // Filter by event_type: Only process manually-sent task lifecycle events
-      const isTaskLifecycleEvent = payload.event_type === 'task_lifecycle';
-      const isOrchestratorEvent = payload.target?.includes('llm_toolkit') || payload.target?.includes('parallel_orchestrator');
-
-      if (!isTaskLifecycleEvent && !isOrchestratorEvent) {
-        // Skip auto-generated tracing events (event_type is null/undefined)
-        return;
-      }
-
-      // Extract task_id from fields
-      const taskId = payload.fields?.task_id;
-      const status = payload.fields?.status;
-
-      // Check for TaskExecutor lifecycle events by event_type marker
-      if (isTaskLifecycleEvent && taskId && payload.fields && status) {
-        // Manual events from TaskExecutor - update task list directly from event fields
-        console.log(`[App] 🎯 TaskExecutor lifecycle event: "${payload.message}", task_id: ${taskId}, status: ${status}`);
-
-        if (payload.fields) {
-          // Update task list optimistically from event fields (has all Task data)
-          setTasks((prevTasks) => {
-            const existingIndex = prevTasks.findIndex(t => t.id === taskId);
-
-            // Build updated task from event fields
-            const updatedTask: Task = {
-              id: payload.fields.taskId,
-              sessionId: payload.fields.sessionId,
-              title: payload.fields.title || '',
-              description: payload.fields.description || '',
-              status: payload.fields.status as TaskStatus,
-              createdAt: payload.fields.createdAt,
-              updatedAt: payload.fields.updatedAt,
-              completedAt: payload.fields.completedAt,
-              stepsExecuted: payload.fields.stepsExecuted || 0,
-              stepsSkipped: payload.fields.stepsSkipped || 0,
-              contextKeys: payload.fields.contextKeys || 0,
-              error: payload.fields.error,
-              result: payload.fields.result,
-              executionDetails: payload.fields.executionDetails,
-            };
-
-            if (existingIndex >= 0) {
-              // Update existing task
-              const newTasks = [...prevTasks];
-              newTasks[existingIndex] = updatedTask;
-              return newTasks;
-            } else {
-              // Add new task
-              return [updatedTask, ...prevTasks];
-            }
-          });
-        }
-
-        // Clear progress for completed/failed tasks
-        if (taskId && (status === 'Completed' || status === 'Failed')) {
-          setTaskProgress((prev) => {
-            const next = new Map(prev);
-            next.delete(taskId);
-            return next;
-          });
-        }
-      } else if (taskId) {
-        // TaskExecutor events with task_id
-        const status = payload.fields?.status;
-
-        // Task completed or failed - refresh from backend (redundant with above, but safe)
-        if (status === 'Completed' || status === 'Failed') {
-          console.log('[App] Task finished (from status field), refreshing from backend...');
-          await refreshTasks();
-
-          // Clear progress for this task
-          setTaskProgress((prev) => {
-            const next = new Map(prev);
-            next.delete(taskId);
-            return next;
-          });
-        } else {
-          // Optimistic update - extract progress info from event
-          setTaskProgress((prev) => {
-            const next = new Map(prev);
-            const progress: TaskProgress = {
-              taskId: taskId,
-              currentWave: payload.fields?.wave_number,
-              currentStep: payload.fields?.step_id,
-              currentAgent: payload.fields?.agent,
-              lastMessage: payload.message,
-              lastUpdated: Date.now(),
-            };
-            next.set(taskId, progress);
-            return next;
-          });
-        }
-      } else if (payload.target?.includes('llm_toolkit') || payload.target?.includes('parallel_orchestrator')) {
-        // ParallelOrchestrator internal events (no task_id) - extract from running tasks
-        // Find the currently running task and update its progress
-        const runningTask = tasks.find(t => t.status === 'Running');
-
-        if (runningTask) {
-          setTaskProgress((prev) => {
-            const next = new Map(prev);
-            const progress: TaskProgress = {
-              taskId: runningTask.id,
-              currentWave: payload.fields?.wave_number,
-              currentStep: payload.fields?.step_id,
-              currentAgent: payload.fields?.agent,
-              lastMessage: payload.message,
-              lastUpdated: Date.now(),
-            };
-            next.set(runningTask.id, progress);
-            return next;
-          });
-        }
-      }
-      });
-      console.log('[App] task-event listener registered successfully');
-    })();
-
-    return () => {
-      console.log('[App] Cleaning up task-event listener');
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
-  }, [refreshTasks]);
 
   // Listen for workspace-switched events to refresh workspace data and Git info
   useEffect(() => {
@@ -1113,16 +991,15 @@ function App() {
             if (!existingTab) {
               // タブがなければ開く
               const restoredMessages = convertSessionToMessages(activeSession, userNickname);
-              openTab(activeSession, restoredMessages, updatedWorkspace.id, true);
+              await openTab(activeSession.id, updatedWorkspace.id, activeSession.title, restoredMessages);
               console.log('[App] Opened tab for active session after workspace switch');
             } else {
               // 既にタブがあればフォーカス
-              switchToTab(existingTab.id);
+              await switchToTab(existingTab.id);
               console.log('[App] Focused existing tab for active session');
             }
           } else {
             console.log('[App] No active session');
-            setTasks([]);
           }
         } catch (error) {
           console.error('[App] Failed to load active session:', error);
@@ -1408,7 +1285,6 @@ function App() {
       setTabThinking,
       activeTabId,
       setStatus,
-      setTasks,
       status.activeTasks,
       status.connection,
       status.currentAgent,
@@ -1640,8 +1516,8 @@ function App() {
       const fullSession = await switchSession(newSession.id);
       const restoredMessages = convertSessionToMessages(fullSession, userNickname);
 
-      // 4. Open tab directly and get tabId
-      const tabId = openTab(fullSession, restoredMessages, workspace.id);
+      // 4. Open tab
+      const tabId = await openTab(newSession.id, workspace.id, fullSession.title, restoredMessages);
       console.log('[handleNewSessionWithFile] Opened tab:', tabId);
 
       // 5. Attach file to the newly created tab
@@ -1886,10 +1762,9 @@ function App() {
   };
 
   const handleTaskDelete = async (taskId: string) => {
-    // Delete task from backend
+    // Delete task from taskStore
     try {
-      await invoke('delete_task', { taskId });
-      await refreshTasks();
+      await deleteTaskFromStore(taskId);
       notifications.show({
         title: 'Task Deleted',
         message: 'Task has been removed',
@@ -1943,8 +1818,8 @@ function App() {
         } : null,
       });
 
-      // 4. タブを開く（session.workspaceIdを使用）
-      openTab(fullSession, restoredMessages, session.workspaceId);
+      // 4. タブを開く
+      await openTab(session.id, session.workspaceId, fullSession.title, restoredMessages);
 
       // Show toast notification
       notifications.show({
@@ -1970,7 +1845,7 @@ function App() {
       // タブも閉じる
       const tab = tabs.find(t => t.sessionId === sessionId);
       if (tab) {
-        await closeTabWithBackend(tab.id);
+        await closeTab(tab.id);
       }
 
       // Show toast notification
@@ -2482,13 +2357,12 @@ function App() {
                                       // 4c. Backend Session切り替え
                                       await switchSession(nextSession.id);
 
-                                      // 4d. 次のSessionのTabを開く（既に開いていればフォーカス）
-                                      // openTab()は既存タブがあれば更新してフォーカス、なければ新規作成
+                                      // 4d. タブを開く
                                       const messages = convertSessionToMessages(nextSession, userNickname);
-                                      openTab(nextSession, messages, workspace.id, true);
+                                      await openTab(nextSession.id, workspace.id, nextSession.title, messages);
 
-                                      // 4e. 古いタブを閉じる（次のSessionに切り替え後）
-                                      await closeTabWithBackend(tab.id);
+                                      // 4f. 古いタブを閉じる（次のSessionに切り替え後）
+                                      await closeTab(tab.id);
                                     } catch (err) {
                                       console.error('[App] Failed to switch to next session:', err);
                                     }
@@ -2502,7 +2376,7 @@ function App() {
                                   }
                                 } else {
                                   // 非ActiveSessionのTab Closeの場合、単純に閉じる
-                                  await closeTabWithBackend(tab.id);
+                                  await closeTab(tab.id);
                                 }
                               }}
                             >

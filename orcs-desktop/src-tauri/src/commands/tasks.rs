@@ -3,6 +3,16 @@ use tauri::State;
 
 use crate::app::AppState;
 
+/// Gets all tasks snapshot (for store initialization)
+#[tauri::command]
+pub async fn get_tasks_snapshot(state: State<'_, AppState>) -> Result<Vec<orcs_core::task::Task>, String> {
+    state
+        .task_repository
+        .list_all()
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Lists all saved tasks
 #[tauri::command]
 pub async fn list_tasks(state: State<'_, AppState>) -> Result<Vec<orcs_core::task::Task>, String> {

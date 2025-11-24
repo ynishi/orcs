@@ -34,7 +34,6 @@ import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention, normalizeMentionsInText } from "./utils/mentionParser";
 import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
 import { changeExecutionStrategy } from "./services/executionStrategyService";
-import { changeConversationMode } from "./services/conversationModeService";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages } from "./types/session";
@@ -87,7 +86,6 @@ function App() {
     repo_name: null,
   });
   const [customCommands, setCustomCommands] = useState<SlashCommand[]>([]);
-  const [conversationMode, setConversationMode] = useState<string>('normal');
   const [executionStrategy, setExecutionStrategy] = useState<string>('sequential');
   const [personas, setPersonas] = useState<import('./types/agent').PersonaConfig[]>([]);
   const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
@@ -123,7 +121,13 @@ function App() {
   const initializeWorkspace = useWorkspaceStore((state) => state.initialize);
 
   // Session Settings Store (Rust SSOT)
-  const { talkStyle, updateTalkStyle, loadSettings: loadSessionSettings } = useSessionSettingsStore();
+  const {
+    talkStyle,
+    conversationMode,
+    updateTalkStyle,
+    updateConversationMode,
+    loadSettings: loadSessionSettings,
+  } = useSessionSettingsStore();
 
   // Initialize AppState Store on mount
   useEffect(() => {
@@ -560,25 +564,7 @@ function App() {
     loadGitInfo();
   }, []);
 
-  // Load conversation mode, talk style, and execution strategy on session change
-  useEffect(() => {
-    const loadConversationSettings = async () => {
-      if (!currentSessionId) return;
-
-      try {
-        const mode = await invoke<string>('get_conversation_mode');
-        setConversationMode(mode);
-      } catch (error) {
-        console.error('Failed to load conversation mode:', error);
-      }
-
-      // Note: talkStyle is now loaded via sessionSettingsStore
-      // Note: execution_strategy is now loaded from Session object in loadActiveSessionMessages effect
-    };
-    loadConversationSettings();
-  }, [currentSessionId]);
-
-  // Load session settings on session change
+  // Load session settings on session change (includes conversationMode, talkStyle, etc.)
   useEffect(() => {
     if (currentSessionId) {
       loadSessionSettings(currentSessionId).catch((error) => {
@@ -1098,7 +1084,7 @@ function App() {
     allWorkspaces,
     workspaceFiles,
     switchWorkspace: switchWorkspaceBackend,
-    setConversationMode,
+    // Note: conversationMode is now managed by Store, removed setConversationMode
     // Note: talkStyle is now managed by Store, removed setTalkStyle
     setInput: (value) => {
       if (activeTabId) {
@@ -1977,11 +1963,8 @@ function App() {
   };
 
   const handleConversationModeChange = async (mode: string) => {
-    // Update local state
-    setConversationMode(mode);
-
-    // Delegate to service layer
-    await changeConversationMode(mode, { invoke, addMessage });
+    // Delegate to Store (which handles service layer)
+    await updateConversationMode(mode, addMessage);
   };
 
   const handleTalkStyleChange = async (value: string | null) => {
@@ -2043,8 +2026,7 @@ function App() {
       if (preset) {
         // Update local state immediately for better UX
         setExecutionStrategy(preset.executionStrategy);
-        setConversationMode(preset.conversationMode);
-        // Note: talkStyle is managed by Store, reload settings to reflect preset changes
+        // Note: conversationMode & talkStyle are managed by Store, reload settings to reflect preset changes
         await loadSessionSettings(currentSessionId || '');
 
         await handleAndPersistSystemMessage(

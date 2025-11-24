@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { PersonaConfig } from '../types/agent';
 import type { MessageType } from '../types/message';
 import { changeTalkStyle } from '../services/talkStyleService';
+import { changeConversationMode } from '../services/conversationModeService';
 
 export type MessageCallback = (type: MessageType, author: string, text: string) => void;
 
@@ -94,9 +95,23 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     }
   },
 
-  updateConversationMode: async (mode: string, _addMessage: MessageCallback) => {
-    // To be implemented
+  updateConversationMode: async (mode: string, addMessage: MessageCallback) => {
     console.log('[SessionSettingsStore] updateConversationMode called:', mode);
+
+    // Optimistic update
+    const currentMode = get().conversationMode;
+    set({ conversationMode: mode });
+
+    try {
+      // Delegate to service layer
+      await changeConversationMode(mode, { invoke, addMessage });
+      console.log('[SessionSettingsStore] ConversationMode updated successfully');
+    } catch (error) {
+      console.error('[SessionSettingsStore] Failed to update ConversationMode:', error);
+      // Revert optimistic update
+      set({ conversationMode: currentMode });
+      throw error;
+    }
   },
 
   updateExecutionStrategy: async (strategy: string, _addMessage: MessageCallback) => {

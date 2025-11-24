@@ -123,6 +123,7 @@ function App() {
     executionStrategy,
     personas,
     activeParticipantIds,
+    isLoaded: sessionSettingsLoaded,
     updateTalkStyle,
     updateConversationMode,
     updateExecutionStrategy,
@@ -578,7 +579,7 @@ function App() {
   // Load active session messages on startup or when currentSessionId changes
   useEffect(() => {
     const loadActiveSessionMessages = async () => {
-      if (!currentSessionId || sessionsLoading) {
+      if (!currentSessionId || sessionsLoading || !sessionSettingsLoaded) {
         return;
       }
 
@@ -695,9 +696,10 @@ function App() {
     };
 
     loadActiveSessionMessages();
-  }, [currentSessionId, sessionsLoading, userNickname, personas, workspace, openTab, getTabBySessionId]);
+  }, [currentSessionId, sessionsLoading, sessionSettingsLoaded, userNickname, personas, workspace, openTab, getTabBySessionId]);
   // Note: `sessions` removed from deps to avoid unnecessary re-renders
   // We only use sessions.find() inside, which is called on-demand
+  // Note: sessionSettingsLoaded ensures Store is ready before loading messages
 
   // Restore tabs from backend on app startup (Phase 2)
   useEffect(() => {

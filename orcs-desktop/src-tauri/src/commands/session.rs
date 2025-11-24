@@ -1246,7 +1246,7 @@ pub async fn update_auto_chat_config(
 pub async fn get_auto_chat_status(
     session_id: String,
     state: State<'_, AppState>,
-) -> Result<Option<u32>, String> {
+) -> Result<Option<i32>, String> {
     // Get the current active session's manager
     let manager = state
         .session_usecase

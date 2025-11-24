@@ -6,6 +6,7 @@
 use super::app_mode::{AppMode, ConversationMode};
 use super::message::ConversationMessage;
 use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
+use schema_bridge::SchemaBridge;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -17,10 +18,10 @@ pub const PLACEHOLDER_WORKSPACE_ID: &str = "___workspace_placeholder___";
 ///
 /// AutoChat enables automatic multi-round dialogue where agents continue
 /// discussing until a stop condition is met.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SchemaBridge)]
 pub struct AutoChatConfig {
     /// Maximum number of dialogue iterations
-    pub max_iterations: u32,
+    pub max_iterations: i32,
     /// Stop condition strategy
     pub stop_condition: StopCondition,
     /// Enable WebSearch during auto-chat
@@ -38,7 +39,7 @@ impl Default for AutoChatConfig {
 }
 
 /// Stop condition for AutoChat mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
 #[serde(rename_all = "snake_case")]
 pub enum StopCondition {
     /// Stop after reaching max_iterations
@@ -62,6 +63,32 @@ pub enum StopCondition {
 ///
 /// This is the "pure" domain model that business logic operates on,
 /// independent of any specific storage format or version.
+///
+/// # Type System Architecture
+///
+/// - **Domain Model**: `Session` (this type) - Full entity with all fields including external types
+/// - **DTO Layer**: `SessionV4_2_0` - Persistence format in `orcs_infrastructure::dto::session`
+/// - **Schema Type**: `SessionType` - TypeScript generation in `crate::schema`
+///
+/// # External Type Dependencies
+///
+/// This struct currently uses external types from `llm_toolkit`:
+/// - `execution_strategy: ExecutionModel` - Multi-agent execution strategy
+/// - `talk_style: Option<TalkStyle>` - Dialogue context style
+///
+/// **Future Migration**: These will be migrated to internal wrapper types
+/// (`ExecutionModelType`, `TalkStyleType`) to enable full TypeScript type generation.
+/// See `crate::schema::SessionType` for the migration marker implementation.
+///
+/// # TypeScript Type Generation
+///
+/// Use `SessionType` from `crate::schema` for TypeScript type generation.
+/// This domain model cannot directly use `SchemaBridge` derive due to:
+/// 1. Complex nested type: `persona_histories: HashMap<String, Vec<ConversationMessage>>`
+/// 2. External types: `ExecutionModel` and `TalkStyle` from llm-toolkit
+///
+/// The DTO layer (`SessionV4_2_0`) handles conversion between Session and persistence format,
+/// isolating the domain model from external crate changes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Session {
     /// Unique session identifier (UUID format)

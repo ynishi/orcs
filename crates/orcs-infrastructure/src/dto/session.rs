@@ -932,6 +932,35 @@ pub struct SessionV4_1_0 {
 }
 
 /// V4.2.0: Added is_muted for memo mode
+///
+/// # Type System Architecture
+///
+/// This is the persistence DTO (Data Transfer Object) for Session entities.
+/// It serves as an Anti-Corruption Layer isolating the domain model from
+/// external type changes in llm-toolkit.
+///
+/// - **Domain Model**: `orcs_core::session::Session` - Full entity with external types
+/// - **DTO Layer**: `SessionV4_2_0` (this type) - Persistence format using internal DTOs
+/// - **Schema Type**: `orcs_core::schema::SessionType` - TypeScript generation
+///
+/// # External Type Isolation
+///
+/// This DTO uses `ExecutionStrategyV2_0_0` (lines 14-104) and `TalkStyle` to isolate
+/// the domain model from llm-toolkit's ExecutionModel changes:
+///
+/// - `execution_strategy: ExecutionStrategyV2_0_0` - Internal DTO enum
+/// - `talk_style: Option<TalkStyle>` - External type (still used in DTO for backward compatibility)
+///
+/// # Conversion Logic
+///
+/// - **IntoDomain** (lines 1503-1536): Converts DTO → Domain model
+///   - ExecutionStrategyV2_0_0 → ExecutionModel via `.into_domain()`
+/// - **FromDomain** (lines 1539-1597): Converts Domain model → DTO
+///   - ExecutionModel → ExecutionStrategyV2_0_0 via `.from_domain()`
+///
+/// # Migration Path
+///
+/// See `orcs_core::session::Session` RustDoc for full migration plan to internal types.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Versioned)]
 #[versioned(version = "4.2.0")]
 pub struct SessionV4_2_0 {

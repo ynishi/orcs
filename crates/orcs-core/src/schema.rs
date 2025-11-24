@@ -181,6 +181,131 @@ impl From<PresetSourceType> for PresetSource {
     }
 }
 
+/// Session metadata for TypeScript type generation.
+///
+/// This is a simplified view of `crate::session::Session` that excludes
+/// `persona_histories` (HashMap<String, Vec<ConversationMessage>>) which
+/// schema-bridge cannot yet fully support.
+///
+/// This type serves two purposes:
+/// 1. **TypeScript Generation**: Enables automatic TypeScript type generation
+///    for Session entity without HashMap<Vec> complexity.
+/// 2. **Future Migration Marker**: The `From<SessionType> for Session` implementation
+///    is intentionally unused but ensures compiler errors if Session structure changes,
+///    guiding developers to update this type accordingly.
+///
+/// # Relationship with Domain Model
+///
+/// - **Domain Model**: `crate::session::Session` - Full entity with all fields
+/// - **DTO Layer**: `crate::infrastructure::dto::session::SessionV4_2_0` - Persistence format
+/// - **Schema Type**: `SessionType` - TypeScript generation (this type)
+///
+/// # Fields Excluded
+///
+/// - `persona_histories: HashMap<String, Vec<ConversationMessage>>` - Complex nested type
+///
+/// # TypeScript Output
+///
+/// Generates TypeScript interface with all metadata fields for frontend use.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionType {
+    /// Unique session identifier (UUID format)
+    pub id: String,
+    /// Human-readable session title
+    pub title: String,
+    /// Timestamp when the session was created (ISO 8601 format)
+    pub created_at: String,
+    /// Timestamp when the session was last updated (ISO 8601 format)
+    pub updated_at: String,
+    /// The currently active persona ID (UUID format)
+    pub current_persona_id: String,
+    /// Workspace ID - all sessions must be associated with a workspace
+    pub workspace_id: String,
+    /// Active participant persona IDs
+    pub active_participant_ids: Vec<String>,
+    /// Execution strategy for multi-agent dialogue
+    pub execution_strategy: ExecutionModelType,
+    /// Participant persona ID to name mapping for display
+    pub participants: std::collections::HashMap<String, String>,
+    /// Participant persona ID to icon mapping for display
+    pub participant_icons: std::collections::HashMap<String, String>,
+    /// Participant persona ID to base color mapping for UI theming
+    pub participant_colors: std::collections::HashMap<String, String>,
+    /// Participant persona ID to backend mapping (e.g., "claude_api", "gemini_cli")
+    pub participant_backends: std::collections::HashMap<String, String>,
+    /// Participant persona ID to model name mapping (e.g., "claude-sonnet-4-5-20250929")
+    pub participant_models: std::collections::HashMap<String, String>,
+    /// Conversation mode (controls verbosity and style)
+    pub conversation_mode: ConversationModeType,
+    /// Talk style for dialogue context (Brainstorm, Debate, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub talk_style: Option<TalkStyleType>,
+    /// Whether this session is marked as favorite (pinned to top)
+    pub is_favorite: bool,
+    /// Whether this session is archived (hidden by default)
+    pub is_archived: bool,
+    /// Manual sort order (optional, for custom ordering within favorites)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<i32>,
+    /// Whether this session is muted (AI won't respond to messages)
+    pub is_muted: bool,
+}
+
+/// Conversion from SessionType to Session domain model.
+///
+/// **NOTE**: This implementation is intentionally unused in current codebase.
+/// Its purpose is to serve as a compiler-enforced marker for future migration
+/// from `ExecutionModel`/`TalkStyle` (external types from llm-toolkit) to
+/// `ExecutionModelType`/`TalkStyleType` (internal schema types).
+///
+/// When Session struct is migrated to use internal types, this implementation
+/// will guide developers to update SessionType accordingly through compiler errors.
+///
+/// # Migration Plan
+///
+/// 1. Change Session.execution_strategy: ExecutionModel → ExecutionModelType
+/// 2. Change Session.talk_style: Option<TalkStyle> → Option<TalkStyleType>
+/// 3. Update this From implementation (compiler will flag outdated conversions)
+/// 4. Update DTO layer conversions in infrastructure crate
+///
+/// For detailed migration plan, see workspace/ENTITY_SSOT_STATUS.md
+impl From<SessionType> for crate::session::Session {
+    fn from(value: SessionType) -> Self {
+        use crate::session::Session;
+
+        Session {
+            id: value.id,
+            title: value.title,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+            current_persona_id: value.current_persona_id,
+            persona_histories: std::collections::HashMap::new(), // Excluded from SessionType
+            app_mode: crate::session::AppMode::Idle, // Default value
+            workspace_id: value.workspace_id,
+            active_participant_ids: value.active_participant_ids,
+            execution_strategy: value.execution_strategy.into(), // ExecutionModelType → ExecutionModel
+            system_messages: Vec::new(),                         // Excluded from SessionType
+            participants: value.participants,
+            participant_icons: value.participant_icons,
+            participant_colors: value.participant_colors,
+            participant_backends: value.participant_backends,
+            participant_models: value
+                .participant_models
+                .into_iter()
+                .map(|(k, v)| (k, Some(v)))
+                .collect(),
+            conversation_mode: value.conversation_mode.into(), // ConversationModeType → ConversationMode
+            talk_style: value.talk_style.map(|ts| ts.into()),  // TalkStyleType → TalkStyle
+            is_favorite: value.is_favorite,
+            is_archived: value.is_archived,
+            sort_order: value.sort_order,
+            auto_chat_config: None, // Excluded from SessionType
+            is_muted: value.is_muted,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

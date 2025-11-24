@@ -125,14 +125,14 @@ pub enum StreamingDialogueTurnKind {
     /// AutoChat iteration progress update
     AutoChatProgress {
         /// Current iteration number (1-indexed)
-        current_iteration: u32,
+        current_iteration: i32,
         /// Maximum iterations configured
-        max_iterations: u32,
+        max_iterations: i32,
     },
     /// AutoChat completion notification
     AutoChatComplete {
         /// Total iterations completed
-        total_iterations: u32,
+        total_iterations: i32,
     },
 }
 
@@ -415,7 +415,7 @@ pub struct InteractionManager {
     /// AutoChat configuration (None means AutoChat is disabled)
     auto_chat_config: Arc<RwLock<Option<AutoChatConfig>>>,
     /// Current iteration in AutoChat mode (None when not running)
-    auto_chat_iteration: Arc<RwLock<Option<u32>>>,
+    auto_chat_iteration: Arc<RwLock<Option<i32>>>,
     /// Optional prompt extension appended to system prompt
     prompt_extension: Arc<RwLock<Option<String>>>,
     /// Whether this session is muted (AI won't respond to messages)
@@ -1202,12 +1202,12 @@ impl InteractionManager {
     }
 
     /// Gets the current AutoChat iteration (None if not running).
-    pub async fn get_auto_chat_iteration(&self) -> Option<u32> {
+    pub async fn get_auto_chat_iteration(&self) -> Option<i32> {
         *self.auto_chat_iteration.read().await
     }
 
     /// Sets the current AutoChat iteration.
-    pub async fn set_auto_chat_iteration(&self, iteration: Option<u32>) {
+    pub async fn set_auto_chat_iteration(&self, iteration: Option<i32>) {
         *self.auto_chat_iteration.write().await = iteration;
     }
 

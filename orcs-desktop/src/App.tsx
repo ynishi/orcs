@@ -766,21 +766,13 @@ function App() {
           continue;
         }
 
-        // Get full session data with personaHistories (needed for convertSessionToMessages)
-        let fullSession;
-        try {
-          fullSession = await invoke<Session>('get_session', { sessionId: backendTab.sessionId });
-        } catch (error) {
-          console.error('[App] Failed to load full session data:', error);
-          continue;
-        }
-
-        // Load messages with preview data for active tab
-        let restoredMessages = convertSessionToMessages(fullSession, userNickname);
+        // Use session data from sessions array (includes personaHistories)
+        // Note: sessions array is loaded by SessionContext with full data
+        let restoredMessages = convertSessionToMessages(session, userNickname);
         console.log('[App] Restored messages for active tab:', {
           tabId: backendTab.id.substring(0, 8),
           sessionId: backendTab.sessionId.substring(0, 8),
-          title: fullSession.title,
+          title: session.title,
           messagesCount: restoredMessages.length,
         });
 

@@ -42,7 +42,7 @@ interface UseSlashCommandsProps {
   workspaceFiles: UploadedFile[];
   switchWorkspace: (sessionId: string, workspaceId: string) => Promise<void>;
   setConversationMode: (mode: string) => void;
-  setTalkStyle: (style: string | null) => void;
+  setTalkStyle?: (style: string | null) => void; // Optional: migrating to Store
   setInput: (value: string) => void;
   refreshPersonas: () => Promise<void>;
   refreshSessions: () => Promise<void>;
@@ -58,7 +58,7 @@ export function useSlashCommands({
   workspaceFiles,
   switchWorkspace,
   setConversationMode,
-  setTalkStyle,
+  // Note: setTalkStyle is now optional (migrating to Store)
   setInput,
   refreshPersonas,
   refreshSessions,
@@ -679,7 +679,7 @@ Generate the BlueprintWorkflow now.`;
               try {
                 const styleValue = style === 'none' ? null : style;
                 await invoke('set_talk_style', { style: styleValue });
-                setTalkStyle(styleValue);
+                // Note: talkStyle is now managed by Store, local state update removed
                 const styleLabels: Record<string, string> = {
                   brainstorm: 'ブレインストーミング (Brainstorm)',
                   casual: 'カジュアル (Casual)',
@@ -907,7 +907,7 @@ Generate the BlueprintWorkflow now.`;
       workspaceFiles,
       switchWorkspace,
       setConversationMode,
-      setTalkStyle,
+      // Note: setTalkStyle removed (migrating to Store)
       setInput,
       refreshPersonas,
       refreshSessions,

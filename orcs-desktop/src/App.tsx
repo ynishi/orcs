@@ -33,7 +33,6 @@ import { parseCommand, extractSlashCommands } from "./utils/commandParser";
 import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
 import { extractMentions, getCurrentMention, normalizeMentionsInText } from "./utils/mentionParser";
 import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
-import { changeTalkStyle } from "./services/talkStyleService";
 import { changeExecutionStrategy } from "./services/executionStrategyService";
 import { changeConversationMode } from "./services/conversationModeService";
 import { useSessions } from "./hooks/useSessions";
@@ -47,6 +46,7 @@ import { ChatPanel } from "./components/chat/ChatPanel";
 import type { SessionEvent } from "./types/session_event";
 import { useAppStateStore } from "./stores/appStateStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
+import { useSessionSettingsStore } from "./stores/sessionSettingsStore";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -88,7 +88,6 @@ function App() {
   });
   const [customCommands, setCustomCommands] = useState<SlashCommand[]>([]);
   const [conversationMode, setConversationMode] = useState<string>('normal');
-  const [talkStyle, setTalkStyle] = useState<string | null>(null);
   const [executionStrategy, setExecutionStrategy] = useState<string>('sequential');
   const [personas, setPersonas] = useState<import('./types/agent').PersonaConfig[]>([]);
   const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
@@ -122,6 +121,9 @@ function App() {
 
   // Workspace Store (Rust SSOT - Phase 4)
   const initializeWorkspace = useWorkspaceStore((state) => state.initialize);
+
+  // Session Settings Store (Rust SSOT)
+  const { talkStyle, updateTalkStyle, loadSettings: loadSessionSettings } = useSessionSettingsStore();
 
   // Initialize AppState Store on mount
   useEffect(() => {
@@ -570,17 +572,20 @@ function App() {
         console.error('Failed to load conversation mode:', error);
       }
 
-      try {
-        const style = await invoke<string | null>('get_talk_style');
-        setTalkStyle(style);
-      } catch (error) {
-        console.error('Failed to load talk style:', error);
-      }
-
+      // Note: talkStyle is now loaded via sessionSettingsStore
       // Note: execution_strategy is now loaded from Session object in loadActiveSessionMessages effect
     };
     loadConversationSettings();
   }, [currentSessionId]);
+
+  // Load session settings on session change
+  useEffect(() => {
+    if (currentSessionId) {
+      loadSessionSettings(currentSessionId).catch((error) => {
+        console.error('Failed to load session settings:', error);
+      });
+    }
+  }, [currentSessionId, loadSessionSettings]);
 
   // Load active session messages on startup or when currentSessionId changes
   useEffect(() => {
@@ -1094,7 +1099,7 @@ function App() {
     workspaceFiles,
     switchWorkspace: switchWorkspaceBackend,
     setConversationMode,
-    setTalkStyle,
+    // Note: talkStyle is now managed by Store, removed setTalkStyle
     setInput: (value) => {
       if (activeTabId) {
         updateTabInput(activeTabId, value);
@@ -1982,11 +1987,8 @@ function App() {
   const handleTalkStyleChange = async (value: string | null) => {
     const style = value || null;
 
-    // Update local state
-    setTalkStyle(style);
-
-    // Delegate to service layer
-    await changeTalkStyle(style, { invoke, addMessage });
+    // Delegate to Store (which handles service layer)
+    await updateTalkStyle(style, addMessage);
   };
 
 
@@ -2036,13 +2038,14 @@ function App() {
       // Apply preset via backend
       await invoke('apply_dialogue_preset', { presetId });
 
-      // Find the preset to update local state
+      // Find the preset to show success message
       const preset = dialoguePresets.find(p => p.id === presetId);
       if (preset) {
         // Update local state immediately for better UX
         setExecutionStrategy(preset.executionStrategy);
         setConversationMode(preset.conversationMode);
-        setTalkStyle(preset.talkStyle || null);
+        // Note: talkStyle is managed by Store, reload settings to reflect preset changes
+        await loadSessionSettings(currentSessionId || '');
 
         await handleAndPersistSystemMessage(
           conversationMessage(`プリセット「${preset.name}」を適用しました`, 'success'),

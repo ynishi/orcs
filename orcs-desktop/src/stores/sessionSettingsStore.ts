@@ -134,9 +134,32 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     }
   },
 
-  toggleParticipant: async (personaId: string, isActive: boolean, _addMessage: MessageCallback) => {
-    // To be implemented
+  toggleParticipant: async (personaId: string, isActive: boolean, addMessage: MessageCallback) => {
     console.log('[SessionSettingsStore] toggleParticipant called:', personaId, isActive);
+
+    const persona = get().personas.find(p => p.id === personaId);
+    if (!persona) {
+      console.error('[SessionSettingsStore] Persona not found:', personaId);
+      return;
+    }
+
+    try {
+      if (isActive) {
+        await invoke('add_participant', { personaId });
+        addMessage('system', 'System', `${persona.name} が会話に参加しました`);
+      } else {
+        await invoke('remove_participant', { personaId });
+        addMessage('system', 'System', `${persona.name} が会話から退出しました`);
+      }
+
+      // Refresh to update active participant list
+      await get().refreshPersonas();
+      console.log('[SessionSettingsStore] Participant toggled successfully');
+    } catch (error) {
+      console.error('[SessionSettingsStore] Failed to toggle participant:', error);
+      addMessage('error', 'System', `Failed to update participant: ${error}`);
+      throw error;
+    }
   },
 
   refreshPersonas: async () => {

@@ -85,8 +85,6 @@ function App() {
     repo_name: null,
   });
   const [customCommands, setCustomCommands] = useState<SlashCommand[]>([]);
-  const [personas, setPersonas] = useState<import('./types/agent').PersonaConfig[]>([]);
-  const [activeParticipantIds, setActiveParticipantIds] = useState<string[]>([]);
   const [dialoguePresets, setDialoguePresets] = useState<import('./types/conversation').DialoguePreset[]>([]);
 
   // セッション管理をカスタムフックに切り替え
@@ -123,9 +121,13 @@ function App() {
     talkStyle,
     conversationMode,
     executionStrategy,
+    personas,
+    activeParticipantIds,
     updateTalkStyle,
     updateConversationMode,
     updateExecutionStrategy,
+    toggleParticipant,
+    refreshPersonas,
     loadSettings: loadSessionSettings,
   } = useSessionSettingsStore();
 
@@ -890,31 +892,8 @@ function App() {
     refreshDialoguePresets();
   }, [refreshDialoguePresets]);
 
-  // Load personas and active participants
-  const refreshPersonas = useCallback(async () => {
-    // セッションがない場合はスキップ（バックエンドが"No active session"エラーを返すため）
-    if (!currentSessionId) {
-      console.log('[refreshPersonas] No active session, skipping');
-      return;
-    }
-
-    try {
-      const personasList = await invoke<import('./types/agent').PersonaConfig[]>('get_personas');
-      const activeIds = await invoke<string[]>('get_active_participants');
-      setPersonas(personasList);
-      setActiveParticipantIds(activeIds);
-      // Note: execution_strategy is loaded from Session object, not from backend command
-    } catch (error) {
-      console.error('Failed to load personas:', error);
-    }
-  }, [currentSessionId]);
-
-  // セッションが変わったら persona を再読み込み
-  useEffect(() => {
-    if (currentSessionId) {
-    refreshPersonas();
-    }
-  }, [currentSessionId, refreshPersonas]);
+  // Note: Personas and activeParticipantIds are now loaded via sessionSettingsStore
+  // in loadSessionSettings useEffect (triggered on session change)
 
   // 初回セッション自動作成（Workspace がある場合のみ）
   useEffect(() => {
@@ -1978,36 +1957,8 @@ function App() {
   };
 
   const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
-    try {
-      const persona = personas.find(p => p.id === personaId);
-      if (!persona) return;
-
-      if (isChecked) {
-        await invoke('add_participant', { personaId });
-        await handleAndPersistSystemMessage(
-          conversationMessage(`${persona.name} が会話に参加しました`, 'success'),
-          addMessage,
-          invoke
-        );
-      } else {
-        await invoke('remove_participant', { personaId });
-        await handleAndPersistSystemMessage(
-          conversationMessage(`${persona.name} が会話から退出しました`, 'info'),
-          addMessage,
-          invoke
-        );
-      }
-
-      // Refresh personas to update active participant list
-      await refreshPersonas();
-    } catch (error) {
-      console.error(error);
-      await handleAndPersistSystemMessage(
-        conversationMessage(`Failed to update participant: ${error}`, 'error'),
-        addMessage,
-        invoke
-      );
-    }
+    // Delegate to Store
+    await toggleParticipant(personaId, isChecked, addMessage);
   };
 
   const handleApplyPreset = async (presetId: string) => {

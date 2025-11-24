@@ -44,6 +44,7 @@ import { notifications } from '@mantine/notifications';
 interface ChatPanelProps {
   tab: SessionTab;
   isActive: boolean; // Whether this tab is currently active
+  currentSessionId: string | null; // Backend's active session ID
   status: StatusInfo;
   userNickname: string;
   gitInfo: GitInfo;
@@ -139,6 +140,7 @@ function onSaveExecHandlersEqual(
 export function ChatPanel({
   tab,
   isActive,
+  currentSessionId,
   status,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   // @ts-ignore - userNickname may be used in future features
@@ -219,6 +221,16 @@ export function ChatPanel({
       return;
     }
 
+    // Only load when backend session matches tab session
+    if (currentSessionId !== tab.sessionId) {
+      // Backend session hasn't switched yet, wait for next trigger
+      console.log('[ChatPanel] Skipping AutoChat config load: session mismatch', {
+        tabSessionId: tab.sessionId.substring(0, 8),
+        currentSessionId: currentSessionId?.substring(0, 8) || 'null',
+      });
+      return;
+    }
+
     const loadAutoChatConfig = async () => {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
@@ -257,7 +269,7 @@ export function ChatPanel({
     };
 
     loadAutoChatConfig();
-  }, [tab.sessionId, isActive]); // Reload when tab changes or becomes active
+  }, [tab.sessionId, currentSessionId, isActive]); // Reload when tab changes, backend session changes, or becomes active
 
   // Load mute status from backend when tab changes
   // Only load for active tab to reduce unnecessary backend calls

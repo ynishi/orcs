@@ -2335,7 +2335,8 @@ function App() {
                     <ChatPanel
                       tab={tab}
                       isActive={activeTabId === tab.id}
-              status={status}
+                      currentSessionId={currentSessionId}
+                      status={status}
                       userNickname={userNickname}
               gitInfo={gitInfo}
               autoMode={autoMode}

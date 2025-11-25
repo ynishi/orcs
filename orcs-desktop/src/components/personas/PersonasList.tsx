@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip, Select, Badge } from '@mantine/core';
-import { IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconPlus, IconPencil, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
@@ -338,7 +338,7 @@ export function PersonasList({
                   }
                 }}
               >
-                💾
+                <IconDeviceFloppy size={14} />
               </ActionIcon>
             </Tooltip>
           )}

@@ -1,7 +1,7 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, Badge, Switch } from '@mantine/core';
-import { IconDeviceFloppy } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconFolder, IconClipboard, IconChartBar, IconFileText, IconTrash } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import { Task, TaskProgress, getTaskIcon } from '../../types/task';
+import { Task, TaskProgress } from '../../types/task';
 import { Session } from '../../types/session';
 import { Workspace } from '../../types/workspace';
 import { useState } from 'react';
@@ -172,9 +172,9 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
           {/* Working Dir Tooltip */}
           {workspace && (
             <Tooltip label={`Working Dir: ${workspace.rootPath}`} withArrow>
-              <Text size="xs" c="dimmed" style={{ marginRight: 'auto' }}>
-                📁
-              </Text>
+              <Box style={{ marginRight: 'auto', display: 'flex', alignItems: 'center' }}>
+                <IconFolder size={14} color="gray" />
+              </Box>
             </Tooltip>
           )}
 
@@ -190,7 +190,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
                   handleCopyTaskOutput(task);
                 }}
               >
-                📋
+                <IconClipboard size={16} />
               </ActionIcon>
             </Tooltip>
           )}
@@ -207,7 +207,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
                   handleDownloadStrategy(task);
                 }}
               >
-                📊
+                <IconChartBar size={16} />
               </ActionIcon>
             </Tooltip>
           )}
@@ -224,7 +224,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
                   handleDownloadJournalLog(task);
                 }}
               >
-                📜
+                <IconFileText size={16} />
               </ActionIcon>
             </Tooltip>
           )}
@@ -251,7 +251,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
               color="red"
               onClick={() => onTaskDelete?.(task.id)}
             >
-              🗑️
+              <IconTrash size={16} />
             </ActionIcon>
           </Tooltip>
         </Group>
@@ -259,9 +259,6 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
         {/* コンテンツエリア */}
         <Box p="md">
           <Group gap="sm" wrap="nowrap">
-            {/* ステータスアイコン */}
-            <Text size="lg">{getTaskIcon(task.status)}</Text>
-
             {/* タスク内容 */}
             <Box style={{ flex: 1, minWidth: 0 }}>
               <Text
@@ -279,7 +276,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
               {task.status === 'Pending' && (
                 <Box mt={4} p={4} style={{ backgroundColor: '#e3fafc', borderRadius: '4px' }}>
                   <Text size="xs" c="cyan" fw={500}>
-                    📋 Generating execution strategy...
+                    Generating execution strategy...
                   </Text>
                 </Box>
               )}
@@ -366,9 +363,19 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
     <Stack gap="md" h="100%">
       {/* ヘッダー */}
       <Group justify="space-between" px="md" pt="md">
-        <Text size="lg" fw={700}>
-          Tasks
-        </Text>
+        <Group gap="xs">
+          <Text size="lg" fw={700}>
+            Tasks
+          </Text>
+          <Badge size="xs" variant="light" color="orange">
+            BETA
+          </Badge>
+          <Tooltip label="Tasks use a fixed model and may be slower" withArrow>
+            <Text size="xs" c="dimmed" style={{ cursor: 'help' }}>
+              ⓘ
+            </Text>
+          </Tooltip>
+        </Group>
         <Text size="sm" c="dimmed">
           {activeTasks.length} active
         </Text>
@@ -432,7 +439,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
                 No tasks yet
               </Text>
               <Text size="xs" c="dimmed" mt="xs">
-                Click 🚀 on a message to execute it as a task
+                Click on a message to execute it as a task
               </Text>
             </Box>
           )}

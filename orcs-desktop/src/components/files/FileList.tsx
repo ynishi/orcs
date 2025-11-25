@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton, Tooltip, Switch } from '@mantine/core';
-import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
+import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown, IconFile, IconFileText, IconBrandJavascript, IconBrandTypescript, IconSettings, IconClipboard } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
 import { useState, useMemo } from 'react';
@@ -133,15 +133,15 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
   const getFileIcon = (file: UploadedFile) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
     switch (ext) {
-      case 'rs': return '🦀';
+      case 'rs': return <IconFile size={16} color="orange" />;
       case 'ts':
-      case 'tsx': return '📘';
+      case 'tsx': return <IconBrandTypescript size={16} color="blue" />;
       case 'js':
-      case 'jsx': return '📜';
-      case 'md': return '📝';
-      case 'json': return '⚙️';
-      case 'toml': return '📋';
-      default: return '📄';
+      case 'jsx': return <IconBrandJavascript size={16} color="yellow" />;
+      case 'md': return <IconFileText size={16} color="gray" />;
+      case 'json': return <IconSettings size={16} color="gray" />;
+      case 'toml': return <IconClipboard size={16} color="gray" />;
+      default: return <IconFile size={16} color="gray" />;
     }
   };
 
@@ -223,7 +223,7 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
         // 編集モード
         <Box p="md">
           <Group gap="sm" wrap="nowrap">
-            <Text size="lg">{getFileIcon(file)}</Text>
+            <Box style={{ display: 'flex', alignItems: 'center' }}>{getFileIcon(file)}</Box>
             <Box style={{ flex: 1, minWidth: 0 }}>
               <TextInput
                 size="xs"
@@ -258,7 +258,7 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
           >
             {/* Left group: ファイルアイコン + Favorite */}
             <Group gap="xs">
-              <Text size="lg">{getFileIcon(file)}</Text>
+              <Box style={{ display: 'flex', alignItems: 'center' }}>{getFileIcon(file)}</Box>
 
               {/* Favoriteボタン */}
               {onToggleFavorite && (

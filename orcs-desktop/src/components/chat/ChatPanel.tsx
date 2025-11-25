@@ -18,7 +18,7 @@ import {
   Paper,
   Text,
 } from '@mantine/core';
-import { IconSettings, IconClipboardList, IconFileText, IconBulb } from '@tabler/icons-react';
+import { IconSettings, IconClipboardList, IconFileText, IconBulb, IconVolume, IconVolumeOff, IconPlayerPlay, IconPlayerStop, IconFile, IconCheck, IconPaperclip } from '@tabler/icons-react';
 import { MessageItem } from './MessageItem';
 import { StatusBar } from './StatusBar';
 import { AgentConfigSelector } from './AgentConfigSelector';
@@ -766,7 +766,7 @@ export function ChatPanel({
                       onClick={copy}
                       size="lg"
                     >
-                      {copied ? '✓' : '📄'}
+                      {copied ? <IconCheck size={20} /> : <IconFile size={20} />}
                     </ActionIcon>
                   </Tooltip>
                 )}
@@ -890,7 +890,7 @@ export function ChatPanel({
 
           <Group gap="xs">
             <Tooltip label="Attach files">
-              <Button variant="light" size="sm" component="label" leftSection="📎">
+              <Button variant="light" size="sm" component="label" leftSection={<IconPaperclip size={16} />}>
                 Attach
                 <input type="file" multiple hidden onChange={onFileSelect} />
               </Button>
@@ -917,7 +917,7 @@ export function ChatPanel({
                 onClick={handleToggleMute}
                 size="lg"
               >
-                {isMuted ? '🔇' : '🔊'}
+                {isMuted ? <IconVolumeOff size={20} /> : <IconVolume size={20} />}
               </ActionIcon>
             </Tooltip>
 
@@ -928,7 +928,7 @@ export function ChatPanel({
                 onClick={handleAutoModeToggle}
                 size="lg"
               >
-                {autoMode ? '⏹️' : '▶️'}
+                {autoMode ? <IconPlayerStop size={20} /> : <IconPlayerPlay size={20} />}
               </ActionIcon>
             </Tooltip>
           </Group>

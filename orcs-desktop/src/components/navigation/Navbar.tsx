@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ScrollArea, Box, Stack, Text } from '@mantine/core';
+import { IconMessages, IconFolder, IconChecklist, IconMask, IconBolt, IconAdjustments } from '@tabler/icons-react';
 import { Session } from '../../types/session';
 import { Task, TaskProgress } from '../../types/task';
 import { MessageType } from '../../types/message';
@@ -112,39 +113,39 @@ export function Navbar({
         flexShrink: 0,
       }}>
         <NavbarIcon
-          icon="💬"
+          icon={<IconMessages size={24} stroke={1.5} />}
           label="Sessions"
           active={activeTab === 'sessions'}
           onClick={() => setActiveTab('sessions')}
           badge={sessions.length}
         />
         <NavbarIcon
-          icon="📁"
+          icon={<IconFolder size={24} stroke={1.5} />}
           label="Workspace"
           active={activeTab === 'workspace'}
           onClick={() => setActiveTab('workspace')}
         />
         <NavbarIcon
-          icon="✅"
+          icon={<IconChecklist size={24} stroke={1.5} />}
           label="Tasks"
           active={activeTab === 'tasks'}
           onClick={() => setActiveTab('tasks')}
           badge={activeTasks}
         />
         <NavbarIcon
-          icon="⭐️"
+          icon={<IconMask size={24} stroke={1.5} />}
           label="Personas"
           active={activeTab === 'personas'}
           onClick={() => setActiveTab('personas')}
         />
         <NavbarIcon
-          icon="⚡"
+          icon={<IconBolt size={24} stroke={1.5} />}
           label="Slash Commands"
           active={activeTab === 'commands'}
           onClick={() => setActiveTab('commands')}
         />
         <NavbarIcon
-          icon="🎨"
+          icon={<IconAdjustments size={24} stroke={1.5} />}
           label="Dialogue Presets"
           active={activeTab === 'presets'}
           onClick={() => setActiveTab('presets')}

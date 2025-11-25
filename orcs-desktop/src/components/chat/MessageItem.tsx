@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor, Image, Stack } from '@mantine/core';
-import { IconDeviceFloppy, IconRocket, IconCommand, IconUser } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRocket, IconCommand, IconUser, IconCheck, IconClipboard } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Message, getMessageStyle } from '../../types/message';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
@@ -227,7 +227,7 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
                         onClick={copy}
                         size="sm"
                       >
-                        {copied ? '✓' : '📋'}
+                        {copied ? <IconCheck size={16} /> : <IconClipboard size={16} />}
                       </ActionIcon>
                     </Tooltip>
                   )}
@@ -343,7 +343,7 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
                         onClick={copy}
                         size="sm"
                       >
-                        {copied ? '✓' : '📋'}
+                        {copied ? <IconCheck size={16} /> : <IconClipboard size={16} />}
                       </ActionIcon>
                     </Tooltip>
                   )}

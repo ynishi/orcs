@@ -1,7 +1,8 @@
 import { Box, Tooltip, Badge } from '@mantine/core';
+import { ReactNode } from 'react';
 
 interface NavbarIconProps {
-  icon: string;
+  icon: ReactNode;
   label: string;
   active: boolean;
   onClick: () => void;
@@ -36,7 +37,9 @@ export function NavbarIcon({ icon, label, active, onClick, badge }: NavbarIconPr
           }
         }}
       >
-        <span style={{ fontSize: '20px' }}>{icon}</span>
+        <Box style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: active ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-gray-7)' }}>
+          {icon}
+        </Box>
         {badge !== undefined && badge > 0 && (
           <Badge
             size="xs"

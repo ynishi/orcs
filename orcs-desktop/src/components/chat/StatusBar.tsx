@@ -1,4 +1,5 @@
 import { Paper, Group, Badge, Text, Divider, Tooltip, Menu, Checkbox, ScrollArea } from '@mantine/core';
+import { IconAdjustments } from '@tabler/icons-react';
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
 import { PersonaConfig } from '../../types/agent';
@@ -235,9 +236,9 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
         <Menu position="top" withArrow>
           <Menu.Target>
             <Tooltip label="Dialogue Presets" withArrow>
-              <Text size="lg" style={{ cursor: 'pointer' }}>
-                🎨
-              </Text>
+              <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <IconAdjustments size={18} stroke={1.5} />
+              </div>
             </Tooltip>
           </Menu.Target>
           <Menu.Dropdown>

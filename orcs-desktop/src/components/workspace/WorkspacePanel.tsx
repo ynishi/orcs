@@ -250,7 +250,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
               color="blue"
               aria-label="Upload file"
             >
-              <IconPlus size={18} />
+              <IconPlus size={16} />
               <input type="file" multiple hidden onChange={handleFileSelect} />
             </ActionIcon>
           </Group>
@@ -319,7 +319,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
             color="blue"
             aria-label="Upload file"
           >
-            <IconPlus size={18} />
+            <IconPlus size={16} />
             <input type="file" multiple hidden onChange={handleFileSelect} />
           </ActionIcon>
         </Group>

@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput, Switch, Badge, Menu } from '@mantine/core';
-import { IconDotsVertical, IconArrowUp, IconArrowDown, IconPencil, IconArchive, IconTrash } from '@tabler/icons-react';
+import { IconDotsVertical, IconArrowUp, IconArrowDown, IconPencil, IconArchive, IconTrash, IconPlus } from '@tabler/icons-react';
 import { Session, getMessageCount, getLastActive, getAllMessages } from '../../types/session';
 import { Workspace } from '../../types/workspace';
 import { useState, useMemo } from 'react';
@@ -362,11 +362,11 @@ export function SessionList({
           <Tooltip label="New session" withArrow>
             <ActionIcon
               color="blue"
-              variant="light"
+              variant="subtle"
               onClick={onNewSession}
               size="xs"
             >
-              ➕
+              <IconPlus size={16} />
             </ActionIcon>
           </Tooltip>
         </Group>

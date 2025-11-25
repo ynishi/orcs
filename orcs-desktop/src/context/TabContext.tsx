@@ -132,8 +132,18 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   // Backend永続化は saveCurrentSession 時に行う
   const [sessionMessages, setSessionMessages] = useState<Map<string, Message[]>>(new Map());
 
+  // Phase 4: Session messages のキャッシュ（無限ループ防止）
+  // key: sessionId, value: Message[]
+  const sessionMessagesCache = useMemo(() => {
+    const cache = new Map<string, Message[]>();
+    sessions.forEach((session) => {
+      cache.set(session.id, convertSessionToMessages(session, 'You'));
+    });
+    return cache;
+  }, [sessions]);
+
   // Phase 2: AppState.openTabs と Sessions と TabUIStates から SessionTab を動的生成
-  // Phase 4: messages は sessionMessages から取得（優先）、なければ Session から
+  // Phase 4: messages は sessionMessages から取得（優先）、なければキャッシュから
   // これが tabs の SSOT となる（Backend-First Pattern）
   const tabs = useMemo<SessionTab[]>(() => {
     if (!appState) return [];
@@ -145,9 +155,10 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       // TabUIStateを取得（なければデフォルト）
       const uiState = tabUIStates.get(openTab.id) ?? getDefaultTabUIState();
 
-      // Phase 4: sessionMessages から取得（優先）、なければ Session から
+      // Phase 4: sessionMessages から取得（優先）、なければキャッシュから
       const messages = sessionMessages.get(openTab.sessionId)
-        ?? (session ? convertSessionToMessages(session, 'You') : []);
+        ?? sessionMessagesCache.get(openTab.sessionId)
+        ?? [];
 
       // SessionTabを構築
       return {
@@ -165,7 +176,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
         ...uiState,
       };
     });
-  }, [appState, sessions, tabUIStates, sessionMessages]);
+  }, [appState, sessions, tabUIStates, sessionMessagesCache]);
 
   // Phase 2: activeTabId は AppState から取得（Backend SSOT）
   const activeTabId = appState?.activeTabId ?? null;
@@ -255,9 +266,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   const updateTabMessages = useCallback((tabId: string, messages: Message[]) => {
     console.log('[TabContext] updateTabMessages:', { tabId, messagesCount: messages.length });
 
-    // Get sessionId from tab
-    const tab = tabs.find((t) => t.id === tabId);
-    if (!tab) {
+    // Phase 4: appState から sessionId を取得（tabs 依存を避けるため）
+    const openTab = appState?.openTabs.find((t) => t.id === tabId);
+    if (!openTab) {
       console.warn('[TabContext] Tab not found for updateTabMessages:', tabId);
       return;
     }
@@ -265,10 +276,10 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     // Phase 4: sessionMessages Map を更新
     setSessionMessages((prev) => {
       const newMap = new Map(prev);
-      newMap.set(tab.sessionId, messages);
+      newMap.set(openTab.sessionId, messages);
       return newMap;
     });
-  }, [tabs]);
+  }, [appState]);
 
   /**
    * タブにメッセージを追加
@@ -277,21 +288,30 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   const addMessageToTab = useCallback((tabId: string, message: Message) => {
     console.log('[TabContext] addMessageToTab:', { tabId, messageId: message.id });
 
-    // Get sessionId from tab
-    const tab = tabs.find((t) => t.id === tabId);
-    if (!tab) {
+    // Phase 4: sessionMessages Map にメッセージを追加
+    // appState から sessionId を取得（tabs 依存を避けるため）
+    const openTab = appState?.openTabs.find((t) => t.id === tabId);
+    if (!openTab) {
       console.warn('[TabContext] Tab not found for addMessageToTab:', tabId);
       return;
     }
 
-    // Phase 4: sessionMessages Map にメッセージを追加
     setSessionMessages((prev) => {
-      const currentMessages = prev.get(tab.sessionId) ?? tab.messages;
+      const currentMessages = prev.get(openTab.sessionId) ?? [];
+      // 既にメッセージがない場合は Session から取得
+      if (currentMessages.length === 0) {
+        const session = sessions.find((s) => s.id === openTab.sessionId);
+        const sessionMessages = session ? convertSessionToMessages(session, 'You') : [];
+        const newMap = new Map(prev);
+        newMap.set(openTab.sessionId, [...sessionMessages, message]);
+        return newMap;
+      }
+
       const newMap = new Map(prev);
-      newMap.set(tab.sessionId, [...currentMessages, message]);
+      newMap.set(openTab.sessionId, [...currentMessages, message]);
       return newMap;
     });
-  }, [tabs]);
+  }, [appState, sessions]);
 
   /**
    * タブのタイトルを更新

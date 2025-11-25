@@ -241,6 +241,7 @@ function App() {
   const workspaceSwitchingRef = useRef(false);
   const workspaceRestoredRef = useRef(false);
   const tabsRestoredRef = useRef(false);
+  const loadedSessionMessagesRef = useRef<Set<string>>(new Set()); // Phase 4: 読み込み済みセッションを記録
 
   // メッセージを追加するヘルパー関数（early definition for useRef/useSlashCommands）
   const addMessage = useCallback((type: MessageType, author: string, text: string, attachments?: import('./types/message').AttachedFile[]) => {
@@ -611,8 +612,17 @@ function App() {
           });
         }
 
+        // Phase 4: Check if messages already loaded to prevent infinite loop
+        if (loadedSessionMessagesRef.current.has(currentSessionId)) {
+          console.log('[App] Session messages already loaded, skipping:', currentSessionId.substring(0, 8));
+          return;
+        }
+
+        // Phase 4: appState から tabId を取得
+        const existingOpenTab = appState?.openTabs.find(t => t.sessionId === currentSessionId);
+
         // Check if tab already exists
-        const existingTab = getTabBySessionId(currentSessionId);
+        const existingTab = existingOpenTab ? getTabBySessionId(currentSessionId) : null;
 
         // If tab exists, check if messages are empty or need preview data
         if (existingTab) {
@@ -695,9 +705,15 @@ function App() {
             });
             void updateTabTitle(existingTab.id, activeSession.title); // Phase 3: updateTabTitle is now async
             _updateTabMessages(existingTab.id, restoredMessages);
+
+            // Phase 4: Mark as loaded to prevent infinite loop
+            loadedSessionMessagesRef.current.add(currentSessionId);
           } else {
             // Tab doesn't exist, create it
             void openTab(activeSession, restoredMessages, workspace.id); // Phase 2: openTab is now async
+
+            // Phase 4: Mark as loaded
+            loadedSessionMessagesRef.current.add(currentSessionId);
           }
         }
 

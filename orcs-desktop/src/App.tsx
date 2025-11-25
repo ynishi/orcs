@@ -220,7 +220,6 @@ function App() {
     closeTab,
     switchTab: switchToTab,
     switchWorkspace: switchWorkspaceTabs,
-    initializeTabUIState,
     updateTabTitle,
     updateTabMessages: _updateTabMessages,
     addMessageToTab,
@@ -694,7 +693,7 @@ function App() {
               title: activeSession.title,
               messagesCount: restoredMessages.length,
             });
-            updateTabTitle(existingTab.id, activeSession.title);
+            void updateTabTitle(existingTab.id, activeSession.title); // Phase 3: updateTabTitle is now async
             _updateTabMessages(existingTab.id, restoredMessages);
           } else {
             // Tab doesn't exist, create it
@@ -751,6 +750,9 @@ function App() {
       const sortedTabs = [...appState.openTabs].sort((a, b) => a.order - b.order);
 
       for (const backendTab of sortedTabs) {
+        // Phase 3: Backend SSOT - タブは自動的にレンダリングされるため initializeTabUIState 不要
+        // Session データも SessionContext から自動的に取得される
+
         // Find session for this tab
         const session = sessions.find((s) => s.id === backendTab.sessionId);
         if (!session) {
@@ -758,21 +760,10 @@ function App() {
           continue;
         }
 
-        // Check if tab already exists in TabContext
-        const existingTab = getTabBySessionId(backendTab.sessionId);
-        if (existingTab) {
-          // Update title for existing tab (may have been created with empty title)
-          updateTabTitle(existingTab.id, session.title);
-          continue;
-        }
-
-        // Initialize UI state with title first (from lightweight session)
-        initializeTabUIState(backendTab.id, backendTab.sessionId, backendTab.workspaceId, session.title, []);
-
         // Only load full session data for the active tab
         const isActiveTab = appState.activeTabId === backendTab.id;
         if (!isActiveTab) {
-          console.log('[App] Initialized non-active tab with title only:', {
+          console.log('[App] Non-active tab will render with basic info:', {
             tabId: backendTab.id.substring(0, 8),
             title: session.title,
           });
@@ -862,7 +853,6 @@ function App() {
     sessions,
     workspace,
     userNickname,
-    initializeTabUIState,
     updateTabTitle,
     getTabBySessionId,
     switchToTab,
@@ -1842,10 +1832,11 @@ function App() {
     try {
       await renameSession(sessionId, newTitle);
 
-      // タブのタイトルも更新
+      // Phase 3: renameSession が SessionContext を更新するため、
+      // computed tabs は自動的に更新される。updateTabTitle は冗長だが互換性のために保持
       const tab = tabs.find(t => t.sessionId === sessionId);
       if (tab) {
-        updateTabTitle(tab.id, newTitle);
+        void updateTabTitle(tab.id, newTitle); // Phase 3: updateTabTitle is now async
       }
     } catch (err) {
       notifications.show({

@@ -77,7 +77,6 @@ export interface TabContextValue {
 
   // タブ操作 (Phase 2: Backend-First)
   openTab: (session: Session, messages: Message[], workspaceId: string, switchToTab?: boolean) => Promise<string>; // 新規タブを開く。既に開いている場合はフォーカス
-  initializeTabUIState: (tabId: string, sessionId: string, workspaceId: string, title: string, messages: Message[]) => void; // 既存のタブIDでタブUI状態を初期化（Backend復元用） - Phase 3で削除予定
   closeTab: (tabId: string) => Promise<void>; // タブを閉じる
   switchTab: (tabId: string) => Promise<void>; // タブを切り替える
   switchWorkspace: (workspaceId: string) => Promise<void>; // Workspace切り替え時にタブを切り替える
@@ -87,7 +86,7 @@ export interface TabContextValue {
   addMessageToTab: (tabId: string, message: Message) => void; // タブにメッセージを追加
   
   // タブメタデータ
-  updateTabTitle: (tabId: string, title: string) => void; // タブのタイトルを更新
+  updateTabTitle: (tabId: string, title: string) => Promise<void>; // タブのタイトルを更新 (Phase 3: async)
   setTabDirty: (tabId: string, isDirty: boolean) => void; // タブのdirtyフラグを更新
   
   // 入力フォーム状態
@@ -123,7 +122,7 @@ interface TabProviderProps {
 export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   // Phase 2: Backend (AppState) を SSOT として取得
   const { appState } = useAppStateStore();
-  const { sessions } = useSessionContext();
+  const { sessions, renameSession } = useSessionContext();
 
   // Phase 2: フロントエンド専用のUI状態を Map で管理
   const [tabUIStates, setTabUIStates] = useState<Map<string, TabUIState>>(new Map());
@@ -195,32 +194,8 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     return tabId;
   }, []);
 
-  /**
-   * 既存のタブIDでタブUI状態を初期化（Backend復元用）
-   * Phase 2: Backend が tabs を管理するため、UIState のみを初期化
-   * Phase 3: この関数は削除予定（Backend からの復元で自動的に UIState が初期化される）
-   */
-  const initializeTabUIState = useCallback((
-    tabId: string,
-    _sessionId: string,
-    _workspaceId: string,
-    _title: string,
-    _messages: Message[]
-  ) => {
-    console.log('[TabContext] initializeTabUIState called (Phase 2: UIState only):', {
-      tabId: tabId.substring(0, 8),
-    });
-
-    // Phase 2: UIStateを初期化（既存タブでなければ）
-    setTabUIStates((prev) => {
-      if (!prev.has(tabId)) {
-        const newMap = new Map(prev);
-        newMap.set(tabId, getDefaultTabUIState());
-        return newMap;
-      }
-      return prev;
-    });
-  }, []);
+  // Phase 3: initializeTabUIState 関数を削除
+  // Backend SSOT により、タブは自動的にレンダリングされるため不要
 
   /**
    * タブを閉じる
@@ -287,14 +262,28 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブのタイトルを更新
-   * Phase 2: Backend (Session) の更新が必要 - 現在は No-op
-   * TODO Phase 3: Backend の Session を更新する実装に変更
+   * Phase 3: Backend Session の renameSession に委譲
    */
-  const updateTabTitle = useCallback((_tabId: string, _title: string) => {
-    console.log('[TabContext] updateTabTitle: Phase 2 - No-op (Backend Session update required)');
-    // Phase 2: tabs は computed なので直接更新できない
-    // Phase 3 で Backend の Session を更新する実装に変更する
-  }, []);
+  const updateTabTitle = useCallback(async (tabId: string, title: string) => {
+    console.log('[TabContext] updateTabTitle:', { tabId, title });
+
+    // Get sessionId from tab
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab) {
+      console.warn('[TabContext] Tab not found for updateTabTitle:', tabId);
+      return;
+    }
+
+    try {
+      // Phase 3: Backend Session を更新（SessionContext経由）
+      await renameSession(tab.sessionId, title);
+      console.log('[TabContext] Title updated via backend session');
+      // Note: SessionContext が sessions を更新し、computed tabs が自動的に更新される
+    } catch (error) {
+      console.error('[TabContext] Failed to update tab title:', error);
+      throw error;
+    }
+  }, [tabs, renameSession]);
 
   /**
    * タブのdirtyフラグを更新
@@ -500,7 +489,6 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
       // タブ操作
       openTab,
-      initializeTabUIState,
       closeTab,
       switchTab,
       switchWorkspace,
@@ -539,7 +527,6 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       tabs,
       activeTabId,
       openTab,
-      initializeTabUIState,
       closeTab,
       switchTab,
       switchWorkspace,

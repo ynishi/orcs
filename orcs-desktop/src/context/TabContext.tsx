@@ -1,22 +1,16 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { Session } from '../types/session';
 import type { Message } from '../types/message';
+import { useAppStateStore } from '../stores/appStateStore';
+import { convertSessionToMessages } from '../types/session';
+import { useSessionContext } from './SessionContext';
 
 /**
- * タブの情報（Aggregated State）
- * - 各タブが独立した状態を持つ
- * - SessionContextと同じく、薄いState層としてModel（Backend）とView（UI）の境界を明確化
+ * フロントエンド専用のタブUI状態
+ * - Backend (OpenTab) には永続化されない一時的なUI状態
+ * - タブごとに独立して管理される
  */
-export interface SessionTab {
-  // セッション情報
-  id: string; // タブのユニークID (タブ作成時に生成)
-  sessionId: string; // 対応するセッションID
-  workspaceId: string; // このタブが属するWorkspace ID
-  title: string; // タブタイトル
-
-  // メッセージ関連
-  messages: Message[]; // タブ固有のメッセージ履歴
-
+export interface TabUIState {
   // 入力フォーム状態
   input: string; // 入力中のテキスト
   attachedFiles: File[]; // 添付ファイル
@@ -32,7 +26,49 @@ export interface SessionTab {
 
   // メタデータ
   isDirty: boolean; // 未保存データがあるか
-  lastAccessedAt: number; // 最終アクセス時刻 (タブ切り替え時に更新)
+}
+
+/**
+ * デフォルトのTabUIStateを返す
+ */
+function getDefaultTabUIState(): TabUIState {
+  return {
+    input: '',
+    attachedFiles: [],
+    isDragging: false,
+    isAiThinking: false,
+    thinkingPersona: 'AI',
+    autoMode: false,
+    autoChatIteration: null,
+    isDirty: false,
+  };
+}
+
+/**
+ * タブの情報（Aggregated State）
+ * - Backend (OpenTab) + Session + TabUIState の統合ビュー
+ * - SessionContextと同じく、薄いState層としてModel（Backend）とView（UI）の境界を明確化
+ */
+export interface SessionTab {
+  // From Backend (OpenTab)
+  id: string; // タブのユニークID
+  sessionId: string; // 対応するセッションID
+  workspaceId: string; // このタブが属するWorkspace ID
+  lastAccessedAt: number; // 最終アクセス時刻
+
+  // From Session (joined by sessionId)
+  title: string; // タブタイトル
+  messages: Message[]; // タブ固有のメッセージ履歴
+
+  // From TabUIState (frontend-only)
+  input: string; // 入力中のテキスト
+  attachedFiles: File[]; // 添付ファイル
+  isDragging: boolean; // ドラッグ中かどうか
+  isAiThinking: boolean; // AI思考中かどうか
+  thinkingPersona: string; // 思考中のペルソナ名
+  autoMode: boolean; // AutoChatモードが有効かどうか
+  autoChatIteration: number | null; // 現在のAutoChat iteration番号 (null = 未実行)
+  isDirty: boolean; // 未保存データがあるか
 }
 
 export interface TabContextValue {
@@ -85,8 +121,50 @@ interface TabProviderProps {
 }
 
 export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
+  // Phase 2: Backend (AppState) を SSOT として取得
+  const { appState } = useAppStateStore();
+  const { sessions } = useSessionContext();
+
+  // Phase 1: 既存の tabs state を維持しつつ、新しい tabUIStates を並行導入
   const [tabs, setTabs] = useState<SessionTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
+  // Phase 1: フロントエンド専用のUI状態を Map で管理
+  const [tabUIStates, setTabUIStates] = useState<Map<string, TabUIState>>(new Map());
+
+  // Phase 2: AppState.openTabs と Sessions と TabUIStates から SessionTab を動的生成
+  const computedTabs = useMemo<SessionTab[]>(() => {
+    if (!appState) return [];
+
+    return appState.openTabs.map((openTab) => {
+      // SessionsからSessionを取得
+      const session = sessions.find((s) => s.id === openTab.sessionId);
+
+      // TabUIStateを取得（なければデフォルト）
+      const uiState = tabUIStates.get(openTab.id) ?? getDefaultTabUIState();
+
+      // SessionTabを構築
+      return {
+        // From Backend (OpenTab)
+        id: openTab.id,
+        sessionId: openTab.sessionId,
+        workspaceId: openTab.workspaceId,
+        lastAccessedAt: openTab.lastAccessedAt,
+
+        // From Session (joined by sessionId)
+        title: session?.title ?? 'Unknown Session',
+        messages: session ? convertSessionToMessages(session, 'You') : [],
+
+        // From TabUIState (frontend-only)
+        ...uiState,
+      };
+    });
+  }, [appState, sessions, tabUIStates]);
+
+  // Phase 1: tabUIStatesが未使用警告を回避（Phase 2で使用予定）
+  if (tabUIStates.size < 0) {
+    console.log('Phase 1: tabUIStates is being managed but not yet used for rendering');
+  }
 
   /**
    * 新規タブを開く（既に開いている場合はフォーカス）
@@ -122,7 +200,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       }
 
       // 新規タブを作成（デフォルト値で初期化）
-      tabId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      tabId = `tab-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
       console.log('[TabContext] Creating new tab:', {
         tabId: tabId.substring(tabId.length - 8),
         messagesCount: messages.length,
@@ -157,6 +235,15 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
       return [...prev, newTab];
     });
+
+    // Phase 1: 新規タブのUIStateを初期化
+    if (!isExistingTab) {
+      setTabUIStates((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(tabId, getDefaultTabUIState());
+        return newMap;
+      });
+    }
 
     // setTabs()の外で setActiveTabId() を呼ぶことで、確実に更新を反映
     // 既存タブの場合もswitchToTabがtrueならアクティブにする
@@ -235,6 +322,16 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
       return [...prev, newTab];
     });
+
+    // Phase 1: UIStateを初期化（既存タブでなければ）
+    setTabUIStates((prev) => {
+      if (!prev.has(tabId)) {
+        const newMap = new Map(prev);
+        newMap.set(tabId, getDefaultTabUIState());
+        return newMap;
+      }
+      return prev;
+    });
   }, []);
 
   /**
@@ -259,6 +356,13 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       const newTabs = prev.filter((tab) => tab.id !== tabId);
       console.log('[TabContext] closeTab: newTabs count =', newTabs.length);
       return newTabs;
+    });
+
+    // Phase 1: UIStateもクリーンアップ
+    setTabUIStates((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(tabId);
+      return newMap;
     });
 
     // アクティブタブを閉じた場合、次のタブにフォーカス
@@ -333,44 +437,77 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
    * タブのdirtyフラグを更新
    */
   const setTabDirty = useCallback((tabId: string, isDirty: boolean) => {
+    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
     setTabs((prev) =>
       prev.map((tab) => (tab.id === tabId ? { ...tab, isDirty } : tab))
     );
+    setTabUIStates((prev) => {
+      const current = prev.get(tabId);
+      if (!current) return prev;
+      const newMap = new Map(prev);
+      newMap.set(tabId, { ...current, isDirty });
+      return newMap;
+    });
   }, []);
 
   /**
    * タブの入力テキストを更新
    */
   const updateTabInput = useCallback((tabId: string, input: string) => {
+    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
     setTabs((prev) =>
       prev.map((tab) => (tab.id === tabId ? { ...tab, input } : tab))
     );
+    setTabUIStates((prev) => {
+      const current = prev.get(tabId);
+      if (!current) return prev;
+      const newMap = new Map(prev);
+      newMap.set(tabId, { ...current, input });
+      return newMap;
+    });
   }, []);
 
   /**
    * タブの添付ファイルを更新
    */
   const updateTabAttachedFiles = useCallback((tabId: string, files: File[]) => {
+    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
     setTabs((prev) =>
       prev.map((tab) => (tab.id === tabId ? { ...tab, attachedFiles: files } : tab))
     );
+    setTabUIStates((prev) => {
+      const current = prev.get(tabId);
+      if (!current) return prev;
+      const newMap = new Map(prev);
+      newMap.set(tabId, { ...current, attachedFiles: files });
+      return newMap;
+    });
   }, []);
 
   /**
    * タブに添付ファイルを追加
    */
   const addAttachedFileToTab = useCallback((tabId: string, file: File) => {
+    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
     setTabs((prev) =>
       prev.map((tab) =>
         tab.id === tabId ? { ...tab, attachedFiles: [...tab.attachedFiles, file] } : tab
       )
     );
+    setTabUIStates((prev) => {
+      const current = prev.get(tabId);
+      if (!current) return prev;
+      const newMap = new Map(prev);
+      newMap.set(tabId, { ...current, attachedFiles: [...current.attachedFiles, file] });
+      return newMap;
+    });
   }, []);
 
   /**
    * タブから添付ファイルを削除
    */
   const removeAttachedFileFromTab = useCallback((tabId: string, index: number) => {
+    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
     setTabs((prev) =>
       prev.map((tab) =>
         tab.id === tabId
@@ -378,48 +515,87 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
           : tab
       )
     );
+    setTabUIStates((prev) => {
+      const current = prev.get(tabId);
+      if (!current) return prev;
+      const newMap = new Map(prev);
+      newMap.set(tabId, { ...current, attachedFiles: current.attachedFiles.filter((_, i) => i !== index) });
+      return newMap;
+    });
   }, []);
 
   /**
    * タブのドラッグ状態を更新
    */
   const setTabDragging = useCallback((tabId: string, isDragging: boolean) => {
+    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
     setTabs((prev) =>
       prev.map((tab) => (tab.id === tabId ? { ...tab, isDragging } : tab))
     );
+    setTabUIStates((prev) => {
+      const current = prev.get(tabId);
+      if (!current) return prev;
+      const newMap = new Map(prev);
+      newMap.set(tabId, { ...current, isDragging });
+      return newMap;
+    });
   }, []);
 
   /**
    * タブのAI思考状態を更新
    */
   const setTabThinking = useCallback((tabId: string, isThinking: boolean, personaName: string = 'AI') => {
+    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
     setTabs((prev) =>
       prev.map((tab) =>
         tab.id === tabId ? { ...tab, isAiThinking: isThinking, thinkingPersona: personaName } : tab
       )
     );
+    setTabUIStates((prev) => {
+      const current = prev.get(tabId);
+      if (!current) return prev;
+      const newMap = new Map(prev);
+      newMap.set(tabId, { ...current, isAiThinking: isThinking, thinkingPersona: personaName });
+      return newMap;
+    });
   }, []);
 
   /**
    * タブのAutoMode状態を更新
    */
   const setTabAutoMode = useCallback((tabId: string, autoMode: boolean) => {
+    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
     setTabs((prev) =>
       prev.map((tab) =>
         tab.id === tabId ? { ...tab, autoMode } : tab
       )
     );
+    setTabUIStates((prev) => {
+      const current = prev.get(tabId);
+      if (!current) return prev;
+      const newMap = new Map(prev);
+      newMap.set(tabId, { ...current, autoMode });
+      return newMap;
+    });
   }, []);
 
   /**
    * タブのAutoChat iteration状態を更新
    */
   const setTabAutoChatIteration = useCallback((tabId: string, iteration: number | null) => {
+    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
     setTabs((prev) =>
       prev.map((tab) =>
         tab.id === tabId ? { ...tab, autoChatIteration: iteration } : tab
       )
     );
+    setTabUIStates((prev) => {
+      const current = prev.get(tabId);
+      if (!current) return prev;
+      const newMap = new Map(prev);
+      newMap.set(tabId, { ...current, autoChatIteration: iteration });
+      return newMap;
+    });
   }, []);
 
   /**
@@ -466,6 +642,8 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   const closeAllTabs = useCallback(() => {
     setTabs([]);
     setActiveTabId(null);
+    // Phase 1: 全UIStateもクリア
+    setTabUIStates(new Map());
   }, []);
 
   /**

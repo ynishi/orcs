@@ -127,7 +127,13 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   // Phase 2: フロントエンド専用のUI状態を Map で管理
   const [tabUIStates, setTabUIStates] = useState<Map<string, TabUIState>>(new Map());
 
+  // Phase 4: セッションメッセージをローカルで管理（リアルタイム更新用）
+  // key: sessionId, value: Message[]
+  // Backend永続化は saveCurrentSession 時に行う
+  const [sessionMessages, setSessionMessages] = useState<Map<string, Message[]>>(new Map());
+
   // Phase 2: AppState.openTabs と Sessions と TabUIStates から SessionTab を動的生成
+  // Phase 4: messages は sessionMessages から取得（優先）、なければ Session から
   // これが tabs の SSOT となる（Backend-First Pattern）
   const tabs = useMemo<SessionTab[]>(() => {
     if (!appState) return [];
@@ -139,6 +145,10 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       // TabUIStateを取得（なければデフォルト）
       const uiState = tabUIStates.get(openTab.id) ?? getDefaultTabUIState();
 
+      // Phase 4: sessionMessages から取得（優先）、なければ Session から
+      const messages = sessionMessages.get(openTab.sessionId)
+        ?? (session ? convertSessionToMessages(session, 'You') : []);
+
       // SessionTabを構築
       return {
         // From Backend (OpenTab)
@@ -149,13 +159,13 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
         // From Session (joined by sessionId)
         title: session?.title ?? 'Unknown Session',
-        messages: session ? convertSessionToMessages(session, 'You') : [],
+        messages,
 
         // From TabUIState (frontend-only)
         ...uiState,
       };
     });
-  }, [appState, sessions, tabUIStates]);
+  }, [appState, sessions, tabUIStates, sessionMessages]);
 
   // Phase 2: activeTabId は AppState から取得（Backend SSOT）
   const activeTabId = appState?.activeTabId ?? null;
@@ -240,25 +250,48 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブのメッセージを更新
-   * Phase 2: Backend (Session) の更新が必要 - 現在は No-op
-   * TODO Phase 3: Backend の Session を更新する実装に変更
+   * Phase 4: sessionMessages Map を更新（ローカル管理）
    */
-  const updateTabMessages = useCallback((_tabId: string, _messages: Message[]) => {
-    console.log('[TabContext] updateTabMessages: Phase 2 - No-op (Backend Session update required)');
-    // Phase 2: tabs は computed なので直接更新できない
-    // Phase 3 で Backend の Session を更新する実装に変更する
-  }, []);
+  const updateTabMessages = useCallback((tabId: string, messages: Message[]) => {
+    console.log('[TabContext] updateTabMessages:', { tabId, messagesCount: messages.length });
+
+    // Get sessionId from tab
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab) {
+      console.warn('[TabContext] Tab not found for updateTabMessages:', tabId);
+      return;
+    }
+
+    // Phase 4: sessionMessages Map を更新
+    setSessionMessages((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(tab.sessionId, messages);
+      return newMap;
+    });
+  }, [tabs]);
 
   /**
    * タブにメッセージを追加
-   * Phase 2: Backend (Session) の更新が必要 - 現在は No-op
-   * TODO Phase 3: Backend の Session を更新する実装に変更
+   * Phase 4: sessionMessages Map にメッセージを追加（ローカル管理）
    */
-  const addMessageToTab = useCallback((_tabId: string, _message: Message) => {
-    console.log('[TabContext] addMessageToTab: Phase 2 - No-op (Backend Session update required)');
-    // Phase 2: tabs は computed なので直接更新できない
-    // Phase 3 で Backend の Session を更新する実装に変更する
-  }, []);
+  const addMessageToTab = useCallback((tabId: string, message: Message) => {
+    console.log('[TabContext] addMessageToTab:', { tabId, messageId: message.id });
+
+    // Get sessionId from tab
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab) {
+      console.warn('[TabContext] Tab not found for addMessageToTab:', tabId);
+      return;
+    }
+
+    // Phase 4: sessionMessages Map にメッセージを追加
+    setSessionMessages((prev) => {
+      const currentMessages = prev.get(tab.sessionId) ?? tab.messages;
+      const newMap = new Map(prev);
+      newMap.set(tab.sessionId, [...currentMessages, message]);
+      return newMap;
+    });
+  }, [tabs]);
 
   /**
    * タブのタイトルを更新

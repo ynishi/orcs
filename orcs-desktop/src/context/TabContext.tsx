@@ -74,13 +74,13 @@ export interface SessionTab {
 export interface TabContextValue {
   tabs: SessionTab[];
   activeTabId: string | null;
-  
-  // タブ操作
-  openTab: (session: Session, messages: Message[], workspaceId: string, switchToTab?: boolean) => string; // 新規タブを開く。既に開いている場合はフォーカス
-  initializeTabUIState: (tabId: string, sessionId: string, workspaceId: string, title: string, messages: Message[]) => void; // 既存のタブIDでタブUI状態を初期化（Backend復元用）
-  closeTab: (tabId: string) => void; // タブを閉じる
-  switchTab: (tabId: string) => void; // タブを切り替える
-  switchWorkspace: (workspaceId: string) => void; // Workspace切り替え時にタブを切り替える
+
+  // タブ操作 (Phase 2: Backend-First)
+  openTab: (session: Session, messages: Message[], workspaceId: string, switchToTab?: boolean) => Promise<string>; // 新規タブを開く。既に開いている場合はフォーカス
+  initializeTabUIState: (tabId: string, sessionId: string, workspaceId: string, title: string, messages: Message[]) => void; // 既存のタブIDでタブUI状態を初期化（Backend復元用） - Phase 3で削除予定
+  closeTab: (tabId: string) => Promise<void>; // タブを閉じる
+  switchTab: (tabId: string) => Promise<void>; // タブを切り替える
+  switchWorkspace: (workspaceId: string) => Promise<void>; // Workspace切り替え時にタブを切り替える
   
   // メッセージ関連
   updateTabMessages: (tabId: string, messages: Message[]) => void; // タブのメッセージを更新
@@ -109,8 +109,8 @@ export interface TabContextValue {
   getTabBySessionId: (sessionId: string) => SessionTab | undefined; // セッションIDからタブを取得
   getActiveTab: () => SessionTab | undefined; // アクティブなタブを取得
   getVisibleTabs: (workspaceId: string) => SessionTab[]; // 指定されたWorkspaceのタブのみを取得
-  reorderTabs: (fromIndex: number, toIndex: number) => void; // タブの順序を変更
-  closeAllTabs: () => void; // 全タブを閉じる
+  reorderTabs: (fromIndex: number, toIndex: number) => Promise<void>; // タブの順序を変更
+  closeAllTabs: () => Promise<void>; // 全タブを閉じる
 }
 
 const TabContext = createContext<TabContextValue | undefined>(undefined);
@@ -125,15 +125,12 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   const { appState } = useAppStateStore();
   const { sessions } = useSessionContext();
 
-  // Phase 1: 既存の tabs state を維持しつつ、新しい tabUIStates を並行導入
-  const [tabs, setTabs] = useState<SessionTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
-
-  // Phase 1: フロントエンド専用のUI状態を Map で管理
+  // Phase 2: フロントエンド専用のUI状態を Map で管理
   const [tabUIStates, setTabUIStates] = useState<Map<string, TabUIState>>(new Map());
 
   // Phase 2: AppState.openTabs と Sessions と TabUIStates から SessionTab を動的生成
-  const computedTabs = useMemo<SessionTab[]>(() => {
+  // これが tabs の SSOT となる（Backend-First Pattern）
+  const tabs = useMemo<SessionTab[]>(() => {
     if (!appState) return [];
 
     return appState.openTabs.map((openTab) => {
@@ -161,169 +158,60 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     });
   }, [appState, sessions, tabUIStates]);
 
-  // Phase 1: tabUIStatesが未使用警告を回避（Phase 2で使用予定）
-  if (tabUIStates.size < 0) {
-    console.log('Phase 1: tabUIStates is being managed but not yet used for rendering');
-  }
+  // Phase 2: activeTabId は AppState から取得（Backend SSOT）
+  const activeTabId = appState?.activeTabId ?? null;
 
   /**
    * 新規タブを開く（既に開いている場合はフォーカス）
+   * Phase 2: Backend (AppStateStore) に委譲
    */
-  const openTab = useCallback((session: Session, messages: Message[], workspaceId: string, switchToTab: boolean = true): string => {
+  const openTab = useCallback(async (session: Session, messages: Message[], workspaceId: string, switchToTab: boolean = true): Promise<string> => {
     console.log('[TabContext] openTab called:', {
       sessionId: session.id.substring(0, 8),
       messagesCount: messages.length,
       workspaceId: workspaceId.substring(0, 8),
+      switchToTab,
     });
 
-    let tabId: string = '';
-    let isExistingTab = false;
+    // Phase 2: Backend (AppStateStore) を呼び出してタブを開く
+    // Backend が既存タブのチェックと新規作成を行う
+    const tabId = await useAppStateStore.getState().openTab(session.id, workspaceId);
 
-    setTabs((prev) => {
-      // 既に同じセッションのタブが開いているか確認
-      const existingTab = prev.find((tab) => tab.sessionId === session.id);
+    console.log('[TabContext] Tab opened by backend:', tabId);
 
-      if (existingTab) {
-        // 既存タブを更新
-        console.log('[TabContext] Updating existing tab:', {
-          tabId: existingTab.id.substring(existingTab.id.length - 8),
-          oldMessagesCount: existingTab.messages.length,
-          newMessagesCount: messages.length,
-        });
-        tabId = existingTab.id;
-        isExistingTab = true;
-        return prev.map((tab) =>
-          tab.id === existingTab.id
-            ? { ...tab, messages, title: session.title, lastAccessedAt: Date.now() }
-            : tab
-        );
-      }
-
-      // 新規タブを作成（デフォルト値で初期化）
-      tabId = `tab-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-      console.log('[TabContext] Creating new tab:', {
-        tabId: tabId.substring(tabId.length - 8),
-        messagesCount: messages.length,
-      });
-      const newTab: SessionTab = {
-        // セッション情報
-        id: tabId,
-        sessionId: session.id,
-        workspaceId: workspaceId,
-        title: session.title,
-
-        // メッセージ関連
-        messages,
-
-        // 入力フォーム状態
-        input: '',
-        attachedFiles: [],
-
-        // UI状態
-        isDragging: false,
-        isAiThinking: false,
-        thinkingPersona: 'AI',
-
-        // AutoChat状態
-        autoMode: false,
-        autoChatIteration: null,
-
-        // メタデータ
-        isDirty: false,
-        lastAccessedAt: Date.now(),
-      };
-
-      return [...prev, newTab];
-    });
-
-    // Phase 1: 新規タブのUIStateを初期化
-    if (!isExistingTab) {
-      setTabUIStates((prev) => {
+    // Phase 2: UIState を初期化（既に存在する場合はスキップ）
+    setTabUIStates((prev) => {
+      if (!prev.has(tabId)) {
         const newMap = new Map(prev);
         newMap.set(tabId, getDefaultTabUIState());
         return newMap;
-      });
-    }
-
-    // setTabs()の外で setActiveTabId() を呼ぶことで、確実に更新を反映
-    // 既存タブの場合もswitchToTabがtrueならアクティブにする
-    if (switchToTab) {
-      setActiveTabId(tabId);
-      if (isExistingTab) {
-        console.log('[TabContext] Switched to existing tab:', tabId);
       }
-    }
+      return prev;
+    });
+
+    // Note: Backend が app-state:update イベントを発火し、activeTabId も自動更新される
+    // switchToTab パラメータは現在無視される（Backend は常にタブをアクティブにする）
 
     return tabId;
   }, []);
 
   /**
    * 既存のタブIDでタブUI状態を初期化（Backend復元用）
-   * - openTabと異なり、新しいIDを生成せずバックエンドから取得したIDをそのまま使用
-   * - 主にアプリ起動時のタブ復元で使用
+   * Phase 2: Backend が tabs を管理するため、UIState のみを初期化
+   * Phase 3: この関数は削除予定（Backend からの復元で自動的に UIState が初期化される）
    */
   const initializeTabUIState = useCallback((
     tabId: string,
-    sessionId: string,
-    workspaceId: string,
-    title: string,
-    messages: Message[]
+    _sessionId: string,
+    _workspaceId: string,
+    _title: string,
+    _messages: Message[]
   ) => {
-    console.log('[TabContext] initializeTabUIState called:', {
+    console.log('[TabContext] initializeTabUIState called (Phase 2: UIState only):', {
       tabId: tabId.substring(0, 8),
-      sessionId: sessionId.substring(0, 8),
-      workspaceId: workspaceId.substring(0, 8),
-      title,
-      messagesCount: messages.length,
     });
 
-    setTabs((prev) => {
-      // 既に同じIDのタブが存在する場合は更新
-      const existingTab = prev.find((tab) => tab.id === tabId);
-
-      if (existingTab) {
-        console.log('[TabContext] Updating existing tab UI state:', tabId.substring(0, 8));
-        return prev.map((tab) =>
-          tab.id === tabId
-            ? { ...tab, sessionId, workspaceId, title, messages, lastAccessedAt: Date.now() }
-            : tab
-        );
-      }
-
-      // 新規タブとして作成（デフォルト値で初期化）
-      console.log('[TabContext] Creating new tab with preset ID:', tabId.substring(0, 8));
-      const newTab: SessionTab = {
-        // セッション情報
-        id: tabId,
-        sessionId,
-        workspaceId,
-        title,
-
-        // メッセージ関連
-        messages,
-
-        // 入力フォーム状態
-        input: '',
-        attachedFiles: [],
-
-        // UI状態
-        isDragging: false,
-        isAiThinking: false,
-        thinkingPersona: 'AI',
-
-        // AutoChat状態
-        autoMode: false,
-        autoChatIteration: null,
-
-        // メタデータ
-        isDirty: false,
-        lastAccessedAt: Date.now(),
-      };
-
-      return [...prev, newTab];
-    });
-
-    // Phase 1: UIStateを初期化（既存タブでなければ）
+    // Phase 2: UIStateを初期化（既存タブでなければ）
     setTabUIStates((prev) => {
       if (!prev.has(tabId)) {
         const newMap = new Map(prev);
@@ -336,111 +224,83 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブを閉じる
+   * Phase 2: Backend (AppStateStore) に委譲
    */
-  const closeTab = useCallback((tabId: string) => {
+  const closeTab = useCallback(async (tabId: string) => {
     console.log('[TabContext] closeTab called:', { tabId });
 
-    // 削除前にタブ情報を取得
-    const currentTabs = tabs;
-    const targetIndex = currentTabs.findIndex((tab) => tab.id === tabId);
+    // Phase 2: Backend (AppStateStore) を呼び出してタブを閉じる
+    await useAppStateStore.getState().closeTab(tabId);
 
-    if (targetIndex === -1) {
-      console.log('[TabContext] closeTab: tab not found');
-      return;
-    }
-
-    console.log('[TabContext] closeTab: targetIndex =', targetIndex, 'total tabs:', currentTabs.length);
-
-    // タブを削除
-    setTabs((prev) => {
-      const newTabs = prev.filter((tab) => tab.id !== tabId);
-      console.log('[TabContext] closeTab: newTabs count =', newTabs.length);
-      return newTabs;
-    });
-
-    // Phase 1: UIStateもクリーンアップ
+    // Phase 2: UIStateもクリーンアップ
     setTabUIStates((prev) => {
       const newMap = new Map(prev);
       newMap.delete(tabId);
       return newMap;
     });
 
-    // アクティブタブを閉じた場合、次のタブにフォーカス
-    if (activeTabId === tabId) {
-      const newTabs = currentTabs.filter((tab) => tab.id !== tabId);
-      if (newTabs.length > 0) {
-        const nextIndex = Math.min(targetIndex, newTabs.length - 1);
-        const nextActiveId = newTabs[nextIndex].id;
-        console.log('[TabContext] closeTab: updating activeTabId to', nextActiveId.substring(0, 8), 'at index', nextIndex);
-        setActiveTabId(nextActiveId);
-      } else {
-        console.log('[TabContext] closeTab: no tabs left, setting activeTabId to null');
-        setActiveTabId(null);
-      }
-    }
-  }, [tabs, activeTabId]);
+    // Note: Backend が app-state:update イベントを発火し、activeTabId も自動更新される
+    console.log('[TabContext] Tab closed by backend:', tabId);
+  }, []);
 
   /**
    * タブを切り替える
+   * Phase 2: Backend (AppStateStore) に委譲
    */
-  const switchTab = useCallback((tabId: string) => {
-    let targetWorkspaceId: string | undefined;
+  const switchTab = useCallback(async (tabId: string) => {
+    console.log('[TabContext] switchTab called:', { tabId });
 
-    setTabs((prev) =>
-      prev.map((tab) => {
-        if (tab.id === tabId) {
-          targetWorkspaceId = tab.workspaceId;
-          return { ...tab, lastAccessedAt: Date.now() };
-        }
-        return tab;
-      })
-    );
+    // Phase 2: Backend (AppStateStore) を呼び出してタブを切り替える
+    await useAppStateStore.getState().setActiveTab(tabId);
 
-    setActiveTabId(tabId);
-
-    // コールバック実行
-    if (targetWorkspaceId && onTabSwitched) {
-      onTabSwitched(tabId, targetWorkspaceId);
+    // コールバック実行（workspaceId を tabs から取得）
+    const targetTab = tabs.find(t => t.id === tabId);
+    if (targetTab && onTabSwitched) {
+      onTabSwitched(tabId, targetTab.workspaceId);
     }
-  }, [onTabSwitched]);
+
+    // Note: Backend が app-state:update イベントを発火し、activeTabId とタブの lastAccessedAt が自動更新される
+    console.log('[TabContext] Tab switched by backend:', tabId);
+  }, [tabs, onTabSwitched]);
 
   /**
    * タブのメッセージを更新
+   * Phase 2: Backend (Session) の更新が必要 - 現在は No-op
+   * TODO Phase 3: Backend の Session を更新する実装に変更
    */
-  const updateTabMessages = useCallback((tabId: string, messages: Message[]) => {
-    setTabs((prev) =>
-      prev.map((tab) => (tab.id === tabId ? { ...tab, messages } : tab))
-    );
+  const updateTabMessages = useCallback((_tabId: string, _messages: Message[]) => {
+    console.log('[TabContext] updateTabMessages: Phase 2 - No-op (Backend Session update required)');
+    // Phase 2: tabs は computed なので直接更新できない
+    // Phase 3 で Backend の Session を更新する実装に変更する
   }, []);
 
   /**
    * タブにメッセージを追加
+   * Phase 2: Backend (Session) の更新が必要 - 現在は No-op
+   * TODO Phase 3: Backend の Session を更新する実装に変更
    */
-  const addMessageToTab = useCallback((tabId: string, message: Message) => {
-    setTabs((prev) =>
-      prev.map((tab) =>
-        tab.id === tabId ? { ...tab, messages: [...tab.messages, message] } : tab
-      )
-    );
+  const addMessageToTab = useCallback((_tabId: string, _message: Message) => {
+    console.log('[TabContext] addMessageToTab: Phase 2 - No-op (Backend Session update required)');
+    // Phase 2: tabs は computed なので直接更新できない
+    // Phase 3 で Backend の Session を更新する実装に変更する
   }, []);
 
   /**
    * タブのタイトルを更新
+   * Phase 2: Backend (Session) の更新が必要 - 現在は No-op
+   * TODO Phase 3: Backend の Session を更新する実装に変更
    */
-  const updateTabTitle = useCallback((tabId: string, title: string) => {
-    setTabs((prev) =>
-      prev.map((tab) => (tab.id === tabId ? { ...tab, title } : tab))
-    );
+  const updateTabTitle = useCallback((_tabId: string, _title: string) => {
+    console.log('[TabContext] updateTabTitle: Phase 2 - No-op (Backend Session update required)');
+    // Phase 2: tabs は computed なので直接更新できない
+    // Phase 3 で Backend の Session を更新する実装に変更する
   }, []);
 
   /**
    * タブのdirtyフラグを更新
+   * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
   const setTabDirty = useCallback((tabId: string, isDirty: boolean) => {
-    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
-    setTabs((prev) =>
-      prev.map((tab) => (tab.id === tabId ? { ...tab, isDirty } : tab))
-    );
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -452,12 +312,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブの入力テキストを更新
+   * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
   const updateTabInput = useCallback((tabId: string, input: string) => {
-    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
-    setTabs((prev) =>
-      prev.map((tab) => (tab.id === tabId ? { ...tab, input } : tab))
-    );
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -469,12 +326,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブの添付ファイルを更新
+   * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
   const updateTabAttachedFiles = useCallback((tabId: string, files: File[]) => {
-    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
-    setTabs((prev) =>
-      prev.map((tab) => (tab.id === tabId ? { ...tab, attachedFiles: files } : tab))
-    );
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -486,14 +340,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブに添付ファイルを追加
+   * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
   const addAttachedFileToTab = useCallback((tabId: string, file: File) => {
-    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
-    setTabs((prev) =>
-      prev.map((tab) =>
-        tab.id === tabId ? { ...tab, attachedFiles: [...tab.attachedFiles, file] } : tab
-      )
-    );
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -505,16 +354,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブから添付ファイルを削除
+   * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
   const removeAttachedFileFromTab = useCallback((tabId: string, index: number) => {
-    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
-    setTabs((prev) =>
-      prev.map((tab) =>
-        tab.id === tabId
-          ? { ...tab, attachedFiles: tab.attachedFiles.filter((_, i) => i !== index) }
-          : tab
-      )
-    );
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -526,12 +368,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブのドラッグ状態を更新
+   * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
   const setTabDragging = useCallback((tabId: string, isDragging: boolean) => {
-    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
-    setTabs((prev) =>
-      prev.map((tab) => (tab.id === tabId ? { ...tab, isDragging } : tab))
-    );
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -543,14 +382,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブのAI思考状態を更新
+   * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
   const setTabThinking = useCallback((tabId: string, isThinking: boolean, personaName: string = 'AI') => {
-    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
-    setTabs((prev) =>
-      prev.map((tab) =>
-        tab.id === tabId ? { ...tab, isAiThinking: isThinking, thinkingPersona: personaName } : tab
-      )
-    );
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -562,14 +396,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブのAutoMode状態を更新
+   * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
   const setTabAutoMode = useCallback((tabId: string, autoMode: boolean) => {
-    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
-    setTabs((prev) =>
-      prev.map((tab) =>
-        tab.id === tabId ? { ...tab, autoMode } : tab
-      )
-    );
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -581,14 +410,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブのAutoChat iteration状態を更新
+   * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
   const setTabAutoChatIteration = useCallback((tabId: string, iteration: number | null) => {
-    // Phase 1: 既存のsetTabsと並行してtabUIStatesも更新
-    setTabs((prev) =>
-      prev.map((tab) =>
-        tab.id === tabId ? { ...tab, autoChatIteration: iteration } : tab
-      )
-    );
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -622,46 +446,44 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブの順序を変更
+   * Phase 2: Backend (AppStateStore) に委譲
    */
-  const reorderTabs = useCallback((fromIndex: number, toIndex: number) => {
-    setTabs((prev) => {
-      if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) {
-        return prev;
-      }
-
-      const newTabs = [...prev];
-      const [movedTab] = newTabs.splice(fromIndex, 1);
-      newTabs.splice(toIndex, 0, movedTab);
-      return newTabs;
-    });
+  const reorderTabs = useCallback(async (fromIndex: number, toIndex: number) => {
+    console.log('[TabContext] reorderTabs called:', { fromIndex, toIndex });
+    await useAppStateStore.getState().reorderTabs(fromIndex, toIndex);
+    // Note: Backend が app-state:update イベントを発火し、tabs の順序が自動更新される
   }, []);
 
   /**
    * 全タブを閉じる
+   * Phase 2: Backend の全タブを閉じるAPIがないため、個別にcloseTabを呼ぶ
    */
-  const closeAllTabs = useCallback(() => {
-    setTabs([]);
-    setActiveTabId(null);
-    // Phase 1: 全UIStateもクリア
-    setTabUIStates(new Map());
-  }, []);
+  const closeAllTabs = useCallback(async () => {
+    console.log('[TabContext] closeAllTabs called');
+    // Phase 2: 全タブを個別に閉じる
+    const tabIds = tabs.map(tab => tab.id);
+    for (const tabId of tabIds) {
+      await closeTab(tabId);
+    }
+    // UIState は closeTab で個別にクリアされる
+  }, [tabs, closeTab]);
 
   /**
    * Workspace切り替え時にタブを切り替える
    * - 新しいWorkspaceのタブがあれば、最後にアクセスしたタブにフォーカス
-   * - なければアクティブタブをnullにする（Appで新しいセッションを開く）
+   * - なければアクティブタブはBackendがnullに設定する
+   * Phase 2: Backend (AppStateStore) の setActiveTab を使用
    */
-  const switchWorkspace = useCallback((workspaceId: string) => {
+  const switchWorkspace = useCallback(async (workspaceId: string) => {
     const workspaceTabs = tabs.filter((tab) => tab.workspaceId === workspaceId);
-    
+
     if (workspaceTabs.length > 0) {
       // 最後にアクセスしたタブを探す
       const sortedTabs = [...workspaceTabs].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
-      setActiveTabId(sortedTabs[0].id);
-    } else {
-      // このWorkspaceのタブがない場合はnullにする
-      setActiveTabId(null);
+      await useAppStateStore.getState().setActiveTab(sortedTabs[0].id);
     }
+    // Note: タブがない場合、activeTabId は Backend が管理しているため、ここでは何もしない
+    // App側で新しいタブを開くロジックが必要
   }, [tabs]);
 
   /**

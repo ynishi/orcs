@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, useRef, type ReactNode } from 'react';
 import type { Session } from '../types/session';
 import type { Message } from '../types/message';
 import { useAppStateStore } from '../stores/appStateStore';
@@ -144,6 +144,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   // Phase 2: AppState.openTabs と Sessions と TabUIStates から SessionTab を動的生成
   // Phase 4: messages は sessionMessages から取得（優先）、なければキャッシュから
+  // Phase 2.4 (V1.6+): Backend保存されたUI状態を復元
   // これが tabs の SSOT となる（Backend-First Pattern）
   const tabs = useMemo<SessionTab[]>(() => {
     if (!appState) return [];
@@ -153,7 +154,20 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       const session = sessions.find((s) => s.id === openTab.sessionId);
 
       // TabUIStateを取得（なければデフォルト）
-      const uiState = tabUIStates.get(openTab.id) ?? getDefaultTabUIState();
+      const localUIState = tabUIStates.get(openTab.id) ?? getDefaultTabUIState();
+
+      // Phase 2.4 (V1.6+): Backend保存されたUI状態を優先的に使用（存在する場合）
+      // ローカルUIStateとBackend UI状態をマージ（Backendが優先）
+      const mergedUIState: TabUIState = {
+        input: openTab.input ?? localUIState.input,
+        attachedFiles: localUIState.attachedFiles, // TODO: Phase 3でパスから復元
+        isDragging: localUIState.isDragging, // 一時的なUI状態なので復元しない
+        isAiThinking: localUIState.isAiThinking, // 一時的なUI状態なので復元しない
+        thinkingPersona: localUIState.thinkingPersona, // 一時的なUI状態なので復元しない
+        autoMode: openTab.autoMode ?? localUIState.autoMode,
+        autoChatIteration: openTab.autoChatIteration ?? localUIState.autoChatIteration,
+        isDirty: openTab.isDirty ?? localUIState.isDirty,
+      };
 
       // Phase 4: sessionMessages から取得（優先）、なければキャッシュから
       const messages = sessionMessages.get(openTab.sessionId)
@@ -172,11 +186,11 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
         title: session?.title ?? 'Unknown Session',
         messages,
 
-        // From TabUIState (frontend-only)
-        ...uiState,
+        // From TabUIState (merged from Backend + local)
+        ...mergedUIState,
       };
     });
-  }, [appState, sessions, tabUIStates, sessionMessagesCache]);
+  }, [appState, sessions, tabUIStates, sessionMessages, sessionMessagesCache]);
 
   // Phase 2: activeTabId は AppState から取得（Backend SSOT）
   const activeTabId = appState?.activeTabId ?? null;
@@ -341,6 +355,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   /**
    * タブのdirtyフラグを更新
    * Phase 2: tabUIStates のみを更新（tabs は computed）
+   * Phase 2.3 (V1.6+): Backend同期 (immediate)
    */
   const setTabDirty = useCallback((tabId: string, isDirty: boolean) => {
     setTabUIStates((prev) => {
@@ -350,13 +365,22 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       newMap.set(tabId, { ...current, isDirty });
       return newMap;
     });
+
+    // Immediate Backend sync (not frequently updated)
+    useAppStateStore.getState().updateTabUIState(tabId, { isDirty }).catch((error) => {
+      console.error('[TabContext] Failed to sync isDirty to backend:', error);
+    });
   }, []);
 
   /**
    * タブの入力テキストを更新
    * Phase 2: tabUIStates のみを更新（tabs は computed）
+   * Phase 2.2 (V1.6+): Backend同期 (debounce 500ms)
    */
+  const updateTabInputTimerRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
   const updateTabInput = useCallback((tabId: string, input: string) => {
+    // Immediate local state update for responsive UI
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
@@ -364,6 +388,23 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       newMap.set(tabId, { ...current, input });
       return newMap;
     });
+
+    // Debounced Backend sync (500ms)
+    const timers = updateTabInputTimerRef.current;
+    const existingTimer = timers.get(tabId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const timer = setTimeout(() => {
+      console.log('[TabContext] Syncing input to backend (debounced):', { tabId, inputLength: input.length });
+      useAppStateStore.getState().updateTabUIState(tabId, { input }).catch((error) => {
+        console.error('[TabContext] Failed to sync input to backend:', error);
+      });
+      timers.delete(tabId);
+    }, 500);
+
+    timers.set(tabId, timer);
   }, []);
 
   /**
@@ -439,6 +480,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   /**
    * タブのAutoMode状態を更新
    * Phase 2: tabUIStates のみを更新（tabs は computed）
+   * Phase 2.3 (V1.6+): Backend同期 (immediate)
    */
   const setTabAutoMode = useCallback((tabId: string, autoMode: boolean) => {
     setTabUIStates((prev) => {
@@ -448,11 +490,17 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       newMap.set(tabId, { ...current, autoMode });
       return newMap;
     });
+
+    // Immediate Backend sync (not frequently updated)
+    useAppStateStore.getState().updateTabUIState(tabId, { autoMode }).catch((error) => {
+      console.error('[TabContext] Failed to sync autoMode to backend:', error);
+    });
   }, []);
 
   /**
    * タブのAutoChat iteration状態を更新
    * Phase 2: tabUIStates のみを更新（tabs は computed）
+   * Phase 2.3 (V1.6+): Backend同期 (immediate)
    */
   const setTabAutoChatIteration = useCallback((tabId: string, iteration: number | null) => {
     setTabUIStates((prev) => {
@@ -461,6 +509,11 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       const newMap = new Map(prev);
       newMap.set(tabId, { ...current, autoChatIteration: iteration });
       return newMap;
+    });
+
+    // Immediate Backend sync (not frequently updated)
+    useAppStateStore.getState().updateTabUIState(tabId, { autoChatIteration: iteration }).catch((error) => {
+      console.error('[TabContext] Failed to sync autoChatIteration to backend:', error);
     });
   }, []);
 

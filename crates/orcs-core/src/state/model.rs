@@ -9,7 +9,7 @@ use version_migrate::DeriveQueryable as Queryable;
 /// Represents an open tab in the application.
 ///
 /// Tabs are views of sessions. This struct tracks which sessions are currently
-/// open as tabs, their display order, and when they were last accessed.
+/// open as tabs, their display order, when they were last accessed, and their UI state.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SchemaBridge)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenTab {
@@ -24,6 +24,29 @@ pub struct OpenTab {
     pub last_accessed_at: i32,
     /// Display order (lower numbers appear first)
     pub order: i32,
+
+    // ============================================================================
+    // UI State (persisted to restore tab state across app restarts)
+    // ============================================================================
+    /// Input text being typed (for message input field)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<String>,
+
+    /// Attached file paths (File objects cannot be serialized, so we store paths)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attached_file_paths: Option<Vec<String>>,
+
+    /// AutoChat mode enabled flag
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_mode: Option<bool>,
+
+    /// Current AutoChat iteration number (null = not running)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_chat_iteration: Option<i32>,
+
+    /// Dirty flag (has unsaved changes)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_dirty: Option<bool>,
 }
 
 /// Application state that persists across restarts.

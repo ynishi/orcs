@@ -224,6 +224,12 @@ impl StateRepository for StateRepositoryImpl {
                 .unwrap()
                 .as_secs() as i32),
             order: state.open_tabs.len() as i32,
+            // UI state fields initialized to None
+            input: None,
+            attached_file_paths: None,
+            auto_mode: None,
+            auto_chat_iteration: None,
+            is_dirty: None,
         };
 
         state.open_tabs.push(new_tab);
@@ -322,6 +328,47 @@ impl StateRepository for StateRepositoryImpl {
     async fn update_state_in_memory(&self, state: AppState) {
         let mut state_lock = self.state.lock().await;
         *state_lock = state;
+    }
+
+    async fn update_tab_ui_state(
+        &self,
+        tab_id: String,
+        input: Option<String>,
+        attached_file_paths: Option<Vec<String>>,
+        auto_mode: Option<bool>,
+        auto_chat_iteration: Option<i32>,
+        is_dirty: Option<bool>,
+    ) -> Result<()> {
+        let mut state = self.state.lock().await.clone();
+
+        // Find the tab and update its UI state
+        let tab = state
+            .open_tabs
+            .iter_mut()
+            .find(|t| t.id == tab_id)
+            .ok_or_else(|| OrcsError::not_found("Tab", &tab_id))?;
+
+        // Update only the provided fields (partial update)
+        if let Some(v) = input {
+            tab.input = Some(v);
+        }
+        if let Some(v) = attached_file_paths {
+            tab.attached_file_paths = Some(v);
+        }
+        if let Some(v) = auto_mode {
+            tab.auto_mode = Some(v);
+        }
+        if let Some(v) = auto_chat_iteration {
+            tab.auto_chat_iteration = Some(v);
+        }
+        if let Some(v) = is_dirty {
+            tab.is_dirty = Some(v);
+        }
+
+        // Memory-only update (no disk write)
+        // Will be saved on app shutdown or when important operation occurs
+        self.update_state_in_memory(state).await;
+        Ok(())
     }
 }
 

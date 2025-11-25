@@ -225,3 +225,35 @@ pub async fn reorder_tabs(
 
     Ok(())
 }
+
+/// Updates tab UI state (input, attached files, AutoChat state, dirty flag).
+/// This is a memory-only update for frequent changes (e.g., text input).
+/// The state will be persisted to disk on app shutdown.
+#[tauri::command]
+pub async fn update_tab_ui_state(
+    tab_id: String,
+    input: Option<String>,
+    attached_file_paths: Option<Vec<String>>,
+    auto_mode: Option<bool>,
+    auto_chat_iteration: Option<i32>,
+    is_dirty: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .app_state_service
+        .update_tab_ui_state(
+            tab_id,
+            input,
+            attached_file_paths,
+            auto_mode,
+            auto_chat_iteration,
+            is_dirty,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Memory-only update, no app-state:update event emission
+    // (to avoid excessive event traffic for frequent updates like text input)
+
+    Ok(())
+}

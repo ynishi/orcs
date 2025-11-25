@@ -114,5 +114,6 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         app_state::close_tab,
         app_state::set_active_tab,
         app_state::reorder_tabs,
+        app_state::update_tab_ui_state,
     ]
 }

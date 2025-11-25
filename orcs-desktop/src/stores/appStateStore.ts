@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { AppState } from '../types/generated/schema';
+import type { AppState } from '../bindings/generated';
 
 export interface AppStateStore {
   appState: AppState | null;
@@ -19,6 +19,18 @@ export interface AppStateStore {
   closeTab: (tabId: string) => Promise<void>;
   setActiveTab: (tabId: string) => Promise<void>;
   reorderTabs: (fromIndex: number, toIndex: number) => Promise<void>;
+
+  // Tab UI state management (V1.6+)
+  updateTabUIState: (
+    tabId: string,
+    uiState: {
+      input?: string;
+      attachedFilePaths?: string[];
+      autoMode?: boolean;
+      autoChatIteration?: number | null;
+      isDirty?: boolean;
+    }
+  ) => Promise<void>;
 }
 
 export const useAppStateStore = create<AppStateStore>((set, get) => ({
@@ -224,6 +236,30 @@ export const useAppStateStore = create<AppStateStore>((set, get) => ({
       if (current) {
         set({ appState: current });
       }
+      throw error;
+    }
+  },
+
+  updateTabUIState: async (tabId: string, uiState) => {
+    console.log('[AppStateStore] Updating tab UI state:', { tabId, uiState });
+
+    try {
+      // Backend call (memory-only update, no disk write)
+      // This is designed for frequent updates like text input
+      await invoke('update_tab_ui_state', {
+        tabId,
+        input: uiState.input,
+        attachedFilePaths: uiState.attachedFilePaths,
+        autoMode: uiState.autoMode,
+        autoChatIteration: uiState.autoChatIteration,
+        isDirty: uiState.isDirty,
+      });
+
+      // Note: No optimistic update or app-state:update event for this operation
+      // to avoid excessive state updates for frequent changes like text input.
+      // The Backend maintains the authoritative state in memory.
+    } catch (error) {
+      console.error('[AppStateStore] Failed to update tab UI state:', error);
       throw error;
     }
   },

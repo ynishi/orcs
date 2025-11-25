@@ -45,4 +45,18 @@ pub trait StateRepository: Send + Sync {
     /// Updates state in memory without saving to disk.
     /// Used for frequent operations like tab switching.
     async fn update_state_in_memory(&self, state: AppState);
+
+    // Tab UI state management (V1.6+)
+    /// Updates tab UI state (input, attached files, AutoChat state, dirty flag).
+    /// This is a memory-only update for frequent changes (e.g., text input).
+    /// The state will be persisted to disk on app shutdown or when important operations occur.
+    async fn update_tab_ui_state(
+        &self,
+        tab_id: String,
+        input: Option<String>,
+        attached_file_paths: Option<Vec<String>>,
+        auto_mode: Option<bool>,
+        auto_chat_iteration: Option<i32>,
+        is_dirty: Option<bool>,
+    ) -> Result<()>;
 }

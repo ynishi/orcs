@@ -150,8 +150,62 @@ pub struct AppStateV1_5 {
     pub active_tab_id: Option<String>,
 }
 
+/// Open tab DTO for V1.6 with UI state support.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenTabDTOV1_6 {
+    pub id: String,
+    pub session_id: String,
+    pub workspace_id: String,
+    pub last_accessed_at: i32,
+    pub order: i32,
+
+    // UI State fields (added in V1.6)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attached_file_paths: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_mode: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_chat_iteration: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_dirty: Option<bool>,
+}
+
+/// Application state configuration V1.6.0.
+///
+/// Added UI state fields to OpenTab for tab state persistence across app restarts.
+/// This allows restoring input text, attached files, AutoChat state, etc.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.6.0")]
+#[serde(rename_all = "camelCase")]
+pub struct AppStateV1_6 {
+    /// ID of the last selected workspace.
+    /// This is used to restore the workspace on application startup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_selected_workspace_id: Option<String>,
+
+    /// ID of the default system workspace (~/orcs).
+    /// None if not yet initialized.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_workspace_id: Option<String>,
+
+    /// ID of the currently active session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_session_id: Option<String>,
+
+    /// List of currently open tabs (with UI state support).
+    #[serde(default)]
+    pub open_tabs: Vec<OpenTabDTOV1_6>,
+
+    /// ID of the currently active tab.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_tab_id: Option<String>,
+}
+
 /// Type alias for the latest AppState version.
-pub type AppStateDTO = AppStateV1_5;
+pub type AppStateDTO = AppStateV1_6;
 
 impl Default for AppStateV1_0 {
     fn default() -> Self {
@@ -203,6 +257,18 @@ impl Default for AppStateV1_4 {
 }
 
 impl Default for AppStateV1_5 {
+    fn default() -> Self {
+        Self {
+            last_selected_workspace_id: None,
+            default_workspace_id: None,
+            active_session_id: None,
+            open_tabs: Vec::new(),
+            active_tab_id: None,
+        }
+    }
+}
+
+impl Default for AppStateV1_6 {
     fn default() -> Self {
         Self {
             last_selected_workspace_id: None,
@@ -276,6 +342,36 @@ impl version_migrate::MigratesTo<AppStateV1_5> for AppStateV1_4 {
             default_workspace_id: self.default_workspace_id,
             active_session_id: self.active_session_id,
             open_tabs: self.open_tabs,
+            active_tab_id: self.active_tab_id,
+        }
+    }
+}
+
+/// Migration from AppStateV1_5 to AppStateV1_6.
+/// Migrates OpenTabDTO to OpenTabDTOV1_6 by adding UI state fields with default values (None).
+impl version_migrate::MigratesTo<AppStateV1_6> for AppStateV1_5 {
+    fn migrate(self) -> AppStateV1_6 {
+        AppStateV1_6 {
+            last_selected_workspace_id: self.last_selected_workspace_id,
+            default_workspace_id: self.default_workspace_id,
+            active_session_id: self.active_session_id,
+            open_tabs: self
+                .open_tabs
+                .into_iter()
+                .map(|tab| OpenTabDTOV1_6 {
+                    id: tab.id,
+                    session_id: tab.session_id,
+                    workspace_id: tab.workspace_id,
+                    last_accessed_at: tab.last_accessed_at,
+                    order: tab.order,
+                    // Default UI state values
+                    input: None,
+                    attached_file_paths: None,
+                    auto_mode: None,
+                    auto_chat_iteration: None,
+                    is_dirty: None,
+                })
+                .collect(),
             active_tab_id: self.active_tab_id,
         }
     }
@@ -357,6 +453,8 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_3 {
 }
 
 /// Convert OpenTabDTO to OpenTab domain model.
+/// OpenTabDTO is the old format (V1.4, V1.5) without UI state fields.
+/// UI state fields are initialized to None.
 impl From<OpenTabDTO> for OpenTab {
     fn from(dto: OpenTabDTO) -> Self {
         OpenTab {
@@ -365,6 +463,12 @@ impl From<OpenTabDTO> for OpenTab {
             workspace_id: dto.workspace_id,
             last_accessed_at: dto.last_accessed_at,
             order: dto.order,
+            // UI state fields default to None (backward compatibility)
+            input: None,
+            attached_file_paths: None,
+            auto_mode: None,
+            auto_chat_iteration: None,
+            is_dirty: None,
         }
     }
 }
@@ -434,6 +538,68 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_5 {
     }
 }
 
+/// Convert OpenTabDTOV1_6 to OpenTab domain model.
+impl From<OpenTabDTOV1_6> for OpenTab {
+    fn from(dto: OpenTabDTOV1_6) -> Self {
+        OpenTab {
+            id: dto.id,
+            session_id: dto.session_id,
+            workspace_id: dto.workspace_id,
+            last_accessed_at: dto.last_accessed_at,
+            order: dto.order,
+            input: dto.input,
+            attached_file_paths: dto.attached_file_paths,
+            auto_mode: dto.auto_mode,
+            auto_chat_iteration: dto.auto_chat_iteration,
+            is_dirty: dto.is_dirty,
+        }
+    }
+}
+
+/// Convert OpenTab domain model to OpenTabDTOV1_6.
+impl From<OpenTab> for OpenTabDTOV1_6 {
+    fn from(tab: OpenTab) -> Self {
+        OpenTabDTOV1_6 {
+            id: tab.id,
+            session_id: tab.session_id,
+            workspace_id: tab.workspace_id,
+            last_accessed_at: tab.last_accessed_at,
+            order: tab.order,
+            input: tab.input,
+            attached_file_paths: tab.attached_file_paths,
+            auto_mode: tab.auto_mode,
+            auto_chat_iteration: tab.auto_chat_iteration,
+            is_dirty: tab.is_dirty,
+        }
+    }
+}
+
+/// Convert AppStateV1_6 DTO to domain model.
+impl IntoDomain<AppState> for AppStateV1_6 {
+    fn into_domain(self) -> AppState {
+        AppState {
+            last_selected_workspace_id: self.last_selected_workspace_id,
+            default_workspace_id: self.default_workspace_id,
+            active_session_id: self.active_session_id,
+            open_tabs: self.open_tabs.into_iter().map(Into::into).collect(),
+            active_tab_id: self.active_tab_id,
+        }
+    }
+}
+
+/// Convert domain model to AppStateV1_6 DTO for persistence.
+impl version_migrate::FromDomain<AppState> for AppStateV1_6 {
+    fn from_domain(state: AppState) -> Self {
+        AppStateV1_6 {
+            last_selected_workspace_id: state.last_selected_workspace_id,
+            default_workspace_id: state.default_workspace_id,
+            active_session_id: state.active_session_id,
+            open_tabs: state.open_tabs.into_iter().map(Into::into).collect(),
+            active_tab_id: state.active_tab_id,
+        }
+    }
+}
+
 // ============================================================================
 // Migrator factory
 // ============================================================================
@@ -449,7 +615,8 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_5 {
 /// - V1.2 → V1.3: Reverts default_workspace_id back to optional
 /// - V1.3 → V1.4: Adds `open_tabs` and `active_tab_id` for tab management
 /// - V1.4 → V1.5: Migrates to camelCase serialization format
-/// - V1.5 → AppState: Converts DTO to domain model
+/// - V1.5 → V1.6: Adds UI state fields to OpenTab (input, attached_file_paths, auto_mode, auto_chat_iteration, is_dirty)
+/// - V1.6 → AppState: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -460,7 +627,7 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_5 {
 pub fn create_app_state_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0 -> V1.1 -> V1.2 -> V1.3 -> V1.4 -> V1.5 -> AppState
+    // Register migration path: V1.0 -> V1.1 -> V1.2 -> V1.3 -> V1.4 -> V1.5 -> V1.6 -> AppState
     let app_state_path = version_migrate::Migrator::define("app_state")
         .from::<AppStateV1_0>()
         .step::<AppStateV1_1>()
@@ -468,6 +635,7 @@ pub fn create_app_state_migrator() -> version_migrate::Migrator {
         .step::<AppStateV1_3>()
         .step::<AppStateV1_4>()
         .step::<AppStateV1_5>()
+        .step::<AppStateV1_6>()
         .into_with_save::<AppState>();
 
     migrator

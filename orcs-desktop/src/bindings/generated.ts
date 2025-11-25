@@ -10,9 +10,9 @@ export type ConversationModeType = 'detailed' | 'normal' | 'concise' | 'brief' |
 
 export type PresetSourceType = 'system' | 'user';
 
-export type AppState = { lastSelectedWorkspaceId: string | null; defaultWorkspaceId: string | null; activeSessionId: string | null; openTabs: { id: string; sessionId: string; workspaceId: string; lastAccessedAt: number; order: number; }[]; activeTabId: string | null; };
+export type AppState = { lastSelectedWorkspaceId: string | null; defaultWorkspaceId: string | null; activeSessionId: string | null; openTabs: { id: string; sessionId: string; workspaceId: string; lastAccessedAt: number; order: number; input: string | null; attachedFilePaths: string[] | null; autoMode: boolean | null; autoChatIteration: number | null; isDirty: boolean | null; }[]; activeTabId: string | null; };
 
-export type OpenTab = { id: string; sessionId: string; workspaceId: string; lastAccessedAt: number; order: number; };
+export type OpenTab = { id: string; sessionId: string; workspaceId: string; lastAccessedAt: number; order: number; input: string | null; attachedFilePaths: string[] | null; autoMode: boolean | null; autoChatIteration: number | null; isDirty: boolean | null; };
 
 export type MessageRole = 'User' | 'Assistant' | 'System';
 

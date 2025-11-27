@@ -2890,6 +2890,8 @@ dependencies = [
  "clap",
  "orcs-core",
  "schema-bridge",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

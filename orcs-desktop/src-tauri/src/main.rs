@@ -8,6 +8,8 @@ use chrono::Local;
 use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID};
 use orcs_execution::tracing_layer::OrchestratorEvent;
 use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
@@ -60,6 +62,10 @@ fn main() {
         let session_usecase_for_setup = bootstrap.app_state.session_usecase.clone();
         let app_state_service_for_setup = bootstrap.app_state.app_state_service.clone();
 
+        // Flag to track if state has been saved during shutdown
+        let state_saved = Arc::new(AtomicBool::new(false));
+        let state_saved_for_event = state_saved.clone();
+
         tauri::Builder::default()
             .plugin(tauri_plugin_opener::init())
             .plugin(tauri_plugin_dialog::init())
@@ -67,6 +73,11 @@ fn main() {
             .manage(bootstrap.app_state)
             .invoke_handler(commands::handlers())
             .setup(move |app| {
+                // Initialize updater plugin in setup phase (desktop only)
+                #[cfg(desktop)]
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+
                 let handle_for_events = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     println!("[EventListener] Starting orchestrator event listener");
@@ -121,26 +132,49 @@ fn main() {
                 Ok(())
             })
             .on_window_event(move |window, event| {
-                if let tauri::WindowEvent::Destroyed = event {
-                    tracing::info!("[Shutdown] Window destroyed, saving app state...");
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    // Check if state has already been saved
+                    if state_saved_for_event.load(Ordering::Relaxed) {
+                        // State already saved, allow close
+                        tracing::info!("[Shutdown] State already saved, allowing close");
+                        return;
+                    }
+
+                    tracing::info!("[Shutdown] Window close requested, saving app state...");
                     let app_state_service = window.state::<app::AppState>();
                     let service = app_state_service.app_state_service.clone();
 
-                    // Save state synchronously on shutdown
-                    tauri::async_runtime::block_on(async move {
-                        use orcs_core::state::repository::StateRepository;
-                        match service.get_state().await {
-                            Ok(state) => {
-                                if let Err(e) = service.save_state(state).await {
-                                    tracing::error!("[Shutdown] Failed to save app state: {}", e);
-                                } else {
-                                    tracing::info!("[Shutdown] App state saved successfully");
+                    // Prevent immediate close to save state first
+                    api.prevent_close();
+
+                    let window_handle = window.clone();
+                    let state_saved_clone = state_saved_for_event.clone();
+
+                    // Save state in background thread
+                    std::thread::spawn(move || {
+                        tauri::async_runtime::block_on(async move {
+                            use orcs_core::state::repository::StateRepository;
+                            match service.get_state().await {
+                                Ok(state) => {
+                                    if let Err(e) = service.save_state(state).await {
+                                        tracing::error!("[Shutdown] Failed to save app state: {}", e);
+                                    } else {
+                                        tracing::info!("[Shutdown] App state saved successfully");
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("[Shutdown] Failed to get app state: {}", e);
                                 }
                             }
-                            Err(e) => {
-                                tracing::error!("[Shutdown] Failed to get app state: {}", e);
+
+                            // Mark state as saved
+                            state_saved_clone.store(true, Ordering::Relaxed);
+
+                            // Destroy the window since close() doesn't work after prevent_close()
+                            if let Err(e) = window_handle.destroy() {
+                                tracing::error!("[Shutdown] Failed to destroy window: {}", e);
                             }
-                        }
+                        });
                     });
                 }
             })

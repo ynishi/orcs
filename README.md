@@ -19,6 +19,22 @@ Download the latest release for your platform:
 - **Windows**: `ORCS-Desktop_<version>_x64-setup.exe`
 - **Linux**: `ORCS-Desktop_<version>_amd64.AppImage` or `.deb`
 
+#### macOS Installation Notes
+
+Since the app is not notarized by Apple, you may see a security warning when first opening it.
+
+**Method 1: Using Terminal (Recommended)**
+```bash
+# After copying the app to /Applications, run:
+xattr -cr "/Applications/ORCS Desktop.app"
+```
+
+**Method 2: System Settings**
+1. Try to open the app (you'll see a security warning)
+2. Go to **System Settings** → **Privacy & Security**
+3. Scroll down and click **"Open Anyway"** next to the ORCS Desktop message
+4. Click **Open** in the confirmation dialog
+
 ### Build from Source
 
 ```bash

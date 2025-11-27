@@ -8,8 +8,8 @@ use chrono::Local;
 use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID};
 use orcs_execution::tracing_layer::OrchestratorEvent;
 use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
@@ -105,7 +105,10 @@ fn main() {
                         Ok(app_state) => {
                             tracing::info!("[Startup] Emitting app-state:snapshot");
                             if let Err(e) = handle.emit("app-state:snapshot", &app_state) {
-                                tracing::error!("[Startup] Failed to emit app-state:snapshot: {}", e);
+                                tracing::error!(
+                                    "[Startup] Failed to emit app-state:snapshot: {}",
+                                    e
+                                );
                             }
                         }
                         Err(e) => {
@@ -157,7 +160,10 @@ fn main() {
                             match service.get_state().await {
                                 Ok(state) => {
                                     if let Err(e) = service.save_state(state).await {
-                                        tracing::error!("[Shutdown] Failed to save app state: {}", e);
+                                        tracing::error!(
+                                            "[Shutdown] Failed to save app state: {}",
+                                            e
+                                        );
                                     } else {
                                         tracing::info!("[Shutdown] App state saved successfully");
                                     }

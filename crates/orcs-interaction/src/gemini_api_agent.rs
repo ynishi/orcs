@@ -116,8 +116,8 @@ impl GeminiApiAgent {
             AgentError::ExecutionFailed("Gemini configuration not found in secret.json".to_string())
         })?;
 
-        let mut agent = Self::new(gemini_config.api_key, GEMINI_3_PRO_MODEL)
-            .with_thinking_level("HIGH");
+        let mut agent =
+            Self::new(gemini_config.api_key, GEMINI_3_PRO_MODEL).with_thinking_level("HIGH");
 
         if enable_search {
             agent = agent.with_google_search(true);

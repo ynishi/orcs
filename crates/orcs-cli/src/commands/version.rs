@@ -22,7 +22,10 @@ pub fn bump(version: &str) -> Result<()> {
     println!("\n💡 Next steps:");
     println!("  1. Run: cargo update (to update Cargo.lock)");
     println!("  2. Test the build: orcs build local");
-    println!("  3. Commit changes: git add -A && git commit -m 'Bump version to {}'", version);
+    println!(
+        "  3. Commit changes: git add -A && git commit -m 'Bump version to {}'",
+        version
+    );
     println!("  4. Create tag: git tag v{}", version);
     println!("  5. Push: git push && git push --tags");
 
@@ -30,8 +33,7 @@ pub fn bump(version: &str) -> Result<()> {
 }
 
 fn update_package_json(path: &str, version: &str) -> Result<()> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path))?;
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path))?;
 
     let mut json: Value = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse {} as JSON", path))?;
@@ -39,16 +41,14 @@ fn update_package_json(path: &str, version: &str) -> Result<()> {
     json["version"] = Value::String(version.to_string());
 
     let updated = serde_json::to_string_pretty(&json)?;
-    fs::write(path, updated + "\n")
-        .with_context(|| format!("Failed to write {}", path))?;
+    fs::write(path, updated + "\n").with_context(|| format!("Failed to write {}", path))?;
 
     println!("  ✓ Updated {}", path);
     Ok(())
 }
 
 fn update_tauri_conf(path: &str, version: &str) -> Result<()> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path))?;
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path))?;
 
     let mut json: Value = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse {} as JSON", path))?;
@@ -56,16 +56,14 @@ fn update_tauri_conf(path: &str, version: &str) -> Result<()> {
     json["version"] = Value::String(version.to_string());
 
     let updated = serde_json::to_string_pretty(&json)?;
-    fs::write(path, updated + "\n")
-        .with_context(|| format!("Failed to write {}", path))?;
+    fs::write(path, updated + "\n").with_context(|| format!("Failed to write {}", path))?;
 
     println!("  ✓ Updated {}", path);
     Ok(())
 }
 
 fn update_cargo_toml(path: &str, version: &str) -> Result<()> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path))?;
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path))?;
 
     let lines: Vec<&str> = content.lines().collect();
     let mut updated_lines = Vec::new();
@@ -95,8 +93,8 @@ fn update_cargo_toml(path: &str, version: &str) -> Result<()> {
 
 pub fn show() -> Result<()> {
     let cargo_path = "Cargo.toml";
-    let content = fs::read_to_string(cargo_path)
-        .with_context(|| format!("Failed to read {}", cargo_path))?;
+    let content =
+        fs::read_to_string(cargo_path).with_context(|| format!("Failed to read {}", cargo_path))?;
 
     for line in content.lines() {
         if line.trim().starts_with("version") && line.contains("\"") {

@@ -5,7 +5,9 @@ use crate::app::AppState;
 
 /// Gets all tasks snapshot (for store initialization)
 #[tauri::command]
-pub async fn get_tasks_snapshot(state: State<'_, AppState>) -> Result<Vec<orcs_core::task::Task>, String> {
+pub async fn get_tasks_snapshot(
+    state: State<'_, AppState>,
+) -> Result<Vec<orcs_core::task::Task>, String> {
     state
         .task_repository
         .list_all()

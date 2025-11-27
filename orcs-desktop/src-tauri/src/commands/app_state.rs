@@ -9,9 +9,7 @@ use crate::app::AppState;
 /// the current state. After that, the frontend listens to `app-state:update`
 /// events for any changes.
 #[tauri::command]
-pub async fn get_app_state_snapshot(
-    state: State<'_, AppState>,
-) -> Result<CoreAppState, String> {
+pub async fn get_app_state_snapshot(state: State<'_, AppState>) -> Result<CoreAppState, String> {
     state
         .app_state_service
         .get_state()

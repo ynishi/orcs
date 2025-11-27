@@ -642,13 +642,11 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
             .collect();
 
         // Sort by sort_order (None values go to the end)
-        favorite_files.sort_by(|(_, a), (_, b)| {
-            match (a.sort_order, b.sort_order) {
-                (Some(a_order), Some(b_order)) => a_order.cmp(&b_order),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => std::cmp::Ordering::Equal,
-            }
+        favorite_files.sort_by(|(_, a), (_, b)| match (a.sort_order, b.sort_order) {
+            (Some(a_order), Some(b_order)) => a_order.cmp(&b_order),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
         });
 
         // Find the position of the target file in the sorted list

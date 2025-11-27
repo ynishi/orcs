@@ -145,9 +145,7 @@ pub async fn list_workspaces(state: State<'_, AppState>) -> Result<Vec<Workspace
 
 /// Gets all workspaces snapshot for initial load (Phase 4)
 #[tauri::command]
-pub async fn get_workspaces_snapshot(
-    state: State<'_, AppState>,
-) -> Result<Vec<Workspace>, String> {
+pub async fn get_workspaces_snapshot(state: State<'_, AppState>) -> Result<Vec<Workspace>, String> {
     state
         .workspace_storage_service
         .list_all_workspaces()
@@ -189,10 +187,7 @@ pub async fn switch_workspace(
         .set_last_selected_workspace(workspace_id.clone())
         .await
     {
-        println!(
-            "[Backend] Failed to save last_selected_workspace: {}",
-            e
-        );
+        println!("[Backend] Failed to save last_selected_workspace: {}", e);
     }
 
     app.emit("workspace-switched", &workspace_id)
@@ -267,7 +262,10 @@ pub async fn delete_workspace(
         })?;
 
     // Emit workspace:delete event (Phase 4)
-    if let Err(e) = app.emit("workspace:delete", serde_json::json!({ "id": workspace_id })) {
+    if let Err(e) = app.emit(
+        "workspace:delete",
+        serde_json::json!({ "id": workspace_id }),
+    ) {
         println!("[Backend] Failed to emit workspace:delete: {}", e);
     }
 

@@ -246,11 +246,17 @@ impl PersonaBackendAgent {
                 // Apply Gemini options if specified
                 if let Some(ref options) = self.gemini_options {
                     if let Some(ref thinking_level) = options.thinking_level {
-                        tracing::info!("[PersonaBackendAgent] Setting Gemini thinking level: {}", thinking_level);
+                        tracing::info!(
+                            "[PersonaBackendAgent] Setting Gemini thinking level: {}",
+                            thinking_level
+                        );
                         agent = agent.with_thinking_level(thinking_level);
                     }
                     if let Some(google_search) = options.google_search {
-                        tracing::info!("[PersonaBackendAgent] Setting Gemini Google Search: {}", google_search);
+                        tracing::info!(
+                            "[PersonaBackendAgent] Setting Gemini Google Search: {}",
+                            google_search
+                        );
                         agent = agent.with_google_search(google_search);
                     }
                 }

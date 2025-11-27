@@ -286,7 +286,7 @@ impl From<SessionType> for crate::session::Session {
             updated_at: value.updated_at,
             current_persona_id: value.current_persona_id,
             persona_histories: std::collections::HashMap::new(), // Excluded from SessionType
-            app_mode: crate::session::AppMode::Idle, // Default value
+            app_mode: crate::session::AppMode::Idle,             // Default value
             workspace_id: value.workspace_id,
             active_participant_ids: value.active_participant_ids,
             execution_strategy: value.execution_strategy.into(), // ExecutionModelType → ExecutionModel

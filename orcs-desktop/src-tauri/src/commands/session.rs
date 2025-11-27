@@ -826,7 +826,9 @@ pub async fn set_execution_strategy(
 
 /// Gets the current execution strategy for the active session
 #[tauri::command]
-pub async fn get_execution_strategy(state: State<'_, AppState>) -> Result<ExecutionModelType, String> {
+pub async fn get_execution_strategy(
+    state: State<'_, AppState>,
+) -> Result<ExecutionModelType, String> {
     let manager = state
         .session_usecase
         .active_session()
@@ -1356,7 +1358,11 @@ pub async fn generate_summary(
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
-    tracing::info!("[SessionSupport] Generating summary for session: {} with config: {:?}", session_id, agent_config);
+    tracing::info!(
+        "[SessionSupport] Generating summary for session: {} with config: {:?}",
+        session_id,
+        agent_config
+    );
 
     let summary = if let Some(config) = agent_config {
         // Use custom agent configuration
@@ -1364,8 +1370,14 @@ pub async fn generate_summary(
             &thread_content,
             &config.backend,
             config.model_name.as_deref(),
-            config.gemini_options.as_ref().and_then(|opts| opts.thinking_level.as_deref()),
-            config.gemini_options.as_ref().and_then(|opts| opts.google_search),
+            config
+                .gemini_options
+                .as_ref()
+                .and_then(|opts| opts.thinking_level.as_deref()),
+            config
+                .gemini_options
+                .as_ref()
+                .and_then(|opts| opts.google_search),
         )
         .await
         .map_err(|e| format!("Failed to generate summary: {}", e))?
@@ -1393,7 +1405,11 @@ pub async fn generate_action_plan(
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
-    tracing::info!("[SessionSupport] Generating action plan for session: {} with config: {:?}", session_id, agent_config);
+    tracing::info!(
+        "[SessionSupport] Generating action plan for session: {} with config: {:?}",
+        session_id,
+        agent_config
+    );
 
     let action_plan = if let Some(config) = agent_config {
         // Use custom agent configuration
@@ -1401,8 +1417,14 @@ pub async fn generate_action_plan(
             &thread_content,
             &config.backend,
             config.model_name.as_deref(),
-            config.gemini_options.as_ref().and_then(|opts| opts.thinking_level.as_deref()),
-            config.gemini_options.as_ref().and_then(|opts| opts.google_search),
+            config
+                .gemini_options
+                .as_ref()
+                .and_then(|opts| opts.thinking_level.as_deref()),
+            config
+                .gemini_options
+                .as_ref()
+                .and_then(|opts| opts.google_search),
         )
         .await
         .map_err(|e| format!("Failed to generate action plan: {}", e))?
@@ -1430,7 +1452,11 @@ pub async fn generate_expertise(
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
-    tracing::info!("[SessionSupport] Generating expertise for session: {} with config: {:?}", session_id, agent_config);
+    tracing::info!(
+        "[SessionSupport] Generating expertise for session: {} with config: {:?}",
+        session_id,
+        agent_config
+    );
 
     let expertise = if let Some(config) = agent_config {
         // Use custom agent configuration
@@ -1438,8 +1464,14 @@ pub async fn generate_expertise(
             &thread_content,
             &config.backend,
             config.model_name.as_deref(),
-            config.gemini_options.as_ref().and_then(|opts| opts.thinking_level.as_deref()),
-            config.gemini_options.as_ref().and_then(|opts| opts.google_search),
+            config
+                .gemini_options
+                .as_ref()
+                .and_then(|opts| opts.thinking_level.as_deref()),
+            config
+                .gemini_options
+                .as_ref()
+                .and_then(|opts| opts.google_search),
         )
         .await
         .map_err(|e| format!("Failed to generate expertise: {}", e))?

@@ -330,7 +330,7 @@ impl SessionSupportAgentService {
                 return Err(anyhow::anyhow!(
                     "Unsupported backend: {}. Supported: gemini_api, claude_api, open_ai_api",
                     backend
-                ))
+                ));
             }
         };
 
@@ -408,7 +408,7 @@ impl SessionSupportAgentService {
                 return Err(anyhow::anyhow!(
                     "Unsupported backend: {}. Supported: gemini_api, claude_api, open_ai_api",
                     backend
-                ))
+                ));
             }
         };
 
@@ -464,7 +464,7 @@ impl SessionSupportAgentService {
                 return Err(anyhow::anyhow!(
                     "Unsupported backend: {}. Supported: gemini_api, claude_api, open_ai_api",
                     backend
-                ))
+                ));
             }
         };
 
@@ -589,10 +589,7 @@ impl SessionSupportAgentService {
         let prompt = request.to_prompt();
 
         // Agent returns Markdown directly (output = "String")
-        let markdown: String = self
-            .expertise_agent
-            .execute(prompt.as_str().into())
-            .await?;
+        let markdown: String = self.expertise_agent.execute(prompt.as_str().into()).await?;
 
         Ok(markdown)
     }

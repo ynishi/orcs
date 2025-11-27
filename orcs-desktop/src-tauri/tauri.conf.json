@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "orcs-desktop",
+  "productName": "ORCS Desktop",
   "version": "0.1.0",
   "identifier": "com.yutakanishimura.orcs-desktop",
   "build": {
@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.anthropic.com https://github.com"
     }
   },
   "bundle": {

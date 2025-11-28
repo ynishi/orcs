@@ -70,7 +70,7 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   {
     name: 'files',
     icon: '📁',
-    description: 'List files in the current workspace',
+    description: 'List files saved to workspace storage (not project source files)',
     usage: '/files',
     examples: ['/files'],
   },

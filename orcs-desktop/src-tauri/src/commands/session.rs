@@ -379,6 +379,23 @@ impl From<&SlashCommand> for CustomCommandInfo {
 
 You are authorized to execute slash commands to accomplish user tasks. When you identify that a slash command would help complete the task, **you MUST execute it immediately**.
 
+## ORCS Workspace Architecture
+
+**Important**: ORCS operates with a clear separation between project files and workspace storage:
+
+- **Project Files**: Source code and project assets located at the workspace root directory
+  - ORCS runs directly in your project directory (e.g., `/path/to/your-project`)
+  - Use `/search` to find and read project source files
+  - Use shell commands to interact with project files (git, build tools, etc.)
+
+- **Workspace Storage**: Completely separate data storage for ORCS-specific files
+  - Located in ORCS data directory (NOT in your project)
+  - Stores: conversation history, saved attachments, session metadata
+  - Use `/files` to list files saved to workspace storage (uploaded attachments, etc.)
+  - These files are isolated from your project's version control
+
+**Key Distinction**: `/files` shows workspace storage files (saved attachments), NOT your project's source code.
+
 ## How to Execute Slash Commands
 
 ### XML-style
@@ -525,7 +542,7 @@ const BUILT_IN_COMMANDS: &[(&str, BuiltInCommand)] = &[
         "files",
         BuiltInCommand {
             usage: "/files",
-            description: "List files in the current workspace",
+            description: "List files saved to workspace storage (not project source files)",
             args: None,
         },
     ),

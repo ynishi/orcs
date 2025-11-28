@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 use std::process::Command;
 
+use orcs_core::agent::build_enhanced_path;
 use orcs_core::error::{OrcsError, Result};
 use orcs_core::search::model::SearchResultItem;
 use orcs_core::search::{SearchFilters, SearchResult, SearchScope, SearchService};
@@ -24,6 +25,10 @@ impl RipgrepSearchService {
         filters: &Option<SearchFilters>,
     ) -> Result<Vec<SearchResultItem>> {
         let mut cmd = Command::new("rg");
+
+        // Set enhanced PATH to find ripgrep in system and workspace-specific locations
+        let enhanced_path = build_enhanced_path(search_path, None);
+        cmd.env("PATH", enhanced_path);
 
         // Basic flags
         cmd.arg("--line-number"); // Show line numbers

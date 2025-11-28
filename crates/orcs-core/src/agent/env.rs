@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 /// 3. Tool manager paths (mise, asdf, volta) if auto-detection is enabled
 /// 4. System paths from /etc/paths and /etc/paths.d/*
 /// 5. Common binary locations (/usr/local/bin, /usr/bin, etc.)
-/// 6. User home bin directories (~/.local/bin, ~/bin)
+/// 6. User home bin directories (~/.local/bin, ~/bin, ~/.cargo/bin, etc.)
 /// 7. Existing PATH entries
 ///
 /// # Arguments
@@ -123,11 +123,17 @@ pub fn build_enhanced_path(
         }
     }
 
-    // 6. Add user's home bin directories
+    // 6. Add user's home bin directories and common development tool paths
     if let Ok(home) = std::env::var("HOME") {
         let home_paths = vec![
             PathBuf::from(&home).join(".local/bin"),
             PathBuf::from(&home).join("bin"),
+            PathBuf::from(&home).join(".cargo/bin"),    // Rust (cargo, rustc, etc.)
+            PathBuf::from(&home).join(".go/bin"),       // Go binaries
+            PathBuf::from(&home).join(".deno/bin"),     // Deno binaries
+            PathBuf::from(&home).join(".bun/bin"),      // Bun binaries
+            PathBuf::from(&home).join(".yarn/bin"),     // Yarn global binaries
+            PathBuf::from(&home).join(".npm-global/bin"), // npm global binaries
         ];
 
         for path in home_paths {

@@ -1446,17 +1446,25 @@ impl InteractionManager {
             return InteractionResult::NoOp;
         }
 
-        // Ensure dialogue is initialized
-        if let Err(e) = self.ensure_dialogue_initialized().await {
-            return InteractionResult::NewMessage(format!("Error initializing dialogue: {}", e));
-        }
+        // Check if session is muted - if so, only add to history but don't run AI
+        let is_muted = self.is_muted().await;
 
-        // Add user input to history BEFORE running dialogue (so timestamp is correct)
-        // Only if add_to_history is true (to avoid adding internal prompts like "Continue the discussion.")
+        // Add user input to history BEFORE checking mute (so user's message is saved)
         let user_name = self.user_service.get_user_name();
         if add_to_history {
             self.add_to_history(&user_name, MessageRole::User, input, file_paths.clone())
                 .await;
+        }
+
+        // If muted, return early without running dialogue
+        if is_muted {
+            tracing::info!("[InteractionManager] Session is muted, skipping AI response");
+            return InteractionResult::NoOp;
+        }
+
+        // Ensure dialogue is initialized
+        if let Err(e) = self.ensure_dialogue_initialized().await {
+            return InteractionResult::NewMessage(format!("Error initializing dialogue: {}", e));
         }
         let user_name_str = if user_name.to_lowercase() == "you" {
             tracing::warn!(

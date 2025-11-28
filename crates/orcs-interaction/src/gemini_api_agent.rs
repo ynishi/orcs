@@ -228,10 +228,25 @@ impl GeminiApiAgent {
             return Err(map_http_error(status, body_text, retry_after));
         }
 
-        let parsed: GenerateContentResponse = response
-            .json()
+        // Read response body as text first to preserve it for error reporting
+        let body_text = response
+            .text()
             .await
-            .map_err(|err| AgentError::Other(format!("Failed to parse Gemini response: {err}")))?;
+            .map_err(|err| AgentError::Other(format!("Failed to read Gemini response body: {err}")))?;
+
+        // Parse JSON from text
+        let parsed: GenerateContentResponse = serde_json::from_str(&body_text)
+            .map_err(|err| {
+                // Include both parse error and response body for debugging
+                let truncated_body = if body_text.len() > 500 {
+                    format!("{}... (truncated, total {} bytes)", &body_text[..500], body_text.len())
+                } else {
+                    body_text.clone()
+                };
+                AgentError::Other(format!(
+                    "Failed to parse Gemini response: {err}\n\nResponse body:\n{truncated_body}"
+                ))
+            })?;
 
         extract_text_response(parsed)
     }

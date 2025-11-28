@@ -15,6 +15,8 @@ struct Cli {
 enum Commands {
     /// Build ORCS Desktop application
     Build,
+    /// Run ORCS Desktop in development mode
+    Dev,
     /// Generate TypeScript type definitions from Rust schemas
     Schema {
         #[command(subcommand)]
@@ -49,6 +51,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Build => commands::build::run()?,
+        Commands::Dev => commands::dev::run()?,
         Commands::Schema { action } => match action {
             SchemaAction::Generate => commands::schema::generate()?,
         },

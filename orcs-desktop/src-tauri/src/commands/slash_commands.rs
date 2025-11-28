@@ -1,5 +1,6 @@
 use std::process::Command;
 
+use orcs_core::agent::build_enhanced_path;
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::slash_command::{CreateSlashCommandRequest, SlashCommand};
 use orcs_core::workspace::manager::WorkspaceStorageService;
@@ -208,10 +209,11 @@ pub async fn execute_shell_command(
     };
 
     // If working_dir is provided, use it. Otherwise, use workspace directory from active session
-    let actual_dir = if let Some(dir) = working_dir {
+    let (actual_dir, workspace_root) = if let Some(dir) = working_dir {
         tracing::info!("execute_shell_command: Using provided dir: {}", dir);
-        cmd.current_dir(&dir);
-        dir
+        let path = std::path::PathBuf::from(&dir);
+        cmd.current_dir(&path);
+        (dir, path)
     } else {
         // Default to workspace directory from active session
         let workspace = if let Some(session_mgr) = state.session_usecase.active_session().await {
@@ -237,8 +239,15 @@ pub async fn execute_shell_command(
         let dir = workspace.root_path.to_string_lossy().to_string();
         tracing::info!("execute_shell_command: Using workspace dir: {}", dir);
         cmd.current_dir(&workspace.root_path);
-        dir
+        (dir, workspace.root_path)
     };
+
+    // Build enhanced PATH from workspace root (without env_settings for now)
+    // This includes workspace-specific tool dirs, system paths, and common binary locations
+    let enhanced_path = build_enhanced_path(&workspace_root, None);
+
+    // Set enhanced PATH as environment variable
+    cmd.env("PATH", enhanced_path);
 
     tracing::info!("execute_shell_command: Executing in: {}", actual_dir);
 

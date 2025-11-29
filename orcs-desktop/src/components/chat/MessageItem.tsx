@@ -17,14 +17,69 @@ interface MessageItemProps {
 // 長いテキストを折りたたむしきい値（文字数）
 const COLLAPSE_THRESHOLD = 200;
 
-// メンションをハイライト表示するヘルパー
+// メンションとSlashコマンドをハイライト表示するヘルパー
 function renderTextWithMentions(text: string) {
+  const parts: (string | React.ReactElement)[] = [];
+  let key = 0;
+
+  // First, handle Slash commands: <Slash> <Name>command</Name> <Args>args</Args> </Slash>
+  const slashRegex = /<Slash>\s*<Name>(.*?)<\/Name>\s*<Args>(.*?)<\/Args>\s*<\/Slash>/g;
+  const slashMatches: Array<{ index: number; length: number; name: string; args: string }> = [];
+  let slashMatch;
+
+  while ((slashMatch = slashRegex.exec(text)) !== null) {
+    slashMatches.push({
+      index: slashMatch.index,
+      length: slashMatch[0].length,
+      name: slashMatch[1],
+      args: slashMatch[2],
+    });
+  }
+
+  // Process text segment by segment
+  let currentIndex = 0;
+
+  for (const slash of slashMatches) {
+    // Text before slash command
+    const beforeText = text.slice(currentIndex, slash.index);
+    if (beforeText) {
+      // Process mentions in the before text
+      processMentions(beforeText, parts, key);
+    }
+
+    // Add slash command badge
+    parts.push(
+      <Badge
+        key={`slash-${key++}`}
+        component="span"
+        size="sm"
+        variant="filled"
+        color="blue"
+        style={{ margin: '0 2px' }}
+      >
+        /{slash.name} {slash.args}
+      </Badge>
+    );
+
+    currentIndex = slash.index + slash.length;
+  }
+
+  // Remaining text after all slash commands
+  const remainingText = text.slice(currentIndex);
+  if (remainingText) {
+    processMentions(remainingText, parts, key);
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
+// Helper function to process mentions in a text segment
+function processMentions(text: string, parts: (string | React.ReactElement)[], startKey: number) {
   // スペース以外の文字にマッチ（日本語、ハイフン、記号などもサポート）
   const mentionRegex = /@(\S+)/g;
-  const parts: (string | React.ReactElement)[] = [];
   let lastIndex = 0;
   let match;
-  let key = 0;
+  let key = startKey;
 
   while ((match = mentionRegex.exec(text)) !== null) {
     // メンション前のテキスト
@@ -37,7 +92,7 @@ function renderTextWithMentions(text: string) {
     const displayName = mentionName.replace(/_/g, ' ');
     parts.push(
       <Badge
-        key={key++}
+        key={`mention-${key++}`}
         component="span"
         size="sm"
         variant="light"
@@ -55,8 +110,6 @@ function renderTextWithMentions(text: string) {
   if (lastIndex < text.length) {
     parts.push(text.slice(lastIndex));
   }
-
-  return parts.length > 0 ? parts : text;
 }
 
 // メッセージタイプを表示用ラベルに変換

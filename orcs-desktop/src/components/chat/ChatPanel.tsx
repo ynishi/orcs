@@ -200,8 +200,10 @@ export function ChatPanel({
   const [slashCommandModalOpened, setSlashCommandModalOpened] = useState(false);
   const [slashCommandDraft, setSlashCommandDraft] = useState<Partial<SlashCommand> | null>(null);
 
-  // Hover state for thread command icons
+  // Hover state for thread command icons with auto-hide
   const [isMessageAreaHovered, setIsMessageAreaHovered] = useState(false);
+  const [showThreadActions, setShowThreadActions] = useState(false);
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Agent configuration for Summary/ActionPlan/Expertise
   const [agentConfig, setAgentConfig] = useState<AgentConfig>({
@@ -632,6 +634,15 @@ export function ChatPanel({
     }
   }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking, addMessageToTab]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Handle creating a slash command from a message
   const handleCreateSlashCommand = useCallback((message: Message) => {
     setSlashCommandDraft({
@@ -688,6 +699,20 @@ export function ChatPanel({
         onDrop={onDrop}
         onMouseEnter={() => setIsMessageAreaHovered(true)}
         onMouseLeave={() => setIsMessageAreaHovered(false)}
+        onMouseMove={() => {
+          // Show actions on mouse move
+          setShowThreadActions(true);
+
+          // Clear existing timeout
+          if (hideTimeoutRef.current) {
+            clearTimeout(hideTimeoutRef.current);
+          }
+
+          // Hide after 3 seconds of no movement
+          hideTimeoutRef.current = setTimeout(() => {
+            setShowThreadActions(false);
+          }, 3000);
+        }}
       >
         <ScrollArea h="100%" viewportRef={viewport}>
           <Stack gap="sm" p="md">
@@ -713,8 +738,8 @@ export function ChatPanel({
           </Stack>
         </ScrollArea>
 
-        {/* Thread command icons (bottom-right floating) - Show on hover */}
-        {tab.messages.length > 0 && isMessageAreaHovered && (
+        {/* Thread command icons (bottom-right floating) - Show on mouse move, hide after 3s */}
+        {tab.messages.length > 0 && isMessageAreaHovered && showThreadActions && (
           <Paper
             shadow="md"
             p={8}

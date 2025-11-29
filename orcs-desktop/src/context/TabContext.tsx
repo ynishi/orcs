@@ -157,9 +157,10 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       const localUIState = tabUIStates.get(openTab.id) ?? getDefaultTabUIState();
 
       // Phase 2.4 (V1.6+): Backend保存されたUI状態を優先的に使用（存在する場合）
-      // ローカルUIStateとBackend UI状態をマージ（Backendが優先）
+      // ローカルUIStateとBackend UI状態をマージ
+      // Note: input は常にローカルを優先（openTab時にBackendから初期化済み）
       const mergedUIState: TabUIState = {
-        input: openTab.input ?? localUIState.input,
+        input: localUIState.input,
         attachedFiles: localUIState.attachedFiles, // TODO: Phase 3でパスから復元
         isDragging: localUIState.isDragging, // 一時的なUI状態なので復元しない
         isAiThinking: localUIState.isAiThinking, // 一時的なUI状態なので復元しない

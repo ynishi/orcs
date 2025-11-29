@@ -282,7 +282,7 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
               )}
 
               {/* リアルタイム進捗表示 (Running中のみ) */}
-              {true && progress && (
+              {task.status === 'Running' && progress && (
                 <Box mt={4} p={4} style={{ backgroundColor: '#e7f5ff', borderRadius: '4px' }}>
                   <Stack gap={2}>
                     {progress.currentWave !== undefined && (
@@ -457,8 +457,16 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
 }
 
 // 日付フォーマット
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string | undefined): string {
+  if (!dateStr) return 'Unknown';
+
   const date = new Date(dateStr);
+
+  // Check if date is invalid
+  if (isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
+
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const minutes = Math.floor(diff / 60000);

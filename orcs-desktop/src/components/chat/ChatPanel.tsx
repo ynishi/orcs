@@ -479,6 +479,16 @@ export function ChatPanel({
         ],
       });
 
+      // Add summary message to frontend tab
+      const summaryMessage: Message = {
+        id: `${Date.now()}-summary`,
+        type: 'ai',
+        author: 'Summary',
+        text: summary,
+        timestamp: new Date(),
+      };
+      addMessageToTab(tab.id, summaryMessage);
+
       notifications.show({
         title: 'Success',
         message: 'Summary generated successfully!',
@@ -507,7 +517,7 @@ export function ChatPanel({
     } finally {
       setTabThinking(tab.id, false);
     }
-  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking]);
+  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking, addMessageToTab]);
 
   // Handle generating action plan from thread
   const handleGenerateActionPlan = useCallback(async () => {
@@ -552,6 +562,16 @@ export function ChatPanel({
         ],
       });
 
+      // Add action plan message to frontend tab
+      const actionPlanMessage: Message = {
+        id: `${Date.now()}-actionplan`,
+        type: 'ai',
+        author: 'ActionPlan',
+        text: actionPlan,
+        timestamp: new Date(),
+      };
+      addMessageToTab(tab.id, actionPlanMessage);
+
       notifications.show({
         title: 'Success',
         message: 'ActionPlan generated successfully!',
@@ -580,7 +600,7 @@ export function ChatPanel({
     } finally {
       setTabThinking(tab.id, false);
     }
-  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking]);
+  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking, addMessageToTab]);
 
   // Handle generating expertise from thread
   const handleGenerateExpertise = useCallback(async () => {
@@ -625,6 +645,16 @@ export function ChatPanel({
         ],
       });
 
+      // Add expertise message to frontend tab
+      const expertiseMessage: Message = {
+        id: `${Date.now()}-expertise`,
+        type: 'ai',
+        author: 'Expertise',
+        text: expertise,
+        timestamp: new Date(),
+      };
+      addMessageToTab(tab.id, expertiseMessage);
+
       notifications.show({
         title: 'Success',
         message: 'Expertise generated successfully!',
@@ -653,7 +683,7 @@ export function ChatPanel({
     } finally {
       setTabThinking(tab.id, false);
     }
-  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking]);
+  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking, addMessageToTab]);
 
   // Handle creating a slash command from a message
   const handleCreateSlashCommand = useCallback((message: Message) => {

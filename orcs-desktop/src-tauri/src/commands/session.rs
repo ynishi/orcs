@@ -1505,3 +1505,50 @@ pub async fn generate_expertise(
 
     Ok(expertise)
 }
+
+/// Generates comprehensive Concept/Design Issue from conversation thread content.
+#[tauri::command]
+pub async fn generate_concept_issue(
+    thread_content: String,
+    session_id: String,
+    agent_config: Option<AgentConfig>,
+    _state: State<'_, AppState>,
+) -> Result<String, String> {
+    use orcs_application::SessionSupportAgentService;
+
+    tracing::info!(
+        "[SessionSupport] Generating concept/design issue for session: {} with config: {:?}",
+        session_id,
+        agent_config
+    );
+
+    let concept_issue = if let Some(config) = agent_config {
+        // Use custom agent configuration
+        SessionSupportAgentService::generate_concept_issue_with_config(
+            &thread_content,
+            &config.backend,
+            config.model_name.as_deref(),
+            config
+                .gemini_options
+                .as_ref()
+                .and_then(|opts| opts.thinking_level.as_deref()),
+            config
+                .gemini_options
+                .as_ref()
+                .and_then(|opts| opts.google_search),
+        )
+        .await
+        .map_err(|e| format!("Failed to generate concept/design issue: {}", e))?
+    } else {
+        // Use default agent
+        let service = SessionSupportAgentService::new();
+        service
+            .generate_concept_issue(&thread_content)
+            .await
+            .map_err(|e| format!("Failed to generate concept/design issue: {}", e))?
+    };
+
+    tracing::info!("[SessionSupport] Concept/Design Issue generated successfully");
+
+    Ok(concept_issue)
+}

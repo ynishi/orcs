@@ -18,7 +18,7 @@ import {
   Paper,
   Text,
 } from '@mantine/core';
-import { IconSettings, IconClipboardList, IconFileText, IconBulb, IconVolume, IconVolumeOff, IconPlayerPlay, IconPlayerStop, IconFile, IconCheck, IconPaperclip } from '@tabler/icons-react';
+import { IconSettings, IconClipboardList, IconFileText, IconBulb, IconFileCode, IconVolume, IconVolumeOff, IconPlayerPlay, IconPlayerStop, IconFile, IconCheck, IconPaperclip } from '@tabler/icons-react';
 import { MessageItem } from './MessageItem';
 import { StatusBar } from './StatusBar';
 import { AgentConfigSelector } from './AgentConfigSelector';
@@ -685,6 +685,89 @@ export function ChatPanel({
     }
   }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking, addMessageToTab]);
 
+  // Handle generating Concept/Design Issue from thread
+  const handleGenerateConceptIssue = useCallback(async () => {
+    const threadContent = getThreadAsText();
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      // Persist system message for Concept/Design Issue generation request
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: '📋 Generating comprehensive Concept/Design Issue from conversation...',
+            messageType: 'info',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Set thinking state
+      setTabThinking(tab.id, true, 'Concept/Design Issue');
+
+      // Call backend to generate concept/design issue
+      const conceptIssue = await invoke<string>('generate_concept_issue', {
+        threadContent,
+        sessionId: tab.sessionId,
+        agentConfig: {
+          backend: agentConfig.backend,
+          modelName: agentConfig.modelName,
+          geminiOptions: agentConfig.geminiOptions,
+        },
+      });
+
+      // Persist concept/design issue with AI response
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: conceptIssue,
+            messageType: 'ai_response',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Add concept/design issue message to frontend tab
+      const conceptIssueMessage: Message = {
+        id: `${Date.now()}-concept-issue`,
+        type: 'ai',
+        author: 'Concept/Design Issue',
+        text: conceptIssue,
+        timestamp: new Date(),
+      };
+      addMessageToTab(tab.id, conceptIssueMessage);
+
+      notifications.show({
+        title: 'Success',
+        message: 'Concept/Design Issue generated successfully!',
+        color: 'green',
+      });
+    } catch (error) {
+      console.error('[ChatPanel] Failed to generate Concept/Design Issue:', error);
+
+      // Persist error message
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: `❌ Failed to generate Concept/Design Issue: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            messageType: 'error',
+            severity: 'error',
+          },
+        ],
+      }).catch((e: unknown) => console.error('[ChatPanel] Failed to persist error message:', e));
+
+      notifications.show({
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to generate Concept/Design Issue',
+        color: 'red',
+      });
+    } finally {
+      setTabThinking(tab.id, false);
+    }
+  }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking, addMessageToTab]);
+
   // Handle creating a slash command from a message
   const handleCreateSlashCommand = useCallback((message: Message) => {
     setSlashCommandDraft({
@@ -832,6 +915,17 @@ export function ChatPanel({
                   size="lg"
                 >
                   <IconBulb size={18} />
+                </ActionIcon>
+              </Tooltip>
+
+              <Tooltip label="Generate Concept/Design Issue" withArrow>
+                <ActionIcon
+                  color="teal"
+                  variant="filled"
+                  onClick={handleGenerateConceptIssue}
+                  size="lg"
+                >
+                  <IconFileCode size={18} />
                 </ActionIcon>
               </Tooltip>
             </Group>

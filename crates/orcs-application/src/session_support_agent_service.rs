@@ -208,6 +208,79 @@ struct ExpertiseGenerationRequest {
     conversation: String,
 }
 
+#[derive(Debug, Clone, Serialize, ToPrompt, Default)]
+#[prompt(
+    template = r#"Create a high-quality, comprehensive Concept/Design Issue document from this conversation.
+
+{{ conversation }}
+
+Requirements:
+- DO NOT summarize or omit details - include ALL technical decisions and reasoning discussed
+- Capture the complete evolution of the discussion, including iterations and refinements
+- Document the final decisions with full context and rationale
+- Include implementation details, edge cases, and considerations discussed
+- Preserve technical depth - this is NOT a summary, this is a complete reference document
+- Use professional technical writing style suitable for design documentation
+
+This document should serve as the authoritative reference for the concept/design, capturing everything discussed without losing information through summarization.
+
+Output format (Markdown):
+# 📋 [Concept/Design Title]
+
+## Overview
+
+[Comprehensive description of what this concept/design addresses]
+
+## Background & Context
+
+[Why this was needed, what problem it solves, relevant context]
+
+## Design Discussion & Evolution
+
+[Complete record of how the design evolved through the conversation:
+- Initial proposals and their reasoning
+- Iterations and refinements discussed
+- Alternative approaches considered and why they were rejected
+- Key insights that shaped the final design]
+
+## Final Design Decision
+
+[The complete, detailed final design decision with:
+- Architecture/structure chosen
+- Technical implementation details
+- Data models, interfaces, or APIs
+- Integration points and dependencies]
+
+## Implementation Details
+
+[Specific implementation guidance:
+- Code patterns to use
+- Configuration requirements
+- Migration/deployment considerations
+- Performance implications]
+
+## Edge Cases & Considerations
+
+[All edge cases, limitations, and special considerations discussed:
+- Known limitations
+- Potential issues and mitigations
+- Future enhancement opportunities]
+
+## Testing Strategy
+
+[How to verify the implementation works correctly]
+
+## References
+
+[Related documentation, similar patterns, or resources mentioned]
+
+IMPORTANT: Output ONLY Markdown, no JSON or code blocks wrapping. Capture EVERYTHING - do not summarize."#
+)]
+struct ConceptIssueGenerationRequest {
+    /// The conversation content to create concept/design issue from
+    conversation: String,
+}
+
 /// Lightweight agent for generating conversation summaries using Gemini Flash API
 #[derive(llm_toolkit::Agent)]
 #[agent(
@@ -235,11 +308,21 @@ struct ActionPlanGeneratorAgent;
 )]
 struct ExpertiseGeneratorAgent;
 
+/// Lightweight agent for generating comprehensive concept/design issue documents
+#[derive(llm_toolkit::Agent)]
+#[agent(
+    expertise = "Create comprehensive, high-quality Concept/Design Issue documents from conversations. Capture ALL technical details, design evolution, and implementation considerations without summarization.",
+    output = "String",
+    default_inner = "orcs_interaction::GeminiApiAgent"
+)]
+struct ConceptIssueGeneratorAgent;
+
 /// Service providing session support LLM utilities
 pub struct SessionSupportAgentService {
     summary_agent: SummaryGeneratorAgent,
     action_plan_agent: ActionPlanGeneratorAgent,
     expertise_agent: ExpertiseGeneratorAgent,
+    concept_issue_agent: ConceptIssueGeneratorAgent,
 }
 
 impl SessionSupportAgentService {
@@ -247,10 +330,12 @@ impl SessionSupportAgentService {
         let summary_agent = SummaryGeneratorAgent;
         let action_plan_agent = ActionPlanGeneratorAgent;
         let expertise_agent = ExpertiseGeneratorAgent;
+        let concept_issue_agent = ConceptIssueGeneratorAgent;
         Self {
             summary_agent,
             action_plan_agent,
             expertise_agent,
+            concept_issue_agent,
         }
     }
 
@@ -471,6 +556,86 @@ impl SessionSupportAgentService {
         Ok(markdown)
     }
 
+    /// Generate concept/design issue with custom agent configuration
+    ///
+    /// # Arguments
+    ///
+    /// * `thread_content` - The conversation thread to create concept/design issue from
+    /// * `backend` - Backend type (e.g., "gemini_api", "claude_api", "open_ai_api")
+    /// * `model_name` - Optional model name override
+    /// * `gemini_thinking_level` - Optional Gemini thinking level (LOW/MEDIUM/HIGH)
+    /// * `gemini_google_search` - Optional Google Search enablement
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(String)` - Generated concept/design issue in markdown format
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let concept_issue = SessionSupportAgentService::generate_concept_issue_with_config(
+    ///     thread_content,
+    ///     "gemini_api",
+    ///     Some("gemini-3-pro-preview"),
+    ///     Some("HIGH"),
+    ///     Some(true),
+    /// ).await?;
+    /// ```
+    pub async fn generate_concept_issue_with_config(
+        thread_content: &str,
+        backend: &str,
+        model_name: Option<&str>,
+        gemini_thinking_level: Option<&str>,
+        gemini_google_search: Option<bool>,
+    ) -> Result<String> {
+        use llm_toolkit::agent::Agent;
+        use llm_toolkit::prompt::ToPrompt;
+        use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
+
+        let request = ConceptIssueGenerationRequest {
+            conversation: thread_content.to_string(),
+        };
+        let prompt = request.to_prompt();
+
+        let markdown: String = match backend {
+            "gemini_api" => {
+                let mut agent = GeminiApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                if let Some(level) = gemini_thinking_level {
+                    agent = agent.with_thinking_level(level);
+                }
+                if let Some(search) = gemini_google_search {
+                    agent = agent.with_google_search(search);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            "claude_api" => {
+                let mut agent = ClaudeApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            "open_ai_api" => {
+                let mut agent = OpenAIApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.as_str().into()).await?
+            }
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported backend: {}. Supported: gemini_api, claude_api, open_ai_api",
+                    backend
+                ));
+            }
+        };
+
+        Ok(markdown)
+    }
+
     /// Generate summary from conversation thread
     ///
     /// # Arguments
@@ -590,6 +755,43 @@ impl SessionSupportAgentService {
 
         // Agent returns Markdown directly (output = "String")
         let markdown: String = self.expertise_agent.execute(prompt.as_str().into()).await?;
+
+        Ok(markdown)
+    }
+
+    /// Generate comprehensive Concept/Design Issue from conversation thread
+    ///
+    /// # Arguments
+    ///
+    /// * `thread_content` - The conversation thread to create concept/design issue from
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(String)` - Generated concept/design issue document in markdown format
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let concept_issue = service.generate_concept_issue(
+    ///     "[2024-01-01 10:00:00] User (user):\nLet's design a new feature...\n---\n..."
+    /// ).await?;
+    /// ```
+    pub async fn generate_concept_issue(&self, thread_content: &str) -> Result<String> {
+        use llm_toolkit::prompt::ToPrompt;
+
+        // Create typed request with Jinja2 template
+        let request = ConceptIssueGenerationRequest {
+            conversation: thread_content.to_string(),
+        };
+
+        // Generate prompt using ToPrompt derive
+        let prompt = request.to_prompt();
+
+        // Agent returns Markdown directly (output = "String")
+        let markdown: String = self
+            .concept_issue_agent
+            .execute(prompt.as_str().into())
+            .await?;
 
         Ok(markdown)
     }

@@ -104,6 +104,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         session::generate_summary,
         session::generate_action_plan,
         session::generate_expertise,
+        session::generate_concept_issue,
         search::execute_search,
         app_state::get_app_state_snapshot,
         app_state::set_last_selected_workspace,

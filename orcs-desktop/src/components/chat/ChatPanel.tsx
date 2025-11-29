@@ -445,6 +445,17 @@ export function ChatPanel({
     try {
       const { invoke } = await import('@tauri-apps/api/core');
 
+      // Persist system message for Summary generation request
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: '📝 Generating summary from conversation...',
+            messageType: 'info',
+            severity: 'info',
+          },
+        ],
+      });
+
       // Set thinking state
       setTabThinking(tab.id, true, 'Summary');
 
@@ -459,7 +470,18 @@ export function ChatPanel({
         },
       });
 
-      // Add summary message to frontend tab (auto-saved on tab switch)
+      // Persist AI response with summary
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: summary,
+            messageType: 'ai_response',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Add summary message to frontend tab
       const summaryMessage: Message = {
         id: `${Date.now()}-summary`,
         type: 'ai',
@@ -476,6 +498,18 @@ export function ChatPanel({
       });
     } catch (error) {
       console.error('[ChatPanel] Failed to generate summary:', error);
+
+      // Persist error message
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: `❌ Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            messageType: 'error',
+            severity: 'error',
+          },
+        ],
+      }).catch((e: unknown) => console.error('[ChatPanel] Failed to persist error message:', e));
 
       notifications.show({
         title: 'Error',
@@ -494,6 +528,17 @@ export function ChatPanel({
     try {
       const { invoke } = await import('@tauri-apps/api/core');
 
+      // Persist system message for ActionPlan generation request
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: '📋 Generating ActionPlan from conversation...',
+            messageType: 'info',
+            severity: 'info',
+          },
+        ],
+      });
+
       // Set thinking state
       setTabThinking(tab.id, true, 'ActionPlan');
 
@@ -508,7 +553,18 @@ export function ChatPanel({
         },
       });
 
-      // Add action plan message to frontend tab (auto-saved on tab switch)
+      // Persist AI response with action plan
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: actionPlan,
+            messageType: 'ai_response',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Add action plan message to frontend tab
       const actionPlanMessage: Message = {
         id: `${Date.now()}-actionplan`,
         type: 'ai',
@@ -525,6 +581,18 @@ export function ChatPanel({
       });
     } catch (error) {
       console.error('[ChatPanel] Failed to generate ActionPlan:', error);
+
+      // Persist error message
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: `❌ Failed to generate ActionPlan: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            messageType: 'error',
+            severity: 'error',
+          },
+        ],
+      }).catch((e: unknown) => console.error('[ChatPanel] Failed to persist error message:', e));
 
       notifications.show({
         title: 'Error',
@@ -543,6 +611,17 @@ export function ChatPanel({
     try {
       const { invoke } = await import('@tauri-apps/api/core');
 
+      // Persist system message for Expertise generation request
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: '💡 Generating Expertise from conversation...',
+            messageType: 'info',
+            severity: 'info',
+          },
+        ],
+      });
+
       // Set thinking state
       setTabThinking(tab.id, true, 'Expertise');
 
@@ -557,7 +636,18 @@ export function ChatPanel({
         },
       });
 
-      // Add expertise message to frontend tab (auto-saved on tab switch)
+      // Persist AI response with expertise
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: expertise,
+            messageType: 'ai_response',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Add expertise message to frontend tab
       const expertiseMessage: Message = {
         id: `${Date.now()}-expertise`,
         type: 'ai',
@@ -574,6 +664,18 @@ export function ChatPanel({
       });
     } catch (error) {
       console.error('[ChatPanel] Failed to generate Expertise:', error);
+
+      // Persist error message
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: `❌ Failed to generate Expertise: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            messageType: 'error',
+            severity: 'error',
+          },
+        ],
+      }).catch((e: unknown) => console.error('[ChatPanel] Failed to persist error message:', e));
 
       notifications.show({
         title: 'Error',
@@ -592,6 +694,17 @@ export function ChatPanel({
     try {
       const { invoke } = await import('@tauri-apps/api/core');
 
+      // Persist system message for Concept/Design Issue generation request
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: '📋 Generating comprehensive Concept/Design Issue from conversation...',
+            messageType: 'info',
+            severity: 'info',
+          },
+        ],
+      });
+
       // Set thinking state
       setTabThinking(tab.id, true, 'Concept/Design Issue');
 
@@ -606,7 +719,18 @@ export function ChatPanel({
         },
       });
 
-      // Add concept/design issue message to frontend tab (auto-saved on tab switch)
+      // Persist concept/design issue with AI response
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: conceptIssue,
+            messageType: 'ai_response',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Add concept/design issue message to frontend tab
       const conceptIssueMessage: Message = {
         id: `${Date.now()}-concept-issue`,
         type: 'ai',
@@ -623,6 +747,18 @@ export function ChatPanel({
       });
     } catch (error) {
       console.error('[ChatPanel] Failed to generate Concept/Design Issue:', error);
+
+      // Persist error message
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: `❌ Failed to generate Concept/Design Issue: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            messageType: 'error',
+            severity: 'error',
+          },
+        ],
+      }).catch((e: unknown) => console.error('[ChatPanel] Failed to persist error message:', e));
 
       notifications.show({
         title: 'Error',

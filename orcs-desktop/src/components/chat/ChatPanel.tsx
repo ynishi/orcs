@@ -292,6 +292,16 @@ export function ChatPanel({
     loadMuteStatus();
   }, [tab.sessionId, isActive]);
 
+  // Focus textarea when tab becomes active
+  useEffect(() => {
+    if (isActive && textareaRef.current) {
+      // Use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
+    }
+  }, [isActive]);
+
   const handleSaveAutoChatConfig = async (config: AutoChatConfig) => {
     setAutoChatConfig(config);
 

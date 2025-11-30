@@ -592,7 +592,7 @@ Generate the BlueprintWorkflow now.`;
               if (!validModes.includes(mode)) {
                 await handleAndPersistSystemMessage(
                   conversationMessage(
-                    `Invalid mode: ${mode}\n\nAvailable modes:\n- normal (通常)\n- concise (簡潔・300文字)\n- brief (極簡潔・150文字)\n- discussion (議論)`,
+                    `Invalid mode: ${mode}\n\nAvailable modes:\n- normal\n- concise (300 chars)\n- brief (150 chars)\n- discussion`,
                     'error'
                   ),
                   addMessage,
@@ -605,10 +605,10 @@ Generate the BlueprintWorkflow now.`;
                 await invoke('set_conversation_mode', { mode });
                 // Note: conversationMode is now managed by Store, local state update removed
                 const modeLabels: Record<string, string> = {
-                  normal: '通常 (Normal)',
-                  concise: '簡潔 (300文字)',
-                  brief: '極簡潔 (150文字)',
-                  discussion: '議論 (Discussion)',
+                  normal: 'Normal',
+                  concise: 'Concise (300 chars)',
+                  brief: 'Brief (150 chars)',
+                  discussion: 'Discussion',
                 };
                 await handleAndPersistSystemMessage(
                   conversationMessage(`Conversation mode changed to: ${modeLabels[mode]}`, 'success', '✅'),
@@ -626,10 +626,10 @@ Generate the BlueprintWorkflow now.`;
               try {
                 const currentMode = await invoke<string>('get_conversation_mode');
                 const modeLabels: Record<string, string> = {
-                  normal: '通常 (Normal)',
-                  concise: '簡潔 (300文字)',
-                  brief: '極簡潔 (150文字)',
-                  discussion: '議論 (Discussion)',
+                  normal: 'Normal',
+                  concise: 'Concise (300 chars)',
+                  brief: 'Brief (150 chars)',
+                  discussion: 'Discussion',
                 };
                 await handleAndPersistSystemMessage(
                   conversationMessage(
@@ -666,7 +666,7 @@ Generate the BlueprintWorkflow now.`;
               if (!validStyles.includes(style)) {
                 await handleAndPersistSystemMessage(
                   conversationMessage(
-                    `Invalid style: ${style}\n\nAvailable styles:\n- brainstorm (ブレインストーミング)\n- casual (カジュアル)\n- decision_making (意思決定)\n- debate (議論)\n- problem_solving (問題解決)\n- review (レビュー)\n- planning (計画)\n- none (解除)`,
+                    `Invalid style: ${style}\n\nAvailable styles:\n- brainstorm\n- casual\n- decision_making\n- debate\n- problem_solving\n- review\n- planning\n- none (clear)`,
                     'error'
                   ),
                   addMessage,
@@ -681,14 +681,14 @@ Generate the BlueprintWorkflow now.`;
                 await invoke('set_talk_style', { style: styleValue });
                 // Note: talkStyle is now managed by Store, local state update removed
                 const styleLabels: Record<string, string> = {
-                  brainstorm: 'ブレインストーミング (Brainstorm)',
-                  casual: 'カジュアル (Casual)',
-                  decision_making: '意思決定 (Decision Making)',
-                  debate: '議論 (Debate)',
-                  problem_solving: '問題解決 (Problem Solving)',
-                  review: 'レビュー (Review)',
-                  planning: '計画 (Planning)',
-                  none: '解除 (None)',
+                  brainstorm: 'Brainstorm',
+                  casual: 'Casual',
+                  decision_making: 'Decision Making',
+                  debate: 'Debate',
+                  problem_solving: 'Problem Solving',
+                  review: 'Review',
+                  planning: 'Planning',
+                  none: 'None (cleared)',
                 };
                 await handleAndPersistSystemMessage(
                   conversationMessage(`Talk style changed to: ${styleLabels[style]}`, 'success', '✅'),
@@ -706,13 +706,13 @@ Generate the BlueprintWorkflow now.`;
               try {
                 const currentStyle = await invoke<string | null>('get_talk_style');
                 const styleLabels: Record<string, string> = {
-                  brainstorm: 'ブレインストーミング (Brainstorm)',
-                  casual: 'カジュアル (Casual)',
-                  decision_making: '意思決定 (Decision Making)',
-                  debate: '議論 (Debate)',
-                  problem_solving: '問題解決 (Problem Solving)',
-                  review: 'レビュー (Review)',
-                  planning: '計画 (Planning)',
+                  brainstorm: 'Brainstorm',
+                  casual: 'Casual',
+                  decision_making: 'Decision Making',
+                  debate: 'Debate',
+                  problem_solving: 'Problem Solving',
+                  review: 'Review',
+                  planning: 'Planning',
                 };
                 const currentLabel = currentStyle ? styleLabels[currentStyle] || currentStyle : 'Not set';
                 await handleAndPersistSystemMessage(

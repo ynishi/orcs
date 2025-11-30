@@ -19,31 +19,31 @@ export interface ConversationModeOption {
 export const CONVERSATION_MODES: ConversationModeOption[] = [
   {
     value: 'detailed',
-    label: '詳細',
+    label: 'Detailed',
     icon: '📖',
     description: 'Detailed mode (comprehensive explanations)',
   },
   {
     value: 'normal',
-    label: '通常',
+    label: 'Normal',
     icon: '🗨️',
     description: 'Normal conversation mode',
   },
   {
     value: 'concise',
-    label: '簡潔',
+    label: 'Concise',
     icon: '📝',
     description: 'Concise mode (300 chars)',
   },
   {
     value: 'brief',
-    label: '極簡潔',
+    label: 'Brief',
     icon: '✏️',
     description: 'Brief mode (150 chars)',
   },
   {
     value: 'discussion',
-    label: '議論',
+    label: 'Discussion',
     icon: '💭',
     description: 'Discussion mode',
   },
@@ -57,48 +57,48 @@ export interface TalkStyleOption {
 }
 
 export const DEFAULT_STYLE_ICON: string = '💬';
-export const DEFAULT_STYLE_LABEL: string = '通常';
+export const DEFAULT_STYLE_LABEL: string = 'Normal';
 
 export const TALK_STYLES: TalkStyleOption[] = [
   {
     value: 'Brainstorm',
-    label: 'ブレインストーミング',
+    label: 'Brainstorm',
     icon: '💡',
     description: 'Brainstorming session',
   },
   {
     value: 'Casual',
-    label: 'カジュアル',
+    label: 'Casual',
     icon: '☕',
     description: 'Casual conversation',
   },
   {
     value: 'DecisionMaking',
-    label: '意思決定',
+    label: 'Decision Making',
     icon: '🎯',
     description: 'Decision making',
   },
   {
     value: 'Debate',
-    label: '議論',
+    label: 'Debate',
     icon: '⚖️',
     description: 'Debate style',
   },
   {
     value: 'ProblemSolving',
-    label: '問題解決',
+    label: 'Problem Solving',
     icon: '🔧',
     description: 'Problem solving',
   },
   {
     value: 'Review',
-    label: 'レビュー',
+    label: 'Review',
     icon: '🔍',
     description: 'Review session',
   },
   {
     value: 'Planning',
-    label: '計画',
+    label: 'Planning',
     icon: '📋',
     description: 'Planning session',
   },

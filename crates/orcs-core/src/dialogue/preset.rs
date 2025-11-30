@@ -96,10 +96,10 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
     vec![
         DialoguePreset {
             id: "preset-brainstorm".to_string(),
-            name: "アイデア出し".to_string(),
+            name: "Brainstorm".to_string(),
             icon: Some("💡".to_string()),
             description: Some(
-                "Broadcast + 簡潔 + Brainstorm: 全員が自由にアイデアを出し合う".to_string(),
+                "Broadcast + Concise + Brainstorm: Everyone freely shares ideas".to_string(),
             ),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Concise,
@@ -109,9 +109,9 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
         },
         DialoguePreset {
             id: "preset-code-review".to_string(),
-            name: "コードレビュー".to_string(),
+            name: "Code Review".to_string(),
             icon: Some("🔍".to_string()),
-            description: Some("Sequential + 極簡潔 + Review: 順番に簡潔にレビュー".to_string()),
+            description: Some("Sequential + Brief + Review: Concise sequential review".to_string()),
             execution_strategy: ExecutionModel::Sequential,
             conversation_mode: ConversationMode::Brief,
             talk_style: Some(TalkStyle::Review),
@@ -120,9 +120,9 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
         },
         DialoguePreset {
             id: "preset-discussion".to_string(),
-            name: "深い議論".to_string(),
+            name: "Deep Discussion".to_string(),
             icon: Some("💭".to_string()),
-            description: Some("Broadcast + 議論 + Debate: 全員で深く議論".to_string()),
+            description: Some("Broadcast + Discussion + Debate: Deep discussion with everyone".to_string()),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Discussion,
             talk_style: Some(TalkStyle::Debate),
@@ -131,10 +131,10 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
         },
         DialoguePreset {
             id: "preset-quick-decision".to_string(),
-            name: "素早い意思決定".to_string(),
+            name: "Quick Decision".to_string(),
             icon: Some("⚡".to_string()),
             description: Some(
-                "Broadcast + 極簡潔 + DecisionMaking: 簡潔に全員の意見を集める".to_string(),
+                "Broadcast + Brief + DecisionMaking: Gather everyone's opinions concisely".to_string(),
             ),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Brief,
@@ -144,9 +144,9 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
         },
         DialoguePreset {
             id: "preset-problem-solving".to_string(),
-            name: "問題解決".to_string(),
+            name: "Problem Solving".to_string(),
             icon: Some("🔧".to_string()),
-            description: Some("Sequential + 簡潔 + ProblemSolving: 順番に解決策を検討".to_string()),
+            description: Some("Sequential + Concise + ProblemSolving: Sequential solution exploration".to_string()),
             execution_strategy: ExecutionModel::Sequential,
             conversation_mode: ConversationMode::Concise,
             talk_style: Some(TalkStyle::ProblemSolving),
@@ -155,9 +155,9 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
         },
         DialoguePreset {
             id: "preset-planning".to_string(),
-            name: "計画立案".to_string(),
+            name: "Planning".to_string(),
             icon: Some("📋".to_string()),
-            description: Some("Sequential + 通常 + Planning: 順番に計画を立てる".to_string()),
+            description: Some("Sequential + Normal + Planning: Sequential planning".to_string()),
             execution_strategy: ExecutionModel::Sequential,
             conversation_mode: ConversationMode::Normal,
             talk_style: Some(TalkStyle::Planning),
@@ -166,9 +166,9 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
         },
         DialoguePreset {
             id: "preset-casual-chat".to_string(),
-            name: "カジュアル雑談".to_string(),
+            name: "Casual Chat".to_string(),
             icon: Some("☕".to_string()),
-            description: Some("Broadcast + 通常 + Casual: 気楽に会話".to_string()),
+            description: Some("Broadcast + Normal + Casual: Relaxed conversation".to_string()),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Normal,
             talk_style: Some(TalkStyle::Casual),

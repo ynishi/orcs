@@ -36,7 +36,7 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     description: 'Switch conversation mode to control agent verbosity',
     usage: '/mode [normal|concise|brief|discussion]',
     examples: ['/mode', '/mode concise', '/mode brief', '/mode discussion'],
-    argsDescription: 'normal (通常) | concise (簡潔・300文字) | brief (極簡潔・150文字) | discussion (議論)',
+    argsDescription: 'normal | concise (300 chars) | brief (150 chars) | discussion',
   },
   {
     name: 'talk',
@@ -44,7 +44,7 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     description: 'Set dialogue style for multi-agent conversation',
     usage: '/talk [brainstorm|casual|decision_making|debate|problem_solving|review|planning|none]',
     examples: ['/talk', '/talk brainstorm', '/talk debate', '/talk none'],
-    argsDescription: 'brainstorm (ブレインストーミング) | casual (カジュアル) | decision_making (意思決定) | debate (議論) | problem_solving (問題解決) | review (レビュー) | planning (計画) | none (解除)',
+    argsDescription: 'brainstorm | casual | decision_making | debate | problem_solving | review | planning | none (clear)',
   },
   {
     name: 'status',

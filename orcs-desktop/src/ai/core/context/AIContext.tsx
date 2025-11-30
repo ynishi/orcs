@@ -71,12 +71,12 @@ export function AIProvider({
   children,
   provider: initialProvider,
   initialDirections = [
-    'フォーマルに',
-    '簡潔に',
-    '専門的に',
-    '友好的に',
-    'カジュアルに',
-    '詳しく',
+    'Formal',
+    'Concise',
+    'Technical',
+    'Friendly',
+    'Casual',
+    'Detailed',
   ],
   initialEnabled = true,
 }: AIProviderProps) {

@@ -46,6 +46,7 @@ import { useAppStateStore } from "./stores/appStateStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useSessionSettingsStore } from "./stores/sessionSettingsStore";
 import { usePersonaStore } from "./stores/personaStore";
+import { useDebugStore } from "./stores/debugStore";
 
 type InteractionResult =
   | { type: 'NewDialogueMessages'; data: { author: string; content: string }[] }
@@ -138,12 +139,22 @@ function App() {
     loadPersonas,
   } = usePersonaStore();
 
+  // Debug Store
+  const { debugSettings, initialize: initializeDebug } = useDebugStore();
+
   // Initialize AppState Store on mount
   useEffect(() => {
     initializeAppState().catch((error: unknown) => {
       console.error('[App] Failed to initialize AppState store:', error);
     });
   }, [initializeAppState]);
+
+  // Initialize Debug Store on mount
+  useEffect(() => {
+    initializeDebug().catch((error: unknown) => {
+      console.error('[App] Failed to initialize Debug store:', error);
+    });
+  }, [initializeDebug]);
 
   // Initialize Workspace Store on mount (Phase 4)
   useEffect(() => {
@@ -2134,11 +2145,28 @@ function App() {
       <AppShell.Main>
         <Container size="md" h="100vh" p="md" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Stack style={{ flex: 1, minHeight: 0 }} gap="md">
-            <Group gap="sm" justify="space-between">
-              <Group gap="sm">
-                <Burger opened={navbarOpened} onClick={toggleNavbar} size="sm" />
-                <Text size="xl" fw={700}>ORCS</Text>
-              </Group>
+            <Paper
+              p="sm"
+              radius="md"
+              style={{
+                backgroundColor: debugSettings?.enableLlmDebug
+                  ? 'var(--mantine-color-orange-1)'
+                  : undefined,
+                borderLeft: debugSettings?.enableLlmDebug
+                  ? '4px solid var(--mantine-color-orange-6)'
+                  : undefined,
+              }}
+            >
+              <Group gap="sm" justify="space-between">
+                <Group gap="sm">
+                  <Burger opened={navbarOpened} onClick={toggleNavbar} size="sm" />
+                  <Text size="xl" fw={700}>ORCS</Text>
+                  {debugSettings?.enableLlmDebug && (
+                    <Badge size="sm" variant="filled" color="orange">
+                      DEBUG MODE
+                    </Badge>
+                  )}
+                </Group>
               <Group gap="md">
                 {/* User Profile */}
                 {userProfile && (
@@ -2171,6 +2199,7 @@ function App() {
                 />
               </Group>
             </Group>
+            </Paper>
 
             {/* タブ領域 */}
             {tabs.length === 0 ? (

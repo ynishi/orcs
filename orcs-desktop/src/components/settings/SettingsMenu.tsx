@@ -1,4 +1,4 @@
-import { Menu, ActionIcon, Text, Stack } from '@mantine/core';
+import { Menu, ActionIcon, Text, Stack, Switch } from '@mantine/core';
 import {
   IconSettings,
   IconFile,
@@ -8,6 +8,7 @@ import {
   IconCopy,
   IconWand,
   IconUser,
+  IconBug,
 } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -16,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { PERSONA_CONFIG_TEMPLATE, CONFIG_TOML_TEMPLATE, SECRETS_TEMPLATE, generateConfigSessionPrompt } from '../../utils/configTemplates';
 import type { PersonaConfig } from '../../types/agent';
 import type { Session } from '../../types/session';
+import { useDebugStore } from '../../stores/debugStore';
 
 interface SettingsMenuProps {
   onSelectSession?: (session: Session) => void;
@@ -45,6 +47,8 @@ export function SettingsMenu({
   const [rootDir, setRootDir] = useState<string>('');
   const [defaultWorkspace, setDefaultWorkspace] = useState<string>('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  const { debugSettings, isLoaded, initialize, toggleDebugMode } = useDebugStore();
 
   useEffect(() => {
     const loadRootDir = async () => {
@@ -81,6 +85,32 @@ export function SettingsMenu({
     };
     loadUserProfile();
   }, []);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      initialize();
+    }
+  }, [isLoaded, initialize]);
+
+  const handleToggleDebugMode = async () => {
+    try {
+      await toggleDebugMode();
+      notifications.show({
+        title: debugSettings?.enableLlmDebug ? 'Debug Mode Disabled' : 'Debug Mode Enabled',
+        message: debugSettings?.enableLlmDebug
+          ? 'Debug mode has been disabled. Log level reset to info.'
+          : 'Debug mode enabled! Menu bar will show debug indicator. Log level set to trace.',
+        color: debugSettings?.enableLlmDebug ? 'gray' : 'orange',
+        autoClose: 3000,
+      });
+    } catch (error) {
+      notifications.show({
+        title: 'Failed to Toggle Debug Mode',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
 
   const handleOpenConfigFile = async () => {
     try {
@@ -524,6 +554,25 @@ export function SettingsMenu({
           onClick={handleOpenTasksDir}
         >
           <Text size="sm">Tasks Directory</Text>
+        </Menu.Item>
+
+        <Menu.Divider />
+
+        <Menu.Label>Debug Settings</Menu.Label>
+        <Menu.Item
+          leftSection={<IconBug size={16} />}
+          closeMenuOnClick={false}
+        >
+          <Stack gap={4}>
+            <Switch
+              label="Debug Mode"
+              description="Show LLM prompts/responses & trace logs"
+              checked={debugSettings?.enableLlmDebug ?? false}
+              onChange={handleToggleDebugMode}
+              disabled={!isLoaded}
+              color="orange"
+            />
+          </Stack>
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>

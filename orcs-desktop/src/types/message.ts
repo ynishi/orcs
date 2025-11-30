@@ -65,6 +65,15 @@ export interface Message {
 }
 
 /**
+ * LLM デバッグ情報
+ */
+export interface LlmDebugInfo {
+  prompt: string;
+  rawResponse: string;
+  model?: string;
+}
+
+/**
  * メッセージメタデータ
  */
 export interface MessageMetadata {
@@ -72,6 +81,7 @@ export interface MessageMetadata {
   taskId?: string;
   agentId?: string;
   status?: 'pending' | 'running' | 'completed' | 'failed';
+  llmDebugInfo?: LlmDebugInfo;
 }
 
 /**

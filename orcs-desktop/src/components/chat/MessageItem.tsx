@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor, Image, Stack } from '@mantine/core';
-import { IconDeviceFloppy, IconRocket, IconCommand, IconUser, IconCheck, IconClipboard } from '@tabler/icons-react';
+import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor, Image, Stack, Collapse, Code } from '@mantine/core';
+import { IconDeviceFloppy, IconRocket, IconCommand, IconUser, IconCheck, IconClipboard, IconChevronDown, IconChevronUp, IconBug } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Message, getMessageStyle } from '../../types/message';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
+import { useDebugStore } from '../../stores/debugStore';
 
 interface MessageItemProps {
   message: Message;
@@ -158,6 +159,9 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [debugExpanded, setDebugExpanded] = useState(false);
+
+  const { debugSettings } = useDebugStore();
 
   // Apply base color with opacity for subtle background tinting
   const backgroundColor = message.baseColor && message.type === 'ai'
@@ -266,6 +270,72 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
               <Text size="xs" c="dimmed" mt={4}>
                 {message.timestamp.toLocaleTimeString()}
               </Text>
+
+              {/* Debug情報表示（デバッグモード時のみ） */}
+              {debugSettings?.enableLlmDebug && message.metadata?.llmDebugInfo && (
+                <Box mt="md">
+                  <Anchor
+                    size="xs"
+                    c="orange"
+                    onClick={() => setDebugExpanded(!debugExpanded)}
+                    style={{
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <IconBug size={14} />
+                    <Text size="xs" fw={600}>LLM Debug Info</Text>
+                    {debugExpanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+                  </Anchor>
+
+                  <Collapse in={debugExpanded}>
+                    <Stack gap="xs" mt="xs">
+                      {message.metadata.llmDebugInfo.model && (
+                        <Box>
+                          <Text size="xs" fw={600} c="dimmed">Model:</Text>
+                          <Badge size="sm" variant="light" color="orange">
+                            {message.metadata.llmDebugInfo.model}
+                          </Badge>
+                        </Box>
+                      )}
+
+                      <Box>
+                        <Text size="xs" fw={600} c="dimmed" mb={4}>Prompt:</Text>
+                        <Code
+                          block
+                          style={{
+                            maxHeight: '200px',
+                            overflow: 'auto',
+                            fontSize: '11px',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {message.metadata.llmDebugInfo.prompt}
+                        </Code>
+                      </Box>
+
+                      <Box>
+                        <Text size="xs" fw={600} c="dimmed" mb={4}>Raw Response:</Text>
+                        <Code
+                          block
+                          style={{
+                            maxHeight: '200px',
+                            overflow: 'auto',
+                            fontSize: '11px',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {message.metadata.llmDebugInfo.rawResponse}
+                        </Code>
+                      </Box>
+                    </Stack>
+                  </Collapse>
+                </Box>
+              )}
             </Box>
 
             {/* アクションボタン */}

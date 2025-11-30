@@ -132,6 +132,62 @@ pub struct EnvSettings {
     pub auto_detect_tool_managers: bool,
 }
 
+// ============================================================================
+// Debug configuration models
+// ============================================================================
+
+/// Debug settings for LLM interactions and logging.
+///
+/// When enabled, provides detailed debugging information including:
+/// - Visual indicators (menu bar color change)
+/// - Raw prompts and responses from LLM calls
+/// - Enhanced logging (TRACE level)
+///
+/// # Example (config.toml)
+///
+/// ```toml
+/// [debug_settings]
+/// enable_llm_debug = true
+/// log_level = "trace"
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugSettings {
+    /// Enable debug mode for LLM interactions.
+    ///
+    /// When true:
+    /// - Changes menu bar color to indicate debug mode
+    /// - Stores the full prompt sent to LLM and raw response received
+    /// - Shows detailed debug information in the UI
+    ///
+    /// Default: `false`
+    #[serde(default)]
+    pub enable_llm_debug: bool,
+
+    /// Log level for the application.
+    ///
+    /// Valid values: "error", "warn", "info", "debug", "trace"
+    ///
+    /// When debug mode is enabled, this is automatically set to "trace"
+    /// to provide maximum visibility into application behavior.
+    ///
+    /// Default: `"info"`
+    #[serde(default = "default_log_level")]
+    pub log_level: String,
+}
+
+fn default_log_level() -> String {
+    "info".to_string()
+}
+
+impl Default for DebugSettings {
+    fn default() -> Self {
+        Self {
+            enable_llm_debug: false,
+            log_level: "info".to_string(),
+        }
+    }
+}
+
 fn default_auto_detect_tool_managers() -> bool {
     true
 }
@@ -255,6 +311,7 @@ impl Default for OpenAIModelConfig {
 /// let nickname = config.user_profile.nickname;
 /// let claude_model = config.model_settings.claude.unwrap().model_name;
 /// let custom_paths = &config.env_settings.additional_paths;
+/// let debug_enabled = config.debug_settings.enable_llm_debug;
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RootConfig {
@@ -269,6 +326,10 @@ pub struct RootConfig {
     /// Controls how PATH is built for CLI-based agents.
     #[serde(default)]
     pub env_settings: EnvSettings,
+    /// Debug settings for LLM interactions.
+    /// Controls debug logging of prompts and responses.
+    #[serde(default)]
+    pub debug_settings: DebugSettings,
 }
 
 impl Default for RootConfig {
@@ -277,6 +338,7 @@ impl Default for RootConfig {
             user_profile: UserProfile::default(),
             model_settings: ModelSettings::default(),
             env_settings: EnvSettings::default(),
+            debug_settings: DebugSettings::default(),
         }
     }
 }

@@ -4,6 +4,8 @@
 //! across the application. Currently returns a constant value, but designed
 //! to support future enhancements like user configuration and preferences.
 
+use crate::config::DebugSettings;
+
 /// Service for managing user information.
 ///
 /// This trait abstracts user-related operations, allowing different
@@ -15,6 +17,7 @@
 /// - Support user preferences
 /// - Multiple user profiles
 /// - User authentication
+#[async_trait::async_trait]
 pub trait UserService: Send + Sync {
     /// Returns the current user's display name.
     ///
@@ -29,6 +32,25 @@ pub trait UserService: Send + Sync {
     ///
     /// A UserProfile containing nickname and background.
     fn get_user_profile(&self) -> super::model::UserProfile;
+
+    /// Returns the current debug settings.
+    ///
+    /// # Returns
+    ///
+    /// A DebugSettings containing enable_llm_debug and log_level.
+    fn get_debug_settings(&self) -> DebugSettings;
+
+    /// Updates the debug settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `enable_llm_debug` - Whether to enable LLM debug mode
+    /// * `log_level` - The log level to use
+    async fn update_debug_settings(
+        &self,
+        enable_llm_debug: bool,
+        log_level: String,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
 }
 
 /// Default implementation that returns a constant user name.
@@ -48,6 +70,7 @@ pub trait UserService: Send + Sync {
 #[derive(Debug, Clone, Default)]
 pub struct DefaultUserService;
 
+#[async_trait::async_trait]
 impl UserService for DefaultUserService {
     fn get_user_name(&self) -> String {
         "user".to_string()
@@ -55,6 +78,19 @@ impl UserService for DefaultUserService {
 
     fn get_user_profile(&self) -> super::model::UserProfile {
         super::model::UserProfile::default()
+    }
+
+    fn get_debug_settings(&self) -> DebugSettings {
+        DebugSettings::default()
+    }
+
+    async fn update_debug_settings(
+        &self,
+        _enable_llm_debug: bool,
+        _log_level: String,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Default implementation does nothing
+        Ok(())
     }
 }
 

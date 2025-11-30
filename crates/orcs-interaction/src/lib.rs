@@ -898,6 +898,7 @@ impl InteractionManager {
                 error_severity: None,
                 system_message_type: None,
                 include_in_dialogue: true,
+                llm_debug_info: None,
             },
             attachments: vec![],
         };
@@ -967,6 +968,7 @@ impl InteractionManager {
                 error_severity: None,
                 system_message_type: None,
                 include_in_dialogue: true,
+                llm_debug_info: None,
             },
             attachments: vec![],
         };
@@ -1020,6 +1022,7 @@ impl InteractionManager {
                 error_severity,
                 system_message_type: message_type,
                 include_in_dialogue: true,
+                llm_debug_info: None,
             },
             attachments: vec![],
         };
@@ -1088,6 +1091,7 @@ impl InteractionManager {
                 error_severity: None,
                 system_message_type: None,
                 include_in_dialogue: true,
+                llm_debug_info: None,
             },
             attachments: vec![],
         };
@@ -1131,6 +1135,7 @@ impl InteractionManager {
                 error_severity: None,
                 system_message_type: None,
                 include_in_dialogue: true,
+                llm_debug_info: None,
             },
             attachments: vec![],
         };
@@ -1175,6 +1180,7 @@ impl InteractionManager {
                     error_severity: None,
                     system_message_type: None,
                     include_in_dialogue: true,
+                    llm_debug_info: None,
                 },
                 attachments: vec![],
             };
@@ -1405,6 +1411,7 @@ impl InteractionManager {
                             error_severity: Some(ErrorSeverity::Critical),
                             system_message_type: None,
                             include_in_dialogue: true,
+                            llm_debug_info: None,
                         },
                         attachments: vec![],
                     };
@@ -1574,6 +1581,7 @@ impl InteractionManager {
                             error_severity: Some(ErrorSeverity::Critical),
                             system_message_type: None,
                             include_in_dialogue: true,
+                            llm_debug_info: None,
                         },
                         attachments: vec![],
                     };

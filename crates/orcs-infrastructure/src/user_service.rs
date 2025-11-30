@@ -7,7 +7,7 @@
 
 use crate::dto::create_config_root_migrator;
 use crate::paths::{OrcsPaths, ServiceType};
-use orcs_core::config::RootConfig;
+use orcs_core::config::{DebugSettings, RootConfig};
 use orcs_core::user::{UserProfile, UserService};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -125,6 +125,7 @@ impl Default for ConfigBasedUserService {
     }
 }
 
+#[async_trait::async_trait]
 impl UserService for ConfigBasedUserService {
     fn get_user_name(&self) -> String {
         self.load_nickname()
@@ -132,6 +133,30 @@ impl UserService for ConfigBasedUserService {
 
     fn get_user_profile(&self) -> UserProfile {
         Self::load_profile_from_config().unwrap_or_default()
+    }
+
+    fn get_debug_settings(&self) -> DebugSettings {
+        load_root_config()
+            .map(|config| config.debug_settings)
+            .unwrap_or_default()
+    }
+
+    async fn update_debug_settings(
+        &self,
+        enable_llm_debug: bool,
+        log_level: String,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Load current config
+        let mut config = load_root_config()?;
+
+        // Update debug settings
+        config.debug_settings.enable_llm_debug = enable_llm_debug;
+        config.debug_settings.log_level = log_level;
+
+        // Save to file
+        save_root_config(config)?;
+
+        Ok(())
     }
 }
 
@@ -226,4 +251,50 @@ pub fn load_root_config() -> Result<RootConfig, String> {
             .next()
             .ok_or_else(|| "No config found after query".to_string())
     }
+}
+
+/// Saves the RootConfig to config.toml.
+///
+/// This function is useful for persisting configuration changes made at runtime.
+///
+/// # Arguments
+///
+/// * `config` - The RootConfig to save
+///
+/// # Returns
+///
+/// Returns `Ok(())` if successfully saved.
+/// Returns `Err(String)` if an error occurs.
+///
+/// # Example
+///
+/// ```ignore
+/// use orcs_infrastructure::user_service::{load_root_config, save_root_config};
+///
+/// let mut config = load_root_config().expect("Failed to load config");
+/// config.debug_settings.enable_llm_debug = true;
+/// save_root_config(config).expect("Failed to save config");
+/// ```
+pub fn save_root_config(config: RootConfig) -> Result<(), String> {
+    // Get config path
+    let config_path = OrcsPaths::new(None)
+        .get_path(ServiceType::Config)
+        .map_err(|e| e.to_string())?
+        .into_path_buf();
+
+    // Create FileStorage with migrator for ConfigRoot
+    let migrator = create_config_root_migrator();
+    let strategy = FileStorageStrategy::new()
+        .with_format(FormatStrategy::Toml)
+        .with_load_behavior(LoadBehavior::CreateIfMissing);
+
+    let mut storage = FileStorage::new(config_path.clone(), migrator, strategy)
+        .map_err(|e| format!("Failed to create FileStorage: {}", e))?;
+
+    // Update and save
+    storage
+        .update_and_save("config_root", vec![config])
+        .map_err(|e| format!("Failed to save config: {}", e))?;
+
+    Ok(())
 }

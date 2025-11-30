@@ -12,7 +12,8 @@ use version_migrate::{IntoDomain, MigratesTo, Versioned};
 
 use super::{AppStateDTO, UserProfileDTO, WorkspaceV1};
 use orcs_core::config::{
-    ClaudeModelConfig, EnvSettings, GeminiModelConfig, ModelSettings, OpenAIModelConfig, RootConfig,
+    ClaudeModelConfig, DebugSettings, EnvSettings, GeminiModelConfig, ModelSettings,
+    OpenAIModelConfig, RootConfig,
 };
 
 // ============================================================================
@@ -186,6 +187,50 @@ impl EnvSettingsDTO {
 }
 
 // ============================================================================
+// DebugSettings DTOs
+// ============================================================================
+
+/// DTO for DebugSettings.
+///
+/// This is a simple passthrough DTO since DebugSettings is already well-structured.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugSettingsDTO {
+    #[serde(default)]
+    pub enable_llm_debug: bool,
+    #[serde(default = "default_log_level")]
+    pub log_level: String,
+}
+
+fn default_log_level() -> String {
+    "info".to_string()
+}
+
+impl Default for DebugSettingsDTO {
+    fn default() -> Self {
+        Self {
+            enable_llm_debug: false,
+            log_level: "info".to_string(),
+        }
+    }
+}
+
+impl DebugSettingsDTO {
+    fn into_domain(self) -> DebugSettings {
+        DebugSettings {
+            enable_llm_debug: self.enable_llm_debug,
+            log_level: self.log_level,
+        }
+    }
+
+    fn from_domain(settings: DebugSettings) -> Self {
+        Self {
+            enable_llm_debug: settings.enable_llm_debug,
+            log_level: settings.log_level,
+        }
+    }
+}
+
+// ============================================================================
 // ConfigRoot DTOs
 // ============================================================================
 
@@ -266,7 +311,7 @@ pub struct ConfigRootV2_1_0 {
     pub model_settings: ModelSettingsDTO,
 }
 
-/// Root configuration structure V2.2.0 for the application config file (current).
+/// Root configuration structure V2.2.0 for the application config file.
 ///
 /// Added env_settings field to configure PATH for CLI-based agents.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
@@ -283,8 +328,28 @@ pub struct ConfigRootV2_2_0 {
     pub env_settings: EnvSettingsDTO,
 }
 
+/// Root configuration structure V2.3.0 for the application config file (current).
+///
+/// Added debug_settings field to enable LLM debug logging.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "2.3.0")]
+pub struct ConfigRootV2_3_0 {
+    /// User profile configuration (name, background, etc.).
+    #[serde(default)]
+    pub user_profile: UserProfileDTO,
+    /// LLM model settings (non-sensitive configuration).
+    #[serde(default)]
+    pub model_settings: ModelSettingsDTO,
+    /// Environment PATH configuration for CLI tools.
+    #[serde(default)]
+    pub env_settings: EnvSettingsDTO,
+    /// Debug settings for LLM interactions.
+    #[serde(default)]
+    pub debug_settings: DebugSettingsDTO,
+}
+
 /// Type alias for the latest ConfigRoot version.
-pub type ConfigRoot = ConfigRootV2_2_0;
+pub type ConfigRoot = ConfigRootV2_3_0;
 
 // ============================================================================
 // Default implementations
@@ -334,6 +399,17 @@ impl Default for ConfigRootV2_2_0 {
             user_profile: UserProfileDTO::default(),
             model_settings: ModelSettingsDTO::default(),
             env_settings: EnvSettingsDTO::default(),
+        }
+    }
+}
+
+impl Default for ConfigRootV2_3_0 {
+    fn default() -> Self {
+        Self {
+            user_profile: UserProfileDTO::default(),
+            model_settings: ModelSettingsDTO::default(),
+            env_settings: EnvSettingsDTO::default(),
+            debug_settings: DebugSettingsDTO::default(),
         }
     }
 }
@@ -389,30 +465,45 @@ impl MigratesTo<ConfigRootV2_2_0> for ConfigRootV2_1_0 {
     }
 }
 
+/// Migration from ConfigRootV2_2_0 to ConfigRootV2_3_0.
+/// Adds debug_settings field with default values (debug disabled).
+impl MigratesTo<ConfigRootV2_3_0> for ConfigRootV2_2_0 {
+    fn migrate(self) -> ConfigRootV2_3_0 {
+        ConfigRootV2_3_0 {
+            user_profile: self.user_profile,
+            model_settings: self.model_settings,
+            env_settings: self.env_settings,
+            debug_settings: DebugSettingsDTO::default(),
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
 
-/// IntoDomain implementation for ConfigRootV2_2_0.
+/// IntoDomain implementation for ConfigRootV2_3_0.
 /// Converts DTO to domain RootConfig.
-impl IntoDomain<RootConfig> for ConfigRootV2_2_0 {
+impl IntoDomain<RootConfig> for ConfigRootV2_3_0 {
     fn into_domain(self) -> RootConfig {
         RootConfig {
             user_profile: self.user_profile.into_domain(),
             model_settings: self.model_settings.into_domain(),
             env_settings: self.env_settings.into_domain(),
+            debug_settings: self.debug_settings.into_domain(),
         }
     }
 }
 
-/// FromDomain implementation for ConfigRootV2_2_0.
+/// FromDomain implementation for ConfigRootV2_3_0.
 /// Converts domain RootConfig to DTO for persistence.
-impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_2_0 {
+impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_3_0 {
     fn from_domain(config: RootConfig) -> Self {
-        ConfigRootV2_2_0 {
+        ConfigRootV2_3_0 {
             user_profile: UserProfileDTO::from_domain(config.user_profile),
             model_settings: ModelSettingsDTO::from_domain(config.model_settings),
             env_settings: EnvSettingsDTO::from_domain(config.env_settings),
+            debug_settings: DebugSettingsDTO::from_domain(config.debug_settings),
         }
     }
 }
@@ -431,7 +522,8 @@ impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_2_0 {
 /// - V1.1.0 → V2.0.0: Removes `personas`, `workspaces`, `app_state` (now managed separately)
 /// - V2.0.0 → V2.1.0: Adds `model_settings` field with default values
 /// - V2.1.0 → V2.2.0: Adds `env_settings` field with default values (auto-detect enabled)
-/// - V2.2.0 → RootConfig: Converts DTO to domain model
+/// - V2.2.0 → V2.3.0: Adds `debug_settings` field with default values (debug disabled)
+/// - V2.3.0 → RootConfig: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -442,13 +534,14 @@ impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_2_0 {
 pub fn create_config_root_migrator() -> version_migrate::Migrator {
     let mut migrator = version_migrate::Migrator::builder().build();
 
-    // Register migration path: V1.0.0 -> V1.1.0 -> V2.0.0 -> V2.1.0 -> V2.2.0 -> RootConfig
+    // Register migration path: V1.0.0 -> V1.1.0 -> V2.0.0 -> V2.1.0 -> V2.2.0 -> V2.3.0 -> RootConfig
     let config_path = version_migrate::Migrator::define("config_root")
         .from::<ConfigRootV1_0_0>()
         .step::<ConfigRootV1_1_0>()
         .step::<ConfigRootV2_0_0>()
         .step::<ConfigRootV2_1_0>()
         .step::<ConfigRootV2_2_0>()
+        .step::<ConfigRootV2_3_0>()
         .into_with_save::<RootConfig>();
 
     migrator

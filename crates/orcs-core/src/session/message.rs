@@ -48,6 +48,21 @@ pub enum ErrorSeverity {
     Info,
 }
 
+/// Debug information for LLM interactions.
+///
+/// Stored when debug mode is enabled to help diagnose issues.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
+#[serde(rename_all = "camelCase")]
+pub struct LlmDebugInfo {
+    /// The raw prompt sent to the LLM.
+    pub prompt: String,
+    /// The raw response received from the LLM.
+    pub raw_response: String,
+    /// Model name used for this request.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
 /// Metadata for conversation messages.
 ///
 /// This provides additional context about the message that helps
@@ -72,6 +87,10 @@ pub struct MessageMetadata {
     /// Defaults to true for backward compatibility.
     #[serde(default = "default_true")]
     pub include_in_dialogue: bool,
+
+    /// Debug information for LLM interactions (only present when debug mode is enabled).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub llm_debug_info: Option<LlmDebugInfo>,
 }
 
 fn default_true() -> bool {

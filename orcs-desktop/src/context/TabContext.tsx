@@ -153,21 +153,23 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       // SessionsからSessionを取得
       const session = sessions.find((s) => s.id === openTab.sessionId);
 
-      // TabUIStateを取得（なければデフォルト）
-      const localUIState = tabUIStates.get(openTab.id) ?? getDefaultTabUIState();
+      // TabUIStateを取得
+      const localUIState = tabUIStates.get(openTab.id);
+      const defaultUIState = getDefaultTabUIState();
 
-      // Phase 2.4 (V1.6+): Backend保存されたUI状態を優先的に使用（存在する場合）
-      // ローカルUIStateとBackend UI状態をマージ
-      // Note: input は常にローカルを優先（openTab時にBackendから初期化済み）
+      // Phase 2.4 (V1.6+): ローカルUIStateとBackend UI状態をマージ
+      // 優先順位: ローカル > Backend > デフォルト
+      // Note: ローカルが未初期化の場合は Backend から復元（アプリ再起動対応）
       const mergedUIState: TabUIState = {
-        input: localUIState.input,
-        attachedFiles: localUIState.attachedFiles, // TODO: Phase 3でパスから復元
-        isDragging: localUIState.isDragging, // 一時的なUI状態なので復元しない
-        isAiThinking: localUIState.isAiThinking, // 一時的なUI状態なので復元しない
-        thinkingPersona: localUIState.thinkingPersona, // 一時的なUI状態なので復元しない
-        autoMode: openTab.autoMode ?? localUIState.autoMode,
-        autoChatIteration: openTab.autoChatIteration ?? localUIState.autoChatIteration,
-        isDirty: openTab.isDirty ?? localUIState.isDirty,
+        // input: ローカルがあればローカル、なければBackend、なければ空文字
+        input: localUIState?.input ?? openTab.input ?? '',
+        attachedFiles: localUIState?.attachedFiles ?? defaultUIState.attachedFiles,
+        isDragging: localUIState?.isDragging ?? defaultUIState.isDragging,
+        isAiThinking: localUIState?.isAiThinking ?? defaultUIState.isAiThinking,
+        thinkingPersona: localUIState?.thinkingPersona ?? defaultUIState.thinkingPersona,
+        autoMode: openTab.autoMode ?? localUIState?.autoMode ?? defaultUIState.autoMode,
+        autoChatIteration: openTab.autoChatIteration ?? localUIState?.autoChatIteration ?? defaultUIState.autoChatIteration,
+        isDirty: openTab.isDirty ?? localUIState?.isDirty ?? defaultUIState.isDirty,
       };
 
       // Phase 4: sessionMessages から取得（優先）、なければキャッシュから
@@ -390,11 +392,19 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   const updateTabInput = useCallback((tabId: string, input: string) => {
     // Immediate local state update for responsive UI
+    // Note: タブが存在しない場合も初期化して更新する（遅延初期化パターン）
+    // これにより、app-state:update が先に発火して tabUIStates がまだ初期化されていない
+    // タイミングでも、入力が正しく反映される
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
-      if (!current) return prev;
       const newMap = new Map(prev);
-      newMap.set(tabId, { ...current, input });
+      if (current) {
+        newMap.set(tabId, { ...current, input });
+      } else {
+        // 初期化されていない場合、Backend から input を取得して初期化
+        // ただし、今回の input で上書きする
+        newMap.set(tabId, { ...getDefaultTabUIState(), input });
+      }
       return newMap;
     });
 

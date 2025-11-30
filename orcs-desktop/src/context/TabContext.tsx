@@ -215,10 +215,18 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     console.log('[TabContext] Tab opened by backend:', tabId);
 
     // Phase 2: UIState を初期化（既に存在する場合はスキップ）
+    // V1.6+: Backend に保存された input を復元（アプリ再起動時のデグレ修正）
     setTabUIStates((prev) => {
       if (!prev.has(tabId)) {
         const newMap = new Map(prev);
-        newMap.set(tabId, getDefaultTabUIState());
+        // Backend から保存された input を取得して復元
+        const backendTab = useAppStateStore.getState().appState?.openTabs.find((t) => t.id === tabId);
+        const restoredInput = backendTab?.input ?? '';
+        console.log('[TabContext] Restoring input from backend:', { tabId, inputLength: restoredInput.length });
+        newMap.set(tabId, {
+          ...getDefaultTabUIState(),
+          input: restoredInput,
+        });
         return newMap;
       }
       return prev;

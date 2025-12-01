@@ -51,8 +51,7 @@ tauri:
 
 # Bump the patch version without publishing, then push the changes.
 release-patch:
-	$(CARGO) release patch --execute --skip-publish
-	git push --follow-tags
+	$(CARGO) release patch --execute --no-publish
 
 help:
 	@echo "Available commands:"

@@ -210,10 +210,16 @@ export function AgentConfigSelector({ value, onChange }: AgentConfigSelectorProp
       <Popover.Target>
         <Tooltip label="Agent Configuration" withArrow>
           <ActionIcon
-            color={isChanged ? 'blue' : 'gray'}
-            variant="filled"
+            variant="transparent"
             onClick={() => setOpened(!opened)}
             size="lg"
+            style={{
+              color: isChanged ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-gray-6)',
+              borderRadius: '6px',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mantine-color-blue-0)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
             <IconSettings size={18} />
           </ActionIcon>

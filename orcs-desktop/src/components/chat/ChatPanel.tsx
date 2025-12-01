@@ -911,10 +911,16 @@ export function ChatPanel({
                 {({ copied, copy }) => (
                   <Tooltip label={copied ? 'Copied!' : 'Copy Session'} withArrow>
                     <ActionIcon
-                      color={copied ? 'teal' : 'gray'}
-                      variant="filled"
+                      variant="transparent"
                       onClick={copy}
                       size="lg"
+                      style={{
+                        color: copied ? 'var(--mantine-color-teal-6)' : 'var(--mantine-color-gray-6)',
+                        borderRadius: '6px',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mantine-color-blue-0)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                     >
                       {copied ? <IconCheck size={20} /> : <IconFile size={20} />}
                     </ActionIcon>
@@ -924,10 +930,16 @@ export function ChatPanel({
 
               <Tooltip label="Generate Summary" withArrow>
                 <ActionIcon
-                  color="blue"
-                  variant="filled"
+                  variant="transparent"
                   onClick={handleGenerateSummary}
                   size="lg"
+                  style={{
+                    color: 'var(--mantine-color-gray-6)',
+                    borderRadius: '6px',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mantine-color-blue-0)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <IconFileText size={18} />
                 </ActionIcon>
@@ -935,10 +947,16 @@ export function ChatPanel({
 
               <Tooltip label="Generate ActionPlan" withArrow>
                 <ActionIcon
-                  color="violet"
-                  variant="filled"
+                  variant="transparent"
                   onClick={handleGenerateActionPlan}
                   size="lg"
+                  style={{
+                    color: 'var(--mantine-color-gray-6)',
+                    borderRadius: '6px',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mantine-color-blue-0)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <IconClipboardList size={18} />
                 </ActionIcon>
@@ -946,10 +964,16 @@ export function ChatPanel({
 
               <Tooltip label="Generate Expertise" withArrow>
                 <ActionIcon
-                  color="yellow"
-                  variant="filled"
+                  variant="transparent"
                   onClick={handleGenerateExpertise}
                   size="lg"
+                  style={{
+                    color: 'var(--mantine-color-gray-6)',
+                    borderRadius: '6px',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mantine-color-blue-0)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <IconBulb size={18} />
                 </ActionIcon>
@@ -957,10 +981,16 @@ export function ChatPanel({
 
               <Tooltip label="Generate Concept/Design Issue" withArrow>
                 <ActionIcon
-                  color="teal"
-                  variant="filled"
+                  variant="transparent"
                   onClick={handleGenerateConceptIssue}
                   size="lg"
+                  style={{
+                    color: 'var(--mantine-color-gray-6)',
+                    borderRadius: '6px',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mantine-color-blue-0)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <IconFileCode size={18} />
                 </ActionIcon>
@@ -969,10 +999,16 @@ export function ChatPanel({
               {onSaveSessionToWorkspace && (
                 <Tooltip label="Save Session to Workspace" withArrow>
                   <ActionIcon
-                    color="green"
-                    variant="filled"
+                    variant="transparent"
                     onClick={onSaveSessionToWorkspace}
                     size="lg"
+                    style={{
+                      color: 'var(--mantine-color-gray-6)',
+                      borderRadius: '6px',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mantine-color-blue-0)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                   >
                     <IconFileExport size={18} />
                   </ActionIcon>

@@ -36,7 +36,7 @@ import type { Workspace } from '../../types/workspace';
 import type { CommandDefinition } from '../../types/command';
 import type { Agent } from '../../types/agent';
 import type { PersonaConfig } from '../../types/agent';
-import type { AutoChatConfig } from '../../types/session';
+import type { AutoChatConfig, ContextMode } from '../../types/session';
 import type { Message } from '../../types/message';
 import type { SlashCommand } from '../../types/slash_command';
 import { notifications } from '@mantine/notifications';
@@ -52,6 +52,7 @@ interface ChatPanelProps {
   conversationMode: string;
   talkStyle: string | null;
   executionStrategy: string;
+  contextMode: ContextMode;
   personas: PersonaConfig[];
   activeParticipantIds: string[];
   workspace: Workspace | null;
@@ -79,6 +80,7 @@ interface ChatPanelProps {
   onTalkStyleChange?: (style: string | null) => void;
   onExecutionStrategyChange?: (strategy: string) => void;
   onConversationModeChange?: (mode: string) => void;
+  onContextModeChange?: (mode: ContextMode) => void;
   onToggleParticipant?: (personaId: string, isChecked: boolean) => void;
   dialoguePresets?: import('../../types/conversation').DialoguePreset[];
   onApplyPreset?: (presetId: string) => void;
@@ -150,6 +152,7 @@ export function ChatPanel({
   conversationMode,
   talkStyle,
   executionStrategy,
+  contextMode,
   personas,
   activeParticipantIds,
   workspace,
@@ -173,6 +176,7 @@ export function ChatPanel({
   onTalkStyleChange,
   onExecutionStrategyChange,
   onConversationModeChange,
+  onContextModeChange,
   onToggleParticipant,
   dialoguePresets,
   onApplyPreset,
@@ -1102,12 +1106,14 @@ export function ChatPanel({
         conversationMode={conversationMode}
         talkStyle={talkStyle}
         executionStrategy={executionStrategy}
+        contextMode={contextMode}
         personas={personas}
         activeParticipantIds={activeParticipantIds}
         dialoguePresets={dialoguePresets}
         onTalkStyleChange={onTalkStyleChange}
         onExecutionStrategyChange={onExecutionStrategyChange}
         onConversationModeChange={onConversationModeChange}
+        onContextModeChange={onContextModeChange}
         onToggleParticipant={onToggleParticipant}
         onApplyPreset={onApplyPreset}
       />

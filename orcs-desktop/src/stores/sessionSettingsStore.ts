@@ -9,6 +9,7 @@ import type { MessageType } from '../types/message';
 import { changeTalkStyle } from '../services/talkStyleService';
 import { changeConversationMode } from '../services/conversationModeService';
 import { changeExecutionStrategy } from '../services/executionStrategyService';
+import type { ContextMode } from '../types/session';
 
 export type MessageCallback = (type: MessageType, author: string, text: string) => void;
 
@@ -17,6 +18,7 @@ export interface SessionSettingsStore {
   conversationMode: string;
   talkStyle: string | null;
   executionStrategy: string;
+  contextMode: ContextMode;
   activeParticipantIds: string[];
   isLoaded: boolean;
 
@@ -25,6 +27,7 @@ export interface SessionSettingsStore {
   updateTalkStyle: (style: string | null, addMessage: MessageCallback) => Promise<void>;
   updateConversationMode: (mode: string, addMessage: MessageCallback) => Promise<void>;
   updateExecutionStrategy: (strategy: string, addMessage: MessageCallback) => Promise<void>;
+  updateContextMode: (mode: ContextMode, addMessage: MessageCallback) => Promise<void>;
   toggleParticipant: (personaId: string, isActive: boolean, personaName: string, addMessage: MessageCallback) => Promise<void>;
   refreshActiveParticipants: () => Promise<void>;
 }
@@ -34,6 +37,7 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
   conversationMode: 'normal',
   talkStyle: null,
   executionStrategy: 'sequential',
+  contextMode: 'rich',
   activeParticipantIds: [],
   isLoaded: false,
 
@@ -49,6 +53,7 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     // Load settings individually with fallback to defaults
     let mode = 'normal';
     let style: string | null = null;
+    let ctxMode: ContextMode = 'rich';
     let activeIds: string[] = [];
 
     try {
@@ -64,6 +69,13 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     }
 
     try {
+      const ctxModeStr = await invoke<string>('get_context_mode');
+      ctxMode = ctxModeStr === 'clean' ? 'clean' : 'rich';
+    } catch (error) {
+      console.warn('[SessionSettingsStore] Failed to load context mode, using default:', error);
+    }
+
+    try {
       activeIds = await invoke<string[]>('get_active_participants');
     } catch (error) {
       console.warn('[SessionSettingsStore] Failed to load active participants, using empty list:', error);
@@ -72,6 +84,7 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     set({
       conversationMode: mode,
       talkStyle: style,
+      contextMode: ctxMode,
       activeParticipantIds: activeIds,
       isLoaded: true,
     });
@@ -132,6 +145,26 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
       console.error('[SessionSettingsStore] Failed to update ExecutionStrategy:', error);
       // Revert optimistic update
       set({ executionStrategy: currentStrategy });
+      throw error;
+    }
+  },
+
+  updateContextMode: async (mode: ContextMode, addMessage: MessageCallback) => {
+    console.log('[SessionSettingsStore] updateContextMode called:', mode);
+
+    // Optimistic update
+    const currentMode = get().contextMode;
+    set({ contextMode: mode });
+
+    try {
+      await invoke('set_context_mode', { mode });
+      const label = mode === 'rich' ? 'Rich Context' : 'Clean Context';
+      addMessage('system', 'System', `Context mode changed to ${label}`);
+      console.log('[SessionSettingsStore] ContextMode updated successfully');
+    } catch (error) {
+      console.error('[SessionSettingsStore] Failed to update ContextMode:', error);
+      // Revert optimistic update
+      set({ contextMode: currentMode });
       throw error;
     }
   },

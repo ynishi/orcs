@@ -1063,16 +1063,23 @@ pub async fn handle_input(
         .await
         .ok_or("No active session")?;
 
-    let slash_commands = state
-        .slash_command_repository
-        .list_commands()
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("[handle_input] Failed to list commands: {}", e);
-            Vec::new()
-        });
-    let prompt_extension = build_slash_command_prompt(&slash_commands);
-    manager.set_prompt_extension(prompt_extension).await;
+    // Only inject SlashCommand prompt extension in Rich mode
+    let context_mode = manager.get_context_mode().await;
+    if matches!(context_mode, orcs_core::session::ContextMode::Rich) {
+        let slash_commands = state
+            .slash_command_repository
+            .list_commands()
+            .await
+            .unwrap_or_else(|e| {
+                eprintln!("[handle_input] Failed to list commands: {}", e);
+                Vec::new()
+            });
+        let prompt_extension = build_slash_command_prompt(&slash_commands);
+        manager.set_prompt_extension(prompt_extension).await;
+    } else {
+        // Clean mode: no prompt extension
+        manager.set_prompt_extension(None).await;
+    }
 
     let current_mode = state.app_mode.lock().await.clone();
 

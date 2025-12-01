@@ -52,7 +52,15 @@ export interface Session {
   sortOrder?: number; // was sort_order
   autoChatConfig?: AutoChatConfig; // was auto_chat_config
   isMuted?: boolean; // was is_muted
+  contextMode?: ContextMode; // was context_mode
 }
+
+/**
+ * Context mode for controlling AI context injection.
+ * - rich: Full context with all system extensions (SlashCommands, TalkStyle, etc.)
+ * - clean: Minimal context with Expertise only
+ */
+export type ContextMode = 'rich' | 'clean';
 
 /**
  * Conversation message metadata (alias for backward compatibility)

@@ -4,6 +4,15 @@ import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
 import { PersonaConfig } from '../../types/agent';
 import { DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, getConversationModeOption, getTalkStyleOption, TALK_STYLES, EXECUTION_STRATEGIES, CONVERSATION_MODES, DialoguePreset, matchesPreset } from '../../types/conversation';
+import type { ContextMode } from '../../types/session';
+
+/**
+ * Context Mode options for StatusBar
+ */
+const CONTEXT_MODES = [
+  { value: 'rich', icon: '📚', label: 'Rich Context', description: 'Full context with all extensions' },
+  { value: 'clean', icon: '🧹', label: 'Clean Context', description: 'Expertise only, minimal extensions' },
+] as const;
 
 interface StatusBarProps {
   status: StatusInfo;
@@ -14,17 +23,19 @@ interface StatusBarProps {
   conversationMode?: string;
   talkStyle?: string | null;
   executionStrategy?: string;
+  contextMode?: ContextMode;
   personas?: PersonaConfig[];
   activeParticipantIds?: string[];
   dialoguePresets?: DialoguePreset[];
   onTalkStyleChange?: (style: string | null) => void;
   onExecutionStrategyChange?: (strategy: string) => void;
   onConversationModeChange?: (mode: string) => void;
+  onContextModeChange?: (mode: ContextMode) => void;
   onToggleParticipant?: (personaId: string, isChecked: boolean) => void;
   onApplyPreset?: (presetId: string) => void;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', personas = [], activeParticipantIds = [], dialoguePresets = [], onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange, onToggleParticipant, onApplyPreset }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', contextMode = 'rich', personas = [], activeParticipantIds = [], dialoguePresets = [], onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange, onContextModeChange, onToggleParticipant, onApplyPreset }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -170,6 +181,28 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
             ●
           </Text>
         </Tooltip>
+
+        {/* Context Mode */}
+        <Divider orientation="vertical" />
+        <Menu position="top" withArrow>
+          <Menu.Target>
+            <Tooltip label={CONTEXT_MODES.find(m => m.value === contextMode)?.label || 'Rich Context'} withArrow>
+              <Text size="lg" style={{ cursor: 'pointer' }}>
+                {CONTEXT_MODES.find(m => m.value === contextMode)?.icon || '📚'}
+              </Text>
+            </Tooltip>
+          </Menu.Target>
+          <Menu.Dropdown>
+            {CONTEXT_MODES.map((mode) => (
+              <Menu.Item key={mode.value} onClick={() => onContextModeChange?.(mode.value)}>
+                {mode.icon} {mode.label}
+                <Text size="xs" c="dimmed" style={{ marginLeft: 8 }}>
+                  {mode.description}
+                </Text>
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
 
         {/* Talk Style */}
         <Divider orientation="vertical" />

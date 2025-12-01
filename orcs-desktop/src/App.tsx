@@ -123,11 +123,13 @@ function App() {
     talkStyle,
     conversationMode,
     executionStrategy,
+    contextMode,
     activeParticipantIds,
     isLoaded: sessionSettingsLoaded,
     updateTalkStyle,
     updateConversationMode,
     updateExecutionStrategy,
+    updateContextMode,
     toggleParticipant,
     refreshActiveParticipants,
     loadSettings: loadSessionSettings,
@@ -1981,6 +1983,11 @@ function App() {
     await updateExecutionStrategy(strategy, addMessage);
   };
 
+  const handleContextModeChange = async (mode: 'rich' | 'clean') => {
+    // Delegate to Store (which handles service layer)
+    await updateContextMode(mode, addMessage);
+  };
+
   const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
     // Get persona name from personaStore
     const persona = personas.find(p => p.id === personaId);
@@ -2400,6 +2407,7 @@ function App() {
               conversationMode={conversationMode}
               talkStyle={talkStyle}
               executionStrategy={executionStrategy}
+              contextMode={contextMode}
                       personas={personas}
                       activeParticipantIds={activeParticipantIds}
                       workspace={workspace}
@@ -2427,6 +2435,7 @@ function App() {
                       onTalkStyleChange={handleTalkStyleChange}
                       onExecutionStrategyChange={handleStrategyChange}
                       onConversationModeChange={handleConversationModeChange}
+                      onContextModeChange={handleContextModeChange}
                       onToggleParticipant={handleToggleParticipant}
                       dialoguePresets={dialoguePresets}
                       onApplyPreset={handleApplyPreset}

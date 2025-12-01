@@ -628,8 +628,13 @@ impl InteractionManager {
         // Rebuild dialogue history from persona_histories
         let history_turns = self.rebuild_dialogue_history().await;
 
-        // Read current talk style
-        let talk_style = self.talk_style.read().await.clone();
+        // Read current talk style (only in Rich mode)
+        let context_mode = self.context_mode.read().await.clone();
+        let talk_style = if matches!(context_mode, ContextMode::Rich) {
+            self.talk_style.read().await.clone()
+        } else {
+            None // Clean mode: no talk style
+        };
 
         // Create dialogue with restored history and context
         let mut dialogue = match strategy_model {
@@ -1354,12 +1359,15 @@ impl InteractionManager {
         let speaker = Speaker::System;
         let mut payload = Payload::new().with_message(speaker, message);
 
-        // Prepend conversation mode system instruction if available
-        let conversation_mode = self.conversation_mode.read().await;
-        if let Some(instruction) = conversation_mode.system_instruction() {
-            payload = payload.prepend_system(instruction);
+        // Prepend conversation mode system instruction if available (Rich mode only)
+        let context_mode = self.context_mode.read().await.clone();
+        if matches!(context_mode, ContextMode::Rich) {
+            let conversation_mode = self.conversation_mode.read().await;
+            if let Some(instruction) = conversation_mode.system_instruction() {
+                payload = payload.prepend_system(instruction);
+            }
+            drop(conversation_mode);
         }
-        drop(conversation_mode);
 
         // Create a partial session for incremental turn processing
         let mut session = dialogue.partial_session(payload);
@@ -1505,12 +1513,15 @@ impl InteractionManager {
         // Note: Dialogue/Persona agents handle speaker attribution internally
         let mut payload = Payload::new().with_message(speaker, input);
 
-        // Prepend conversation mode system instruction if available
-        let conversation_mode = self.conversation_mode.read().await;
-        if let Some(instruction) = conversation_mode.system_instruction() {
-            payload = payload.prepend_system(instruction);
+        // Prepend conversation mode system instruction if available (Rich mode only)
+        let context_mode = self.context_mode.read().await.clone();
+        if matches!(context_mode, ContextMode::Rich) {
+            let conversation_mode = self.conversation_mode.read().await;
+            if let Some(instruction) = conversation_mode.system_instruction() {
+                payload = payload.prepend_system(instruction);
+            }
+            drop(conversation_mode);
         }
-        drop(conversation_mode);
 
         // Add file attachments if provided
         if let Some(paths) = file_paths {

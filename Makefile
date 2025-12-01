@@ -4,7 +4,7 @@
 CARGO := cargo
 
 # Phony targets are not files. This prevents conflicts with files of the same name.
-.PHONY: all build run check test fmt clippy clean schema-generate dev tauri
+.PHONY: all build run check test fmt clippy clean schema-generate dev tauri release-patch
 
 # The default target executed when you run `make`.
 all: build
@@ -49,6 +49,11 @@ dev:
 tauri:
 	cd orcs-desktop && npm run tauri build
 
+# Bump the patch version without publishing, then push the changes.
+release-patch:
+	$(CARGO) release patch --execute --skip-publish
+	git push --follow-tags
+
 help:
 	@echo "Available commands:"
 	@echo "  make all             - Build the project (default)"
@@ -64,3 +69,4 @@ help:
 	@echo "  make schema-generate - Generate TypeScript types from Rust schemas"
 	@echo "  make dev             - Run Tauri app in development mode"
 	@echo "  make tauri           - Build Tauri desktop application"
+	@echo "  make release-patch   - Bump patch version, commit, tag, and push (no publish)"

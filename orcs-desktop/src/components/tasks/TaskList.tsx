@@ -257,20 +257,28 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
         </Group>
 
         {/* コンテンツエリア */}
-        <Box p="md">
-          <Group gap="sm" wrap="nowrap">
-            {/* タスク内容 */}
-            <Box style={{ flex: 1, minWidth: 0 }}>
-              <Text
-                size="sm"
-                fw={task.status === 'Running' || task.status === 'Pending' ? 600 : 400}
-                style={{
-                  textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
-                  color: task.status === 'Completed' ? '#868e96' : task.status === 'Failed' ? '#fa5252' : undefined,
-                }}
-              >
-                {task.title}
-              </Text>
+        <Tooltip
+          label={getTaskPreview(task)}
+          withArrow
+          position="right"
+          multiline
+          w={350}
+          disabled={!task.result && !task.error}
+        >
+          <Box p="md">
+            <Group gap="sm" wrap="nowrap">
+              {/* タスク内容 */}
+              <Box style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  size="sm"
+                  fw={task.status === 'Running' || task.status === 'Pending' ? 600 : 400}
+                  style={{
+                    textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
+                    color: task.status === 'Completed' ? '#868e96' : task.status === 'Failed' ? '#fa5252' : undefined,
+                  }}
+                >
+                  {task.title}
+                </Text>
 
               {/* Planning状態の表示 */}
               {task.status === 'Pending' && (
@@ -355,8 +363,35 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
             </Box>
           </Group>
         </Box>
+        </Tooltip>
       </Box>
     );
+  };
+
+  // Generate preview text for task tooltip
+  const getTaskPreview = (task: Task): string => {
+    const lines: string[] = [];
+
+    if (task.result) {
+      lines.push('📋 Result:');
+      // Show first 500 chars of result
+      const resultPreview = task.result.length > 500
+        ? task.result.slice(0, 500) + '...'
+        : task.result;
+      lines.push(resultPreview);
+    }
+
+    if (task.error) {
+      if (lines.length > 0) lines.push('');
+      lines.push('❌ Error:');
+      // Show first 300 chars of error
+      const errorPreview = task.error.length > 300
+        ? task.error.slice(0, 300) + '...'
+        : task.error;
+      lines.push(errorPreview);
+    }
+
+    return lines.join('\n') || 'No result available';
   };
 
   return (

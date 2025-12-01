@@ -27,6 +27,7 @@ interface NavbarProps {
   onToggleArchive?: (sessionId: string) => void;
   onMoveSortOrder?: (sessionId: string, direction: 'up' | 'down') => void;
   onNewSession: () => void;
+  onSaveSessionToWorkspace?: (session: Session) => void;
 
   // Tasks
   tasks: Task[];
@@ -74,6 +75,7 @@ export function Navbar({
   onToggleArchive,
   onMoveSortOrder,
   onNewSession,
+  onSaveSessionToWorkspace,
   tasks,
   taskProgress,
   onTaskToggle,
@@ -182,6 +184,7 @@ export function Navbar({
               onToggleArchive={onToggleArchive}
               onMoveSortOrder={onMoveSortOrder}
               onNewSession={onNewSession}
+              onSaveToWorkspace={onSaveSessionToWorkspace}
             />
           )}
 

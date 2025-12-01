@@ -336,3 +336,94 @@ export function convertSessionToMessages(session: Session, userNickname: string 
     )
   );
 }
+
+// ============================================================================
+// Session to Markdown Export
+// ============================================================================
+
+export interface SessionExportResult {
+  filename: string;
+  content: string;
+  latestMessageTimestamp: string | null;
+}
+
+/**
+ * セッションをMarkdown形式でエクスポート
+ */
+export function exportSessionToMarkdown(
+  session: Session,
+  userNickname: string = 'You'
+): SessionExportResult {
+  const messagesWithAuthors = getAllMessagesWithAuthors(session);
+  const exportDate = new Date().toISOString();
+  const messageCount = messagesWithAuthors.length;
+
+  // Get latest message timestamp
+  const latestMessageTimestamp = messagesWithAuthors.length > 0
+    ? messagesWithAuthors[messagesWithAuthors.length - 1].message.timestamp
+    : null;
+
+  // Generate filename (sanitize title for filesystem)
+  const sanitizedTitle = session.title
+    .replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\s-]/g, '')
+    .replace(/\s+/g, '_')
+    .slice(0, 50);
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const filename = `session_${sanitizedTitle}_${dateStr}.md`;
+
+  // Build markdown content
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`# ${session.title}`);
+  lines.push('');
+  lines.push(`> Session: \`${session.id}\` | Exported: ${exportDate} | Messages: ${messageCount}`);
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+
+  // Messages
+  for (const { message, authorId } of messagesWithAuthors) {
+    // Skip system messages for cleaner export
+    if (message.role === 'System') {
+      continue;
+    }
+
+    // Resolve author name
+    let author: string;
+    if (message.role === 'User') {
+      author = userNickname;
+    } else {
+      author = session.participants?.[authorId] || authorId;
+    }
+
+    // Format timestamp
+    const timestamp = new Date(message.timestamp).toLocaleString();
+
+    // Author line
+    lines.push(`**${author}** _(${timestamp})_`);
+    lines.push('');
+
+    // Content
+    lines.push(message.content);
+
+    // Attachments (if any)
+    if (message.attachments && message.attachments.length > 0) {
+      lines.push('');
+      for (const attachment of message.attachments) {
+        const fileName = attachment.split('/').pop() || 'file';
+        lines.push(`> 📎 _${fileName} attached_`);
+      }
+    }
+
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  }
+
+  return {
+    filename,
+    content: lines.join('\n'),
+    latestMessageTimestamp,
+  };
+}

@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton, Tooltip, Switch } from '@mantine/core';
-import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown, IconFile, IconFileText, IconBrandJavascript, IconBrandTypescript, IconSettings, IconClipboard, IconFolderShare } from '@tabler/icons-react';
+import { IconMessage, IconMessages, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown, IconFile, IconFileText, IconBrandJavascript, IconBrandTypescript, IconSettings, IconClipboard, IconFolderShare, IconChecklist } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
 import { useState, useMemo } from 'react';
@@ -113,11 +113,30 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
       const decoder = new TextDecoder('utf-8');
       const content = decoder.decode(uint8Array);
 
-      // Cache the preview (first 50 characters)
-      const preview = content.slice(0, 50).trim();
+      // Extract preview content
+      let previewContent = content;
+
+      // For session exports, skip metadata section (everything before ---)
+      if (file.name.startsWith('session_') && file.name.endsWith('.md')) {
+        const separatorIndex = content.indexOf('\n---\n');
+        if (separatorIndex !== -1) {
+          // Skip past separator and get the actual conversation content
+          previewContent = content.slice(separatorIndex + 5).trim();
+          // Remove the ## Author header line if present
+          if (previewContent.startsWith('## ')) {
+            const firstNewline = previewContent.indexOf('\n');
+            if (firstNewline !== -1) {
+              previewContent = previewContent.slice(firstNewline + 1).trim();
+            }
+          }
+        }
+      }
+
+      // Cache the preview (first 80 characters for better context)
+      const preview = previewContent.slice(0, 80).trim() + (previewContent.length > 80 ? '...' : '');
       setFilePreviewCache(prev => ({
         ...prev,
-        [file.id]: preview,
+        [file.id]: preview || file.name,
       }));
     } catch (err) {
       console.error('[FileList] Failed to load file preview:', err);
@@ -132,6 +151,21 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
   };
 
   const getFileIcon = (file: UploadedFile) => {
+    // 出所に基づくアイコン判定（優先）
+    // Session保存: session_*.md
+    if (file.name.startsWith('session_') && file.name.endsWith('.md')) {
+      return <IconMessages size={16} color="var(--mantine-color-blue-6)" />;
+    }
+    // Task保存: task_*.md
+    if (file.name.startsWith('task_') && file.name.endsWith('.md')) {
+      return <IconChecklist size={16} color="var(--mantine-color-violet-6)" />;
+    }
+    // Chat/Message保存: sessionIdがある場合（上記以外）
+    if (file.sessionId) {
+      return <IconMessage size={16} color="var(--mantine-color-teal-6)" />;
+    }
+
+    // 拡張子に基づくアイコン判定（フォールバック）
     const ext = file.name.split('.').pop()?.toLowerCase();
     switch (ext) {
       case 'rs': return <IconFile size={16} color="orange" />;

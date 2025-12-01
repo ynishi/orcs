@@ -35,7 +35,7 @@ import { extractMentions, getCurrentMention, normalizeMentionsInText } from "./u
 import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
-import { convertSessionToMessages } from "./types/session";
+import { convertSessionToMessages, exportSessionToMarkdown } from "./types/session";
 import { SlashCommand } from "./types/slash_command";
 import { useTabContext } from "./context/TabContext";
 import { useSlashCommands } from "./hooks/useSlashCommands";
@@ -1747,6 +1747,49 @@ function App() {
     }
   };
 
+  // セッションをワークスペースに保存するハンドラー
+  const handleSaveSessionToWorkspace = async (session: Session) => {
+    try {
+      // Markdownを生成
+      const { filename, content, latestMessageTimestamp } = exportSessionToMarkdown(
+        session,
+        userProfile?.nickname ?? 'You'
+      );
+
+      // メッセージテキストをバイト配列に変換
+      const encoder = new TextEncoder();
+      const data = encoder.encode(content);
+      const fileData = Array.from(data);
+
+      // ワークスペースIDを取得
+      const currentWorkspace = await invoke<{ id: string }>('get_current_workspace');
+
+      // ワークスペースに保存
+      await invoke('upload_file_from_bytes', {
+        workspaceId: currentWorkspace.id,
+        filename: filename,
+        fileData: fileData,
+        sessionId: session.id,
+        messageTimestamp: latestMessageTimestamp,
+      });
+
+      // Toast notification
+      notifications.show({
+        title: 'Session saved',
+        message: `${filename}`,
+        color: 'green',
+        icon: '💾',
+      });
+    } catch (err) {
+      console.error('Failed to save session to workspace:', err);
+      notifications.show({
+        title: 'Failed to save session',
+        message: String(err),
+        color: 'red',
+      });
+    }
+  };
+
   // タスク操作ハンドラー
   const handleTaskToggle = async (taskId: string) => {
     // Tasks are managed by backend - toggle is not supported for execution tasks
@@ -2120,6 +2163,7 @@ function App() {
           onToggleArchive={handleToggleArchive}
           onMoveSortOrder={handleMoveSortOrder}
           onNewSession={handleNewSession}
+          onSaveSessionToWorkspace={handleSaveSessionToWorkspace}
           tasks={tasks}
           taskProgress={taskProgress}
           onTaskToggle={handleTaskToggle}
@@ -2442,6 +2486,12 @@ function App() {
                       onSelectCommand={selectCommand}
                       onSelectAgent={selectAgent}
                       onHoverSuggestion={setSelectedSuggestionIndex}
+                      onSaveSessionToWorkspace={() => {
+                        const session = sessions.find(s => s.id === tab.sessionId);
+                        if (session) {
+                          void handleSaveSessionToWorkspace(session);
+                        }
+                      }}
                     />
                   </Tabs.Panel>
                 ))}

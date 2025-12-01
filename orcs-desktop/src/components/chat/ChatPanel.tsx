@@ -18,7 +18,7 @@ import {
   Paper,
   Text,
 } from '@mantine/core';
-import { IconSettings, IconClipboardList, IconFileText, IconBulb, IconFileCode, IconVolume, IconVolumeOff, IconPlayerPlay, IconPlayerStop, IconFile, IconCheck, IconPaperclip } from '@tabler/icons-react';
+import { IconSettings, IconClipboardList, IconFileText, IconBulb, IconFileCode, IconVolume, IconVolumeOff, IconPlayerPlay, IconPlayerStop, IconFile, IconCheck, IconPaperclip, IconFileExport } from '@tabler/icons-react';
 import { MessageItem } from './MessageItem';
 import { StatusBar } from './StatusBar';
 import { AgentConfigSelector } from './AgentConfigSelector';
@@ -87,6 +87,7 @@ interface ChatPanelProps {
   onSelectCommand: (command: CommandDefinition) => void;
   onSelectAgent: (agent: Agent) => void;
   onHoverSuggestion: (index: number) => void;
+  onSaveSessionToWorkspace?: () => void;
 }
 
 interface MessageListProps {
@@ -183,6 +184,7 @@ export function ChatPanel({
   onSelectCommand,
   onSelectAgent,
   onHoverSuggestion,
+  onSaveSessionToWorkspace,
 }: ChatPanelProps) {
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -963,6 +965,19 @@ export function ChatPanel({
                   <IconFileCode size={18} />
                 </ActionIcon>
               </Tooltip>
+
+              {onSaveSessionToWorkspace && (
+                <Tooltip label="Save Session to Workspace" withArrow>
+                  <ActionIcon
+                    color="green"
+                    variant="filled"
+                    onClick={onSaveSessionToWorkspace}
+                    size="lg"
+                  >
+                    <IconFileExport size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
             </Group>
           </Paper>
         )}

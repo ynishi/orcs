@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, UnstyledButton, ActionIcon, Tooltip, TextInput, Switch, Badge, Menu } from '@mantine/core';
-import { IconDotsVertical, IconArrowUp, IconArrowDown, IconPencil, IconArchive, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconDotsVertical, IconArrowUp, IconArrowDown, IconPencil, IconArchive, IconTrash, IconPlus, IconFileExport } from '@tabler/icons-react';
 import { Session, getMessageCount, getLastActive, getAllMessages } from '../../types/session';
 import { Workspace } from '../../types/workspace';
 import { useState, useMemo } from 'react';
@@ -16,6 +16,7 @@ interface SessionListProps {
   onToggleFavorite?: (sessionId: string) => void;
   onToggleArchive?: (sessionId: string) => void;
   onMoveSortOrder?: (sessionId: string, direction: 'up' | 'down') => void;
+  onSaveToWorkspace?: (session: Session) => void;
 }
 
 export function SessionList({
@@ -30,6 +31,7 @@ export function SessionList({
   onToggleFavorite,
   onToggleArchive,
   onMoveSortOrder,
+  onSaveToWorkspace,
 }: SessionListProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
@@ -226,6 +228,24 @@ export function SessionList({
               </ActionIcon>
             </Tooltip>
 
+            {/* Save to Workspaceボタン */}
+            {onSaveToWorkspace && (
+              <Tooltip label="Save to workspace files" withArrow>
+                <ActionIcon
+                  size="sm"
+                  color="gray"
+                  variant="subtle"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSaveToWorkspace(session);
+                  }}
+                  style={{ flexShrink: 0 }}
+                >
+                  <IconFileExport size={16} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+
             {/* メニュー */}
             <Menu position="bottom-end" withinPortal>
               <Menu.Target>
@@ -258,6 +278,16 @@ export function SessionList({
                     </Menu.Item>
                     <Menu.Divider />
                   </>
+                )}
+
+                {/* Save to workspace files */}
+                {onSaveToWorkspace && (
+                  <Menu.Item
+                    leftSection={<IconFileExport size={14} />}
+                    onClick={() => onSaveToWorkspace(session)}
+                  >
+                    Save to workspace files
+                  </Menu.Item>
                 )}
 
                 {/* Rename */}

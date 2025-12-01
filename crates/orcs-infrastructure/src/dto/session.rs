@@ -1787,32 +1787,15 @@ impl version_migrate::FromDomain<Session> for SessionV4_3_0 {
 
 /// Creates and configures a Migrator instance for Session entities.
 ///
-/// The migrator handles automatic schema migration from V1.0.0 to V4.1.0
-/// and conversion to the domain model.
+/// Uses the `migrator!` macro for simplified migration path definition.
+/// The migrator handles automatic schema migration from V1.0.0 to V4.3.0
+/// and conversion to the domain model with save support.
 ///
 /// # Migration Path
 ///
-/// - V1.0.0 → V1.1.0: Renames `name` field to `title`
-/// - V1.1.0 → V2.0.0: Adds `workspace_id` field with default value None
-/// - V2.0.0 → V2.1.0: Adds `active_participant_ids` and `execution_strategy` fields
-/// - V2.1.0 → V2.2.0: Adds `system_messages` field for system notifications
-/// - V2.2.0 → V2.3.0: Adds `participants` field for persona ID to name mapping
-/// - V2.3.0 → V2.4.0: Adds `conversation_mode` field for controlling dialogue verbosity
-/// - V2.4.0 → V2.5.0: Adds `talk_style` field for dialogue context
-/// - V2.5.0 → V2.6.0: Normalizes conversation metadata for system message types
-/// - V2.6.0 → V2.7.0: Changes execution_strategy from String to ExecutionModel enum
-/// - V2.7.0 → V2.8.0: Adds `participant_icons` field for persona icons
-/// - V2.8.0 → V2.9.0: Adds `participant_colors` field for UI theming
-/// - V2.9.0 → V3.0.0: Makes `workspace_id` required
-/// - V3.0.0 → V3.1.0: Adds `is_favorite` and `is_archived` fields for session organization
-/// - V3.1.0 → V3.2.0: Adds `sort_order` field for manual session ordering
-/// - V3.2.0 → V3.3.0: Adds `auto_chat_config` field for AutoChat mode
-/// - V3.3.0 → V3.4.0: Adds `participant_backends` and `participant_models` fields
-/// - V3.4.0 → V4.0.0: Changes execution_strategy to ExecutionStrategyV2_0_0 enum
-/// - V4.0.0 → V4.1.0: Fixes participant_models to avoid TOML null errors
-/// - V4.1.0 → V4.2.0: Adds `is_muted` field for memo mode
-/// - V4.2.0 → V4.3.0: Adds `context_mode` field for AI context injection control
-/// - V4.3.0 → Session: Converts DTO to domain model
+/// V1.0.0 → V1.1.0 → V2.0.0 → ... → V4.3.0 → Session
+///
+/// See individual DTO version structs for detailed migration documentation.
 ///
 /// # Example
 ///
@@ -1821,36 +1804,29 @@ impl version_migrate::FromDomain<Session> for SessionV4_3_0 {
 /// let session: Session = migrator.load_flat_from("session", toml_value)?;
 /// ```
 pub fn create_session_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-
-    // Register migration path: V1.0.0 -> ... -> V4.2.0 -> V4.3.0 -> Session
-    let session_path = version_migrate::Migrator::define("session")
-        .from::<SessionV1_0_0>()
-        .step::<SessionV1_1_0>()
-        .step::<SessionV2_0_0>()
-        .step::<SessionV2_1_0>()
-        .step::<SessionV2_2_0>()
-        .step::<SessionV2_3_0>()
-        .step::<SessionV2_4_0>()
-        .step::<SessionV2_5_0>()
-        .step::<SessionV2_6_0>()
-        .step::<SessionV2_7_0>()
-        .step::<SessionV2_8_0>()
-        .step::<SessionV2_9_0>()
-        .step::<SessionV3_0_0>()
-        .step::<SessionV3_1_0>()
-        .step::<SessionV3_2_0>()
-        .step::<SessionV3_3_0>()
-        .step::<SessionV3_4_0>()
-        .step::<SessionV4_0_0>()
-        .step::<SessionV4_1_0>()
-        .step::<SessionV4_2_0>()
-        .step::<SessionV4_3_0>()
-        .into_with_save::<Session>();
-
-    migrator
-        .register(session_path)
-        .expect("Failed to register session migration path");
-
-    migrator
+    version_migrate::migrator!("session" => [
+        SessionV1_0_0,
+        SessionV1_1_0,
+        SessionV2_0_0,
+        SessionV2_1_0,
+        SessionV2_2_0,
+        SessionV2_3_0,
+        SessionV2_4_0,
+        SessionV2_5_0,
+        SessionV2_6_0,
+        SessionV2_7_0,
+        SessionV2_8_0,
+        SessionV2_9_0,
+        SessionV3_0_0,
+        SessionV3_1_0,
+        SessionV3_2_0,
+        SessionV3_3_0,
+        SessionV3_4_0,
+        SessionV4_0_0,
+        SessionV4_1_0,
+        SessionV4_2_0,
+        SessionV4_3_0,
+        Session
+    ], save = true)
+    .expect("Failed to create session migrator")
 }

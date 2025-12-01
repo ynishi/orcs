@@ -497,3 +497,33 @@ pub async fn move_workspace_file_sort_order(
 
     Ok(())
 }
+
+/// Copies a file from one workspace to another
+#[tauri::command]
+pub async fn copy_file_to_workspace(
+    source_workspace_id: String,
+    file_id: String,
+    target_workspace_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<UploadedFile, String> {
+    let result = state
+        .workspace_storage_service
+        .copy_file_to_workspace(&source_workspace_id, &file_id, &target_workspace_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Emit workspace:update event for the target workspace
+    if let Some(workspace) = state
+        .workspace_storage_service
+        .get_workspace(&target_workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        if let Err(e) = app.emit("workspace:update", &workspace) {
+            tracing::error!("Failed to emit workspace:update: {}", e);
+        }
+    }
+
+    Ok(result)
+}

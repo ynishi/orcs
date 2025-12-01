@@ -337,4 +337,36 @@ pub trait WorkspaceStorageService: Send + Sync {
     /// - The workspace does not exist
     /// - The deletion operation fails
     async fn delete_workspace(&self, workspace_id: &str) -> Result<()>;
+
+    /// Copies a file from one workspace to another.
+    ///
+    /// This creates a duplicate of the file in the target workspace with a new ID.
+    /// Most metadata is preserved (session_id, message_timestamp, author),
+    /// but workspace-specific state (is_favorite, is_archived, sort_order) is reset.
+    /// If a file with the same name exists in the target workspace, the new file
+    /// will be renamed (e.g., "file(1).png").
+    ///
+    /// # Arguments
+    ///
+    /// * `source_workspace_id` - The ID of the workspace containing the source file
+    /// * `file_id` - The ID of the file to copy
+    /// * `target_workspace_id` - The ID of the workspace to copy the file to
+    ///
+    /// # Returns
+    ///
+    /// Returns the newly created `UploadedFile` in the target workspace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The source workspace does not exist
+    /// - The target workspace does not exist
+    /// - The file does not exist in the source workspace
+    /// - The file cannot be read or copied
+    async fn copy_file_to_workspace(
+        &self,
+        source_workspace_id: &str,
+        file_id: &str,
+        target_workspace_id: &str,
+    ) -> Result<UploadedFile>;
 }

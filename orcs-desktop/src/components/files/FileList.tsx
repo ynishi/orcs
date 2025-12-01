@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton, Tooltip, Switch } from '@mantine/core';
-import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown, IconFile, IconFileText, IconBrandJavascript, IconBrandTypescript, IconSettings, IconClipboard } from '@tabler/icons-react';
+import { IconMessage, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown, IconFile, IconFileText, IconBrandJavascript, IconBrandTypescript, IconSettings, IconClipboard, IconFolderShare } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
 import { useState, useMemo } from 'react';
@@ -16,9 +16,10 @@ interface FileListProps {
   onToggleArchive?: (file: UploadedFile) => void;
   onToggleFavorite?: (file: UploadedFile) => void;
   onMoveSortOrder?: (fileId: string, direction: 'up' | 'down') => void;
+  onCopyToWorkspace?: (file: UploadedFile) => void;
 }
 
-export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession, onNewSessionWithFile, onToggleArchive, onToggleFavorite, onMoveSortOrder }: FileListProps) {
+export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession, onNewSessionWithFile, onToggleArchive, onToggleFavorite, onMoveSortOrder, onCopyToWorkspace }: FileListProps) {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
@@ -352,6 +353,16 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
                 >
                   Rename
                 </Menu.Item>
+
+                {/* Copy to another workspace */}
+                {onCopyToWorkspace && (
+                  <Menu.Item
+                    leftSection={<IconFolderShare size={14} />}
+                    onClick={() => onCopyToWorkspace(file)}
+                  >
+                    Copy to workspace...
+                  </Menu.Item>
+                )}
 
                 {/* Move Up/Down (favoriteファイルが2つ以上ある場合のみ) */}
                 {file.isFavorite && onMoveSortOrder && favoriteFilesCount >= 2 && (

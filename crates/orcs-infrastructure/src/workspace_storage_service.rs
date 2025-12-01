@@ -28,6 +28,39 @@ fn infer_mime_type(filename: &str) -> String {
         .to_string()
 }
 
+/// Generates a unique filename by appending a number suffix if a file with the same name exists.
+///
+/// For example, if "image.png" already exists, this returns "image(1).png".
+/// If "image(1).png" also exists, it returns "image(2).png", and so on.
+fn generate_unique_filename(original_name: &str, existing_files: &[UploadedFile]) -> String {
+    let existing_names: std::collections::HashSet<&str> =
+        existing_files.iter().map(|f| f.name.as_str()).collect();
+
+    if !existing_names.contains(original_name) {
+        return original_name.to_string();
+    }
+
+    // Split filename into base and extension
+    let (base, ext) = if let Some(dot_pos) = original_name.rfind('.') {
+        (&original_name[..dot_pos], Some(&original_name[dot_pos..]))
+    } else {
+        (original_name, None)
+    };
+
+    // Find a unique name by incrementing the counter
+    let mut counter = 1;
+    loop {
+        let candidate = match ext {
+            Some(extension) => format!("{}({}){}", base, counter, extension),
+            None => format!("{}({})", base, counter),
+        };
+        if !existing_names.contains(candidate.as_str()) {
+            return candidate;
+        }
+        counter += 1;
+    }
+}
+
 /// File system-based workspace manager.
 ///
 /// Stores workspace data in the `~/.orcs/workspaces` directory. Each workspace
@@ -864,6 +897,104 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
 
         Ok(())
     }
+
+    async fn copy_file_to_workspace(
+        &self,
+        source_workspace_id: &str,
+        file_id: &str,
+        target_workspace_id: &str,
+    ) -> Result<UploadedFile> {
+        // Load source workspace and find the file
+        let source_workspace = self.load_workspace(source_workspace_id).await?;
+        let source_file = source_workspace
+            .resources
+            .uploaded_files
+            .iter()
+            .find(|f| f.id == file_id)
+            .ok_or_else(|| {
+                OrcsError::io(format!(
+                    "File with ID '{}' not found in source workspace",
+                    file_id
+                ))
+            })?;
+
+        // Read the source file content
+        let file_content = fs::read(&source_file.path).await.map_err(|e| {
+            OrcsError::io(format!(
+                "Failed to read source file '{}': {}",
+                source_file.path.display(),
+                e
+            ))
+        })?;
+
+        // Load target workspace
+        let mut target_workspace = self.load_workspace(target_workspace_id).await?;
+
+        // Get the target workspace directory
+        let target_workspace_dir = self.get_workspace_dir(target_workspace_id);
+        let uploaded_dir = target_workspace_dir.join("resources").join("uploaded");
+
+        // Ensure the destination directory exists
+        fs::create_dir_all(&uploaded_dir).await.map_err(|e| {
+            OrcsError::io(format!(
+                "Failed to create uploaded directory '{}': {}",
+                uploaded_dir.display(),
+                e
+            ))
+        })?;
+
+        // Determine the filename, handling conflicts
+        let final_filename =
+            generate_unique_filename(&source_file.name, &target_workspace.resources.uploaded_files);
+        let dest_path = uploaded_dir.join(&final_filename);
+
+        // Write the file to the target workspace
+        fs::write(&dest_path, &file_content).await.map_err(|e| {
+            OrcsError::io(format!(
+                "Failed to write file to '{}': {}",
+                dest_path.display(),
+                e
+            ))
+        })?;
+
+        // Generate a new unique ID for the copied file
+        let new_file_id = Uuid::new_v4().to_string();
+
+        // Get current timestamp
+        let uploaded_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| OrcsError::io(format!("Failed to get current timestamp: {}", e)))?
+            .as_secs() as i64;
+
+        // Create the new UploadedFile, preserving most metadata
+        let new_file = UploadedFile {
+            id: new_file_id,
+            name: final_filename,
+            path: dest_path,
+            mime_type: source_file.mime_type.clone(),
+            size: file_content.len() as u64,
+            uploaded_at,
+            // Preserve origin metadata
+            session_id: source_file.session_id.clone(),
+            message_timestamp: source_file.message_timestamp.clone(),
+            author: source_file.author.clone(),
+            // Reset workspace-specific state
+            is_archived: false,
+            is_favorite: false,
+            sort_order: None,
+        };
+
+        // Add to target workspace's uploaded_files list
+        target_workspace
+            .resources
+            .uploaded_files
+            .push(new_file.clone());
+
+        // Save the updated target workspace metadata
+        self.save_workspace(&target_workspace).await?;
+
+        Ok(new_file)
+    }
 }
 
 #[cfg(test)]
@@ -1218,5 +1349,238 @@ mod tests {
 
         // Cleanup
         cleanup_workspace(&manager, &workspace.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_to_workspace() {
+        let temp_dir = TempDir::new().unwrap();
+        let root_path = temp_dir.path().join("workspaces");
+        let source_repo_path = temp_dir.path().join("source-repo");
+        let target_repo_path = temp_dir.path().join("target-repo");
+        fs::create_dir_all(&source_repo_path).await.unwrap();
+        fs::create_dir_all(&target_repo_path).await.unwrap();
+
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
+            .await
+            .unwrap();
+
+        // Create source and target workspaces
+        let source_workspace = manager
+            .get_or_create_workspace(&source_repo_path)
+            .await
+            .unwrap();
+        let target_workspace = manager
+            .get_or_create_workspace(&target_repo_path)
+            .await
+            .unwrap();
+
+        // Add a file to source workspace
+        let test_content = b"Hello, copy me!";
+        let source_file = manager
+            .add_file_from_bytes(
+                &source_workspace.id,
+                "test.txt",
+                test_content,
+                Some("session-123".to_string()),
+                Some("2024-01-01T00:00:00Z".to_string()),
+                Some("user-456".to_string()),
+            )
+            .await
+            .unwrap();
+
+        // Copy file to target workspace
+        let copied_file = manager
+            .copy_file_to_workspace(&source_workspace.id, &source_file.id, &target_workspace.id)
+            .await
+            .unwrap();
+
+        // Verify the copied file has a new ID
+        assert_ne!(copied_file.id, source_file.id);
+
+        // Verify the file content matches
+        let copied_content = fs::read(&copied_file.path).await.unwrap();
+        assert_eq!(copied_content, test_content);
+
+        // Verify metadata is preserved
+        assert_eq!(copied_file.name, source_file.name);
+        assert_eq!(copied_file.mime_type, source_file.mime_type);
+        assert_eq!(copied_file.session_id, source_file.session_id);
+        assert_eq!(copied_file.message_timestamp, source_file.message_timestamp);
+        assert_eq!(copied_file.author, source_file.author);
+
+        // Verify workspace-specific state is reset
+        assert!(!copied_file.is_archived);
+        assert!(!copied_file.is_favorite);
+        assert!(copied_file.sort_order.is_none());
+
+        // Verify target workspace metadata was updated
+        let updated_target = manager
+            .get_workspace(&target_workspace.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated_target.resources.uploaded_files.len(), 1);
+        assert_eq!(updated_target.resources.uploaded_files[0].id, copied_file.id);
+
+        // Verify source file still exists
+        let updated_source = manager
+            .get_workspace(&source_workspace.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated_source.resources.uploaded_files.len(), 1);
+        assert!(source_file.path.exists());
+
+        // Cleanup
+        cleanup_workspace(&manager, &source_workspace.id).await;
+        cleanup_workspace(&manager, &target_workspace.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_to_workspace_handles_name_conflict() {
+        let temp_dir = TempDir::new().unwrap();
+        let root_path = temp_dir.path().join("workspaces");
+        let source_repo_path = temp_dir.path().join("source-repo");
+        let target_repo_path = temp_dir.path().join("target-repo");
+        fs::create_dir_all(&source_repo_path).await.unwrap();
+        fs::create_dir_all(&target_repo_path).await.unwrap();
+
+        let manager = FileSystemWorkspaceManager::new(Some(&root_path))
+            .await
+            .unwrap();
+
+        // Create source and target workspaces
+        let source_workspace = manager
+            .get_or_create_workspace(&source_repo_path)
+            .await
+            .unwrap();
+        let target_workspace = manager
+            .get_or_create_workspace(&target_repo_path)
+            .await
+            .unwrap();
+
+        // Add a file to source workspace
+        let source_file = manager
+            .add_file_from_bytes(&source_workspace.id, "test.txt", b"Source content", None, None, None)
+            .await
+            .unwrap();
+
+        // Add a file with the same name to target workspace
+        let _existing_file = manager
+            .add_file_from_bytes(&target_workspace.id, "test.txt", b"Existing content", None, None, None)
+            .await
+            .unwrap();
+
+        // Copy file to target workspace (should create test(1).txt)
+        let copied_file = manager
+            .copy_file_to_workspace(&source_workspace.id, &source_file.id, &target_workspace.id)
+            .await
+            .unwrap();
+
+        // Verify the copied file was renamed
+        assert_eq!(copied_file.name, "test(1).txt");
+
+        // Verify target workspace now has 2 files
+        let updated_target = manager
+            .get_workspace(&target_workspace.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated_target.resources.uploaded_files.len(), 2);
+
+        // Cleanup
+        cleanup_workspace(&manager, &source_workspace.id).await;
+        cleanup_workspace(&manager, &target_workspace.id).await;
+    }
+
+    #[test]
+    fn test_generate_unique_filename_no_conflict() {
+        let existing_files: Vec<UploadedFile> = vec![];
+        assert_eq!(
+            generate_unique_filename("image.png", &existing_files),
+            "image.png"
+        );
+    }
+
+    #[test]
+    fn test_generate_unique_filename_with_conflict() {
+        let existing_files = vec![UploadedFile {
+            id: "1".to_string(),
+            name: "image.png".to_string(),
+            path: PathBuf::from("/tmp/image.png"),
+            mime_type: "image/png".to_string(),
+            size: 100,
+            uploaded_at: 0,
+            session_id: None,
+            message_timestamp: None,
+            author: None,
+            is_archived: false,
+            is_favorite: false,
+            sort_order: None,
+        }];
+        assert_eq!(
+            generate_unique_filename("image.png", &existing_files),
+            "image(1).png"
+        );
+    }
+
+    #[test]
+    fn test_generate_unique_filename_multiple_conflicts() {
+        let existing_files = vec![
+            UploadedFile {
+                id: "1".to_string(),
+                name: "image.png".to_string(),
+                path: PathBuf::from("/tmp/image.png"),
+                mime_type: "image/png".to_string(),
+                size: 100,
+                uploaded_at: 0,
+                session_id: None,
+                message_timestamp: None,
+                author: None,
+                is_archived: false,
+                is_favorite: false,
+                sort_order: None,
+            },
+            UploadedFile {
+                id: "2".to_string(),
+                name: "image(1).png".to_string(),
+                path: PathBuf::from("/tmp/image(1).png"),
+                mime_type: "image/png".to_string(),
+                size: 100,
+                uploaded_at: 0,
+                session_id: None,
+                message_timestamp: None,
+                author: None,
+                is_archived: false,
+                is_favorite: false,
+                sort_order: None,
+            },
+        ];
+        assert_eq!(
+            generate_unique_filename("image.png", &existing_files),
+            "image(2).png"
+        );
+    }
+
+    #[test]
+    fn test_generate_unique_filename_no_extension() {
+        let existing_files = vec![UploadedFile {
+            id: "1".to_string(),
+            name: "README".to_string(),
+            path: PathBuf::from("/tmp/README"),
+            mime_type: "text/plain".to_string(),
+            size: 100,
+            uploaded_at: 0,
+            session_id: None,
+            message_timestamp: None,
+            author: None,
+            is_archived: false,
+            is_favorite: false,
+            sort_order: None,
+        }];
+        assert_eq!(
+            generate_unique_filename("README", &existing_files),
+            "README(1)"
+        );
     }
 }

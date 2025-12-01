@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Stack, Text, ActionIcon, Group, Tooltip, Switch, ScrollArea, Box, Center } from '@mantine/core';
 import { IconPlus, IconFolder, IconTerminal } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
+import { notifications } from '@mantine/notifications';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { FileList } from '../files/FileList';
+import { CopyToWorkspaceModal } from '../files/CopyToWorkspaceModal';
 import { UploadedFile } from '../../types/workspace';
 
 interface WorkspacePanelProps {
@@ -15,7 +18,9 @@ interface WorkspacePanelProps {
 }
 
 export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession, onNewSessionWithFile }: WorkspacePanelProps) {
-  const { workspace, files, toggleFileArchive } = useWorkspace();
+  const { workspace, files, toggleFileArchive, allWorkspaces } = useWorkspace();
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
+  const [fileToCopy, setFileToCopy] = useState<UploadedFile | null>(null);
 
   // Phase 4: No need to manually refresh - event-driven via workspace:update
   // onRefresh prop kept for backward compatibility but not used
@@ -211,6 +216,48 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
     }
   };
 
+  // Handle opening copy to workspace modal
+  const handleOpenCopyModal = (file: UploadedFile) => {
+    setFileToCopy(file);
+    setCopyModalOpen(true);
+  };
+
+  // Handle closing copy to workspace modal
+  const handleCloseCopyModal = () => {
+    setCopyModalOpen(false);
+    setFileToCopy(null);
+  };
+
+  // Handle copying file to another workspace
+  const handleCopyToWorkspace = async (file: UploadedFile, targetWorkspaceId: string) => {
+    if (!workspace) return;
+
+    try {
+      const copiedFile = await invoke<UploadedFile>('copy_file_to_workspace', {
+        sourceWorkspaceId: workspace.id,
+        fileId: file.id,
+        targetWorkspaceId: targetWorkspaceId,
+      });
+
+      const targetWorkspace = allWorkspaces.find((ws) => ws.id === targetWorkspaceId);
+      const targetName = targetWorkspace?.name || 'target workspace';
+
+      notifications.show({
+        title: 'File copied',
+        message: `"${copiedFile.name}" copied to ${targetName}`,
+        color: 'green',
+      });
+    } catch (err) {
+      console.error('Failed to copy file:', err);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to copy file: ${err instanceof Error ? err.message : String(err)}`,
+        color: 'red',
+      });
+      throw err; // Re-throw to let the modal handle loading state
+    }
+  };
+
   // Phase 4: No loading/error states - workspace data comes from event-driven store
 
   // No files state
@@ -353,8 +400,19 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
           onToggleArchive={toggleFileArchive}
           onToggleFavorite={handleToggleFavorite}
           onMoveSortOrder={handleMoveSortOrder}
+          onCopyToWorkspace={handleOpenCopyModal}
         />
       </ScrollArea>
+
+      {/* Copy to Workspace Modal */}
+      <CopyToWorkspaceModal
+        opened={copyModalOpen}
+        onClose={handleCloseCopyModal}
+        file={fileToCopy}
+        currentWorkspaceId={workspace?.id || ''}
+        allWorkspaces={allWorkspaces}
+        onCopy={handleCopyToWorkspace}
+      />
     </Stack>
   );
 }

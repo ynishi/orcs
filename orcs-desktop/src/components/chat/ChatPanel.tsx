@@ -213,6 +213,7 @@ export function ChatPanel({
       thinking_level: 'HIGH',
       google_search: true,
     },
+    sessionScope: 'full',
   });
 
   // Load AutoChat config from backend when tab changes
@@ -429,14 +430,19 @@ export function ChatPanel({
     previousTabId.current = tab.id;
   }, [tab.messages, tab.id]);
 
-  const getThreadAsText = useCallback((): string => {
-    return tab.messages
+  const getThreadAsText = useCallback((scope?: 'full' | 'recent'): string => {
+    const effectiveScope = scope || agentConfig.sessionScope || 'full';
+    const messagesToUse = effectiveScope === 'recent'
+      ? tab.messages.slice(-10)  // Recent 10 messages
+      : tab.messages;            // Full session
+
+    return messagesToUse
       .map((msg) => {
         const time = msg.timestamp.toLocaleString();
         return `[${time}] ${msg.author} (${msg.type}):\n${msg.text}\n`;
       })
       .join('\n---\n\n');
-  }, [tab.messages]);
+  }, [tab.messages, agentConfig.sessionScope]);
 
   // Handle generating summary from thread
   const handleGenerateSummary = useCallback(async () => {

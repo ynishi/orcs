@@ -17,12 +17,19 @@ import { IconSettings } from '@tabler/icons-react';
 import type { PersonaBackend, GeminiOptions } from '../../types/agent';
 
 /**
+ * Session Scope - 対象とするメッセージ範囲
+ */
+export type SessionScope = 'full' | 'recent';
+
+/**
  * Agent設定
  */
 export interface AgentConfig {
   backend: PersonaBackend;
   modelName?: string;
   geminiOptions?: GeminiOptions;
+  /** Session scope: 'full' (全メッセージ) or 'recent' (直近10件) */
+  sessionScope?: SessionScope;
 }
 
 /**
@@ -43,7 +50,16 @@ const DEFAULT_CONFIG: AgentConfig = {
     thinking_level: 'HIGH',
     google_search: true,
   },
+  sessionScope: 'full',
 };
+
+/**
+ * Session Scope選択肢
+ */
+const SESSION_SCOPE_OPTIONS = [
+  { value: 'full', label: '📜 Full Session' },
+  { value: 'recent', label: '📝 Recent 10 messages' },
+];
 
 /**
  * Backend別のModel選択肢
@@ -81,9 +97,9 @@ const MODEL_OPTIONS: Record<PersonaBackend, { value: string; label: string }[]> 
  * Thinking Level選択肢
  */
 const THINKING_LEVEL_OPTIONS = [
-  { value: 'LOW', label: '🧠 Low' },
-  { value: 'MEDIUM', label: '🧠🧠 Medium' },
   { value: 'HIGH', label: '🧠🧠🧠 High' },
+  { value: 'MEDIUM', label: '🧠🧠 Medium' },
+  { value: 'LOW', label: '🧠 Low' },
 ];
 
 /**
@@ -94,6 +110,7 @@ function isConfigChanged(config: AgentConfig): boolean {
   if (config.modelName !== DEFAULT_CONFIG.modelName) return true;
   if (config.geminiOptions?.thinking_level !== DEFAULT_CONFIG.geminiOptions?.thinking_level) return true;
   if (config.geminiOptions?.google_search !== DEFAULT_CONFIG.geminiOptions?.google_search) return true;
+  if ((config.sessionScope || 'full') !== DEFAULT_CONFIG.sessionScope) return true;
   return false;
 }
 
@@ -136,6 +153,7 @@ export function AgentConfigSelector({ value, onChange }: AgentConfigSelectorProp
               google_search: true,
             }
           : undefined,
+      sessionScope: value.sessionScope, // Preserve session scope
     });
   };
 
@@ -168,6 +186,16 @@ export function AgentConfigSelector({ value, onChange }: AgentConfigSelectorProp
         ...value.geminiOptions,
         google_search: checked,
       },
+    });
+  };
+
+  // Session Scope変更ハンドラー
+  const handleSessionScopeChange = (scope: string | null) => {
+    if (!scope) return;
+
+    onChange({
+      ...value,
+      sessionScope: scope as 'full' | 'recent',
     });
   };
 
@@ -254,6 +282,21 @@ export function AgentConfigSelector({ value, onChange }: AgentConfigSelectorProp
               />
             </>
           )}
+
+          {/* Session Scope選択 */}
+          <Select
+            label={
+              <Group gap={4}>
+                <Text size="sm" fw={500}>
+                  Session Scope
+                </Text>
+              </Group>
+            }
+            value={value.sessionScope || 'full'}
+            onChange={handleSessionScopeChange}
+            data={SESSION_SCOPE_OPTIONS}
+            size="xs"
+          />
 
           {/* 設定変更の表示 */}
           {isChanged && (

@@ -727,11 +727,71 @@ pub async fn execute_message_as_task(
         None
     };
 
+    // Build thread context from session's Summary and recent messages
+    let thread_context = build_thread_context_for_task(&session);
+
     state
         .task_executor
-        .execute_from_message(session_id, message_content, workspace_root)
+        .execute_from_message_with_context(session_id, message_content, workspace_root, thread_context)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Builds thread context for task execution from session data.
+///
+/// Extracts Summary messages and recent conversation messages to provide
+/// context for the task executor. This helps AI agents understand the
+/// conversation context when executing tasks created via /task command.
+fn build_thread_context_for_task(session: &Session) -> Option<String> {
+    let mut context_parts: Vec<String> = Vec::new();
+
+    // 1. Extract Summary from system_messages (most recent one)
+    let summary = session
+        .system_messages
+        .iter()
+        .filter(|msg| {
+            msg.metadata
+                .system_message_type
+                .as_ref()
+                .is_some_and(|t| t == "Summary")
+        })
+        .last()
+        .map(|msg| msg.content.clone());
+
+    if let Some(summary_content) = summary {
+        context_parts.push(format!("### Thread Summary\n{}", summary_content));
+    }
+
+    // 2. Get recent conversation messages (last 10 user/assistant messages)
+    // persona_histories is HashMap<persona_id, Vec<ConversationMessage>>
+    let recent_messages: Vec<String> = session
+        .persona_histories
+        .iter()
+        .flat_map(|(persona_id, history)| {
+            history.iter().rev().take(5).map(move |msg| {
+                let role_str = match msg.role {
+                    orcs_core::session::MessageRole::User => "User",
+                    orcs_core::session::MessageRole::Assistant => persona_id.as_str(),
+                    orcs_core::session::MessageRole::System => "System",
+                };
+                format!("**{}**: {}", role_str, msg.content.chars().take(500).collect::<String>())
+            })
+        })
+        .take(10)
+        .collect();
+
+    if !recent_messages.is_empty() {
+        context_parts.push(format!(
+            "### Recent Conversation\n{}",
+            recent_messages.join("\n\n")
+        ));
+    }
+
+    if context_parts.is_empty() {
+        None
+    } else {
+        Some(context_parts.join("\n\n"))
+    }
 }
 
 /// Adds a participant to the active session

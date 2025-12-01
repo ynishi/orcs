@@ -140,17 +140,58 @@ impl TaskExecutor {
         message_content: String,
         workspace_root: Option<std::path::PathBuf>,
     ) -> Result<String, OrcsError> {
+        self.execute_from_message_with_context(session_id, message_content, workspace_root, None)
+            .await
+    }
+
+    /// Executes a message content as a task with optional thread context.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The session ID where this task is being executed
+    /// * `message_content` - The message content to execute as a task
+    /// * `workspace_root` - Optional workspace root path where the task should execute
+    /// * `thread_context` - Optional thread context (summary, recent messages) for better task understanding
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(String)` with the execution result summary
+    /// * `Err(OrcsError)` if an error occurs during execution
+    pub async fn execute_from_message_with_context(
+        &self,
+        session_id: String,
+        message_content: String,
+        workspace_root: Option<std::path::PathBuf>,
+        thread_context: Option<String>,
+    ) -> Result<String, OrcsError> {
         tracing::info!("TaskExecutor: Executing task from message with ParallelOrchestrator");
         tracing::debug!(
             "Task content: {}",
             message_content.chars().take(200).collect::<String>()
         );
 
+        if let Some(ref ctx) = thread_context {
+            tracing::info!(
+                "Task has thread context ({} chars)",
+                ctx.len()
+            );
+        }
+
         if let Some(ref root) = workspace_root {
             tracing::info!("Task will execute in workspace: {}", root.display());
         } else {
             tracing::info!("Task will execute without specific workspace root");
         }
+
+        // Build full task content with context if provided
+        let full_message_content = if let Some(ref ctx) = thread_context {
+            format!(
+                "## Thread Context\n{}\n\n## Task\n{}",
+                ctx, message_content
+            )
+        } else {
+            message_content.clone()
+        };
 
         // Create agent with workspace_root and enhanced PATH if provided
         let agent = if let Some(ref workspace) = workspace_root {
@@ -186,7 +227,7 @@ impl TaskExecutor {
             id: task_id.clone(),
             session_id,
             title: fallback_title.clone(), // Temporary title
-            description: message_content.clone(),
+            description: full_message_content.clone(), // Include context in description
             status: TaskStatus::Pending,
             created_at: now.clone(),
             updated_at: now.clone(),
@@ -263,8 +304,8 @@ impl TaskExecutor {
             }
         }
 
-        // Create a blueprint using the message content as the workflow description
-        let blueprint = BlueprintWorkflow::new(message_content.clone());
+        // Create a blueprint using the full message content (with context) as the workflow description
+        let blueprint = BlueprintWorkflow::new(full_message_content.clone());
 
         // Initialize ParallelOrchestrator with workspace-aware internal agents
         // This ensures Strategy generation happens in the correct workspace context

@@ -19,8 +19,8 @@ use orcs_core::config::EnvSettings;
 use orcs_core::persona::{Persona as PersonaDomain, PersonaBackend};
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{
-    AppMode, AutoChatConfig, ConversationMessage, ConversationMode, ErrorSeverity, MessageMetadata,
-    MessageRole, Plan, Session, SystemEventType,
+    AppMode, AutoChatConfig, ContextMode, ConversationMessage, ConversationMode, ErrorSeverity,
+    MessageMetadata, MessageRole, Plan, Session, SystemEventType,
 };
 use orcs_core::user::UserService;
 use serde::{Deserialize, Serialize};
@@ -427,6 +427,8 @@ pub struct InteractionManager {
     prompt_extension: Arc<RwLock<Option<String>>>,
     /// Whether this session is muted (AI won't respond to messages)
     is_muted: Arc<RwLock<bool>>,
+    /// Context mode for AI interactions (Rich = full context, Clean = expertise only)
+    context_mode: Arc<RwLock<ContextMode>>,
 }
 
 impl InteractionManager {
@@ -476,6 +478,7 @@ impl InteractionManager {
             auto_chat_iteration: Arc::new(RwLock::new(None)),
             prompt_extension: Arc::new(RwLock::new(None)),
             is_muted: Arc::new(RwLock::new(false)),
+            context_mode: Arc::new(RwLock::new(ContextMode::default())),
         }
     }
 
@@ -524,6 +527,7 @@ impl InteractionManager {
             auto_chat_iteration: Arc::new(RwLock::new(None)), // Never running when restored from disk
             prompt_extension: Arc::new(RwLock::new(None)),
             is_muted: Arc::new(RwLock::new(data.is_muted)),
+            context_mode: Arc::new(RwLock::new(data.context_mode)),
         }
     }
 
@@ -821,6 +825,7 @@ impl InteractionManager {
             sort_order: None,
             auto_chat_config,
             is_muted,
+            context_mode: self.context_mode.read().await.clone(),
         }
     }
 
@@ -1250,6 +1255,16 @@ impl InteractionManager {
     /// Sets the mute status.
     pub async fn set_mute(&self, muted: bool) {
         *self.is_muted.write().await = muted;
+    }
+
+    /// Gets the current context mode.
+    pub async fn get_context_mode(&self) -> ContextMode {
+        *self.context_mode.read().await
+    }
+
+    /// Sets the context mode.
+    pub async fn set_context_mode(&self, mode: ContextMode) {
+        *self.context_mode.write().await = mode;
     }
 
     /// Handles user input based on the current application mode.

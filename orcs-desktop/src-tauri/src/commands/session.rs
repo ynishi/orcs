@@ -879,6 +879,46 @@ pub async fn get_mute_status(state: State<'_, AppState>) -> Result<bool, String>
     Ok(manager.is_muted().await)
 }
 
+/// Gets the context mode for the active session
+#[tauri::command]
+pub async fn get_context_mode(state: State<'_, AppState>) -> Result<String, String> {
+    let manager = state
+        .session_usecase
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let mode = manager.get_context_mode().await;
+    Ok(match mode {
+        orcs_core::session::ContextMode::Rich => "rich".to_string(),
+        orcs_core::session::ContextMode::Clean => "clean".to_string(),
+    })
+}
+
+/// Sets the context mode for the active session
+#[tauri::command]
+pub async fn set_context_mode(mode: String, state: State<'_, AppState>) -> Result<(), String> {
+    let manager = state
+        .session_usecase
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let context_mode = match mode.as_str() {
+        "rich" => orcs_core::session::ContextMode::Rich,
+        "clean" => orcs_core::session::ContextMode::Clean,
+        _ => return Err(format!("Invalid context mode: {}", mode)),
+    };
+
+    manager.set_context_mode(context_mode).await;
+
+    // Save session
+    let app_mode = state.app_mode.lock().await.clone();
+    let _ = state.session_usecase.save_active_session(app_mode).await;
+
+    Ok(())
+}
+
 /// Sets the execution strategy for the active session
 #[tauri::command]
 pub async fn set_execution_strategy(

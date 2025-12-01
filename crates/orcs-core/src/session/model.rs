@@ -49,6 +49,21 @@ pub enum StopCondition {
     // Future: ConsensusReached - detect when agents reach consensus
 }
 
+/// Context mode for controlling AI context injection.
+///
+/// Controls the amount of system context provided to AI agents:
+/// - Rich: Full context with all system extensions (SlashCommands, TalkStyle, etc.)
+/// - Clean: Minimal context with Expertise only, no system extensions
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, SchemaBridge)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextMode {
+    /// Full context: all system extensions enabled (default)
+    #[default]
+    Rich,
+    /// Clean context: expertise only, no system extensions
+    Clean,
+}
+
 /// Represents a user session in the application's domain layer.
 ///
 /// A session contains:
@@ -163,6 +178,9 @@ pub struct Session {
     /// Whether this session is muted (AI won't respond to messages)
     #[serde(default)]
     pub is_muted: bool,
+    /// Context mode for AI interactions (Rich = full context, Clean = expertise only)
+    #[serde(default)]
+    pub context_mode: ContextMode,
 }
 
 fn default_execution_strategy() -> ExecutionModel {

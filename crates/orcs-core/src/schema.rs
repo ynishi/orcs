@@ -307,6 +307,7 @@ impl From<SessionType> for crate::session::Session {
             sort_order: value.sort_order,
             auto_chat_config: None, // Excluded from SessionType
             is_muted: value.is_muted,
+            context_mode: crate::session::ContextMode::default(), // Default to Rich
         }
     }
 }

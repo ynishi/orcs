@@ -318,20 +318,33 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
               )}
 
               <Group gap="xs" mt={4}>
-                {/* Status Badge for active tasks */}
+                {/* Status Badge */}
+                {task.status === 'Completed' && (
+                  <>
+                    <Badge size="xs" variant="filled" color="green">
+                      ✓ Success
+                    </Badge>
+                    <Text size="xs" c="dimmed">•</Text>
+                  </>
+                )}
+                {task.status === 'Failed' && (
+                  <>
+                    <Badge size="xs" variant="filled" color="red">
+                      ✗ Failed
+                    </Badge>
+                    <Text size="xs" c="dimmed">•</Text>
+                  </>
+                )}
                 {(task.status === 'Pending' || task.status === 'Running') && (
                   <>
                     <Badge
                       size="xs"
                       variant="dot"
-                      color={
-                        task.status === 'Pending' ? 'gray' :
-                        'blue'
-                      }
+                      color={task.status === 'Pending' ? 'gray' : 'blue'}
                     >
                       {task.status}
                     </Badge>
-                    {workspace && <Text size="xs" c="dimmed">•</Text>}
+                    <Text size="xs" c="dimmed">•</Text>
                   </>
                 )}
 
@@ -368,30 +381,49 @@ export function TaskList({ tasks, taskProgress, sessions, workspaces, currentWor
     );
   };
 
-  // Generate preview text for task tooltip
+  // Generate preview text for task tooltip - show execution context content
   const getTaskPreview = (task: Task): string => {
-    const lines: string[] = [];
+    const MAX_PREVIEW_LENGTH = 500;
+    let preview = '';
 
-    if (task.result) {
-      lines.push('📋 Result:');
-      // Show first 500 chars of result
-      const resultPreview = task.result.length > 500
-        ? task.result.slice(0, 500) + '...'
-        : task.result;
-      lines.push(resultPreview);
+    // Show execution context content (the actual results)
+    if (task.executionDetails?.context) {
+      const context = task.executionDetails.context;
+      const keys = Object.keys(context);
+
+      for (const key of keys) {
+        const value = context[key];
+        let content = '';
+
+        if (typeof value === 'string') {
+          content = value;
+        } else {
+          content = JSON.stringify(value, null, 2);
+        }
+
+        // Add key header and content
+        preview += `【${key}】\n${content}\n\n`;
+
+        // Stop if we've reached the limit
+        if (preview.length >= MAX_PREVIEW_LENGTH) {
+          preview = preview.slice(0, MAX_PREVIEW_LENGTH) + '...';
+          break;
+        }
+      }
     }
 
-    if (task.error) {
-      if (lines.length > 0) lines.push('');
-      lines.push('❌ Error:');
-      // Show first 300 chars of error
-      const errorPreview = task.error.length > 300
-        ? task.error.slice(0, 300) + '...'
-        : task.error;
-      lines.push(errorPreview);
+    // Fallback to result/error if no context
+    if (!preview) {
+      if (task.result) {
+        preview = task.result.slice(0, MAX_PREVIEW_LENGTH);
+        if (task.result.length > MAX_PREVIEW_LENGTH) preview += '...';
+      } else if (task.error) {
+        preview = `❌ Error: ${task.error.slice(0, MAX_PREVIEW_LENGTH)}`;
+        if (task.error.length > MAX_PREVIEW_LENGTH) preview += '...';
+      }
     }
 
-    return lines.join('\n') || 'No result available';
+    return preview || 'No result available';
   };
 
   return (

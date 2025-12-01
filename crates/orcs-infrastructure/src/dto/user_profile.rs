@@ -96,17 +96,10 @@ impl version_migrate::FromDomain<UserProfile> for UserProfileV1_1 {
 /// let profile: UserProfile = migrator.load_flat_from("user_profile", toml_value)?;
 /// ```
 pub fn create_user_profile_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-
-    // Register migration path: V1.0 -> V1.1 -> UserProfile
-    let user_profile_path = version_migrate::Migrator::define("user_profile")
-        .from::<UserProfileV1_0>()
-        .step::<UserProfileV1_1>()
-        .into_with_save::<UserProfile>();
-
-    migrator
-        .register(user_profile_path)
-        .expect("Failed to register user_profile migration path");
-
-    migrator
+    version_migrate::migrator!("user_profile" => [
+        UserProfileV1_0,
+        UserProfileV1_1,
+        UserProfile
+    ], save = true)
+    .expect("Failed to create user_profile migrator")
 }

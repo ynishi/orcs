@@ -625,22 +625,15 @@ impl version_migrate::FromDomain<AppState> for AppStateV1_6 {
 /// let state: AppState = migrator.load_flat_from("app_state", toml_value)?;
 /// ```
 pub fn create_app_state_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-
-    // Register migration path: V1.0 -> V1.1 -> V1.2 -> V1.3 -> V1.4 -> V1.5 -> V1.6 -> AppState
-    let app_state_path = version_migrate::Migrator::define("app_state")
-        .from::<AppStateV1_0>()
-        .step::<AppStateV1_1>()
-        .step::<AppStateV1_2>()
-        .step::<AppStateV1_3>()
-        .step::<AppStateV1_4>()
-        .step::<AppStateV1_5>()
-        .step::<AppStateV1_6>()
-        .into_with_save::<AppState>();
-
-    migrator
-        .register(app_state_path)
-        .expect("Failed to register app_state migration path");
-
-    migrator
+    version_migrate::migrator!("app_state" => [
+        AppStateV1_0,
+        AppStateV1_1,
+        AppStateV1_2,
+        AppStateV1_3,
+        AppStateV1_4,
+        AppStateV1_5,
+        AppStateV1_6,
+        AppState
+    ], save = true)
+    .expect("Failed to create app_state migrator")
 }

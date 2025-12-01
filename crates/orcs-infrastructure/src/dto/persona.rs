@@ -476,23 +476,16 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_5_0 {
 /// let personas: Vec<Persona> = migrator.load_vec_from("persona", toml_personas)?;
 /// ```
 pub fn create_persona_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-
-    // Register migration path: V1.0.0 -> V1.1.0 -> V1.2.0 -> V1.3.0 -> V1.4.0 -> V1.5.0 -> Persona
-    let persona_path = version_migrate::Migrator::define("persona")
-        .from::<PersonaConfigV1_0_0>()
-        .step::<PersonaConfigV1_1_0>()
-        .step::<PersonaConfigV1_2_0>()
-        .step::<PersonaConfigV1_3_0>()
-        .step::<PersonaConfigV1_4_0>()
-        .step::<PersonaConfigV1_5_0>()
-        .into_with_save::<Persona>();
-
-    migrator
-        .register(persona_path)
-        .expect("Failed to register persona migration path");
-
-    migrator
+    version_migrate::migrator!("persona" => [
+        PersonaConfigV1_0_0,
+        PersonaConfigV1_1_0,
+        PersonaConfigV1_2_0,
+        PersonaConfigV1_3_0,
+        PersonaConfigV1_4_0,
+        PersonaConfigV1_5_0,
+        Persona
+    ], save = true)
+    .expect("Failed to create persona migrator")
 }
 
 #[cfg(test)]

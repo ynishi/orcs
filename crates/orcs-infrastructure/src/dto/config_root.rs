@@ -532,21 +532,14 @@ impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_3_0 {
 /// let config: RootConfig = migrator.load_flat_from("config_root", toml_value)?;
 /// ```
 pub fn create_config_root_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-
-    // Register migration path: V1.0.0 -> V1.1.0 -> V2.0.0 -> V2.1.0 -> V2.2.0 -> V2.3.0 -> RootConfig
-    let config_path = version_migrate::Migrator::define("config_root")
-        .from::<ConfigRootV1_0_0>()
-        .step::<ConfigRootV1_1_0>()
-        .step::<ConfigRootV2_0_0>()
-        .step::<ConfigRootV2_1_0>()
-        .step::<ConfigRootV2_2_0>()
-        .step::<ConfigRootV2_3_0>()
-        .into_with_save::<RootConfig>();
-
-    migrator
-        .register(config_path)
-        .expect("Failed to register config_root migration path");
-
-    migrator
+    version_migrate::migrator!("config_root" => [
+        ConfigRootV1_0_0,
+        ConfigRootV1_1_0,
+        ConfigRootV2_0_0,
+        ConfigRootV2_1_0,
+        ConfigRootV2_2_0,
+        ConfigRootV2_3_0,
+        RootConfig
+    ], save = true)
+    .expect("Failed to create config_root migrator")
 }

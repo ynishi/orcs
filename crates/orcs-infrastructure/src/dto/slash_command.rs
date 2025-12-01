@@ -146,14 +146,11 @@ impl FromDomain<SlashCommand> for SlashCommandV1_2 {
 
 /// Creates a Migrator for SlashCommand entities.
 pub fn create_slash_command_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-    let path = version_migrate::Migrator::define("slash_command")
-        .from::<SlashCommandV1>()
-        .step::<SlashCommandV1_1>()
-        .step::<SlashCommandV1_2>()
-        .into_with_save::<SlashCommand>();
-    migrator
-        .register(path)
-        .expect("Failed to register slash_command migration path");
-    migrator
+    version_migrate::migrator!("slash_command" => [
+        SlashCommandV1,
+        SlashCommandV1_1,
+        SlashCommandV1_2,
+        SlashCommand
+    ], save = true)
+    .expect("Failed to create slash_command migrator")
 }

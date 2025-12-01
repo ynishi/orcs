@@ -270,6 +270,7 @@ mod tests {
             sort_order: None,
             auto_chat_config: None,
             is_muted: false,
+            context_mode: Default::default(),
         }
     }
 

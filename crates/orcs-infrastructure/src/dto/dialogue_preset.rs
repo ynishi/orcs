@@ -70,12 +70,6 @@ impl FromDomain<DialoguePreset> for DialoguePresetV1_0_0 {
 
 /// Creates a Migrator for DialoguePreset entities.
 pub fn create_dialogue_preset_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-    let path = version_migrate::Migrator::define("dialogue_preset")
-        .from::<DialoguePresetV1_0_0>()
-        .into_with_save::<DialoguePreset>();
-    migrator
-        .register(path)
-        .expect("Failed to register dialogue_preset migration path");
-    migrator
+    version_migrate::migrator!("dialogue_preset" => [DialoguePresetV1_0_0, DialoguePreset], save = true)
+        .expect("Failed to create dialogue_preset migrator")
 }

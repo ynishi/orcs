@@ -531,14 +531,8 @@ impl From<&SessionWorkspace> for SessionWorkspaceV1 {
 ///
 /// - V1.0.0 → TempFile: Converts DTO to domain model (no migration needed yet)
 pub fn create_temp_file_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-    let path = version_migrate::Migrator::define("temp_file")
-        .from::<TempFileV1>()
-        .into::<TempFile>();
-    migrator
-        .register(path)
-        .expect("Failed to register temp_file migration path");
-    migrator
+    version_migrate::migrator!("temp_file" => [TempFileV1, TempFile])
+        .expect("Failed to create temp_file migrator")
 }
 
 /// Creates a Migrator for ProjectContext entities.
@@ -547,14 +541,8 @@ pub fn create_temp_file_migrator() -> version_migrate::Migrator {
 ///
 /// - V1.0.0 → ProjectContext: Converts DTO to domain model (no migration needed yet)
 pub fn create_project_context_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-    let path = version_migrate::Migrator::define("project_context")
-        .from::<ProjectContextV1>()
-        .into::<ProjectContext>();
-    migrator
-        .register(path)
-        .expect("Failed to register project_context migration path");
-    migrator
+    version_migrate::migrator!("project_context" => [ProjectContextV1, ProjectContext])
+        .expect("Failed to create project_context migrator")
 }
 
 /// Creates a Migrator for WorkspaceResources entities.
@@ -563,14 +551,8 @@ pub fn create_project_context_migrator() -> version_migrate::Migrator {
 ///
 /// - V1.0.0 → WorkspaceResources: Converts DTO to domain model (no migration needed yet)
 pub fn create_workspace_resources_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-    let path = version_migrate::Migrator::define("workspace_resources")
-        .from::<WorkspaceResourcesV1>()
-        .into::<WorkspaceResources>();
-    migrator
-        .register(path)
-        .expect("Failed to register workspace_resources migration path");
-    migrator
+    version_migrate::migrator!("workspace_resources" => [WorkspaceResourcesV1, WorkspaceResources])
+        .expect("Failed to create workspace_resources migrator")
 }
 
 /// Creates a Migrator for Workspace entities.
@@ -582,18 +564,14 @@ pub fn create_workspace_resources_migrator() -> version_migrate::Migrator {
 /// - V1.2.0 → V1.3.0: Updated to support UploadedFile V1.4.0 (is_favorite, sort_order)
 /// - V1.3.0 → Workspace: Converts DTO to domain model
 pub fn create_workspace_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-    let path = version_migrate::Migrator::define("workspace")
-        .from::<WorkspaceV1>()
-        .step::<WorkspaceV1_1_0>()
-        .step::<WorkspaceV1_2_0>()
-        .step::<WorkspaceV1_3_0>()
-        .into_with_save::<Workspace>();
-    // into_with_save() で登録
-    migrator
-        .register(path)
-        .expect("Failed to register workspace migration path");
-    migrator
+    version_migrate::migrator!("workspace" => [
+        WorkspaceV1,
+        WorkspaceV1_1_0,
+        WorkspaceV1_2_0,
+        WorkspaceV1_3_0,
+        Workspace
+    ], save = true)
+    .expect("Failed to create workspace migrator")
 }
 
 /// Creates a Migrator for SessionWorkspace entities.
@@ -602,12 +580,6 @@ pub fn create_workspace_migrator() -> version_migrate::Migrator {
 ///
 /// - V1.0.0 → SessionWorkspace: Converts DTO to domain model (no migration needed yet)
 pub fn create_session_workspace_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-    let path = version_migrate::Migrator::define("session_workspace")
-        .from::<SessionWorkspaceV1>()
-        .into::<SessionWorkspace>();
-    migrator
-        .register(path)
-        .expect("Failed to register session_workspace migration path");
-    migrator
+    version_migrate::migrator!("session_workspace" => [SessionWorkspaceV1, SessionWorkspace])
+        .expect("Failed to create session_workspace migrator")
 }

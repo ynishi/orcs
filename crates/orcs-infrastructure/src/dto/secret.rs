@@ -62,15 +62,6 @@ impl version_migrate::FromDomain<SecretConfig> for SecretConfigV1_0_0 {
 
 /// Creates a migrator for secret configuration entities.
 pub fn create_secret_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-
-    let path = version_migrate::Migrator::define("secret")
-        .from::<SecretConfigV1_0_0>()
-        .into_with_save::<SecretConfig>();
-
-    migrator
-        .register(path)
-        .expect("Failed to register secret migration path");
-
-    migrator
+    version_migrate::migrator!("secret" => [SecretConfigV1_0_0, SecretConfig], save = true)
+        .expect("Failed to create secret migrator")
 }

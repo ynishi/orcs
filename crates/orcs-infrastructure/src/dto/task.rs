@@ -344,19 +344,12 @@ impl version_migrate::FromDomain<Task> for TaskV1_1_0 {
 /// let tasks: Vec<Task> = migrator.load_vec_from("task", toml_tasks)?;
 /// ```
 pub fn create_task_migrator() -> version_migrate::Migrator {
-    let mut migrator = version_migrate::Migrator::builder().build();
-
-    // Register migration path: V1.0.0 -> V1.1.0 -> Task
-    let task_path = version_migrate::Migrator::define("task")
-        .from::<TaskV1_0_0>()
-        .step::<TaskV1_1_0>()
-        .into_with_save::<Task>();
-
-    migrator
-        .register(task_path)
-        .expect("Failed to register task migration path");
-
-    migrator
+    version_migrate::migrator!("task" => [
+        TaskV1_0_0,
+        TaskV1_1_0,
+        Task
+    ], save = true)
+    .expect("Failed to create task migrator")
 }
 
 #[cfg(test)]

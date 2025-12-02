@@ -7,6 +7,8 @@ use anyhow::Result;
 use llm_toolkit::ToPrompt;
 use llm_toolkit::agent::Agent;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// Response structure for conversation summary
 #[derive(Debug, Clone, Serialize, Deserialize, ToPrompt)]
@@ -348,6 +350,7 @@ impl SessionSupportAgentService {
     /// * `model_name` - Optional model name override
     /// * `gemini_thinking_level` - Optional Gemini thinking level (LOW/MEDIUM/HIGH)
     /// * `gemini_google_search` - Optional Google Search enablement
+    /// * `cancel_flag` - Optional atomic flag to check for cancellation
     ///
     /// # Returns
     ///
@@ -362,6 +365,7 @@ impl SessionSupportAgentService {
     ///     Some("gemini-3-pro-preview"),
     ///     Some("HIGH"),
     ///     Some(true),
+    ///     None,
     /// ).await?;
     /// ```
     pub async fn generate_summary_with_config(
@@ -370,10 +374,18 @@ impl SessionSupportAgentService {
         model_name: Option<&str>,
         gemini_thinking_level: Option<&str>,
         gemini_google_search: Option<bool>,
+        cancel_flag: Option<Arc<AtomicBool>>,
     ) -> Result<String> {
         use llm_toolkit::agent::Agent;
         use llm_toolkit::prompt::ToPrompt;
         use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
+
+        // Check cancellation before starting
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(Ordering::SeqCst) {
+                return Err(anyhow::anyhow!("Operation cancelled"));
+            }
+        }
 
         // Create typed request
         let request = SummaryGenerationRequest {
@@ -419,6 +431,13 @@ impl SessionSupportAgentService {
             }
         };
 
+        // Check cancellation after LLM execution
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(Ordering::SeqCst) {
+                return Err(anyhow::anyhow!("Operation cancelled"));
+            }
+        }
+
         // Parse JSON response
         let response: SummaryResponse = serde_json::from_str(&response_str)
             .map_err(|e| anyhow::anyhow!("Failed to parse summary response: {}", e))?;
@@ -450,10 +469,18 @@ impl SessionSupportAgentService {
         model_name: Option<&str>,
         gemini_thinking_level: Option<&str>,
         gemini_google_search: Option<bool>,
+        cancel_flag: Option<Arc<AtomicBool>>,
     ) -> Result<String> {
         use llm_toolkit::agent::Agent;
         use llm_toolkit::prompt::ToPrompt;
         use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
+
+        // Check cancellation before starting
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(Ordering::SeqCst) {
+                return Err(anyhow::anyhow!("Operation cancelled"));
+            }
+        }
 
         let request = ActionPlanGenerationRequest {
             conversation: thread_content.to_string(),
@@ -497,6 +524,13 @@ impl SessionSupportAgentService {
             }
         };
 
+        // Check cancellation after LLM execution
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(Ordering::SeqCst) {
+                return Err(anyhow::anyhow!("Operation cancelled"));
+            }
+        }
+
         Ok(markdown)
     }
 
@@ -507,10 +541,18 @@ impl SessionSupportAgentService {
         model_name: Option<&str>,
         gemini_thinking_level: Option<&str>,
         gemini_google_search: Option<bool>,
+        cancel_flag: Option<Arc<AtomicBool>>,
     ) -> Result<String> {
         use llm_toolkit::agent::Agent;
         use llm_toolkit::prompt::ToPrompt;
         use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
+
+        // Check cancellation before starting
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(Ordering::SeqCst) {
+                return Err(anyhow::anyhow!("Operation cancelled"));
+            }
+        }
 
         let request = ExpertiseGenerationRequest {
             conversation: thread_content.to_string(),
@@ -553,6 +595,13 @@ impl SessionSupportAgentService {
             }
         };
 
+        // Check cancellation after LLM execution
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(Ordering::SeqCst) {
+                return Err(anyhow::anyhow!("Operation cancelled"));
+            }
+        }
+
         Ok(markdown)
     }
 
@@ -565,6 +614,7 @@ impl SessionSupportAgentService {
     /// * `model_name` - Optional model name override
     /// * `gemini_thinking_level` - Optional Gemini thinking level (LOW/MEDIUM/HIGH)
     /// * `gemini_google_search` - Optional Google Search enablement
+    /// * `cancel_flag` - Optional atomic flag to check for cancellation
     ///
     /// # Returns
     ///
@@ -579,6 +629,7 @@ impl SessionSupportAgentService {
     ///     Some("gemini-3-pro-preview"),
     ///     Some("HIGH"),
     ///     Some(true),
+    ///     None,
     /// ).await?;
     /// ```
     pub async fn generate_concept_issue_with_config(
@@ -587,10 +638,18 @@ impl SessionSupportAgentService {
         model_name: Option<&str>,
         gemini_thinking_level: Option<&str>,
         gemini_google_search: Option<bool>,
+        cancel_flag: Option<Arc<AtomicBool>>,
     ) -> Result<String> {
         use llm_toolkit::agent::Agent;
         use llm_toolkit::prompt::ToPrompt;
         use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
+
+        // Check cancellation before starting
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(Ordering::SeqCst) {
+                return Err(anyhow::anyhow!("Operation cancelled"));
+            }
+        }
 
         let request = ConceptIssueGenerationRequest {
             conversation: thread_content.to_string(),
@@ -632,6 +691,13 @@ impl SessionSupportAgentService {
                 ));
             }
         };
+
+        // Check cancellation after LLM execution
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(Ordering::SeqCst) {
+                return Err(anyhow::anyhow!("Operation cancelled"));
+            }
+        }
 
         Ok(markdown)
     }

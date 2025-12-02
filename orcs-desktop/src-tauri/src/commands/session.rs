@@ -1478,7 +1478,7 @@ pub async fn generate_summary(
     thread_content: String,
     session_id: String,
     agent_config: Option<AgentConfig>,
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
@@ -1502,6 +1502,7 @@ pub async fn generate_summary(
                 .gemini_options
                 .as_ref()
                 .and_then(|opts| opts.google_search),
+            Some(state.cancel_flag.clone()),
         )
         .await
         .map_err(|e| format!("Failed to generate summary: {}", e))?
@@ -1525,7 +1526,7 @@ pub async fn generate_action_plan(
     thread_content: String,
     session_id: String,
     agent_config: Option<AgentConfig>,
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
@@ -1549,6 +1550,7 @@ pub async fn generate_action_plan(
                 .gemini_options
                 .as_ref()
                 .and_then(|opts| opts.google_search),
+            Some(state.cancel_flag.clone()),
         )
         .await
         .map_err(|e| format!("Failed to generate action plan: {}", e))?
@@ -1572,7 +1574,7 @@ pub async fn generate_expertise(
     thread_content: String,
     session_id: String,
     agent_config: Option<AgentConfig>,
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
@@ -1596,6 +1598,7 @@ pub async fn generate_expertise(
                 .gemini_options
                 .as_ref()
                 .and_then(|opts| opts.google_search),
+            Some(state.cancel_flag.clone()),
         )
         .await
         .map_err(|e| format!("Failed to generate expertise: {}", e))?
@@ -1619,7 +1622,7 @@ pub async fn generate_concept_issue(
     thread_content: String,
     session_id: String,
     agent_config: Option<AgentConfig>,
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
 ) -> Result<String, String> {
     use orcs_application::SessionSupportAgentService;
 
@@ -1643,6 +1646,7 @@ pub async fn generate_concept_issue(
                 .gemini_options
                 .as_ref()
                 .and_then(|opts| opts.google_search),
+            Some(state.cancel_flag.clone()),
         )
         .await
         .map_err(|e| format!("Failed to generate concept/design issue: {}", e))?

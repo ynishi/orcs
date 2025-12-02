@@ -1659,3 +1659,27 @@ pub async fn generate_concept_issue(
 
     Ok(concept_issue)
 }
+
+// ============================================================================
+// Operation Cancellation
+// ============================================================================
+
+/// Cancels the currently running operation.
+#[tauri::command]
+pub async fn cancel_current_operation(state: State<'_, AppState>) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+
+    tracing::info!("[Cancel] Cancelling current operation");
+    state.cancel_flag.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+/// Resets the cancellation flag.
+#[tauri::command]
+pub async fn reset_cancel_flag(state: State<'_, AppState>) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+
+    tracing::debug!("[Cancel] Resetting cancel flag");
+    state.cancel_flag.store(false, Ordering::SeqCst);
+    Ok(())
+}

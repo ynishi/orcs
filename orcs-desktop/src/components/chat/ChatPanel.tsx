@@ -391,6 +391,9 @@ export function ChatPanel({
     try {
       const { invoke } = await import('@tauri-apps/api/core');
 
+      // Reset cancel flag before starting
+      await invoke('reset_cancel_flag');
+
       // Start AutoChat (this is a long-running operation)
       // Backend will emit dialogue-turn events with AutoChat progress
       await invoke('start_auto_chat', {
@@ -450,12 +453,39 @@ export function ChatPanel({
       .join('\n---\n\n');
   }, [tab.messages, agentConfig.sessionScope]);
 
+  // Handle cancelling current operation
+  const handleCancelOperation = useCallback(async () => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('cancel_current_operation');
+
+      notifications.show({
+        title: 'Operation Cancelled',
+        message: 'The current operation has been cancelled.',
+        color: 'orange',
+      });
+
+      // Clear thinking state
+      setTabThinking(tab.id, false);
+    } catch (error) {
+      console.error('[ChatPanel] Failed to cancel operation:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to cancel operation',
+        color: 'red',
+      });
+    }
+  }, [tab.id, setTabThinking]);
+
   // Handle generating summary from thread
   const handleGenerateSummary = useCallback(async () => {
     const threadContent = getThreadAsText();
 
     try {
       const { invoke } = await import('@tauri-apps/api/core');
+
+      // Reset cancel flag before starting
+      await invoke('reset_cancel_flag');
 
       // Persist system message for Summary generation request
       await invoke('append_system_messages', {
@@ -540,6 +570,9 @@ export function ChatPanel({
     try {
       const { invoke } = await import('@tauri-apps/api/core');
 
+      // Reset cancel flag before starting
+      await invoke('reset_cancel_flag');
+
       // Persist system message for ActionPlan generation request
       await invoke('append_system_messages', {
         messages: [
@@ -623,6 +656,9 @@ export function ChatPanel({
     try {
       const { invoke } = await import('@tauri-apps/api/core');
 
+      // Reset cancel flag before starting
+      await invoke('reset_cancel_flag');
+
       // Persist system message for Expertise generation request
       await invoke('append_system_messages', {
         messages: [
@@ -705,6 +741,9 @@ export function ChatPanel({
 
     try {
       const { invoke } = await import('@tauri-apps/api/core');
+
+      // Reset cancel flag before starting
+      await invoke('reset_cancel_flag');
 
       // Persist system message for Concept/Design Issue generation request
       await invoke('append_system_messages', {
@@ -881,7 +920,7 @@ export function ChatPanel({
               </Box>
             )}
             {tab.isAiThinking && activeParticipantIds.length > 0 && !isMuted && (
-              <ThinkingIndicator personaName={tab.thinkingPersona} />
+              <ThinkingIndicator personaName={tab.thinkingPersona} onCancel={handleCancelOperation} />
             )}
           </Stack>
         </ScrollArea>

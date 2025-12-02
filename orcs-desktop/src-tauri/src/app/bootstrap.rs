@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use anyhow::{Result, anyhow};
 use orcs_application::session::{SessionMetadataService, SessionUpdater};
@@ -336,6 +337,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         task_repository,
         task_repository_concrete,
         task_executor,
+        cancel_flag: Arc::new(AtomicBool::new(false)),
     };
 
     AppBootstrap { app_state }

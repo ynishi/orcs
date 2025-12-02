@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use orcs_application::session::SessionMetadataService;
@@ -35,4 +36,5 @@ pub struct AppState {
     pub task_repository: Arc<dyn TaskRepository>,
     pub task_repository_concrete: Arc<AsyncDirTaskRepository>,
     pub task_executor: Arc<TaskExecutor>,
+    pub cancel_flag: Arc<AtomicBool>,
 }

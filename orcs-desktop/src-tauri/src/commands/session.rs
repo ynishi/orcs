@@ -1444,7 +1444,7 @@ pub async fn start_auto_chat(
             if let Err(e) = app_clone.emit("dialogue-turn", streaming_turn) {
                 eprintln!("[TAURI] Failed to emit dialogue-turn event: {}", e);
             }
-        })
+        }, Some(state.cancel_flag.clone()))
         .await;
 
     // Emit AutoChat completion event

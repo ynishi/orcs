@@ -1634,6 +1634,7 @@ impl InteractionManager {
     /// * `initial_input` - The user's initial input to start the auto-chat
     /// * `file_paths` - Optional list of file paths to attach (only for initial input)
     /// * `on_turn` - Callback function called for each dialogue turn as it becomes available
+    /// * `cancel_flag` - Optional atomic flag to check for cancellation
     ///
     /// # Returns
     ///
@@ -1643,12 +1644,13 @@ impl InteractionManager {
     ///
     /// - Iteration 1: Uses `initial_input` from the user
     /// - Iteration 2+: Uses empty string (agents continue discussion based on context)
-    /// - Stops when: max_iterations reached OR user calls stop (via set_auto_chat_iteration(None))
+    /// - Stops when: max_iterations reached OR user calls stop (via set_auto_chat_iteration(None)) OR cancel_flag is set
     pub async fn execute_auto_chat<F>(
         &self,
         initial_input: &str,
         file_paths: Option<Vec<String>>,
         on_turn: F,
+        cancel_flag: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     ) -> InteractionResult
     where
         F: Fn(&DialogueMessage),
@@ -1677,6 +1679,14 @@ impl InteractionManager {
         let mut last_result = InteractionResult::NoOp;
 
         while current_iteration < config.max_iterations {
+            // Check cancellation flag
+            if let Some(ref flag) = cancel_flag {
+                if flag.load(std::sync::atomic::Ordering::SeqCst) {
+                    tracing::info!("[AutoChat] Cancelled by user");
+                    break;
+                }
+            }
+
             // Check if user manually stopped (set_auto_chat_iteration(None))
             if self.get_auto_chat_iteration().await.is_none() {
                 tracing::info!("[AutoChat] Manually stopped by user");

@@ -244,7 +244,6 @@ function App() {
     setTabThinking,
     getActiveTab,
     getTab: _getTab,
-    getVisibleTabs,
     getTabBySessionId,
   } = useTabContext();
 
@@ -2274,8 +2273,30 @@ function App() {
             )}
           </Box>
           ) : (() => {
-            // 現在のWorkspaceのタブのみを表示
-            const visibleTabs = workspace ? getVisibleTabs(workspace.id) : [];
+            // 全タブを表示（現在WSを先頭に、WSごとにグループ化）
+            const currentWsId = workspace?.id;
+            const sortedTabs = [...tabs].sort((a, b) => {
+              const aIsCurrent = a.workspaceId === currentWsId;
+              const bIsCurrent = b.workspaceId === currentWsId;
+              // 現在WSを先頭に
+              if (aIsCurrent && !bIsCurrent) return -1;
+              if (!aIsCurrent && bIsCurrent) return 1;
+              // 同じWSならlastAccessedAt順
+              if (a.workspaceId === b.workspaceId) {
+                return b.lastAccessedAt - a.lastAccessedAt;
+              }
+              // 違うWSならWS IDでグループ化（安定ソート）
+              return a.workspaceId.localeCompare(b.workspaceId);
+            });
+
+            // Workspace名取得用ヘルパー
+            const getWorkspaceName = (wsId: string): string => {
+              return allWorkspaces.find(w => w.id === wsId)?.name || 'Unknown';
+            };
+            const getWorkspaceBadge = (wsId: string): string => {
+              const name = getWorkspaceName(wsId);
+              return name.slice(0, 3).toUpperCase();
+            };
             
             return (
               <Tabs
@@ -2319,19 +2340,35 @@ function App() {
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
               >
                 <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {visibleTabs.map((tab) => (
-                    <Tabs.Tab
+                  {sortedTabs.map((tab) => {
+                    const isOtherWorkspace = tab.workspaceId !== currentWsId;
+                    const wsName = getWorkspaceName(tab.workspaceId);
+                    const wsBadge = getWorkspaceBadge(tab.workspaceId);
+
+                    return (
+                    <Tooltip
                       key={tab.id}
+                      label={`${wsName} / ${tab.title}`}
+                      withArrow
+                      position="bottom"
+                    >
+                    <Tabs.Tab
                       value={tab.id}
                       data-tab-id={tab.id}
                       style={{
-                        minWidth: '120px',
-                        maxWidth: '200px',
+                        minWidth: isOtherWorkspace ? '150px' : '120px',
+                        maxWidth: '220px',
                         flexShrink: 0,
                       }}
-                      leftSection={tab.isDirty ? '●' : undefined}
+                      leftSection={
+                        isOtherWorkspace ? (
+                          <Badge size="xs" variant="light" color="gray" style={{ minWidth: '35px', padding: '2px 5px', fontSize: '9px', textAlign: 'center' }}>
+                            {wsBadge}
+                          </Badge>
+                        ) : tab.isDirty ? '●' : undefined
+                      }
                         rightSection={
-                          visibleTabs.length > 1 ? (
+                          sortedTabs.length > 1 ? (
                             <Box
                               component="span"
                               style={{
@@ -2420,7 +2457,9 @@ function App() {
                         {tab.title}
                       </Text>
                     </Tabs.Tab>
-                  ))}
+                    </Tooltip>
+                    );
+                  })}
 
                   {/* 新規セッション追加ボタン */}
                   <Tooltip label="New Session" withArrow>
@@ -2438,7 +2477,7 @@ function App() {
                   </Tooltip>
                 </Tabs.List>
 
-                {visibleTabs.map((tab) => (
+                {sortedTabs.map((tab) => (
                   <Tabs.Panel key={tab.id} value={tab.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <ChatPanel
                       tab={tab}

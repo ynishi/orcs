@@ -30,6 +30,7 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
   const [runningCommand, setRunningCommand] = useState<SlashCommand | null>(null);
   const [runArgs, setRunArgs] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [deletingCommand, setDeletingCommand] = useState<string | null>(null);
 
   // Fetch slash commands from backend
   const fetchCommands = async () => {
@@ -76,20 +77,31 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
     }
   };
 
-  // Handler for deleting a command
-  const handleDeleteCommand = async (name: string) => {
-    if (!window.confirm(`Are you sure you want to delete the command "/${name}"?`)) {
-      return;
-    }
+  // Handler for initiating delete confirmation
+  const handleRequestDelete = (name: string) => {
+    setDeletingCommand(name);
+  };
+
+  // Handler for confirming deletion
+  const handleConfirmDelete = async () => {
+    if (!deletingCommand) return;
+
+    const nameToDelete = deletingCommand;
+    setDeletingCommand(null);
 
     try {
-      await invoke('remove_slash_command', { name });
+      await invoke('remove_slash_command', { name: nameToDelete });
       await fetchCommands();
-      onMessage?.('system', 'SYSTEM', `Deleted slash command: /${name}`);
+      onMessage?.('system', 'SYSTEM', `Deleted slash command: /${nameToDelete}`);
     } catch (error) {
       console.error('Failed to delete slash command:', error);
       onMessage?.('error', 'SYSTEM', `Failed to delete command: ${error}`);
     }
+  };
+
+  // Handler for cancelling deletion
+  const handleCancelDelete = () => {
+    setDeletingCommand(null);
   };
 
   const handleRunCommand = (command: SlashCommand) => {
@@ -188,7 +200,7 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDeleteCommand(command.name);
+                handleRequestDelete(command.name);
               }}
             >
               <IconTrash size={14} />
@@ -310,6 +322,32 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
               }
             >
               Run Command
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Delete confirmation modal */}
+      <Modal
+        opened={!!deletingCommand}
+        onClose={handleCancelDelete}
+        title="Delete Command"
+        centered
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Are you sure you want to delete the command "/{deletingCommand}"?
+          </Text>
+          <Text size="xs" c="dimmed">
+            This action cannot be undone.
+          </Text>
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={handleCancelDelete}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleConfirmDelete}>
+              Delete
             </Button>
           </Group>
         </Stack>

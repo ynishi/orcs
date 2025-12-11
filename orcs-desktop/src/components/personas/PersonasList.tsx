@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip, Select, Badge } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip, Select, Badge, Modal, Button } from '@mantine/core';
 import { IconPlus, IconPencil, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
@@ -61,6 +61,7 @@ export function PersonasList({
   const [selectedStrategy, setSelectedStrategy] = useState<string>('default');
   const [selectedConversationMode, setSelectedConversationMode] = useState<string>('normal');
   const [selectedTalkStyle, setSelectedTalkStyle] = useState<string | null>(null);
+  const [deletingPersonaId, setDeletingPersonaId] = useState<string | null>(null);
 
   const handleStrategyChange = (value: string | null) => {
     const strategy = value || 'broadcast';
@@ -239,14 +240,25 @@ export function PersonasList({
     handleCloseModal();
   };
 
-  // Handler for deleting a persona
-  const handleDeletePersona = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this persona?')) {
-      return;
-    }
+  // Handler for initiating delete confirmation
+  const handleRequestDelete = (id: string) => {
+    setDeletingPersonaId(id);
+  };
 
-    const updatedConfigs = personas.filter(p => p.id !== id);
+  // Handler for confirming deletion
+  const handleConfirmDelete = async () => {
+    if (!deletingPersonaId) return;
+
+    const idToDelete = deletingPersonaId;
+    setDeletingPersonaId(null);
+
+    const updatedConfigs = personas.filter(p => p.id !== idToDelete);
     await saveAndReload(updatedConfigs);
+  };
+
+  // Handler for cancelling deletion
+  const handleCancelDelete = () => {
+    setDeletingPersonaId(null);
   };
 
   const renderPersona = (persona: PersonaConfig) => {
@@ -357,7 +369,7 @@ export function PersonasList({
               variant="subtle"
               color="red"
               size="sm"
-              onClick={() => handleDeletePersona(persona.id)}
+              onClick={() => handleRequestDelete(persona.id)}
             >
               <IconTrash size={14} />
             </ActionIcon>
@@ -485,6 +497,32 @@ export function PersonasList({
         persona={editingPersona}
         onSave={handleSavePersona}
       />
+
+      {/* Delete confirmation modal */}
+      <Modal
+        opened={!!deletingPersonaId}
+        onClose={handleCancelDelete}
+        title="Delete Persona"
+        centered
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Are you sure you want to delete this persona?
+          </Text>
+          <Text size="xs" c="dimmed">
+            This action cannot be undone.
+          </Text>
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={handleCancelDelete}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }

@@ -8,6 +8,8 @@ import {
   Stack,
   Tooltip,
   ScrollArea,
+  Modal,
+  Button,
 } from '@mantine/core';
 import {
   IconFolder,
@@ -44,6 +46,7 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
   const { workspace, allWorkspaces, switchWorkspace, toggleFavorite } = useWorkspace();
   const { refreshSessions } = useSession();
   const [isOpen, setIsOpen] = useState(false);
+  const [deletingWorkspace, setDeletingWorkspace] = useState<{ id: string; name: string } | null>(null);
 
   const handleSwitch = async (targetWorkspaceId: string) => {
     console.log('[Workspace] handleSwitch called:', {
@@ -141,12 +144,18 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
     }
   };
 
-  const handleDeleteWorkspace = async (workspaceId: string, workspaceName: string, e: React.MouseEvent) => {
+  // Handler for initiating delete confirmation
+  const handleRequestDelete = (workspaceId: string, workspaceName: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    setDeletingWorkspace({ id: workspaceId, name: workspaceName });
+  };
 
-    if (!confirm(`Are you sure you want to delete workspace "${workspaceName}"?\n\nThis will remove the workspace metadata and uploaded files. Your project files will not be affected.`)) {
-      return;
-    }
+  // Handler for confirming deletion
+  const handleConfirmDelete = async () => {
+    if (!deletingWorkspace) return;
+
+    const { id: workspaceId, name: workspaceName } = deletingWorkspace;
+    setDeletingWorkspace(null);
 
     try {
       await invoke('delete_workspace', { workspaceId });
@@ -166,6 +175,11 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
         color: 'red',
       });
     }
+  };
+
+  // Handler for cancelling deletion
+  const handleCancelDelete = () => {
+    setDeletingWorkspace(null);
   };
 
   const formatLastAccessed = (timestamp: number): string => {
@@ -205,7 +219,7 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
               size="xs"
               variant="subtle"
               color="red"
-              onClick={(e) => handleDeleteWorkspace(ws.id, ws.name, e)}
+              onClick={(e) => handleRequestDelete(ws.id, ws.name, e)}
             >
               <IconTrash size={14} />
             </ActionIcon>
@@ -312,6 +326,32 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
           )}
         </ScrollArea.Autosize>
       </Menu.Dropdown>
+
+      {/* Delete confirmation modal */}
+      <Modal
+        opened={!!deletingWorkspace}
+        onClose={handleCancelDelete}
+        title="Delete Workspace"
+        centered
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Are you sure you want to delete workspace "{deletingWorkspace?.name}"?
+          </Text>
+          <Text size="xs" c="dimmed">
+            This will remove the workspace metadata and uploaded files. Your project files will not be affected.
+          </Text>
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={handleCancelDelete}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Menu>
   );
 }

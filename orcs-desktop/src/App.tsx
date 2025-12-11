@@ -15,6 +15,8 @@ import {
   Loader,
   ActionIcon,
   Tooltip,
+  Modal,
+  Button,
 } from "@mantine/core";
 import { IconPlus } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
@@ -65,6 +67,7 @@ function App() {
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
+  const [closingTabId, setClosingTabId] = useState<string | null>(null);
 
   // Task Store
   const {
@@ -289,9 +292,7 @@ function App() {
         const activeTab = tabs.find(t => t.id === activeTabId);
         if (activeTab) {
           if (activeTab.isDirty) {
-            if (window.confirm(`"${activeTab.title}" has unsaved changes. Close anyway?`)) {
-              void closeTab(activeTabId); // Phase 2: closeTab is now async
-            }
+            setClosingTabId(activeTabId);
           } else {
             void closeTab(activeTabId); // Phase 2: closeTab is now async
           }
@@ -327,6 +328,46 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [tabs, activeTabId, switchToTab, closeTab]);
+
+  // Handler for confirming tab close
+  const handleConfirmCloseTab = async () => {
+    if (!closingTabId) return;
+
+    const tabId = closingTabId;
+    setClosingTabId(null);
+
+    // 1. 閉じるタブの情報を取得
+    const closingTab = tabs.find(t => t.id === tabId);
+    if (!closingTab) return;
+
+    // 2. ActiveSessionのタブを閉じる場合
+    const isClosingActiveSession = closingTab.sessionId === currentSessionId;
+
+    // 3. ActiveSessionだった場合、次のSessionを選択
+    if (isClosingActiveSession && workspace) {
+      // 4a. 現在のWorkspace内の残りSession取得
+      const remainingSessions = sessions.filter(
+        s => s.workspaceId === workspace.id && s.id !== closingTab.sessionId
+      );
+
+      if (remainingSessions.length > 0) {
+        // 4b. 更新日時が直近のSessionを選択
+        const sortedSessions = [...remainingSessions].sort(
+          (a, b) => b.updatedAt - a.updatedAt
+        );
+        const nextSession = sortedSessions[0];
+        await switchSession(nextSession.id);
+      }
+    }
+
+    // 5. タブを閉じる
+    await closeTab(tabId);
+  };
+
+  // Handler for cancelling tab close
+  const handleCancelCloseTab = () => {
+    setClosingTabId(null);
+  };
 
   const activeTabScrollKey = useMemo(() => {
     const activeTab = tabs.find(t => t.id === activeTabId);
@@ -2395,9 +2436,8 @@ function App() {
 
                                 // 未保存の場合は確認
                                 if (tab.isDirty) {
-                                  if (!window.confirm(`"${tab.title}" has unsaved changes. Close anyway?`)) {
-                                    return;
-                                  }
+                                  setClosingTabId(tab.id);
+                                  return;
                                 }
 
                                 // 1. 閉じるタブの情報を取得
@@ -2540,6 +2580,32 @@ function App() {
           </Stack>
         </Container>
       </AppShell.Main>
+
+      {/* Close tab confirmation modal */}
+      <Modal
+        opened={!!closingTabId}
+        onClose={handleCancelCloseTab}
+        title="Close Tab"
+        centered
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            "{tabs.find(t => t.id === closingTabId)?.title}" has unsaved changes. Close anyway?
+          </Text>
+          <Text size="xs" c="dimmed">
+            Any unsaved changes will be lost.
+          </Text>
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={handleCancelCloseTab}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleConfirmCloseTab}>
+              Close
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </AppShell>
   );
 }

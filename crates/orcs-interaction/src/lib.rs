@@ -916,7 +916,15 @@ impl InteractionManager {
 
         // Lock the dialogue and add participant
         let mut dialogue_guard = self.dialogue.lock().await;
-        let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
+        let dialogue = match dialogue_guard.as_mut() {
+            Some(d) => d,
+            None => {
+                return Err(
+                    "Dialogue was invalidated during initialization (possible race condition)"
+                        .to_string(),
+                )
+            }
+        };
         let agent = agent_for_persona(
             &persona_config,
             self.agent_workspace_root.clone(),
@@ -986,7 +994,15 @@ impl InteractionManager {
 
         // Lock the dialogue and remove participant
         let mut dialogue_guard = self.dialogue.lock().await;
-        let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
+        let dialogue = match dialogue_guard.as_mut() {
+            Some(d) => d,
+            None => {
+                return Err(
+                    "Dialogue was invalidated during initialization (possible race condition)"
+                        .to_string(),
+                )
+            }
+        };
         dialogue
             .remove_participant(&persona.name)
             .map_err(|e| e.to_string())?;
@@ -1058,7 +1074,15 @@ impl InteractionManager {
         self.ensure_dialogue_initialized().await?;
 
         let dialogue_guard = self.dialogue.lock().await;
-        let dialogue = dialogue_guard.as_ref().expect("Dialogue not initialized");
+        let dialogue = match dialogue_guard.as_ref() {
+            Some(d) => d,
+            None => {
+                return Err(
+                    "Dialogue was invalidated during initialization (possible race condition)"
+                        .to_string(),
+                )
+            }
+        };
 
         // Convert participant names to persona UUIDs
         let mut participant_ids = Vec::new();
@@ -1354,7 +1378,16 @@ impl InteractionManager {
 
         // Run the dialogue with system speaker
         let mut dialogue_guard = self.dialogue.lock().await;
-        let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
+        let dialogue = match dialogue_guard.as_mut() {
+            Some(d) => d,
+            None => {
+                drop(dialogue_guard);
+                return InteractionResult::NewMessage(
+                    "Error: Dialogue was invalidated during initialization (possible race condition)"
+                        .to_string(),
+                );
+            }
+        };
 
         let speaker = Speaker::System;
         let mut payload = Payload::new().with_message(speaker, message);
@@ -1508,7 +1541,16 @@ impl InteractionManager {
 
         // Run the dialogue with the user's input using partial_session for streaming
         let mut dialogue_guard = self.dialogue.lock().await;
-        let dialogue = dialogue_guard.as_mut().expect("Dialogue not initialized");
+        let dialogue = match dialogue_guard.as_mut() {
+            Some(d) => d,
+            None => {
+                drop(dialogue_guard);
+                return InteractionResult::NewMessage(
+                    "Error: Dialogue was invalidated during initialization (possible race condition)"
+                        .to_string(),
+                );
+            }
+        };
 
         // Note: Dialogue/Persona agents handle speaker attribution internally
         let mut payload = Payload::new().with_message(speaker, input);

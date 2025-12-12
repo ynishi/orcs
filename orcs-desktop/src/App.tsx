@@ -353,7 +353,7 @@ function App() {
       if (remainingSessions.length > 0) {
         // 4b. 更新日時が直近のSessionを選択
         const sortedSessions = [...remainingSessions].sort(
-          (a, b) => b.updatedAt - a.updatedAt
+          (a, b) => b.updatedAt.localeCompare(a.updatedAt)
         );
         const nextSession = sortedSessions[0];
         await switchSession(nextSession.id);

@@ -2314,20 +2314,16 @@ function App() {
             )}
           </Box>
           ) : (() => {
-            // 全タブを表示（現在WSを先頭に、WSごとにグループ化）
+            // 全タブを表示（現在WSを末尾に、orderで並べる）
             const currentWsId = workspace?.id;
             const sortedTabs = [...tabs].sort((a, b) => {
               const aIsCurrent = a.workspaceId === currentWsId;
               const bIsCurrent = b.workspaceId === currentWsId;
-              // 現在WSを先頭に
-              if (aIsCurrent && !bIsCurrent) return -1;
-              if (!aIsCurrent && bIsCurrent) return 1;
-              // 同じWSならlastAccessedAt順
-              if (a.workspaceId === b.workspaceId) {
-                return b.lastAccessedAt - a.lastAccessedAt;
-              }
-              // 違うWSならWS IDでグループ化（安定ソート）
-              return a.workspaceId.localeCompare(b.workspaceId);
+              // 現在WSを末尾に（右端に配置）
+              if (aIsCurrent && !bIsCurrent) return 1;
+              if (!aIsCurrent && bIsCurrent) return -1;
+              // それ以外はorderフィールドで並べる（ドラッグ&ドロップの順序を保持）
+              return a.order - b.order;
             });
 
             // Workspace名取得用ヘルパー

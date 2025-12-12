@@ -55,6 +55,7 @@ export interface SessionTab {
   sessionId: string; // 対応するセッションID
   workspaceId: string; // このタブが属するWorkspace ID
   lastAccessedAt: number; // 最終アクセス時刻
+  order: number; // タブの表示順序
 
   // From Session (joined by sessionId)
   title: string; // タブタイトル
@@ -184,6 +185,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
         sessionId: openTab.sessionId,
         workspaceId: openTab.workspaceId,
         lastAccessedAt: openTab.lastAccessedAt,
+        order: openTab.order,
 
         // From Session (joined by sessionId)
         title: session?.title ?? 'Unknown Session',

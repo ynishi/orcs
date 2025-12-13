@@ -4,7 +4,7 @@
 CARGO := cargo
 
 # Phony targets are not files. This prevents conflicts with files of the same name.
-.PHONY: all build run check test fmt clippy clean schema-generate dev tauri release-patch install-cli
+.PHONY: all build run check test fmt clippy clean schema-generate dev tauri release-patch install-cli preflight
 
 # The default target executed when you run `make`.
 all: build
@@ -60,6 +60,43 @@ release-patch:
 install-cli:
 	$(CARGO) install --path crates/orcs-cli
 
+# Run preflight checks before release.
+preflight:
+	@echo "🚀 Running preflight checks..."
+	@echo ""
+	@echo "📋 Step 1/7: Rust format check..."
+	$(CARGO) fmt --all --check
+	@echo "✅ Format check passed"
+	@echo ""
+	@echo "📋 Step 2/7: Rust clippy..."
+	$(CARGO) clippy --all -- -D warnings
+	@echo "✅ Clippy passed"
+	@echo ""
+	@echo "📋 Step 3/7: Rust check..."
+	$(CARGO) check
+	@echo "✅ Check passed"
+	@echo ""
+	@echo "📋 Step 4/7: Rust tests..."
+	$(CARGO) test
+	@echo "✅ Rust tests passed"
+	@echo ""
+	@echo "📋 Step 5/7: TypeScript type check..."
+	cd orcs-desktop && npx tsc --noEmit
+	@echo "✅ TypeScript type check passed"
+	@echo ""
+	@echo "📋 Step 6/7: TypeScript tests..."
+	cd orcs-desktop && npm run test:run
+	@echo "✅ TypeScript tests passed"
+	@echo ""
+	@echo "📋 Step 7/7: Schema generation check..."
+	@if git diff --quiet crates/orcs-interaction/src/lib.rs orcs-desktop/src/bindings/generated.ts; then \
+		echo "✅ Schema is up to date"; \
+	else \
+		echo "⚠️  Warning: Schema may be out of sync. Run 'make schema-generate' if needed."; \
+	fi
+	@echo ""
+	@echo "✨ All preflight checks passed! Ready for release."
+
 help:
 	@echo "Available commands:"
 	@echo "  make all             - Build the project (default)"
@@ -75,5 +112,6 @@ help:
 	@echo "  make schema-generate - Generate TypeScript types from Rust schemas"
 	@echo "  make dev             - Run Tauri app in development mode"
 	@echo "  make tauri           - Build Tauri desktop application"
+	@echo "  make preflight       - Run all checks before release (format, lint, test, types)"
 	@echo "  make release-patch   - Bump patch version, commit, tag, and push (no publish)"
 	@echo "  make install-cli     - Install orcs-cli binary to the system"

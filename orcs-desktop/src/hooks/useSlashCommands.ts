@@ -802,7 +802,7 @@ Generate the BlueprintWorkflow now.`;
                 worktree_path: result.worktree_path,
                 original_branch: result.original_branch,
                 sandbox_branch: result.sandbox_branch,
-                sandbox_root: sandboxRoot,
+                sandbox_root: sandboxRoot ?? null,
               };
               onSandboxEntered?.(sandboxState);
 

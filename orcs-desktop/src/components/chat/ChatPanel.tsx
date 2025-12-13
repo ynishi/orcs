@@ -97,6 +97,7 @@ interface MessageListProps {
   onExecuteAsTask: (message: Message) => Promise<void>;
   onCreateSlashCommand: (message: Message) => void;
   onCreatePersona: (message: Message) => void;
+  onRedo: (message: Message) => void;
   workspaceRootPath?: string;
 }
 
@@ -107,6 +108,7 @@ const MessageList = memo(
     onExecuteAsTask,
     onCreateSlashCommand,
     onCreatePersona,
+    onRedo,
     workspaceRootPath,
   }: MessageListProps) => (
     <>
@@ -118,6 +120,7 @@ const MessageList = memo(
           onExecuteAsTask={onExecuteAsTask}
           onCreateSlashCommand={onCreateSlashCommand}
           onCreatePersona={onCreatePersona}
+          onRedo={onRedo}
           workspaceRootPath={workspaceRootPath}
         />
       ))}
@@ -137,7 +140,8 @@ function onSaveExecHandlersEqual(
     prev.onSaveMessageToWorkspace === next.onSaveMessageToWorkspace &&
     prev.onExecuteAsTask === next.onExecuteAsTask &&
     prev.onCreateSlashCommand === next.onCreateSlashCommand &&
-    prev.onCreatePersona === next.onCreatePersona
+    prev.onCreatePersona === next.onCreatePersona &&
+    prev.onRedo === next.onRedo
   );
 }
 
@@ -852,6 +856,11 @@ export function ChatPanel({
     setSlashCommandModalOpened(true);
   }, []);
 
+  // Handle redoing a message (re-send the message text)
+  const handleRedo = useCallback((message: Message) => {
+    onInputChange(message.text);
+  }, [onInputChange]);
+
   // Handle saving the new slash command
   const handleSaveSlashCommand = async (command: SlashCommand) => {
     try {
@@ -913,6 +922,7 @@ export function ChatPanel({
                 onExecuteAsTask={onExecuteAsTask}
                 onCreateSlashCommand={handleCreateSlashCommand}
                 onCreatePersona={handleCreatePersona}
+                onRedo={handleRedo}
                 workspaceRootPath={workspace?.rootPath}
               />
             ) : (

@@ -14,7 +14,7 @@ pub trait SearchService: Send + Sync {
     /// # Arguments
     /// * `query` - The search query string
     /// * `scope` - The scope in which to search (workspace, local, global)
-    /// * `workspace_path` - Path to the current workspace (required for workspace/local scopes)
+    /// * `workspace_paths` - Paths to search within (e.g., project root and workspace storage)
     /// * `filters` - Optional filters to refine search results
     ///
     /// # Returns
@@ -23,7 +23,7 @@ pub trait SearchService: Send + Sync {
         &self,
         query: &str,
         scope: SearchScope,
-        workspace_path: Option<PathBuf>,
+        workspace_paths: Vec<PathBuf>,
         filters: Option<SearchFilters>,
     ) -> Result<SearchResult>;
 }

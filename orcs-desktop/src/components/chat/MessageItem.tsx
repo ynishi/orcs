@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor, Image, Stack, Collapse, Code } from '@mantine/core';
-import { IconDeviceFloppy, IconRocket, IconCommand, IconUser, IconCheck, IconClipboard, IconChevronDown, IconChevronUp, IconBug } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRocket, IconCommand, IconUser, IconCheck, IconClipboard, IconChevronDown, IconChevronUp, IconBug, IconRefresh } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Message, getMessageStyle } from '../../types/message';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
@@ -12,6 +12,7 @@ interface MessageItemProps {
   onExecuteAsTask?: (message: Message) => Promise<void>;
   onCreateSlashCommand?: (message: Message) => void;
   onCreatePersona?: (message: Message) => void;
+  onRedo?: (message: Message) => void;
   workspaceRootPath?: string;
 }
 
@@ -155,7 +156,7 @@ function formatModelName(modelName: string | null | undefined): string | null {
   return modelName.slice(0, 20);
 }
 
-export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCreateSlashCommand, onCreatePersona, workspaceRootPath }: MessageItemProps) {
+export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCreateSlashCommand, onCreatePersona, onRedo, workspaceRootPath }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -391,6 +392,19 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
                       size="sm"
                     >
                       <IconUser size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+
+                {onRedo && message.type === 'command' && (
+                  <Tooltip label="Redo" withArrow>
+                    <ActionIcon
+                      color="orange"
+                      variant="subtle"
+                      onClick={() => onRedo(message)}
+                      size="sm"
+                    >
+                      <IconRefresh size={16} />
                     </ActionIcon>
                   </Tooltip>
                 )}

@@ -17,17 +17,98 @@ impl RipgrepSearchService {
         Self
     }
 
+    /// Searches for files by filename matching the query.
+    fn search_by_filename(
+        &self,
+        query: &str,
+        search_paths: &[PathBuf],
+        filters: &Option<SearchFilters>,
+    ) -> Result<Vec<SearchResultItem>> {
+        if search_paths.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut cmd = Command::new("rg");
+
+        // Set enhanced PATH
+        let enhanced_path = build_enhanced_path(&search_paths[0], None);
+        cmd.env("PATH", enhanced_path);
+
+        // List files only
+        cmd.arg("--files");
+
+        // Apply file type filters if provided
+        if let Some(f) = filters {
+            if let Some(ref types) = f.file_types {
+                for t in types {
+                    cmd.arg("--type").arg(t);
+                }
+            }
+
+            if let Some(ref excludes) = f.exclude_paths {
+                for exclude in excludes {
+                    cmd.arg("--glob").arg(format!("!{}", exclude));
+                }
+            }
+        }
+
+        // Add all search paths
+        for path in search_paths {
+            cmd.arg(path);
+        }
+
+        tracing::debug!("Executing ripgrep --files command: {:?}", cmd);
+
+        // Execute command
+        let output = cmd
+            .output()
+            .map_err(|e| OrcsError::io(format!("Failed to execute ripgrep --files: {}", e)))?;
+
+        // Parse output and filter by query
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let query_lower = query.to_lowercase();
+        let mut items = Vec::new();
+
+        for line in stdout.lines() {
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            // Check if filename contains the query (case-insensitive)
+            let path_str = line.to_string();
+            if let Some(file_name) = std::path::Path::new(&path_str).file_name() {
+                let file_name_str = file_name.to_string_lossy().to_string();
+                if file_name_str.to_lowercase().contains(&query_lower) {
+                    items.push(SearchResultItem {
+                        path: path_str,
+                        line_number: None,
+                        content: format!("[Filename match: {}]", file_name_str),
+                        context_before: None,
+                        context_after: None,
+                    });
+                }
+            }
+        }
+
+        Ok(items)
+    }
+
     /// Executes ripgrep command with the given parameters.
     fn execute_ripgrep(
         &self,
         query: &str,
-        search_path: &PathBuf,
+        search_paths: &[PathBuf],
         filters: &Option<SearchFilters>,
     ) -> Result<Vec<SearchResultItem>> {
+        if search_paths.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut cmd = Command::new("rg");
 
         // Set enhanced PATH to find ripgrep in system and workspace-specific locations
-        let enhanced_path = build_enhanced_path(search_path, None);
+        // Use first path for PATH enhancement
+        let enhanced_path = build_enhanced_path(&search_paths[0], None);
         cmd.env("PATH", enhanced_path);
 
         // Basic flags
@@ -65,9 +146,13 @@ impl RipgrepSearchService {
             }
         }
 
-        // Add query and search path
+        // Add query
         cmd.arg(query);
-        cmd.arg(search_path);
+
+        // Add all search paths
+        for path in search_paths {
+            cmd.arg(path);
+        }
 
         tracing::debug!("Executing ripgrep command: {:?}", cmd);
 
@@ -125,28 +210,46 @@ impl SearchService for RipgrepSearchService {
         &self,
         query: &str,
         scope: SearchScope,
-        workspace_path: Option<PathBuf>,
+        workspace_paths: Vec<PathBuf>,
         filters: Option<SearchFilters>,
     ) -> Result<SearchResult> {
         match scope {
             SearchScope::Workspace => {
                 // Search in current workspace
-                let path = workspace_path.ok_or_else(|| {
-                    OrcsError::internal("Workspace path required for workspace search")
-                })?;
+                if workspace_paths.is_empty() {
+                    return Err(OrcsError::internal(
+                        "Workspace paths required for workspace search",
+                    ));
+                }
 
-                let items = self.execute_ripgrep(query, &path, &filters)?;
-                Ok(SearchResult::new(query.to_string(), scope, items))
+                // Search both file contents and filenames
+                let content_items = self.execute_ripgrep(query, &workspace_paths, &filters)?;
+                let filename_items = self.search_by_filename(query, &workspace_paths, &filters)?;
+
+                // Merge results (filename matches first, then content matches)
+                let mut all_items = filename_items;
+                all_items.extend(content_items);
+
+                Ok(SearchResult::new(query.to_string(), scope, all_items))
             }
             SearchScope::Local => {
                 // TODO: Implement cross-workspace search
                 // For now, just search in current workspace
-                let path = workspace_path.ok_or_else(|| {
-                    OrcsError::internal("Workspace path required for local search")
-                })?;
+                if workspace_paths.is_empty() {
+                    return Err(OrcsError::internal(
+                        "Workspace paths required for local search",
+                    ));
+                }
 
-                let items = self.execute_ripgrep(query, &path, &filters)?;
-                Ok(SearchResult::new(query.to_string(), scope, items))
+                // Search both file contents and filenames
+                let content_items = self.execute_ripgrep(query, &workspace_paths, &filters)?;
+                let filename_items = self.search_by_filename(query, &workspace_paths, &filters)?;
+
+                // Merge results (filename matches first, then content matches)
+                let mut all_items = filename_items;
+                all_items.extend(content_items);
+
+                Ok(SearchResult::new(query.to_string(), scope, all_items))
             }
             SearchScope::Global => {
                 // Web search not implemented in ripgrep service

@@ -42,8 +42,8 @@ pub async fn execute_search(
     tracing::info!("execute_search: Query: {}", request.query);
     tracing::info!("execute_search: Scope: {:?}", request.scope);
 
-    // Get workspace path from active session
-    let workspace_path = if request.scope != SearchScope::Global {
+    // Get workspace paths from active session
+    let workspace_paths = if request.scope != SearchScope::Global {
         let session_mgr = state
             .session_usecase
             .active_session()
@@ -64,12 +64,13 @@ pub async fn execute_search(
                 .map_err(|e| e.to_string())?
                 .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
 
-            Some(workspace.root_path)
+            // Search both the project root path and the workspace storage directory
+            vec![workspace.root_path, workspace.workspace_dir]
         } else {
-            None
+            vec![]
         }
     } else {
-        None
+        vec![]
     };
 
     // Execute search using RipgrepSearchService
@@ -78,7 +79,7 @@ pub async fn execute_search(
         .search(
             &request.query,
             request.scope,
-            workspace_path,
+            workspace_paths,
             request.filters,
         )
         .await

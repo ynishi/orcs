@@ -17,7 +17,6 @@ export interface PersonaStore {
 
   // Actions
   loadPersonas: () => Promise<void>;
-  savePersonaConfigs: (configs: PersonaConfig[]) => Promise<void>;
   addPersona: (persona: PersonaConfig) => Promise<void>;
   updatePersona: (persona: PersonaConfig) => Promise<void>;
   deletePersona: (personaId: string) => Promise<void>;
@@ -55,49 +54,57 @@ export const usePersonaStore = create<PersonaStore>((set, get) => ({
     }
   },
 
-  savePersonaConfigs: async (configs: PersonaConfig[]) => {
-    console.log('[PersonaStore] Saving persona configs:', configs.length);
-
-    try {
-      await invoke('save_persona_configs', { configs });
-
-      // Update local state
-      set({ personas: configs });
-
-      console.log('[PersonaStore] Persona configs saved successfully');
-    } catch (error) {
-      console.error('[PersonaStore] Failed to save persona configs:', error);
-      throw error;
-    }
-  },
-
   addPersona: async (persona: PersonaConfig) => {
     console.log('[PersonaStore] Adding persona:', persona.id);
 
-    const currentPersonas = get().personas;
-    const updatedPersonas = [...currentPersonas, persona];
+    try {
+      await invoke('save_persona', { persona });
 
-    await get().savePersonaConfigs(updatedPersonas);
+      set(state => ({
+        personas: [...state.personas.filter(p => p.id !== persona.id), persona],
+      }));
+
+      console.log('[PersonaStore] Persona added successfully');
+    } catch (error) {
+      console.error('[PersonaStore] Failed to add persona:', error);
+      throw error;
+    }
   },
 
   updatePersona: async (persona: PersonaConfig) => {
     console.log('[PersonaStore] Updating persona:', persona.id);
 
-    const currentPersonas = get().personas;
-    const updatedPersonas = currentPersonas.map(p =>
-      p.id === persona.id ? persona : p
-    );
+    try {
+      await invoke('save_persona', { persona });
 
-    await get().savePersonaConfigs(updatedPersonas);
+      set(state => ({
+        personas: state.personas.map(p =>
+          p.id === persona.id ? persona : p
+        ),
+      }));
+
+      console.log('[PersonaStore] Persona updated successfully');
+    } catch (error) {
+      console.error('[PersonaStore] Failed to update persona:', error);
+      throw error;
+    }
   },
 
   deletePersona: async (personaId: string) => {
     console.log('[PersonaStore] Deleting persona:', personaId);
 
-    const currentPersonas = get().personas;
-    const updatedPersonas = currentPersonas.filter(p => p.id !== personaId);
+    try {
+      await invoke('delete_persona', { personaId });
 
-    await get().savePersonaConfigs(updatedPersonas);
+      set(state => ({
+        personas: state.personas.filter(p => p.id !== personaId),
+      }));
+
+      console.log('[PersonaStore] Persona deleted successfully');
+    } catch (error) {
+      console.error('[PersonaStore] Failed to delete persona:', error);
+      throw error;
+    }
   },
 
   saveAdhocPersona: async (personaId: string) => {

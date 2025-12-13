@@ -65,9 +65,8 @@ impl StateRepositoryImpl {
 
         // Ensure parent directory exists
         if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                OrcsError::io(format!("Failed to create parent directory: {}", e))
-            })?;
+            fs::create_dir_all(parent)
+                .map_err(|e| OrcsError::io(format!("Failed to create parent directory: {}", e)))?;
         }
 
         // Setup migrator
@@ -413,8 +412,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_and_get_last_selected_workspace() {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let service = AppStateService::with_base_dir(Some(temp_dir.path()))
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let service = AppStateService::with_base_dir(Some(temp_file.path()))
             .await
             .unwrap();
         service
@@ -427,8 +426,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_clear_last_selected_workspace() {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let service = AppStateService::with_base_dir(Some(temp_dir.path()))
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let service = AppStateService::with_base_dir(Some(temp_file.path()))
             .await
             .unwrap();
         service

@@ -1173,6 +1173,9 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let root_path = temp_dir.path().join("workspaces");
         let repo_path = temp_dir.path().join("test-repo");
+        // Create root_path before passing to FileSystemWorkspaceManager
+        // so that OrcsPaths::get_path() can detect it as an existing directory
+        fs::create_dir_all(&root_path).await.unwrap();
         fs::create_dir_all(&repo_path).await.unwrap();
 
         let manager = FileSystemWorkspaceManager::new(Some(&root_path))

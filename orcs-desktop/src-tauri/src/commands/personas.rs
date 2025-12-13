@@ -138,25 +138,6 @@ pub async fn delete_persona(persona_id: String, state: State<'_, AppState>) -> R
     Ok(())
 }
 
-/// Saves persona configurations (bulk save)
-#[tauri::command]
-pub async fn save_persona_configs(
-    configs: Vec<Persona>,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .persona_repository
-        .save_all(&configs)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if let Some(manager) = state.session_usecase.active_session().await {
-        manager.invalidate_dialogue().await;
-    }
-
-    Ok(())
-}
-
 /// Gets all available persona backend options
 #[tauri::command]
 pub async fn get_persona_backend_options() -> Result<Vec<(String, String)>, String> {

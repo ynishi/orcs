@@ -161,66 +161,9 @@ impl SessionRepository for AsyncDirSessionRepository {
 mod tests {
     use super::*;
     use llm_toolkit::agent::dialogue::ExecutionModel;
-    use orcs_core::persona::{Persona, PersonaBackend, PersonaRepository, PersonaSource};
     use orcs_core::session::{AppMode, ConversationMessage, MessageMetadata, MessageRole};
     use std::collections::HashMap;
-    use std::sync::Mutex;
     use tempfile::TempDir;
-
-    // Mock PersonaRepository for testing
-    struct MockPersonaRepository {
-        personas: Mutex<Vec<Persona>>,
-    }
-
-    impl MockPersonaRepository {
-        fn new() -> Self {
-            Self {
-                personas: Mutex::new(vec![Persona {
-                    id: "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c".to_string(),
-                    name: "Mai".to_string(),
-                    role: "Engineer".to_string(),
-                    background: "".to_string(),
-                    communication_style: "".to_string(),
-                    default_participant: true,
-                    source: PersonaSource::System,
-                    backend: PersonaBackend::ClaudeCli,
-                    model_name: None,
-                    icon: None,
-                    base_color: None,
-                    gemini_options: None,
-                }]),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl PersonaRepository for MockPersonaRepository {
-        async fn find_by_id(&self, persona_id: &str) -> Result<Option<Persona>> {
-            Ok(self
-                .personas
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|p| p.id == persona_id)
-                .cloned())
-        }
-
-        async fn save(&self, _persona: &Persona) -> Result<()> {
-            Ok(())
-        }
-
-        async fn delete(&self, _persona_id: &str) -> Result<()> {
-            Ok(())
-        }
-
-        async fn get_all(&self) -> Result<Vec<Persona>> {
-            Ok(self.personas.lock().unwrap().clone())
-        }
-
-        async fn save_all(&self, _configs: &[Persona]) -> Result<()> {
-            Ok(())
-        }
-    }
 
     fn create_test_session(id: &str) -> Session {
         let mut persona_histories = HashMap::new();

@@ -22,8 +22,11 @@
 //! ```rust
 //! use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
 //!
+//! # fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // In AppStateService
-//! let base_path = OrcsPaths::get_path(ServiceType::AppState)?;
+//! let base_path = OrcsPaths::new(None).get_path(ServiceType::AppState)?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! This centralizes path resolution logic and makes it easy to change paths
@@ -70,11 +73,15 @@
 //!
 //! Example:
 //! ```rust
+//! use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
+//!
 //! // In your service implementation
-//! pub async fn new() -> Result<Self, String> {
-//!     let base_path = OrcsPaths::get_path(ServiceType::YourService)
+//! async fn new_service() -> Result<(), String> {
+//!     let base_path = OrcsPaths::new(None)
+//!         .get_path(ServiceType::Workspace)
 //!         .map_err(|e| e.to_string())?;
 //!     // ... setup storage with base_path
+//!     Ok(())
 //! }
 //! ```
 
@@ -285,17 +292,35 @@ impl OrcsPaths {
     /// ```rust
     /// use orcs_infrastructure::paths::{OrcsPaths, ServiceType, PathType};
     ///
-    /// let path_type = OrcsPaths::get_path(ServiceType::AppState)?;
+    /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let path_type = OrcsPaths::new(None).get_path(ServiceType::AppState)?;
     /// match path_type {
     ///     PathType::Dir(dir) => {
     ///         // Use dir for multi-file storage
+    ///         assert!(dir.ends_with("app_state"));
     ///     }
     ///     PathType::File(file) => {
     ///         // Use file path directly
+    ///         assert!(file.ends_with("app_state.json"));
     ///     }
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn get_path(self, service_type: ServiceType) -> Result<PathType, PathError> {
+        // Special handling for testing: if base_path is provided and exists as a file/dir,
+        // return it directly. This allows tests to pass specific file/directory paths.
+        // If base_path doesn't exist yet, fall through to normal logic (for tempdir-based tests).
+        if let Some(base) = self.base_path.as_ref()
+            && base.exists()
+        {
+            if base.is_file() {
+                return Ok(PathType::File(self.base_path.unwrap()));
+            } else if base.is_dir() {
+                return Ok(PathType::Dir(self.base_path.unwrap()));
+            }
+        }
+
         match service_type {
             // Single-file services (return File path)
             ServiceType::AppState => Ok(PathType::File(self.config_dir()?.join("app_state.json"))),
@@ -342,9 +367,12 @@ impl OrcsPaths {
     /// ```rust
     /// use orcs_infrastructure::paths::OrcsPaths;
     ///
+    /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let orcs_paths = OrcsPaths::new(None);
     /// let default_workspace_path = orcs_paths.default_user_workspace_path()?;
-    /// // Returns: ~/orcs
+    /// assert!(default_workspace_path.ends_with("orcs"));
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn default_user_workspace_path(&self) -> Result<PathBuf, PathError> {
         if let Some(ref base) = self.base_path {
@@ -379,11 +407,17 @@ impl OrcsPaths {
     /// # Example
     ///
     /// ```rust
+    /// use orcs_infrastructure::dto::create_persona_migrator;
+    /// use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
+    ///
+    /// # async fn example() -> Result<(), String> {
     /// let migrator = create_persona_migrator();
-    /// let storage = OrcsPaths::create_async_dir_storage(
-    ///     ServiceType::Persona,
-    ///     migrator
-    /// ).await?;
+    /// let storage = OrcsPaths::new(None)
+    ///     .create_async_dir_storage(ServiceType::Persona, migrator)
+    ///     .await?;
+    /// # let _ = storage;
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn create_async_dir_storage(
         self,

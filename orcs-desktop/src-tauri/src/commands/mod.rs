@@ -33,7 +33,6 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         personas::get_personas,
         personas::save_persona,
         personas::delete_persona,
-        personas::save_persona_configs,
         personas::get_persona_backend_options,
         personas::create_persona,
         dialogue_presets::get_dialogue_presets,

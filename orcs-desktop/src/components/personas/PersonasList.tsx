@@ -48,7 +48,7 @@ export function PersonasList({
   onRefreshSessions,
 }: PersonasListProps) {
   // Use personaStore for save operations
-  const { savePersonaConfigs, saveAdhocPersona } = usePersonaStore();
+  const { addPersona, updatePersona, deletePersona, saveAdhocPersona } = usePersonaStore();
 
   // Use props if provided, otherwise maintain local state for backwards compatibility
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfig[]>([]);
@@ -198,10 +198,13 @@ export function PersonasList({
   };
 
   // Helper function to save and reload
-  const saveAndReload = async (updatedConfigs: PersonaConfig[]) => {
+  const saveAndReload = async (
+    operation: () => Promise<void>,
+    updatedConfigs: PersonaConfig[]
+  ) => {
     try {
-      // Use personaStore to save
-      await savePersonaConfigs(updatedConfigs);
+      await operation();
+      setPersonaConfigs(updatedConfigs);
 
       // personaStore automatically updates its state, so onRefresh is optional now
       // Keep onRefresh call for any additional UI updates if needed
@@ -231,12 +234,13 @@ export function PersonasList({
       // Update existing persona
       updatedConfigs = [...personas];
       updatedConfigs[existingIndex] = personaToSave;
+      await saveAndReload(() => updatePersona(personaToSave), updatedConfigs);
     } else {
       // Add new persona
       updatedConfigs = [...personas, personaToSave];
+      await saveAndReload(() => addPersona(personaToSave), updatedConfigs);
     }
 
-    await saveAndReload(updatedConfigs);
     handleCloseModal();
   };
 
@@ -253,7 +257,7 @@ export function PersonasList({
     setDeletingPersonaId(null);
 
     const updatedConfigs = personas.filter(p => p.id !== idToDelete);
-    await saveAndReload(updatedConfigs);
+    await saveAndReload(() => deletePersona(idToDelete), updatedConfigs);
   };
 
   // Handler for cancelling deletion

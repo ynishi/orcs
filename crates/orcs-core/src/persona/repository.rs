@@ -64,11 +64,12 @@ pub trait PersonaRepository: Send + Sync {
     /// - `Err(OrcsError)`: Error if retrieval fails
     async fn get_all(&self) -> Result<Vec<Persona>>;
 
-    /// Saves all personas to storage, replacing existing ones.
+    /// Saves all provided personas to storage.
     ///
     /// # Arguments
     ///
-    /// * `personas` - The personas to save
+    /// * `personas` - The personas to save or update. Use
+    ///   [`PersonaRepository::delete`] to remove personas that should no longer exist.
     ///
     /// # Returns
     ///

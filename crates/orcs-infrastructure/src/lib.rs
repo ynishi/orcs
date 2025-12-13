@@ -11,7 +11,10 @@
 //! use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
 //!
 //! // In your service implementation
-//! let base_path = OrcsPaths::get_path(ServiceType::AppState)?;
+//! # fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let base_path = OrcsPaths::new(None).get_path(ServiceType::AppState)?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! This approach ensures:

@@ -203,9 +203,15 @@ impl SessionUseCase {
     /// # Example
     ///
     /// ```no_run
-    /// let (workspace, session) = session_usecase
+    /// # use std::path::Path;
+    /// # use orcs_application::session_usecase::SessionUseCase;
+    /// # use anyhow::Result;
+    /// # async fn example(session_usecase: &SessionUseCase) -> Result<()> {
+    /// let (_workspace, _session) = session_usecase
     ///     .create_workspace_with_session(Path::new("/path/to/project"))
     ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn create_workspace_with_session(
         &self,

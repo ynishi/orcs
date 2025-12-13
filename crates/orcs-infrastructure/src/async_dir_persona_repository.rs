@@ -102,19 +102,9 @@ impl PersonaRepository for AsyncDirPersonaRepository {
     }
 
     async fn save_all(&self, personas: &[Persona]) -> Result<()> {
-        let existing = self.storage.load_all::<Persona>(Self::ENTITY_NAME).await?;
-
-        let existing_ids: std::collections::HashSet<String> =
-            existing.iter().map(|(id, _)| id.clone()).collect();
-        let new_ids: std::collections::HashSet<String> =
-            personas.iter().map(|p| p.id.clone()).collect();
-
-        // Delete orphaned personas (exist in storage but not in new list)
-        for orphaned_id in existing_ids.difference(&new_ids) {
-            self.storage.delete(orphaned_id).await?;
-        }
-
-        // Save each persona individually (1 persona = 1 file)
+        // Save each persona individually (1 persona = 1 file).
+        // Deletions must be handled explicitly via `delete` to avoid losing
+        // personas when callers only save a subset (e.g. incremental updates).
         for persona in personas {
             self.storage
                 .save(Self::ENTITY_NAME, &persona.id, persona)
@@ -212,6 +202,53 @@ mod tests {
         let names: Vec<String> = personas.iter().map(|p| p.name.clone()).collect();
         assert!(names.contains(&"Persona 1".to_string()));
         assert!(names.contains(&"Persona 2".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_save_all_preserves_existing_personas() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = AsyncDirPersonaRepository::new(Some(temp_dir.path()))
+            .await
+            .unwrap();
+
+        let persona1 = Persona {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: "Existing".to_string(),
+            role: "Role".to_string(),
+            background: "Background".to_string(),
+            communication_style: "Style".to_string(),
+            default_participant: true,
+            source: PersonaSource::System,
+            backend: PersonaBackend::ClaudeCli,
+            model_name: None,
+            icon: None,
+            base_color: None,
+            gemini_options: None,
+        };
+
+        let persona2 = Persona {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: "New".to_string(),
+            role: "Role".to_string(),
+            background: "Background".to_string(),
+            communication_style: "Style".to_string(),
+            default_participant: false,
+            source: PersonaSource::User,
+            backend: PersonaBackend::GeminiCli,
+            model_name: None,
+            icon: None,
+            base_color: None,
+            gemini_options: None,
+        };
+
+        repo.save_all(&[persona1.clone()]).await.unwrap();
+        repo.save_all(&[persona2.clone()]).await.unwrap();
+
+        let personas = repo.get_all().await.unwrap();
+        let names: Vec<String> = personas.iter().map(|p| p.name.clone()).collect();
+        assert_eq!(personas.len(), 2);
+        assert!(names.contains(&"Existing".to_string()));
+        assert!(names.contains(&"New".to_string()));
     }
 
     #[tokio::test]

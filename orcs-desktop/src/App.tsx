@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { check as checkForUpdates } from "@tauri-apps/plugin-updater";
 import { notifications } from '@mantine/notifications';
 import {
   Stack,
@@ -181,6 +182,28 @@ function App() {
       console.error('[App] Failed to load personas:', error);
     });
   }, [loadPersonas]);
+
+  // Check for app updates on startup
+  useEffect(() => {
+    const checkForAppUpdates = async () => {
+      try {
+        console.log('[App] Checking for updates...');
+        const update = await checkForUpdates();
+        if (update) {
+          console.log('[App] Update available:', update.version);
+          // The built-in dialog will handle user interaction when dialog: true is set in tauri.conf.json
+          // The updater will automatically prompt, download, and install if user accepts
+        } else {
+          console.log('[App] No updates available');
+        }
+      } catch (error) {
+        // Silently fail - don't interrupt app startup for update check failures
+        console.error('[App] Failed to check for updates:', error);
+      }
+    };
+
+    checkForAppUpdates();
+  }, []);
 
   // Restore last selected workspace on app startup (Phase 3)
   useEffect(() => {

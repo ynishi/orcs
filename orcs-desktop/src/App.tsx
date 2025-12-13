@@ -2089,13 +2089,14 @@ function App() {
 
   const handleSessionDelete = async (sessionId: string) => {
     try {
-      await deleteSession(sessionId);
-
-      // タブも閉じる
+      // タブを先に閉じる（Session削除前にタブを閉じることで"Unknown Session"表示を防ぐ）
       const tab = tabs.find(t => t.sessionId === sessionId);
       if (tab) {
         await closeTab(tab.id);
       }
+
+      // Sessionを削除
+      await deleteSession(sessionId);
 
       // Show toast notification
       notifications.show({

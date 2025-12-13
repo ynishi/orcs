@@ -404,7 +404,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_last_selected_workspace_default() {
-        let service = AppStateService::new().await.unwrap();
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let service = AppStateService::with_base_dir(Some(temp_file.path()))
+            .await
+            .unwrap();
         let workspace_id = service.get_last_selected_workspace().await;
         // Default should be None
         assert!(workspace_id.is_none());

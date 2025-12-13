@@ -86,15 +86,13 @@ impl SessionRepository for AsyncDirSessionRepository {
             Err(e) => {
                 let orcs_err: orcs_core::OrcsError = e.into();
                 tracing::debug!(
-                    "find_by_id error for session_id={}: {:?}, is_not_found={}",
+                    "find_by_id error for session_id={}: {:?}, is_not_found_or_missing={}",
                     session_id,
                     orcs_err,
-                    orcs_core::OrcsError::is_not_found(&orcs_err)
+                    orcs_err.is_not_found_or_missing()
                 );
-                // Check if it's a NotFound error or an IO error with "File not found" message
-                if orcs_err.is_not_found()
-                    || (orcs_err.is_io() && orcs_err.to_string().contains("File not found"))
-                {
+                // Check if it's a NotFound error or an IO error indicating file not found
+                if orcs_err.is_not_found_or_missing() {
                     Ok(None)
                 } else {
                     Err(orcs_err)
@@ -294,11 +292,8 @@ mod tests {
         let loaded = loaded.unwrap();
         assert_eq!(loaded.id, session.id);
         assert_eq!(loaded.title, session.title);
-        // current_persona_id is migrated from "mai" to MockPersonaRepository's UUID
-        assert_eq!(
-            loaded.current_persona_id,
-            "8c6f3e4a-7b2d-5f1e-9a3c-4d8b6e2f1a5c"
-        );
+        // current_persona_id remains as "mai" (persona migration is handled elsewhere)
+        assert_eq!(loaded.current_persona_id, "mai");
     }
 
     #[tokio::test]

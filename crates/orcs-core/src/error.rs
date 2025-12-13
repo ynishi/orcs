@@ -119,6 +119,25 @@ impl OrcsError {
     pub fn is_config(&self) -> bool {
         matches!(self, Self::Config(_))
     }
+
+    /// Check if this error indicates a file/entity was not found.
+    ///
+    /// Returns true for:
+    /// - `NotFound` errors
+    /// - `Io` errors with "File not found" or "not found" in the message
+    ///
+    /// This helper centralizes the logic for detecting "not found" conditions
+    /// across different error types.
+    pub fn is_not_found_or_missing(&self) -> bool {
+        match self {
+            Self::NotFound { .. } => true,
+            Self::Io { message } => {
+                let lower = message.to_lowercase();
+                lower.contains("file not found") || lower.contains("not found")
+            }
+            _ => false,
+        }
+    }
 }
 
 // ============================================================================

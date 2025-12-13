@@ -61,8 +61,8 @@ impl TaskRepository for AsyncDirTaskRepository {
         match self.storage.load::<Task>(Self::ENTITY_NAME, task_id).await {
             Ok(task) => Ok(Some(task)),
             Err(e) => {
-                let orcs_err = e.into();
-                if orcs_core::OrcsError::is_not_found(&orcs_err) {
+                let orcs_err: orcs_core::OrcsError = e.into();
+                if orcs_err.is_not_found_or_missing() {
                     Ok(None)
                 } else {
                     Err(orcs_err)

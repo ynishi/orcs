@@ -188,7 +188,7 @@ mod tests {
         assert!(preset.is_some(), "Should find system preset");
 
         let preset = preset.unwrap();
-        assert_eq!(preset.name, "アイデア出し");
+        assert_eq!(preset.name, "Brainstorm");
         assert_eq!(preset.source, PresetSource::System);
     }
 

@@ -295,7 +295,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
     async fn get_workspace(&self, workspace_id: &str) -> Result<Option<Workspace>> {
         match self.load_workspace(workspace_id).await {
             Ok(workspace) => Ok(Some(workspace)),
-            Err(e) if e.is_not_found() => Ok(None),
+            Err(e) if e.is_not_found_or_missing() => Ok(None),
             Err(e) => Err(e),
         }
     }
@@ -1048,7 +1048,10 @@ mod tests {
         let workspace = manager.get_or_create_workspace(&repo_path).await.unwrap();
 
         assert_eq!(workspace.name, "test-repo");
-        assert_eq!(workspace.root_path, repo_path);
+        // Canonicalize paths to handle symlinks (e.g., /var -> /private/var on macOS)
+        let expected_path = repo_path.canonicalize().unwrap();
+        let actual_path = workspace.root_path.canonicalize().unwrap();
+        assert_eq!(actual_path, expected_path);
         assert!(workspace.resources.uploaded_files.is_empty());
         assert!(workspace.resources.temp_files.is_empty());
 

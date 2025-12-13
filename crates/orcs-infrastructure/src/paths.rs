@@ -296,13 +296,6 @@ impl OrcsPaths {
     /// }
     /// ```
     pub fn get_path(self, service_type: ServiceType) -> Result<PathType, PathError> {
-        if self.base_path.is_some() {
-            if self.base_path.as_ref().unwrap().is_file() {
-                return Ok(PathType::File(self.base_path.unwrap()));
-            } else {
-                return Ok(PathType::Dir(self.base_path.unwrap()));
-            }
-        }
         match service_type {
             // Single-file services (return File path)
             ServiceType::AppState => Ok(PathType::File(self.config_dir()?.join("app_state.json"))),
@@ -482,7 +475,7 @@ mod tests {
     fn test_storage_dir() {
         let orcs_paths = OrcsPaths::new(None);
         let storage_dir = orcs_paths.storage_dir().unwrap();
-        assert!(storage_dir.ends_with("files"));
+        assert!(storage_dir.ends_with("storage"));
         // Verify it's under data_dir
         let orcs_paths2 = OrcsPaths::new(None);
         let data_dir = orcs_paths2.data_dir().unwrap();

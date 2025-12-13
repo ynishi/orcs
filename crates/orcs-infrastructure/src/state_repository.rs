@@ -47,10 +47,28 @@ impl StateRepositoryImpl {
     ///
     /// Uses the centralized path management via `ServiceType::AppState`.
     pub async fn new() -> Result<Self> {
+        Self::with_base_dir(None).await
+    }
+
+    /// Creates a new AppStateService with a custom base directory (for testing).
+    ///
+    /// # Arguments
+    ///
+    /// * `base_dir` - Optional base directory. If None, uses the default system path.
+    pub async fn with_base_dir(base_dir: Option<&std::path::Path>) -> Result<Self> {
+        use std::fs;
+
         // Get file path for AppState via centralized path management
-        let orcs_paths = OrcsPaths::new(None);
+        let orcs_paths = OrcsPaths::new(base_dir);
         let path_type = orcs_paths.get_path(ServiceType::AppState)?;
-        let file_path = path_type.into_path_buf(); // app_state.toml
+        let file_path = path_type.into_path_buf(); // app_state.json
+
+        // Ensure parent directory exists
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| {
+                OrcsError::io(format!("Failed to create parent directory: {}", e))
+            })?;
+        }
 
         // Setup migrator
         let migrator = create_app_state_migrator();
@@ -395,7 +413,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_and_get_last_selected_workspace() {
-        let service = AppStateService::new().await.unwrap();
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let service = AppStateService::with_base_dir(Some(temp_dir.path()))
+            .await
+            .unwrap();
         service
             .set_last_selected_workspace("ws-123".to_string())
             .await
@@ -406,7 +427,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_clear_last_selected_workspace() {
-        let service = AppStateService::new().await.unwrap();
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let service = AppStateService::with_base_dir(Some(temp_dir.path()))
+            .await
+            .unwrap();
         service
             .set_last_selected_workspace("ws-456".to_string())
             .await

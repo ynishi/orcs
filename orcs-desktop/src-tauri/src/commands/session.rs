@@ -5,7 +5,7 @@ use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
 use orcs_core::schema::{ExecutionModelType, TalkStyleType};
 use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
-    PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent,
+    SessionRepository, PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent,
 };
 use orcs_core::slash_command::{CommandType, SlashCommand};
 use orcs_core::workspace::manager::WorkspaceStorageService;
@@ -1686,4 +1686,94 @@ pub async fn reset_cancel_flag(state: State<'_, AppState>) -> Result<(), String>
     tracing::debug!("[Cancel] Resetting cancel flag");
     state.cancel_flag.store(false, Ordering::SeqCst);
     Ok(())
+}
+
+// ============================================================================
+// Sandbox Mode Commands
+// ============================================================================
+
+/// Enters sandbox mode by saving sandbox state to the current session
+#[tauri::command]
+pub async fn enter_sandbox_mode(
+    worktree_path: String,
+    original_branch: String,
+    sandbox_branch: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use orcs_core::session::SandboxState;
+
+    let session_manager = state
+        .session_usecase
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let app_mode = state.app_mode.lock().await.clone();
+    let mut session = session_manager
+        .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+        .await;
+
+    // Set sandbox state
+    session.sandbox_state = Some(SandboxState {
+        worktree_path,
+        original_branch,
+        sandbox_branch,
+    });
+
+    // Save session
+    state
+        .session_repository
+        .save(&session)
+        .await
+        .map_err(|e| format!("Failed to save session: {}", e))?;
+
+    tracing::info!("[Sandbox] Entered sandbox mode for session {}", session.id);
+    Ok(())
+}
+
+/// Exits sandbox mode by removing sandbox state from the current session
+#[tauri::command]
+pub async fn exit_sandbox_mode(state: State<'_, AppState>) -> Result<(), String> {
+    let session_manager = state
+        .session_usecase
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let app_mode = state.app_mode.lock().await.clone();
+    let mut session = session_manager
+        .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+        .await;
+
+    // Clear sandbox state
+    session.sandbox_state = None;
+
+    // Save session
+    state
+        .session_repository
+        .save(&session)
+        .await
+        .map_err(|e| format!("Failed to save session: {}", e))?;
+
+    tracing::info!("[Sandbox] Exited sandbox mode for session {}", session.id);
+    Ok(())
+}
+
+/// Gets the current sandbox state for the active session
+#[tauri::command]
+pub async fn get_sandbox_state(
+    state: State<'_, AppState>,
+) -> Result<Option<orcs_core::session::SandboxState>, String> {
+    let session_manager = state
+        .session_usecase
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    let app_mode = state.app_mode.lock().await.clone();
+    let session = session_manager
+        .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+        .await;
+
+    Ok(session.sandbox_state)
 }

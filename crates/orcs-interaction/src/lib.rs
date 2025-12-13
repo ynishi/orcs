@@ -831,6 +831,7 @@ impl InteractionManager {
             auto_chat_config,
             is_muted,
             context_mode: self.context_mode.read().await.clone(),
+            sandbox_state: None, // Interactive session doesn't use sandbox mode
         }
     }
 

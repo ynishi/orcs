@@ -4,7 +4,7 @@
 CARGO := cargo
 
 # Phony targets are not files. This prevents conflicts with files of the same name.
-.PHONY: all build run check test fmt clippy clean schema-generate dev tauri release-patch
+.PHONY: all build run check test fmt clippy clean schema-generate dev tauri release-patch install-cli
 
 # The default target executed when you run `make`.
 all: build
@@ -56,6 +56,10 @@ release-patch:
 	git tag -a "v$$VERSION" -m "Release v$$VERSION"; \
 	git push origin main --tags
 
+# Install orcs-cli binary to the system.
+install-cli:
+	$(CARGO) install --path crates/orcs-cli
+
 help:
 	@echo "Available commands:"
 	@echo "  make all             - Build the project (default)"
@@ -72,3 +76,4 @@ help:
 	@echo "  make dev             - Run Tauri app in development mode"
 	@echo "  make tauri           - Build Tauri desktop application"
 	@echo "  make release-patch   - Bump patch version, commit, tag, and push (no publish)"
+	@echo "  make install-cli     - Install orcs-cli binary to the system"

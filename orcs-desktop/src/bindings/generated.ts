@@ -34,7 +34,7 @@ export type AutoChatConfig = { max_iterations: number; stop_condition: 'iteratio
 
 export type StopCondition = 'iteration_count' | 'user_interrupt';
 
-export type SandboxState = { worktree_path: string; original_branch: string; sandbox_branch: string; };
+export type SandboxState = { worktree_path: string; original_branch: string; sandbox_branch: string; sandbox_root: string | null; };
 
 export type Workspace = { id: string; name: string; rootPath: string; workspaceDir: string; resources: { uploadedFiles: { id: string; name: string; path: string; mimeType: string; size: number; uploadedAt: number; sessionId: string | null; messageTimestamp: string | null; author: string | null; isArchived: boolean; isFavorite: boolean; sortOrder: number | null; }[]; tempFiles: { id: string; path: string; purpose: string; createdAt: number; autoDelete: boolean; }[]; }; projectContext: { languages: string[]; buildSystem: string | null; description: string | null; repositoryUrl: string | null; metadata: Record<string, string>; }; lastAccessed: number; isFavorite: boolean; lastActiveSessionId: string | null; };
 

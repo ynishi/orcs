@@ -133,8 +133,9 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     name: 'sandbox',
     icon: '🔬',
     description: 'Enter sandbox mode with isolated git worktree',
-    usage: '/sandbox',
-    examples: ['/sandbox'],
+    usage: '/sandbox [root]',
+    examples: ['/sandbox', '/sandbox ../', '/sandbox ./.orcs-sandboxes'],
+    argsDescription: 'root: Base directory for sandbox (default: "../")',
   },
   {
     name: 'exit-sandbox',

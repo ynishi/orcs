@@ -769,8 +769,12 @@ Generate the BlueprintWorkflow now.`;
                 break;
               }
 
+              // Parse sandbox root argument (optional)
+              const sandboxRoot = parsed.args && parsed.args.length > 0 ? parsed.args[0] : undefined;
+              const rootDesc = sandboxRoot ? sandboxRoot : '../ (default)';
+
               await handleAndPersistSystemMessage(
-                conversationMessage('Creating sandbox worktree...', 'info', '🔬'),
+                conversationMessage(`Creating sandbox worktree at: ${rootDesc}`, 'info', '🔬'),
                 addMessage,
                 invoke
               );
@@ -782,6 +786,7 @@ Generate the BlueprintWorkflow now.`;
                 sandbox_branch: string;
               }>('create_sandbox_worktree', {
                 sessionId: activeSession.id,
+                sandboxRoot,
               });
 
               // Save sandbox state to session
@@ -789,6 +794,7 @@ Generate the BlueprintWorkflow now.`;
                 worktreePath: result.worktree_path,
                 originalBranch: result.original_branch,
                 sandboxBranch: result.sandbox_branch,
+                sandboxRoot,
               });
 
               // Notify parent component of sandbox entry
@@ -796,14 +802,18 @@ Generate the BlueprintWorkflow now.`;
                 worktree_path: result.worktree_path,
                 original_branch: result.original_branch,
                 sandbox_branch: result.sandbox_branch,
+                sandbox_root: sandboxRoot,
               };
               onSandboxEntered?.(sandboxState);
 
+              // Extract relative path from worktree_path for cleaner display
+              const pathParts = result.worktree_path.split('/');
+              const relativePath = `../.orcs-sandboxes/${pathParts[pathParts.length - 1]}`;
+
               await handleAndPersistSystemMessage(
                 conversationMessage(
-                  `Entered sandbox mode!\n\nBranch: ${result.sandbox_branch}\nPath: ${result.worktree_path}\n\nYou can now experiment freely. Use /exit-sandbox when done.`,
-                  'success',
-                  '✅'
+                  `🔬 Sandbox mode activated\n\n🌿 Branch: ${result.sandbox_branch}\n📂 Location: ${relativePath}\n\nExperiment freely - changes are isolated.\nUse /exit-sandbox to merge or discard.`,
+                  'success'
                 ),
                 addMessage,
                 invoke
@@ -851,9 +861,9 @@ Generate the BlueprintWorkflow now.`;
 
                 await invoke('exit_sandbox_worktree', {
                   options: {
-                    worktreePath: sandboxState.worktree_path,
-                    originalBranch: sandboxState.original_branch,
-                    sandboxBranch: sandboxState.sandbox_branch,
+                    worktree_path: sandboxState.worktree_path,
+                    original_branch: sandboxState.original_branch,
+                    sandbox_branch: sandboxState.sandbox_branch,
                     merge: true,
                   },
                 });

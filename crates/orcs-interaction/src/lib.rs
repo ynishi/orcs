@@ -429,6 +429,8 @@ pub struct InteractionManager {
     is_muted: Arc<RwLock<bool>>,
     /// Context mode for AI interactions (Rich = full context, Clean = expertise only)
     context_mode: Arc<RwLock<ContextMode>>,
+    /// Sandbox state for git worktree-based isolated development
+    sandbox_state: Arc<RwLock<Option<orcs_core::session::SandboxState>>>,
 }
 
 impl InteractionManager {
@@ -479,6 +481,7 @@ impl InteractionManager {
             prompt_extension: Arc::new(RwLock::new(None)),
             is_muted: Arc::new(RwLock::new(false)),
             context_mode: Arc::new(RwLock::new(ContextMode::default())),
+            sandbox_state: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -528,6 +531,7 @@ impl InteractionManager {
             prompt_extension: Arc::new(RwLock::new(None)),
             is_muted: Arc::new(RwLock::new(data.is_muted)),
             context_mode: Arc::new(RwLock::new(data.context_mode)),
+            sandbox_state: Arc::new(RwLock::new(data.sandbox_state)),
         }
     }
 
@@ -831,7 +835,7 @@ impl InteractionManager {
             auto_chat_config,
             is_muted,
             context_mode: self.context_mode.read().await.clone(),
-            sandbox_state: None, // Interactive session doesn't use sandbox mode
+            sandbox_state: self.sandbox_state.read().await.clone(),
         }
     }
 
@@ -1295,6 +1299,16 @@ impl InteractionManager {
     /// Sets the context mode.
     pub async fn set_context_mode(&self, mode: ContextMode) {
         *self.context_mode.write().await = mode;
+    }
+
+    /// Sets the sandbox state for git worktree-based isolated development.
+    pub async fn set_sandbox_state(&self, state: Option<orcs_core::session::SandboxState>) {
+        *self.sandbox_state.write().await = state;
+    }
+
+    /// Gets the current sandbox state.
+    pub async fn get_sandbox_state(&self) -> Option<orcs_core::session::SandboxState> {
+        self.sandbox_state.read().await.clone()
     }
 
     /// Handles user input based on the current application mode.

@@ -61,6 +61,10 @@ pub struct SandboxState {
     pub original_branch: String,
     /// Sandbox branch name (e.g., "sandbox-{session_id}")
     pub sandbox_branch: String,
+    /// Base directory for sandbox worktrees (e.g., "../" or "./.orcs-sandboxes")
+    /// Defaults to "../" if not specified
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sandbox_root: Option<String>,
 }
 
 /// Context mode for controlling AI context injection.

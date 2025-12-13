@@ -436,9 +436,9 @@ function App() {
 
       await invoke('exit_sandbox_worktree', {
         options: {
-          worktreePath: sandboxState.worktree_path,
-          originalBranch: sandboxState.original_branch,
-          sandboxBranch: sandboxState.sandbox_branch,
+          worktree_path: sandboxState.worktree_path,
+          original_branch: sandboxState.original_branch,
+          sandbox_branch: sandboxState.sandbox_branch,
           merge: true,
         },
       });
@@ -493,9 +493,9 @@ function App() {
 
       await invoke('exit_sandbox_worktree', {
         options: {
-          worktreePath: sandboxState.worktree_path,
-          originalBranch: sandboxState.original_branch,
-          sandboxBranch: sandboxState.sandbox_branch,
+          worktree_path: sandboxState.worktree_path,
+          original_branch: sandboxState.original_branch,
+          sandbox_branch: sandboxState.sandbox_branch,
           merge: false,
         },
       });
@@ -2791,10 +2791,10 @@ function App() {
           </Text>
           {pendingSandboxExit && (
             <Paper p="sm" bg="dark.6" style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-              <Text size="xs" c="dimmed">Branch:</Text>
-              <Text size="sm">{pendingSandboxExit.sandbox_branch}</Text>
-              <Text size="xs" c="dimmed" mt="xs">Worktree:</Text>
-              <Text size="sm" style={{ wordBreak: 'break-all' }}>
+              <Text size="xs" c="gray.4">Branch:</Text>
+              <Text size="sm" c="white">{pendingSandboxExit.sandbox_branch}</Text>
+              <Text size="xs" c="gray.4" mt="xs">Worktree:</Text>
+              <Text size="sm" c="white" style={{ wordBreak: 'break-all' }}>
                 {pendingSandboxExit.worktree_path}
               </Text>
             </Paper>

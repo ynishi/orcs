@@ -136,6 +136,7 @@ pub struct CreateSandboxResult {
 #[tauri::command]
 pub async fn create_sandbox_worktree(
     session_id: String,
+    sandbox_root: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<CreateSandboxResult, String> {
     use orcs_core::workspace::manager::WorkspaceStorageService;
@@ -211,14 +212,46 @@ pub async fn create_sandbox_worktree(
             }
         })?;
 
-    // Create worktree path
-    let worktree_path = PathBuf::from(&git_root)
-        .join(".orcs-sandboxes")
-        .join(&sandbox_branch);
+    // Determine sandbox root directory (default: "../")
+    let sandbox_root_dir = sandbox_root.as_deref().unwrap_or("../");
 
-    // Create .orcs-sandboxes directory if it doesn't exist
+    // Create worktree path based on sandbox_root
+    let git_root_path = PathBuf::from(&git_root);
+    let worktree_base = if sandbox_root_dir.starts_with("./") || sandbox_root_dir.starts_with(".\\") {
+        // Relative to git root (e.g., "./.orcs-sandboxes")
+        git_root_path.join(sandbox_root_dir)
+    } else if sandbox_root_dir == "../" || sandbox_root_dir == ".." {
+        // Parent directory
+        git_root_path
+            .parent()
+            .ok_or_else(|| "Cannot use ../ - git root has no parent directory".to_string())?
+            .join(".orcs-sandboxes")
+    } else {
+        // Absolute path or other relative path
+        PathBuf::from(sandbox_root_dir)
+    };
+
+    let worktree_path = worktree_base.join(&sandbox_branch);
+
+    // Create sandbox directory if it doesn't exist
     std::fs::create_dir_all(worktree_path.parent().unwrap())
         .map_err(|e| format!("Failed to create sandbox directory: {}", e))?;
+
+    // Check if branch already exists and delete it
+    let branch_check = ProcessCommand::new("git")
+        .current_dir(working_dir)
+        .args(["rev-parse", "--verify", &sandbox_branch])
+        .output()
+        .map_err(|e| format!("Failed to check branch: {}", e))?;
+
+    if branch_check.status.success() {
+        // Branch exists, delete it
+        ProcessCommand::new("git")
+            .current_dir(working_dir)
+            .args(["branch", "-D", &sandbox_branch])
+            .output()
+            .map_err(|e| format!("Failed to delete existing branch: {}", e))?;
+    }
 
     // Create worktree with new branch
     let output = ProcessCommand::new("git")

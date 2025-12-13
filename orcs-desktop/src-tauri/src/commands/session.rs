@@ -1698,6 +1698,7 @@ pub async fn enter_sandbox_mode(
     worktree_path: String,
     original_branch: String,
     sandbox_branch: String,
+    sandbox_root: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     use orcs_core::session::SandboxState;
@@ -1708,19 +1709,21 @@ pub async fn enter_sandbox_mode(
         .await
         .ok_or("No active session")?;
 
-    let app_mode = state.app_mode.lock().await.clone();
-    let mut session = session_manager
-        .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
-        .await;
-
-    // Set sandbox state
-    session.sandbox_state = Some(SandboxState {
+    // Set sandbox state in InteractionManager
+    let sandbox_state = SandboxState {
         worktree_path,
         original_branch,
         sandbox_branch,
-    });
+        sandbox_root,
+    };
+    session_manager.set_sandbox_state(Some(sandbox_state)).await;
 
-    // Save session
+    // Save session with updated sandbox state
+    let app_mode = state.app_mode.lock().await.clone();
+    let session = session_manager
+        .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+        .await;
+
     state
         .session_repository
         .save(&session)
@@ -1740,15 +1743,15 @@ pub async fn exit_sandbox_mode(state: State<'_, AppState>) -> Result<(), String>
         .await
         .ok_or("No active session")?;
 
+    // Clear sandbox state in InteractionManager
+    session_manager.set_sandbox_state(None).await;
+
+    // Save session with cleared sandbox state
     let app_mode = state.app_mode.lock().await.clone();
-    let mut session = session_manager
+    let session = session_manager
         .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
         .await;
 
-    // Clear sandbox state
-    session.sandbox_state = None;
-
-    // Save session
     state
         .session_repository
         .save(&session)
@@ -1770,10 +1773,5 @@ pub async fn get_sandbox_state(
         .await
         .ok_or("No active session")?;
 
-    let app_mode = state.app_mode.lock().await.clone();
-    let session = session_manager
-        .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
-        .await;
-
-    Ok(session.sandbox_state)
+    Ok(session_manager.get_sandbox_state().await)
 }

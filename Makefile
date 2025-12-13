@@ -51,7 +51,7 @@ tauri:
 
 # Bump the patch version without publishing, then create and push plain version tag.
 release-patch:
-	$(CARGO) release patch --execute --no-publish
+	$(CARGO) release patch --execute --no-confirm --no-publish
 	@VERSION=$$(grep -A 10 '\[workspace.package\]' Cargo.toml | grep '^version' | sed 's/version = "\(.*\)"/\1/'); \
 	git tag -a "v$$VERSION" -m "Release v$$VERSION"; \
 	git push origin main --tags

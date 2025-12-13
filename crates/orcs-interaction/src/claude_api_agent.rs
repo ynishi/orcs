@@ -50,14 +50,13 @@ impl ClaudeApiAgent {
     /// Model name defaults to `claude-sonnet-4-20250514` if not specified.
     pub async fn try_from_env() -> Result<Self, AgentError> {
         // Try loading from SecretService first
-        if let Ok(service) = SecretServiceImpl::default() {
-            if let Ok(secret_config) = service.load_secrets().await {
-                if let Some(claude_config) = secret_config.claude {
-                    // Use default model (model settings now in config.toml)
-                    let model = DEFAULT_CLAUDE_MODEL.to_string();
-                    return Ok(Self::new(claude_config.api_key, model));
-                }
-            }
+        if let Ok(service) = SecretServiceImpl::new_default()
+            && let Ok(secret_config) = service.load_secrets().await
+            && let Some(claude_config) = secret_config.claude
+        {
+            // Use default model (model settings now in config.toml)
+            let model = DEFAULT_CLAUDE_MODEL.to_string();
+            return Ok(Self::new(claude_config.api_key, model));
         }
 
         // Fallback to environment variables
@@ -117,13 +116,10 @@ impl ClaudeApiAgent {
     async fn attachment_to_content_block(
         attachment: &Attachment,
     ) -> Result<Option<ContentBlock>, AgentError> {
-        match attachment {
-            Attachment::Remote(_) => {
-                return Err(AgentError::ExecutionFailed(
-                    "Remote attachments are not supported for Claude API".into(),
-                ));
-            }
-            _ => {}
+        if let Attachment::Remote(_) = attachment {
+            return Err(AgentError::ExecutionFailed(
+                "Remote attachments are not supported for Claude API".into(),
+            ));
         }
 
         let bytes = attachment.load_bytes().await.map_err(|err| {
@@ -288,9 +284,10 @@ fn extract_text_response(response: CreateMessageResponse) -> Result<String, Agen
     response
         .content
         .into_iter()
-        .find_map(|block| match block {
-            ContentBlockResponse::Text { text } => Some(text),
+        .map(|block| match block {
+            ContentBlockResponse::Text { text } => text,
         })
+        .next()
         .ok_or_else(|| {
             AgentError::ExecutionFailed(
                 "Claude API returned no text in the response content".into(),

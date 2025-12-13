@@ -13,10 +13,10 @@ pub fn find_workspace_root() -> Result<PathBuf> {
     if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
         let manifest_path = PathBuf::from(&manifest_dir);
         // Navigate up from crates/orcs-cli to workspace root
-        if let Some(workspace_root) = manifest_path.parent().and_then(|p| p.parent()) {
-            if workspace_root.join("orcs-desktop").exists() {
-                return Ok(workspace_root.to_path_buf());
-            }
+        if let Some(workspace_root) = manifest_path.parent().and_then(|p| p.parent())
+            && workspace_root.join("orcs-desktop").exists()
+        {
+            return Ok(workspace_root.to_path_buf());
         }
     }
 
@@ -29,10 +29,10 @@ pub fn find_workspace_root() -> Result<PathBuf> {
 
         if cargo_toml.exists() && orcs_desktop.exists() {
             // Verify it's a workspace by checking for [workspace] section
-            if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
-                if content.contains("[workspace]") {
-                    return Ok(current);
-                }
+            if let Ok(content) = std::fs::read_to_string(&cargo_toml)
+                && content.contains("[workspace]")
+            {
+                return Ok(current);
             }
         }
 

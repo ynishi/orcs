@@ -7,8 +7,8 @@ use anyhow::Result;
 use llm_toolkit::ToPrompt;
 use llm_toolkit::agent::Agent;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Response structure for conversation summary
 #[derive(Debug, Clone, Serialize, Deserialize, ToPrompt)]
@@ -381,10 +381,10 @@ impl SessionSupportAgentService {
         use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
 
         // Check cancellation before starting
-        if let Some(ref flag) = cancel_flag {
-            if flag.load(Ordering::SeqCst) {
-                return Err(anyhow::anyhow!("Operation cancelled"));
-            }
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
         }
 
         // Create typed request
@@ -432,10 +432,10 @@ impl SessionSupportAgentService {
         };
 
         // Check cancellation after LLM execution
-        if let Some(ref flag) = cancel_flag {
-            if flag.load(Ordering::SeqCst) {
-                return Err(anyhow::anyhow!("Operation cancelled"));
-            }
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
         }
 
         // Parse JSON response
@@ -476,10 +476,10 @@ impl SessionSupportAgentService {
         use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
 
         // Check cancellation before starting
-        if let Some(ref flag) = cancel_flag {
-            if flag.load(Ordering::SeqCst) {
-                return Err(anyhow::anyhow!("Operation cancelled"));
-            }
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
         }
 
         let request = ActionPlanGenerationRequest {
@@ -525,10 +525,10 @@ impl SessionSupportAgentService {
         };
 
         // Check cancellation after LLM execution
-        if let Some(ref flag) = cancel_flag {
-            if flag.load(Ordering::SeqCst) {
-                return Err(anyhow::anyhow!("Operation cancelled"));
-            }
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
         }
 
         Ok(markdown)
@@ -548,10 +548,10 @@ impl SessionSupportAgentService {
         use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
 
         // Check cancellation before starting
-        if let Some(ref flag) = cancel_flag {
-            if flag.load(Ordering::SeqCst) {
-                return Err(anyhow::anyhow!("Operation cancelled"));
-            }
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
         }
 
         let request = ExpertiseGenerationRequest {
@@ -596,10 +596,10 @@ impl SessionSupportAgentService {
         };
 
         // Check cancellation after LLM execution
-        if let Some(ref flag) = cancel_flag {
-            if flag.load(Ordering::SeqCst) {
-                return Err(anyhow::anyhow!("Operation cancelled"));
-            }
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
         }
 
         Ok(markdown)
@@ -645,10 +645,10 @@ impl SessionSupportAgentService {
         use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
 
         // Check cancellation before starting
-        if let Some(ref flag) = cancel_flag {
-            if flag.load(Ordering::SeqCst) {
-                return Err(anyhow::anyhow!("Operation cancelled"));
-            }
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
         }
 
         let request = ConceptIssueGenerationRequest {
@@ -693,10 +693,10 @@ impl SessionSupportAgentService {
         };
 
         // Check cancellation after LLM execution
-        if let Some(ref flag) = cancel_flag {
-            if flag.load(Ordering::SeqCst) {
-                return Err(anyhow::anyhow!("Operation cancelled"));
-            }
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
         }
 
         Ok(markdown)

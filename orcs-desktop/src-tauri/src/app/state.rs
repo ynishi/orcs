@@ -1,5 +1,5 @@
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use orcs_application::session::SessionMetadataService;
 use orcs_application::{AdhocPersonaService, SessionUseCase};
@@ -31,6 +31,7 @@ pub struct AppState {
     pub slash_command_repository: Arc<dyn SlashCommandRepository>,
     pub slash_command_repository_concrete: Arc<AsyncDirSlashCommandRepository>,
     pub dialogue_preset_repository: Arc<dyn DialoguePresetRepository>,
+    #[allow(dead_code)]
     pub dialogue_preset_repository_concrete: Arc<AsyncDirDialoguePresetRepository>,
     pub app_state_service: Arc<AppStateService>,
     pub task_repository: Arc<dyn TaskRepository>,

@@ -5,7 +5,7 @@ use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
 use orcs_core::schema::{ExecutionModelType, TalkStyleType};
 use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
-    SessionRepository, PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent,
+    PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent, SessionRepository,
 };
 use orcs_core::slash_command::{CommandType, SlashCommand};
 use orcs_core::workspace::manager::WorkspaceStorageService;
@@ -732,7 +732,12 @@ pub async fn execute_message_as_task(
 
     state
         .task_executor
-        .execute_from_message_with_context(session_id, message_content, workspace_root, thread_context)
+        .execute_from_message_with_context(
+            session_id,
+            message_content,
+            workspace_root,
+            thread_context,
+        )
         .await
         .map_err(|e| e.to_string())
 }
@@ -749,13 +754,12 @@ fn build_thread_context_for_task(session: &Session) -> Option<String> {
     let summary = session
         .system_messages
         .iter()
-        .filter(|msg| {
+        .rfind(|msg| {
             msg.metadata
                 .system_message_type
                 .as_ref()
                 .is_some_and(|t| t == "Summary")
         })
-        .last()
         .map(|msg| msg.content.clone());
 
     if let Some(summary_content) = summary {
@@ -774,7 +778,11 @@ fn build_thread_context_for_task(session: &Session) -> Option<String> {
                     orcs_core::session::MessageRole::Assistant => persona_id.as_str(),
                     orcs_core::session::MessageRole::System => "System",
                 };
-                format!("**{}**: {}", role_str, msg.content.chars().take(500).collect::<String>())
+                format!(
+                    "**{}**: {}",
+                    role_str,
+                    msg.content.chars().take(500).collect::<String>()
+                )
             })
         })
         .take(10)
@@ -1020,7 +1028,7 @@ pub async fn set_talk_style(
         .map(|s| {
             use std::str::FromStr;
             TalkStyleType::from_str(&s)
-                .map(|style_type| TalkStyle::from(style_type))
+                .map(TalkStyle::from)
                 .map_err(|_e| format!("Unknown talk style: {}", s))
         })
         .transpose()?;
@@ -1108,14 +1116,10 @@ pub async fn handle_input(
                 Err(e) => format!("❌ Failed to create persona: {}", e),
             },
             "create-slash-command" => {
-                format!(
-                    "❌ /create-slash-command is not yet implemented.\n\nPlease create slash commands manually in ~/.orcs/slash_commands/ for now."
-                )
+                "❌ /create-slash-command is not yet implemented.\n\nPlease create slash commands manually in ~/.orcs/slash_commands/ for now.".to_string()
             }
             "create-workspace" => {
-                format!(
-                    "❌ /create-workspace is not yet implemented.\n\nPlease use the workspace management UI for now."
-                )
+                "❌ /create-workspace is not yet implemented.\n\nPlease use the workspace management UI for now.".to_string()
             }
             // For all other commands, check the repository
             _ => {
@@ -1428,23 +1432,28 @@ pub async fn start_auto_chat(
     let session_id_clone = session_id.clone();
 
     let result = manager
-        .execute_auto_chat(&input, file_paths, move |turn| {
-            use orcs_interaction::{StreamingDialogueTurn, StreamingDialogueTurnKind};
+        .execute_auto_chat(
+            &input,
+            file_paths,
+            move |turn| {
+                use orcs_interaction::{StreamingDialogueTurn, StreamingDialogueTurnKind};
 
-            // Convert DialogueMessage to StreamingDialogueTurn for frontend
-            let streaming_turn = StreamingDialogueTurn {
-                session_id: turn.session_id.clone(),
-                timestamp: chrono::Utc::now().to_rfc3339(),
-                kind: StreamingDialogueTurnKind::Chunk {
-                    author: turn.author.clone(),
-                    content: turn.content.clone(),
-                },
-            };
+                // Convert DialogueMessage to StreamingDialogueTurn for frontend
+                let streaming_turn = StreamingDialogueTurn {
+                    session_id: turn.session_id.clone(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                    kind: StreamingDialogueTurnKind::Chunk {
+                        author: turn.author.clone(),
+                        content: turn.content.clone(),
+                    },
+                };
 
-            if let Err(e) = app_clone.emit("dialogue-turn", streaming_turn) {
-                eprintln!("[TAURI] Failed to emit dialogue-turn event: {}", e);
-            }
-        }, Some(state.cancel_flag.clone()))
+                if let Err(e) = app_clone.emit("dialogue-turn", streaming_turn) {
+                    eprintln!("[TAURI] Failed to emit dialogue-turn event: {}", e);
+                }
+            },
+            Some(state.cancel_flag.clone()),
+        )
         .await;
 
     // Emit AutoChat completion event
@@ -1764,15 +1773,16 @@ pub async fn exit_sandbox_mode(state: State<'_, AppState>) -> Result<(), String>
 
     // Restore original workspace root from workspace_id
     if workspace_id != PLACEHOLDER_WORKSPACE_ID {
-        match state.workspace_storage_service.get_workspace(workspace_id).await {
+        match state
+            .workspace_storage_service
+            .get_workspace(workspace_id)
+            .await
+        {
             Ok(Some(workspace)) => {
                 session_manager
                     .set_agent_workspace_root(Some(workspace.root_path.clone()))
                     .await;
-                tracing::info!(
-                    "[Sandbox] Restored agent CWD to: {:?}",
-                    workspace.root_path
-                );
+                tracing::info!("[Sandbox] Restored agent CWD to: {:?}", workspace.root_path);
             }
             Ok(None) => {
                 tracing::warn!("[Sandbox] Workspace not found for id: {}", workspace_id);

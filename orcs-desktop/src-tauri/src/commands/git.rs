@@ -88,7 +88,7 @@ pub async fn get_git_info(state: State<'_, AppState>) -> Result<GitInfo, String>
                 String::from_utf8(output.stdout).ok().and_then(|url| {
                     url.trim()
                         .split('/')
-                        .last()
+                        .next_back()
                         .map(|name| name.trim_end_matches(".git").to_string())
                 })
             } else {
@@ -217,7 +217,8 @@ pub async fn create_sandbox_worktree(
 
     // Create worktree path based on sandbox_root
     let git_root_path = PathBuf::from(&git_root);
-    let worktree_base = if sandbox_root_dir.starts_with("./") || sandbox_root_dir.starts_with(".\\") {
+    let worktree_base = if sandbox_root_dir.starts_with("./") || sandbox_root_dir.starts_with(".\\")
+    {
         // Relative to git root (e.g., "./.orcs-sandboxes")
         git_root_path.join(sandbox_root_dir)
     } else if sandbox_root_dir == "../" || sandbox_root_dir == ".." {

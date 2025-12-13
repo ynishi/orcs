@@ -7,10 +7,11 @@ use serde::{Deserialize, Serialize};
 use version_migrate::DeriveQueryable as Queryable;
 
 /// Supported LLM backends for personas.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PersonaBackend {
     /// Anthropic Claude Code CLI backend
+    #[default]
     ClaudeCli,
     /// Anthropic Claude API backend
     ClaudeApi,
@@ -175,31 +176,20 @@ For file modifications, provide exact code suggestions that CLI agents can imple
     }
 }
 
-impl Default for PersonaBackend {
-    fn default() -> Self {
-        PersonaBackend::ClaudeCli
-    }
-}
-
 /// Represents the source of a persona (system-provided or user-created).
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Default)]
 pub enum PersonaSource {
     /// System-provided default personas
     System,
     /// User-created custom personas
+    #[default]
     User,
     /// Adhoc expert persona (temporary, session-specific)
     Adhoc,
 }
 
-impl Default for PersonaSource {
-    fn default() -> Self {
-        PersonaSource::User
-    }
-}
-
 /// Options specific to Gemini models (e.g., Gemini 3).
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct GeminiOptions {
     /// Thinking level for Gemini 3+ models (LOW, MEDIUM, HIGH)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -207,15 +197,6 @@ pub struct GeminiOptions {
     /// Enable Google Search tool
     #[serde(skip_serializing_if = "Option::is_none")]
     pub google_search: Option<bool>,
-}
-
-impl Default for GeminiOptions {
-    fn default() -> Self {
-        Self {
-            thinking_level: None,
-            google_search: None,
-        }
-    }
 }
 
 /// A persona representing an AI agent with specific characteristics and expertise.

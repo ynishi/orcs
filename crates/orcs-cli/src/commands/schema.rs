@@ -41,48 +41,41 @@ pub fn generate() -> Result<()> {
     println!("Generating TypeScript types...");
     println!("Output: {}", output_file.display());
 
-    let mut types = Vec::new();
-
-    // Core types
-    types.push(("TalkStyleType", TalkStyleType::to_ts()));
-    types.push(("ExecutionModelType", ExecutionModelType::to_ts()));
-    types.push(("ConversationModeType", ConversationModeType::to_ts()));
-    types.push(("PresetSourceType", PresetSourceType::to_ts()));
-
-    // App State types
-    types.push(("AppState", AppState::to_ts()));
-    types.push(("OpenTab", OpenTab::to_ts()));
-
-    // Message types
-    types.push(("MessageRole", MessageRole::to_ts()));
-    types.push(("SystemEventType", SystemEventType::to_ts()));
-    types.push(("ErrorSeverity", ErrorSeverity::to_ts()));
-    types.push(("MessageMetadata", MessageMetadata::to_ts()));
-    types.push(("ConversationMessage", ConversationMessage::to_ts()));
-
-    // App Mode types
-    types.push(("Plan", Plan::to_ts()));
-    types.push(("AppMode", AppMode::to_ts()));
-    types.push(("ConversationMode", ConversationMode::to_ts()));
-
-    // Session types
-    types.push(("AutoChatConfig", AutoChatConfig::to_ts()));
-    types.push(("StopCondition", StopCondition::to_ts()));
-    types.push(("SandboxState", SandboxState::to_ts()));
-
-    // Workspace types
-    types.push(("Workspace", Workspace::to_ts()));
-    types.push(("WorkspaceResources", WorkspaceResources::to_ts()));
-    types.push(("UploadedFile", UploadedFile::to_ts()));
-    types.push(("ProjectContext", ProjectContext::to_ts()));
-    types.push(("TempFile", TempFile::to_ts()));
-
-    // Session metadata type (excludes persona_histories and system_messages)
-    types.push(("SessionType", SessionType::to_ts()));
-
-    // Task types
-    types.push(("TaskType", TaskType::to_ts()));
-    types.push(("TaskStatus", TaskStatus::to_ts()));
+    let types = vec![
+        // Core types
+        ("TalkStyleType", TalkStyleType::to_ts()),
+        ("ExecutionModelType", ExecutionModelType::to_ts()),
+        ("ConversationModeType", ConversationModeType::to_ts()),
+        ("PresetSourceType", PresetSourceType::to_ts()),
+        // App State types
+        ("AppState", AppState::to_ts()),
+        ("OpenTab", OpenTab::to_ts()),
+        // Message types
+        ("MessageRole", MessageRole::to_ts()),
+        ("SystemEventType", SystemEventType::to_ts()),
+        ("ErrorSeverity", ErrorSeverity::to_ts()),
+        ("MessageMetadata", MessageMetadata::to_ts()),
+        ("ConversationMessage", ConversationMessage::to_ts()),
+        // App Mode types
+        ("Plan", Plan::to_ts()),
+        ("AppMode", AppMode::to_ts()),
+        ("ConversationMode", ConversationMode::to_ts()),
+        // Session types
+        ("AutoChatConfig", AutoChatConfig::to_ts()),
+        ("StopCondition", StopCondition::to_ts()),
+        ("SandboxState", SandboxState::to_ts()),
+        // Workspace types
+        ("Workspace", Workspace::to_ts()),
+        ("WorkspaceResources", WorkspaceResources::to_ts()),
+        ("UploadedFile", UploadedFile::to_ts()),
+        ("ProjectContext", ProjectContext::to_ts()),
+        ("TempFile", TempFile::to_ts()),
+        // Session metadata type (excludes persona_histories and system_messages)
+        ("SessionType", SessionType::to_ts()),
+        // Task types
+        ("TaskType", TaskType::to_ts()),
+        ("TaskStatus", TaskStatus::to_ts()),
+    ];
 
     // Write to file
     let mut content =

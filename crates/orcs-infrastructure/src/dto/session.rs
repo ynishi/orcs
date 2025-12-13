@@ -7,7 +7,7 @@ use version_migrate::{FromDomain, IntoDomain, MigratesTo, Versioned};
 
 use orcs_core::session::{
     AppMode, AutoChatConfig, ContextMode, ConversationMessage, ConversationMode, MessageRole,
-    SandboxState, Session, PLACEHOLDER_WORKSPACE_ID,
+    PLACEHOLDER_WORKSPACE_ID, SandboxState, Session,
 };
 
 // ============================================================================
@@ -1040,6 +1040,7 @@ pub struct SessionV4_1_0 {
 ///   - ExecutionStrategyV2_0_0 → ExecutionModel via `.into_domain()`
 /// - **FromDomain** (lines 1539-1597): Converts Domain model → DTO
 ///   - ExecutionModel → ExecutionStrategyV2_0_0 via `.from_domain()`
+///
 /// Context mode for controlling AI context injection.
 ///
 /// DTO representation matching `orcs_core::session::ContextMode`.
@@ -2009,7 +2010,7 @@ impl IntoDomain<Session> for SessionV4_5_0 {
                 .into_iter()
                 .map(|(k, v)| (k, Some(v)))
                 .collect(),
-            conversation_mode: self.conversation_mode.into(), // DTO → Domain
+            conversation_mode: self.conversation_mode, // DTO → Domain
             talk_style: self.talk_style,
             is_favorite: self.is_favorite,
             is_archived: self.is_archived,
@@ -2076,15 +2077,15 @@ impl FromDomain<Session> for SessionV4_5_0 {
             participant_colors,
             participant_backends,
             participant_models,
-            conversation_mode: conversation_mode.into(), // Domain → DTO
+            conversation_mode, // Domain → DTO
             talk_style,
             is_favorite,
             is_archived,
             sort_order,
             auto_chat_config,
             is_muted,
-            context_mode: context_mode.into(),                        // Domain → DTO
-            sandbox_state: sandbox_state.map(|s| SandboxStateV1_1_0::from_domain(s)), // Domain → DTO
+            context_mode: context_mode.into(), // Domain → DTO
+            sandbox_state: sandbox_state.map(SandboxStateV1_1_0::from_domain), // Domain → DTO
         }
     }
 }
@@ -2114,7 +2115,7 @@ impl IntoDomain<Session> for SessionV4_4_0 {
                 .into_iter()
                 .map(|(k, v)| (k, Some(v)))
                 .collect(),
-            conversation_mode: self.conversation_mode.into(), // DTO → Domain
+            conversation_mode: self.conversation_mode, // DTO → Domain
             talk_style: self.talk_style,
             is_favorite: self.is_favorite,
             is_archived: self.is_archived,
@@ -2122,7 +2123,7 @@ impl IntoDomain<Session> for SessionV4_4_0 {
             auto_chat_config: self.auto_chat_config,
             is_muted: self.is_muted,
             context_mode: self.context_mode.into(), // DTO → Domain
-            sandbox_state: self.sandbox_state,     // Direct mapping
+            sandbox_state: self.sandbox_state,      // Direct mapping
         }
     }
 }
@@ -2160,7 +2161,7 @@ impl IntoDomain<Session> for SessionV4_3_0 {
             auto_chat_config: self.auto_chat_config,
             is_muted: self.is_muted,
             context_mode: self.context_mode.into(), // DTO → Domain
-            sandbox_state: None,                   // V4_3_0 doesn't have sandbox_state
+            sandbox_state: None,                    // V4_3_0 doesn't have sandbox_state
         }
     }
 }

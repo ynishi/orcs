@@ -243,6 +243,7 @@ impl DebugSettingsDTO {
 /// - AppState: PrefDir/state.toml
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.0.0")]
+#[derive(Default)]
 pub struct ConfigRootV1_0_0 {
     /// Persona configurations (each has its own version field).
     /// Stored as serde_json::Value (intermediate format) to allow version-migrate to handle migration.
@@ -263,6 +264,7 @@ pub struct ConfigRootV1_0_0 {
 /// Added app_state field (now moved to separate state.toml).
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.1.0")]
+#[derive(Default)]
 pub struct ConfigRootV1_1_0 {
     /// Persona configurations (each has its own version field).
     /// Stored as serde_json::Value (intermediate format) to allow version-migrate to handle migration.
@@ -291,6 +293,7 @@ pub struct ConfigRootV1_1_0 {
 /// - AppState: PrefDir/state.toml (separate file for frequent updates)
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "2.0.0")]
+#[derive(Default)]
 pub struct ConfigRootV2_0_0 {
     /// User profile configuration (name, background, etc.).
     #[serde(default)]
@@ -302,6 +305,7 @@ pub struct ConfigRootV2_0_0 {
 /// Added model_settings field to separate model configuration from secrets.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "2.1.0")]
+#[derive(Default)]
 pub struct ConfigRootV2_1_0 {
     /// User profile configuration (name, background, etc.).
     #[serde(default)]
@@ -316,6 +320,7 @@ pub struct ConfigRootV2_1_0 {
 /// Added env_settings field to configure PATH for CLI-based agents.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "2.2.0")]
+#[derive(Default)]
 pub struct ConfigRootV2_2_0 {
     /// User profile configuration (name, background, etc.).
     #[serde(default)]
@@ -333,6 +338,7 @@ pub struct ConfigRootV2_2_0 {
 /// Added debug_settings field to enable LLM debug logging.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "2.3.0")]
+#[derive(Default)]
 pub struct ConfigRootV2_3_0 {
     /// User profile configuration (name, background, etc.).
     #[serde(default)]
@@ -354,65 +360,6 @@ pub type ConfigRoot = ConfigRootV2_3_0;
 // ============================================================================
 // Default implementations
 // ============================================================================
-
-impl Default for ConfigRootV1_0_0 {
-    fn default() -> Self {
-        Self {
-            personas: Vec::new(),
-            user_profile: None,
-            workspaces: Vec::new(),
-        }
-    }
-}
-
-impl Default for ConfigRootV1_1_0 {
-    fn default() -> Self {
-        Self {
-            personas: Vec::new(),
-            user_profile: None,
-            app_state: None,
-            workspaces: Vec::new(),
-        }
-    }
-}
-
-impl Default for ConfigRootV2_0_0 {
-    fn default() -> Self {
-        Self {
-            user_profile: UserProfileDTO::default(),
-        }
-    }
-}
-
-impl Default for ConfigRootV2_1_0 {
-    fn default() -> Self {
-        Self {
-            user_profile: UserProfileDTO::default(),
-            model_settings: ModelSettingsDTO::default(),
-        }
-    }
-}
-
-impl Default for ConfigRootV2_2_0 {
-    fn default() -> Self {
-        Self {
-            user_profile: UserProfileDTO::default(),
-            model_settings: ModelSettingsDTO::default(),
-            env_settings: EnvSettingsDTO::default(),
-        }
-    }
-}
-
-impl Default for ConfigRootV2_3_0 {
-    fn default() -> Self {
-        Self {
-            user_profile: UserProfileDTO::default(),
-            model_settings: ModelSettingsDTO::default(),
-            env_settings: EnvSettingsDTO::default(),
-            debug_settings: DebugSettingsDTO::default(),
-        }
-    }
-}
 
 // ============================================================================
 // Migration implementations

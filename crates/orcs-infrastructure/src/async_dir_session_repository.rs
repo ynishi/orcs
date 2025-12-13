@@ -271,6 +271,7 @@ mod tests {
             auto_chat_config: None,
             is_muted: false,
             context_mode: Default::default(),
+            sandbox_state: None,
         }
     }
 

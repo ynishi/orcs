@@ -38,7 +38,7 @@ pub struct SecretServiceImpl {
 }
 
 impl SecretServiceImpl {
-    pub fn default() -> Result<Self> {
+    pub fn new_default() -> Result<Self> {
         Self::new(None)
     }
     /// Creates a new SecretServiceImpl.

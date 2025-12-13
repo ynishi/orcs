@@ -35,7 +35,7 @@ pub use message::{
     ConversationMessage, ErrorSeverity, MessageMetadata, MessageRole, SystemEventType,
 };
 pub use model::{
-    AutoChatConfig, ContextMode, SandboxState, Session, StopCondition, PLACEHOLDER_WORKSPACE_ID,
+    AutoChatConfig, ContextMode, PLACEHOLDER_WORKSPACE_ID, SandboxState, Session, StopCondition,
 };
 pub use repository::SessionRepository;
 pub use user_input::UserInput;

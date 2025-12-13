@@ -69,7 +69,7 @@ pub struct OpenTab {
 /// * `active_session_id` - The ID of the currently active session.
 /// * `open_tabs` - List of currently open tabs.
 /// * `active_tab_id` - The ID of the currently active tab.
-#[derive(Debug, Clone, Serialize, Deserialize, Queryable, SchemaBridge)]
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable, SchemaBridge, Default)]
 #[queryable(entity = "app_state")]
 #[serde(rename_all = "camelCase")]
 pub struct AppState {
@@ -90,18 +90,6 @@ pub struct AppState {
 
     /// ID of the currently active tab.
     pub active_tab_id: Option<String>,
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self {
-            last_selected_workspace_id: None,
-            default_workspace_id: None,
-            active_session_id: None,
-            open_tabs: Vec::new(),
-            active_tab_id: None,
-        }
-    }
 }
 
 impl AppState {

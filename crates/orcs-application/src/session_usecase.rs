@@ -249,7 +249,7 @@ impl SessionUseCase {
 
         let workspace_sessions: Vec<_> = existing_sessions
             .into_iter()
-            .filter(|s| &s.workspace_id == &workspace.id)
+            .filter(|s| s.workspace_id == workspace.id)
             .collect();
 
         let session = if !workspace_sessions.is_empty() {
@@ -659,7 +659,7 @@ impl SessionUseCase {
 
         let workspace_sessions: Vec<_> = all_sessions
             .into_iter()
-            .filter(|s| &s.workspace_id == &workspace.id)
+            .filter(|s| s.workspace_id == workspace.id)
             .collect();
 
         println!(
@@ -678,26 +678,25 @@ impl SessionUseCase {
                 match self.switch_session(last_session_id).await {
                     Ok(_) => {
                         // Update session's workspace_id to the new workspace
-                        if let Some(active_session_id) = self.active_session_id().await {
-                            if let Some(manager) = self.session_cache.get(&active_session_id).await
-                            {
-                                manager
-                                    .set_workspace_id(
-                                        Some(workspace.id.clone()),
-                                        Some(workspace.root_path.clone()),
-                                    )
-                                    .await;
-                                // Persist the updated workspace association
-                                let session = self
-                                    .session_factory
-                                    .to_session(
-                                        manager.as_ref(),
-                                        orcs_core::session::AppMode::Idle,
-                                        workspace.id.clone(),
-                                    )
-                                    .await;
-                                let _ = self.session_repository.save(&session).await;
-                            }
+                        if let Some(active_session_id) = self.active_session_id().await
+                            && let Some(manager) = self.session_cache.get(&active_session_id).await
+                        {
+                            manager
+                                .set_workspace_id(
+                                    Some(workspace.id.clone()),
+                                    Some(workspace.root_path.clone()),
+                                )
+                                .await;
+                            // Persist the updated workspace association
+                            let session = self
+                                .session_factory
+                                .to_session(
+                                    manager.as_ref(),
+                                    orcs_core::session::AppMode::Idle,
+                                    workspace.id.clone(),
+                                )
+                                .await;
+                            let _ = self.session_repository.save(&session).await;
                         }
                         println!(
                             "[SessionUseCase] Successfully switched to workspace {} with last active session {}",
@@ -734,25 +733,25 @@ impl SessionUseCase {
             match self.switch_session(&most_recent.id).await {
                 Ok(_) => {
                     // Update session's workspace_id to the new workspace
-                    if let Some(active_session_id) = self.active_session_id().await {
-                        if let Some(manager) = self.session_cache.get(&active_session_id).await {
-                            manager
-                                .set_workspace_id(
-                                    Some(workspace.id.clone()),
-                                    Some(workspace.root_path.clone()),
-                                )
-                                .await;
-                            // Persist the updated workspace association
-                            let session = self
-                                .session_factory
-                                .to_session(
-                                    manager.as_ref(),
-                                    orcs_core::session::AppMode::Idle,
-                                    workspace.id.clone(),
-                                )
-                                .await;
-                            let _ = self.session_repository.save(&session).await;
-                        }
+                    if let Some(active_session_id) = self.active_session_id().await
+                        && let Some(manager) = self.session_cache.get(&active_session_id).await
+                    {
+                        manager
+                            .set_workspace_id(
+                                Some(workspace.id.clone()),
+                                Some(workspace.root_path.clone()),
+                            )
+                            .await;
+                        // Persist the updated workspace association
+                        let session = self
+                            .session_factory
+                            .to_session(
+                                manager.as_ref(),
+                                orcs_core::session::AppMode::Idle,
+                                workspace.id.clone(),
+                            )
+                            .await;
+                        let _ = self.session_repository.save(&session).await;
                     }
                     println!(
                         "[SessionUseCase] Successfully switched to workspace {} with recent session {}",
@@ -1022,9 +1021,7 @@ impl SessionUseCase {
     ///
     /// `Some(manager)` if there is an active session, `None` otherwise.
     pub async fn active_session(&self) -> Option<Arc<InteractionManager>> {
-        let Some(session_id) = self.active_session_id().await else {
-            return None;
-        };
+        let session_id = (self.active_session_id().await)?;
         self.session_cache.get(&session_id).await
     }
 
@@ -1089,13 +1086,13 @@ impl SessionUseCase {
         self.session_repository.delete(session_id).await?;
 
         // Clear active session if this was the active session
-        if let Some(active_session_id) = self.active_session_id().await {
-            if active_session_id == session_id {
-                self.app_state_service
-                    .clear_active_session()
-                    .await
-                    .map_err(|e| anyhow!("Failed to clear active session: {}", e))?;
-            }
+        if let Some(active_session_id) = self.active_session_id().await
+            && active_session_id == session_id
+        {
+            self.app_state_service
+                .clear_active_session()
+                .await
+                .map_err(|e| anyhow!("Failed to clear active session: {}", e))?;
         }
 
         Ok(())

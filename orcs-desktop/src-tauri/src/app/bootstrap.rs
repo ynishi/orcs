@@ -50,14 +50,14 @@ async fn ensure_default_workspace(
     let current_default_id = app_state_service.get_default_workspace().await;
 
     // Skip if it exists and the workspace is valid
-    if let Some(workspace_id) = current_default_id {
-        if let Ok(Some(_)) = workspace_storage_service.get_workspace(&workspace_id).await {
-            tracing::info!(
-                "[Bootstrap] Using existing default workspace: {}",
-                workspace_id
-            );
-            return Ok(workspace_id);
-        }
+    if let Some(workspace_id) = current_default_id
+        && let Ok(Some(_)) = workspace_storage_service.get_workspace(&workspace_id).await
+    {
+        tracing::info!(
+            "[Bootstrap] Using existing default workspace: {}",
+            workspace_id
+        );
+        return Ok(workspace_id);
     }
 
     // 2. Get default user workspace path from Infrastructure
@@ -153,7 +153,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
 
     // Initialize SecretService and ensure secret.json exists by loading secrets
     let secret_service_impl =
-        SecretServiceImpl::default().expect("Failed to initialize secret service");
+        SecretServiceImpl::new_default().expect("Failed to initialize secret service");
     let _ = secret_service_impl.load_secrets().await; // Trigger file creation if missing
     let secret_service: Arc<dyn SecretService> = Arc::new(secret_service_impl);
 
@@ -182,13 +182,13 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         dialogue_preset_repository_concrete.clone();
 
     // Seed the personas directory with default personas if it's empty on first run.
-    if let Ok(personas) = persona_repository.get_all().await {
-        if personas.is_empty() {
-            let default_presets = get_default_presets();
-            if let Err(e) = persona_repository.save_all(&default_presets).await {
-                // This is a critical failure on startup, so we panic.
-                panic!("Failed to seed default personas: {}", e);
-            }
+    if let Ok(personas) = persona_repository.get_all().await
+        && personas.is_empty()
+    {
+        let default_presets = get_default_presets();
+        if let Err(e) = persona_repository.save_all(&default_presets).await {
+            // This is a critical failure on startup, so we panic.
+            panic!("Failed to seed default personas: {}", e);
         }
     }
 

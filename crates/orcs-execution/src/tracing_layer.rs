@@ -56,11 +56,11 @@ where
         let mut span_fields = HashMap::new();
 
         // Extract span name for context (e.g., "wave")
-        if let Some(span_id) = ctx.current_span().id() {
-            if let Some(span) = ctx.span(span_id) {
-                let metadata = span.metadata();
-                span_fields.insert("span_name".to_string(), serde_json::json!(metadata.name()));
-            }
+        if let Some(span_id) = ctx.current_span().id()
+            && let Some(span) = ctx.span(span_id)
+        {
+            let metadata = span.metadata();
+            span_fields.insert("span_name".to_string(), serde_json::json!(metadata.name()));
         }
 
         // Extract wave_number from message if present

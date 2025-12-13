@@ -3,21 +3,16 @@
 use serde::{Deserialize, Serialize};
 
 /// Scope of the search operation.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SearchScope {
     /// Search within the current workspace (default)
+    #[default]
     Workspace,
     /// Search across all workspaces (local RAG)
     Local,
     /// Search the web (global)
     Global,
-}
-
-impl Default for SearchScope {
-    fn default() -> Self {
-        Self::Workspace
-    }
 }
 
 /// Filters to refine search results.

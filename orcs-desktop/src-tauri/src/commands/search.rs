@@ -140,16 +140,16 @@ async fn execute_global_search(
 
 fn format_reference(reference: &WebSearchReference) -> String {
     let mut lines = Vec::new();
-    if let Some(snippet) = &reference.snippet {
-        if !snippet.trim().is_empty() {
-            lines.push(snippet.trim().to_string());
-        }
+    if let Some(snippet) = &reference.snippet
+        && !snippet.trim().is_empty()
+    {
+        lines.push(snippet.trim().to_string());
     }
     lines.push(reference.url.clone());
-    if let Some(source) = &reference.source {
-        if !source.trim().is_empty() {
-            lines.push(format!("Source: {}", source));
-        }
+    if let Some(source) = &reference.source
+        && !source.trim().is_empty()
+    {
+        lines.push(format!("Source: {}", source));
     }
     lines.join("\n")
 }

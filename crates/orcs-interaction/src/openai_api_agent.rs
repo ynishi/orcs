@@ -47,14 +47,13 @@ impl OpenAIApiAgent {
     /// Model name defaults to `gpt-4o` if not specified.
     pub async fn try_from_env() -> Result<Self, AgentError> {
         // Try loading from SecretService first
-        if let Ok(service) = SecretServiceImpl::default() {
-            if let Ok(secret_config) = service.load_secrets().await {
-                if let Some(openai_config) = secret_config.openai {
-                    // Use default model (model settings now in config.toml)
-                    let model = DEFAULT_OPENAI_MODEL.to_string();
-                    return Ok(Self::new(openai_config.api_key, model));
-                }
-            }
+        if let Ok(service) = SecretServiceImpl::new_default()
+            && let Ok(secret_config) = service.load_secrets().await
+            && let Some(openai_config) = secret_config.openai
+        {
+            // Use default model (model settings now in config.toml)
+            let model = DEFAULT_OPENAI_MODEL.to_string();
+            return Ok(Self::new(openai_config.api_key, model));
         }
 
         // Fallback to environment variables
@@ -111,16 +110,13 @@ impl OpenAIApiAgent {
     async fn attachment_to_content(
         attachment: &Attachment,
     ) -> Result<Option<MessageContent>, AgentError> {
-        match attachment {
-            Attachment::Remote(url) => {
-                // OpenAI supports image URLs directly
-                return Ok(Some(MessageContent::ImageUrl {
-                    image_url: ImageUrl {
-                        url: url.to_string(),
-                    },
-                }));
-            }
-            _ => {}
+        if let Attachment::Remote(url) = attachment {
+            // OpenAI supports image URLs directly
+            return Ok(Some(MessageContent::ImageUrl {
+                image_url: ImageUrl {
+                    url: url.to_string(),
+                },
+            }));
         }
 
         let bytes = attachment.load_bytes().await.map_err(|err| {

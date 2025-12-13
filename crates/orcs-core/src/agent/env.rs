@@ -52,12 +52,11 @@ pub fn build_enhanced_path(
     ];
 
     for dir in workspace_tool_dirs {
-        if dir.exists() {
-            if let Some(dir_str) = dir.to_str() {
-                if !path_components.contains(&dir_str.to_string()) {
-                    path_components.push(dir_str.to_string());
-                }
-            }
+        if dir.exists()
+            && let Some(dir_str) = dir.to_str()
+            && !path_components.contains(&dir_str.to_string())
+        {
+            path_components.push(dir_str.to_string());
         }
     }
 
@@ -128,21 +127,20 @@ pub fn build_enhanced_path(
         let home_paths = vec![
             PathBuf::from(&home).join(".local/bin"),
             PathBuf::from(&home).join("bin"),
-            PathBuf::from(&home).join(".cargo/bin"),    // Rust (cargo, rustc, etc.)
-            PathBuf::from(&home).join(".go/bin"),       // Go binaries
-            PathBuf::from(&home).join(".deno/bin"),     // Deno binaries
-            PathBuf::from(&home).join(".bun/bin"),      // Bun binaries
-            PathBuf::from(&home).join(".yarn/bin"),     // Yarn global binaries
+            PathBuf::from(&home).join(".cargo/bin"), // Rust (cargo, rustc, etc.)
+            PathBuf::from(&home).join(".go/bin"),    // Go binaries
+            PathBuf::from(&home).join(".deno/bin"),  // Deno binaries
+            PathBuf::from(&home).join(".bun/bin"),   // Bun binaries
+            PathBuf::from(&home).join(".yarn/bin"),  // Yarn global binaries
             PathBuf::from(&home).join(".npm-global/bin"), // npm global binaries
         ];
 
         for path in home_paths {
-            if path.exists() {
-                if let Some(path_str) = path.to_str() {
-                    if !path_components.contains(&path_str.to_string()) {
-                        path_components.push(path_str.to_string());
-                    }
-                }
+            if path.exists()
+                && let Some(path_str) = path.to_str()
+                && !path_components.contains(&path_str.to_string())
+            {
+                path_components.push(path_str.to_string());
             }
         }
     }
@@ -181,29 +179,30 @@ fn detect_tool_manager_paths() -> Vec<String> {
 
     // mise paths
     let mise_shims = PathBuf::from(&home).join(".local/share/mise/shims");
-    if mise_shims.exists() {
-        if let Some(path_str) = mise_shims.to_str() {
-            detected_paths.push(path_str.to_string());
-        }
+    if mise_shims.exists()
+        && let Some(path_str) = mise_shims.to_str()
+    {
+        detected_paths.push(path_str.to_string());
     }
 
     // Scan mise installs directory for specific tool bins (e.g., gemini, node, etc.)
     let mise_installs = PathBuf::from(&home).join(".local/share/mise/installs");
-    if mise_installs.exists() {
-        if let Ok(entries) = std::fs::read_dir(&mise_installs) {
-            for entry in entries.flatten() {
-                let tool_path = entry.path();
-                // Look for version directories under each tool (e.g., gemini/0.11.0/bin)
-                if tool_path.is_dir() {
-                    if let Ok(version_entries) = std::fs::read_dir(&tool_path) {
-                        for version_entry in version_entries.flatten() {
-                            let bin_path = version_entry.path().join("bin");
-                            if bin_path.exists() && bin_path.is_dir() {
-                                if let Some(bin_str) = bin_path.to_str() {
-                                    detected_paths.push(bin_str.to_string());
-                                }
-                            }
-                        }
+    if mise_installs.exists()
+        && let Ok(entries) = std::fs::read_dir(&mise_installs)
+    {
+        for entry in entries.flatten() {
+            let tool_path = entry.path();
+            // Look for version directories under each tool (e.g., gemini/0.11.0/bin)
+            if tool_path.is_dir()
+                && let Ok(version_entries) = std::fs::read_dir(&tool_path)
+            {
+                for version_entry in version_entries.flatten() {
+                    let bin_path = version_entry.path().join("bin");
+                    if bin_path.exists()
+                        && bin_path.is_dir()
+                        && let Some(bin_str) = bin_path.to_str()
+                    {
+                        detected_paths.push(bin_str.to_string());
                     }
                 }
             }
@@ -212,18 +211,18 @@ fn detect_tool_manager_paths() -> Vec<String> {
 
     // asdf paths
     let asdf_shims = PathBuf::from(&home).join(".asdf/shims");
-    if asdf_shims.exists() {
-        if let Some(path_str) = asdf_shims.to_str() {
-            detected_paths.push(path_str.to_string());
-        }
+    if asdf_shims.exists()
+        && let Some(path_str) = asdf_shims.to_str()
+    {
+        detected_paths.push(path_str.to_string());
     }
 
     // volta paths
     let volta_bin = PathBuf::from(&home).join(".volta/bin");
-    if volta_bin.exists() {
-        if let Some(path_str) = volta_bin.to_str() {
-            detected_paths.push(path_str.to_string());
-        }
+    if volta_bin.exists()
+        && let Some(path_str) = volta_bin.to_str()
+    {
+        detected_paths.push(path_str.to_string());
     }
 
     detected_paths

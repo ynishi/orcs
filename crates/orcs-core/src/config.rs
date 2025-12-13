@@ -313,7 +313,7 @@ impl Default for OpenAIModelConfig {
 /// let custom_paths = &config.env_settings.additional_paths;
 /// let debug_enabled = config.debug_settings.enable_llm_debug;
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RootConfig {
     /// User profile configuration (name, background, etc.).
     /// Changes infrequently.
@@ -330,17 +330,6 @@ pub struct RootConfig {
     /// Controls debug logging of prompts and responses.
     #[serde(default)]
     pub debug_settings: DebugSettings,
-}
-
-impl Default for RootConfig {
-    fn default() -> Self {
-        Self {
-            user_profile: UserProfile::default(),
-            model_settings: ModelSettings::default(),
-            env_settings: EnvSettings::default(),
-            debug_settings: DebugSettings::default(),
-        }
-    }
 }
 
 impl Queryable for RootConfig {

@@ -231,10 +231,9 @@ pub async fn toggle_favorite_workspace(
         .get_workspace(&workspace_id)
         .await
         .map_err(|e| e.to_string())?
+        && let Err(e) = app.emit("workspace:update", &workspace)
     {
-        if let Err(e) = app.emit("workspace:update", &workspace) {
-            println!("[Backend] Failed to emit workspace:update: {}", e);
-        }
+        println!("[Backend] Failed to emit workspace:update: {}", e);
     }
 
     Ok(())
@@ -308,6 +307,7 @@ pub async fn upload_file_to_workspace(
 
 /// Uploads a file to a workspace from binary data
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn upload_file_from_bytes(
     workspace_id: String,
     filename: String,
@@ -371,10 +371,9 @@ pub async fn delete_file_from_workspace(
         .get_workspace(&workspace_id)
         .await
         .map_err(|e| e.to_string())?
+        && let Err(e) = app.emit("workspace:update", &workspace)
     {
-        if let Err(e) = app.emit("workspace:update", &workspace) {
-            tracing::error!("Failed to emit workspace:update: {}", e);
-        }
+        tracing::error!("Failed to emit workspace:update: {}", e);
     }
 
     Ok(())
@@ -401,10 +400,9 @@ pub async fn rename_file_in_workspace(
         .get_workspace(&workspace_id)
         .await
         .map_err(|e| e.to_string())?
+        && let Err(e) = app.emit("workspace:update", &workspace)
     {
-        if let Err(e) = app.emit("workspace:update", &workspace) {
-            tracing::error!("Failed to emit workspace:update: {}", e);
-        }
+        tracing::error!("Failed to emit workspace:update: {}", e);
     }
 
     Ok(result)
@@ -430,10 +428,9 @@ pub async fn toggle_workspace_file_archive(
         .get_workspace(&workspace_id)
         .await
         .map_err(|e| e.to_string())?
+        && let Err(e) = app.emit("workspace:update", &workspace)
     {
-        if let Err(e) = app.emit("workspace:update", &workspace) {
-            tracing::error!("Failed to emit workspace:update: {}", e);
-        }
+        tracing::error!("Failed to emit workspace:update: {}", e);
     }
 
     Ok(())
@@ -459,10 +456,9 @@ pub async fn toggle_workspace_file_favorite(
         .get_workspace(&workspace_id)
         .await
         .map_err(|e| e.to_string())?
+        && let Err(e) = app.emit("workspace:update", &workspace)
     {
-        if let Err(e) = app.emit("workspace:update", &workspace) {
-            tracing::error!("Failed to emit workspace:update: {}", e);
-        }
+        tracing::error!("Failed to emit workspace:update: {}", e);
     }
 
     Ok(())
@@ -489,10 +485,9 @@ pub async fn move_workspace_file_sort_order(
         .get_workspace(&workspace_id)
         .await
         .map_err(|e| e.to_string())?
+        && let Err(e) = app.emit("workspace:update", &workspace)
     {
-        if let Err(e) = app.emit("workspace:update", &workspace) {
-            tracing::error!("Failed to emit workspace:update: {}", e);
-        }
+        tracing::error!("Failed to emit workspace:update: {}", e);
     }
 
     Ok(())
@@ -519,10 +514,9 @@ pub async fn copy_file_to_workspace(
         .get_workspace(&target_workspace_id)
         .await
         .map_err(|e| e.to_string())?
+        && let Err(e) = app.emit("workspace:update", &workspace)
     {
-        if let Err(e) = app.emit("workspace:update", &workspace) {
-            tracing::error!("Failed to emit workspace:update: {}", e);
-        }
+        tracing::error!("Failed to emit workspace:update: {}", e);
     }
 
     Ok(result)

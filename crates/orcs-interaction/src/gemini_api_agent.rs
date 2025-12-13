@@ -78,7 +78,7 @@ impl GeminiApiAgent {
     ///
     /// Model name defaults to `gemini-2.5-flash` if not specified.
     pub async fn try_from_env() -> Result<Self, AgentError> {
-        let service = SecretServiceImpl::default().map_err(|e| {
+        let service = SecretServiceImpl::new_default().map_err(|e| {
             AgentError::ExecutionFailed(format!("Failed to initialize SecretService: {}", e))
         })?;
 
@@ -104,7 +104,7 @@ impl GeminiApiAgent {
     /// - Enables HIGH thinking level
     /// - Optionally enables Google Search tool
     pub async fn try_gemini_3_from_env(enable_search: bool) -> Result<Self, AgentError> {
-        let service = SecretServiceImpl::default().map_err(|e| {
+        let service = SecretServiceImpl::new_default().map_err(|e| {
             AgentError::ExecutionFailed(format!("Failed to initialize SecretService: {}", e))
         })?;
 
@@ -174,13 +174,10 @@ impl GeminiApiAgent {
     }
 
     async fn attachment_to_part(attachment: &Attachment) -> Result<Option<Part>, AgentError> {
-        match attachment {
-            Attachment::Remote(_) => {
-                return Err(AgentError::ExecutionFailed(
-                    "Remote attachments are not supported for Gemini API".into(),
-                ));
-            }
-            _ => {}
+        if let Attachment::Remote(_) = attachment {
+            return Err(AgentError::ExecutionFailed(
+                "Remote attachments are not supported for Gemini API".into(),
+            ));
         }
 
         let bytes = attachment.load_bytes().await.map_err(|err| {
@@ -229,24 +226,26 @@ impl GeminiApiAgent {
         }
 
         // Read response body as text first to preserve it for error reporting
-        let body_text = response
-            .text()
-            .await
-            .map_err(|err| AgentError::Other(format!("Failed to read Gemini response body: {err}")))?;
+        let body_text = response.text().await.map_err(|err| {
+            AgentError::Other(format!("Failed to read Gemini response body: {err}"))
+        })?;
 
         // Parse JSON from text
-        let parsed: GenerateContentResponse = serde_json::from_str(&body_text)
-            .map_err(|err| {
-                // Include both parse error and response body for debugging
-                let truncated_body = if body_text.len() > 500 {
-                    format!("{}... (truncated, total {} bytes)", &body_text[..500], body_text.len())
-                } else {
-                    body_text.clone()
-                };
-                AgentError::Other(format!(
-                    "Failed to parse Gemini response: {err}\n\nResponse body:\n{truncated_body}"
-                ))
-            })?;
+        let parsed: GenerateContentResponse = serde_json::from_str(&body_text).map_err(|err| {
+            // Include both parse error and response body for debugging
+            let truncated_body = if body_text.len() > 500 {
+                format!(
+                    "{}... (truncated, total {} bytes)",
+                    &body_text[..500],
+                    body_text.len()
+                )
+            } else {
+                body_text.clone()
+            };
+            AgentError::Other(format!(
+                "Failed to parse Gemini response: {err}\n\nResponse body:\n{truncated_body}"
+            ))
+        })?;
 
         extract_text_response(parsed)
     }

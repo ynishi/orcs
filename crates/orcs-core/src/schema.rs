@@ -308,7 +308,7 @@ impl From<SessionType> for crate::session::Session {
             auto_chat_config: None, // Excluded from SessionType
             is_muted: value.is_muted,
             context_mode: crate::session::ContextMode::default(), // Default to Rich
-            sandbox_state: None, // Default to non-sandbox mode
+            sandbox_state: None,                                  // Default to non-sandbox mode
         }
     }
 }

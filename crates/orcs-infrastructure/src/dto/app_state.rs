@@ -14,6 +14,7 @@ use orcs_core::state::model::{AppState, OpenTab};
 /// such as the last selected workspace ID.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.0.0")]
+#[derive(Default)]
 pub struct AppStateV1_0 {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.
@@ -26,6 +27,7 @@ pub struct AppStateV1_0 {
 /// Added default_workspace_id field for system workspace (ConfigDir).
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.1.0")]
+#[derive(Default)]
 pub struct AppStateV1_1 {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.
@@ -42,6 +44,7 @@ pub struct AppStateV1_1 {
 /// Added active_session_id field to track the currently active session.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.2.0")]
+#[derive(Default)]
 pub struct AppStateV1_2 {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.
@@ -63,6 +66,7 @@ pub struct AppStateV1_2 {
 /// Using placeholder pattern was a bad practice - if a value can be invalid, it should be Option.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.3.0")]
+#[derive(Default)]
 pub struct AppStateV1_3 {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.
@@ -95,6 +99,7 @@ pub struct OpenTabDTO {
 /// Added open_tabs and active_tab_id for tab management.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.4.0")]
+#[derive(Default)]
 pub struct AppStateV1_4 {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.
@@ -126,6 +131,7 @@ pub struct AppStateV1_4 {
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.5.0")]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub struct AppStateV1_5 {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.
@@ -180,6 +186,7 @@ pub struct OpenTabDTOV1_6 {
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.6.0")]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub struct AppStateV1_6 {
     /// ID of the last selected workspace.
     /// This is used to restore the workspace on application startup.
@@ -206,79 +213,6 @@ pub struct AppStateV1_6 {
 
 /// Type alias for the latest AppState version.
 pub type AppStateDTO = AppStateV1_6;
-
-impl Default for AppStateV1_0 {
-    fn default() -> Self {
-        Self {
-            last_selected_workspace_id: None,
-        }
-    }
-}
-
-impl Default for AppStateV1_1 {
-    fn default() -> Self {
-        Self {
-            last_selected_workspace_id: None,
-            default_workspace_id: None,
-        }
-    }
-}
-
-impl Default for AppStateV1_2 {
-    fn default() -> Self {
-        Self {
-            last_selected_workspace_id: None,
-            default_workspace_id: None,
-            active_session_id: None,
-        }
-    }
-}
-
-impl Default for AppStateV1_3 {
-    fn default() -> Self {
-        Self {
-            last_selected_workspace_id: None,
-            default_workspace_id: None,
-            active_session_id: None,
-        }
-    }
-}
-
-impl Default for AppStateV1_4 {
-    fn default() -> Self {
-        Self {
-            last_selected_workspace_id: None,
-            default_workspace_id: None,
-            active_session_id: None,
-            open_tabs: Vec::new(),
-            active_tab_id: None,
-        }
-    }
-}
-
-impl Default for AppStateV1_5 {
-    fn default() -> Self {
-        Self {
-            last_selected_workspace_id: None,
-            default_workspace_id: None,
-            active_session_id: None,
-            open_tabs: Vec::new(),
-            active_tab_id: None,
-        }
-    }
-}
-
-impl Default for AppStateV1_6 {
-    fn default() -> Self {
-        Self {
-            last_selected_workspace_id: None,
-            default_workspace_id: None,
-            active_session_id: None,
-            open_tabs: Vec::new(),
-            active_tab_id: None,
-        }
-    }
-}
 
 // ============================================================================
 // Migration implementations

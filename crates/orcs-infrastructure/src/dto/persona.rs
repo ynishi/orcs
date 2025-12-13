@@ -7,35 +7,26 @@ use version_migrate::{IntoDomain, MigratesTo, Versioned};
 use orcs_core::persona::{GeminiOptions, Persona, PersonaBackend, PersonaSource};
 
 /// Represents the source of a persona.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PersonaSourceDTO {
     System,
+    #[default]
     User,
     Adhoc,
-}
-
-impl Default for PersonaSourceDTO {
-    fn default() -> Self {
-        PersonaSourceDTO::User
-    }
 }
 
 /// Represents backend options for a persona.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum PersonaBackendDTO {
+    #[default]
     ClaudeCli,
     ClaudeApi,
     GeminiCli,
     GeminiApi,
     OpenAiApi,
     CodexCli,
-}
-
-impl Default for PersonaBackendDTO {
-    fn default() -> Self {
-        PersonaBackendDTO::ClaudeCli
-    }
 }
 
 /// Gemini-specific options DTO

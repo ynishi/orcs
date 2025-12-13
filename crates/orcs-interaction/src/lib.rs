@@ -585,31 +585,31 @@ impl InteractionManager {
         // Convert to DialogueTurn with explicit Speaker attribution
         all_messages
             .iter()
-            .filter_map(|(persona_id, _, msg)| {
+            .map(|(persona_id, _, msg)| {
                 match msg.role {
                     MessageRole::User => {
                         // User input with explicit User speaker
                         let user_name = self.user_service.get_user_name();
-                        Some(DialogueTurn {
+                        DialogueTurn {
                             speaker: Speaker::user(user_name, "User"),
                             content: msg.content.clone(),
-                        })
+                        }
                     }
                     MessageRole::Assistant => {
                         // Assistant response - convert persona_id to Agent speaker
-                        // Note: We cannot await inside filter_map, so we'll use a fallback
+                        // Note: We cannot await inside map, so we'll use a fallback
                         // This is acceptable because we're just displaying the history
-                        Some(DialogueTurn {
+                        DialogueTurn {
                             speaker: Speaker::agent(persona_id, "Agent"),
                             content: msg.content.clone(),
-                        })
+                        }
                     }
                     MessageRole::System => {
                         // System/Error messages included in dialogue history
-                        Some(DialogueTurn {
+                        DialogueTurn {
                             speaker: Speaker::System,
                             content: msg.content.clone(),
-                        })
+                        }
                     }
                 }
             })
@@ -633,9 +633,9 @@ impl InteractionManager {
         let history_turns = self.rebuild_dialogue_history().await;
 
         // Read current talk style (only in Rich mode)
-        let context_mode = self.context_mode.read().await.clone();
+        let context_mode = *self.context_mode.read().await;
         let talk_style = if matches!(context_mode, ContextMode::Rich) {
-            self.talk_style.read().await.clone()
+            *self.talk_style.read().await
         } else {
             None // Clean mode: no talk style
         };
@@ -659,11 +659,11 @@ impl InteractionManager {
                  - 建設的で協調的なコミュニケーションを心がけてください"
             .to_string();
 
-        if let Some(extension) = self.prompt_extension.read().await.clone() {
-            if !extension.trim().is_empty() {
-                additional_context.push_str("\n\n");
-                additional_context.push_str(&extension);
-            }
+        if let Some(extension) = self.prompt_extension.read().await.clone()
+            && !extension.trim().is_empty()
+        {
+            additional_context.push_str("\n\n");
+            additional_context.push_str(&extension);
         }
 
         dialogue
@@ -806,9 +806,9 @@ impl InteractionManager {
         }
 
         let conversation_mode = self.conversation_mode.read().await.clone();
-        let talk_style = self.talk_style.read().await.clone();
+        let talk_style = *self.talk_style.read().await;
         let auto_chat_config = self.auto_chat_config.read().await.clone();
-        let is_muted = self.is_muted.read().await.clone();
+        let is_muted = *self.is_muted.read().await;
 
         Session {
             id: self.session_id.clone(),
@@ -834,7 +834,7 @@ impl InteractionManager {
             sort_order: None,
             auto_chat_config,
             is_muted,
-            context_mode: self.context_mode.read().await.clone(),
+            context_mode: *self.context_mode.read().await,
             sandbox_state: self.sandbox_state.read().await.clone(),
         }
     }
@@ -954,7 +954,7 @@ impl InteractionManager {
                 return Err(
                     "Dialogue was invalidated during initialization (possible race condition)"
                         .to_string(),
-                )
+                );
             }
         };
         let agent = agent_for_persona(
@@ -1032,7 +1032,7 @@ impl InteractionManager {
                 return Err(
                     "Dialogue was invalidated during initialization (possible race condition)"
                         .to_string(),
-                )
+                );
             }
         };
         dialogue
@@ -1112,7 +1112,7 @@ impl InteractionManager {
                 return Err(
                     "Dialogue was invalidated during initialization (possible race condition)"
                         .to_string(),
-                )
+                );
             }
         };
 
@@ -1261,7 +1261,7 @@ impl InteractionManager {
 
     /// Gets the current talk style.
     pub async fn get_talk_style(&self) -> Option<TalkStyle> {
-        self.talk_style.read().await.clone()
+        *self.talk_style.read().await
     }
 
     /// Sets an additional prompt extension that will be appended to the system prompt.
@@ -1435,7 +1435,7 @@ impl InteractionManager {
         let mut payload = Payload::new().with_message(speaker, message);
 
         // Prepend conversation mode system instruction if available (Rich mode only)
-        let context_mode = self.context_mode.read().await.clone();
+        let context_mode = *self.context_mode.read().await;
         if matches!(context_mode, ContextMode::Rich) {
             let conversation_mode = self.conversation_mode.read().await;
             if let Some(instruction) = conversation_mode.system_instruction() {
@@ -1598,7 +1598,7 @@ impl InteractionManager {
         let mut payload = Payload::new().with_message(speaker, input);
 
         // Prepend conversation mode system instruction if available (Rich mode only)
-        let context_mode = self.context_mode.read().await.clone();
+        let context_mode = *self.context_mode.read().await;
         if matches!(context_mode, ContextMode::Rich) {
             let conversation_mode = self.conversation_mode.read().await;
             if let Some(instruction) = conversation_mode.system_instruction() {
@@ -1764,11 +1764,11 @@ impl InteractionManager {
 
         while current_iteration < config.max_iterations {
             // Check cancellation flag
-            if let Some(ref flag) = cancel_flag {
-                if flag.load(std::sync::atomic::Ordering::SeqCst) {
-                    tracing::info!("[AutoChat] Cancelled by user");
-                    break;
-                }
+            if let Some(ref flag) = cancel_flag
+                && flag.load(std::sync::atomic::Ordering::SeqCst)
+            {
+                tracing::info!("[AutoChat] Cancelled by user");
+                break;
             }
 
             // Check if user manually stopped (set_auto_chat_iteration(None))
@@ -1813,11 +1813,10 @@ impl InteractionManager {
             if matches!(
                 config.stop_condition,
                 orcs_core::session::StopCondition::UserInterrupt
-            ) {
-                if self.get_auto_chat_iteration().await.is_none() {
-                    tracing::info!("[AutoChat] User interrupt detected");
-                    break;
-                }
+            ) && self.get_auto_chat_iteration().await.is_none()
+            {
+                tracing::info!("[AutoChat] User interrupt detected");
+                break;
             }
         }
 

@@ -216,29 +216,30 @@ pub async fn execute_shell_command(
         (dir, path)
     } else {
         // Default to workspace directory from active session
-        let (workspace, sandbox_state) = if let Some(session_mgr) = state.session_usecase.active_session().await {
-            let app_mode = state.app_mode.lock().await.clone();
-            let session = session_mgr
-                .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
-                .await;
+        let (workspace, sandbox_state) =
+            if let Some(session_mgr) = state.session_usecase.active_session().await {
+                let app_mode = state.app_mode.lock().await.clone();
+                let session = session_mgr
+                    .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+                    .await;
 
-            let sandbox = session.sandbox_state.clone();
+                let sandbox = session.sandbox_state.clone();
 
-            if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
-                let workspace_id = &session.workspace_id;
-                let ws = state
-                    .workspace_storage_service
-                    .get_workspace(workspace_id)
-                    .await
-                    .map_err(|e| format!("Failed to get workspace: {}", e))?
-                    .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
-                (ws, sandbox)
+                if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
+                    let workspace_id = &session.workspace_id;
+                    let ws = state
+                        .workspace_storage_service
+                        .get_workspace(workspace_id)
+                        .await
+                        .map_err(|e| format!("Failed to get workspace: {}", e))?
+                        .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
+                    (ws, sandbox)
+                } else {
+                    return Err("No workspace associated with current session".to_string());
+                }
             } else {
-                return Err("No workspace associated with current session".to_string());
-            }
-        } else {
-            return Err("No active session".to_string());
-        };
+                return Err("No active session".to_string());
+            };
 
         // Check if session is in sandbox mode
         if let Some(sandbox) = sandbox_state {

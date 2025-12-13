@@ -19,19 +19,14 @@ use version_migrate::DeriveQueryable as Queryable;
 /// # JSON Serialization Format
 ///
 /// Uses `#[serde(rename_all = "snake_case")]` to serialize as "system" or "user".
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PresetSource {
     /// System-provided default presets
     System,
     /// User-created custom presets
+    #[default]
     User,
-}
-
-impl Default for PresetSource {
-    fn default() -> Self {
-        PresetSource::User
-    }
 }
 
 /// A dialogue preset configuration.
@@ -122,7 +117,9 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             id: "preset-discussion".to_string(),
             name: "Deep Discussion".to_string(),
             icon: Some("💭".to_string()),
-            description: Some("Broadcast + Discussion + Debate: Deep discussion with everyone".to_string()),
+            description: Some(
+                "Broadcast + Discussion + Debate: Deep discussion with everyone".to_string(),
+            ),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Discussion,
             talk_style: Some(TalkStyle::Debate),
@@ -134,7 +131,8 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             name: "Quick Decision".to_string(),
             icon: Some("⚡".to_string()),
             description: Some(
-                "Broadcast + Brief + DecisionMaking: Gather everyone's opinions concisely".to_string(),
+                "Broadcast + Brief + DecisionMaking: Gather everyone's opinions concisely"
+                    .to_string(),
             ),
             execution_strategy: ExecutionModel::Broadcast,
             conversation_mode: ConversationMode::Brief,
@@ -146,7 +144,10 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             id: "preset-problem-solving".to_string(),
             name: "Problem Solving".to_string(),
             icon: Some("🔧".to_string()),
-            description: Some("Sequential + Concise + ProblemSolving: Sequential solution exploration".to_string()),
+            description: Some(
+                "Sequential + Concise + ProblemSolving: Sequential solution exploration"
+                    .to_string(),
+            ),
             execution_strategy: ExecutionModel::Sequential,
             conversation_mode: ConversationMode::Concise,
             talk_style: Some(TalkStyle::ProblemSolving),
@@ -221,7 +222,7 @@ mod tests {
             .find(|p| p.id == "preset-brainstorm")
             .expect("Brainstorm preset should exist");
 
-        assert_eq!(brainstorm.name, "アイデア出し");
+        assert_eq!(brainstorm.name, "Brainstorm");
         assert_eq!(brainstorm.icon, Some("💡".to_string()));
         assert!(matches!(
             brainstorm.execution_strategy,
@@ -239,7 +240,7 @@ mod tests {
             .find(|p| p.id == "preset-code-review")
             .expect("Code review preset should exist");
 
-        assert_eq!(code_review.name, "コードレビュー");
+        assert_eq!(code_review.name, "Code Review");
         assert_eq!(code_review.icon, Some("🔍".to_string()));
         assert!(matches!(
             code_review.execution_strategy,

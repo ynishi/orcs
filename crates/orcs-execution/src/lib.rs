@@ -57,6 +57,12 @@ pub struct TaskExecutor {
     utility_service: Option<Arc<UtilityAgentService>>,
 }
 
+impl Default for TaskExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskExecutor {
     /// Creates a new `TaskExecutor` instance with ClaudeCodeAgent.
     pub fn new() -> Self {
@@ -171,10 +177,7 @@ impl TaskExecutor {
         );
 
         if let Some(ref ctx) = thread_context {
-            tracing::info!(
-                "Task has thread context ({} chars)",
-                ctx.len()
-            );
+            tracing::info!("Task has thread context ({} chars)", ctx.len());
         }
 
         if let Some(ref root) = workspace_root {
@@ -185,10 +188,7 @@ impl TaskExecutor {
 
         // Build full task content with context if provided
         let full_message_content = if let Some(ref ctx) = thread_context {
-            format!(
-                "## Thread Context\n{}\n\n## Task\n{}",
-                ctx, message_content
-            )
+            format!("## Thread Context\n{}\n\n## Task\n{}", ctx, message_content)
         } else {
             message_content.clone()
         };
@@ -243,10 +243,10 @@ impl TaskExecutor {
         };
 
         // 🚀 STEP 1: Save immediately with Pending status (for instant UI display)
-        if let Some(repo) = &self.task_repository {
-            if let Err(e) = repo.save(&task).await {
-                tracing::warn!("Failed to save initial task record: {}", e);
-            }
+        if let Some(repo) = &self.task_repository
+            && let Err(e) = repo.save(&task).await
+        {
+            tracing::warn!("Failed to save initial task record: {}", e);
         }
 
         // Send task created event
@@ -278,18 +278,18 @@ impl TaskExecutor {
         task.title = generated_title;
         task.updated_at = chrono::Utc::now().to_rfc3339();
 
-        if let Some(repo) = &self.task_repository {
-            if let Err(e) = repo.save(&task).await {
-                tracing::warn!("Failed to update task title: {}", e);
-            }
+        if let Some(repo) = &self.task_repository
+            && let Err(e) = repo.save(&task).await
+        {
+            tracing::warn!("Failed to update task title: {}", e);
         }
 
         task.status = TaskStatus::Running;
         task.updated_at = chrono::Utc::now().to_rfc3339();
-        if let Some(repo) = &self.task_repository {
-            if let Err(e) = repo.save(&task).await {
-                tracing::warn!("Failed to update task to Running: {}", e);
-            }
+        if let Some(repo) = &self.task_repository
+            && let Err(e) = repo.save(&task).await
+        {
+            tracing::warn!("Failed to update task to Running: {}", e);
         }
 
         if let Some(sender) = &self.event_sender {
@@ -399,10 +399,10 @@ impl TaskExecutor {
                 .and_then(|j| serde_json::to_string_pretty(j).ok());
 
             // Save final task record
-            if let Some(repo) = &self.task_repository {
-                if let Err(e) = repo.save(&task).await {
-                    tracing::warn!("Failed to save completed task record: {}", e);
-                }
+            if let Some(repo) = &self.task_repository
+                && let Err(e) = repo.save(&task).await
+            {
+                tracing::warn!("Failed to save completed task record: {}", e);
             }
 
             // Send task completed event
@@ -440,10 +440,10 @@ impl TaskExecutor {
                 .and_then(|j| serde_json::to_string_pretty(j).ok());
 
             // Save failed task record
-            if let Some(repo) = &self.task_repository {
-                if let Err(e) = repo.save(&task).await {
-                    tracing::warn!("Failed to save failed task record: {}", e);
-                }
+            if let Some(repo) = &self.task_repository
+                && let Err(e) = repo.save(&task).await
+            {
+                tracing::warn!("Failed to save failed task record: {}", e);
             }
 
             // Send task failed event

@@ -154,7 +154,7 @@ impl FileSystemWorkspaceManager {
     }
 
     pub fn workspace_data_path(&self) -> &Path {
-        &self.workspace_repository.base_dir()
+        self.workspace_repository.base_dir()
     }
 
     /// Gets the workspace directory path for a given workspace ID.
@@ -944,8 +944,10 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
         })?;
 
         // Determine the filename, handling conflicts
-        let final_filename =
-            generate_unique_filename(&source_file.name, &target_workspace.resources.uploaded_files);
+        let final_filename = generate_unique_filename(
+            &source_file.name,
+            &target_workspace.resources.uploaded_files,
+        );
         let dest_path = uploaded_dir.join(&final_filename);
 
         // Write the file to the target workspace
@@ -1420,7 +1422,10 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(updated_target.resources.uploaded_files.len(), 1);
-        assert_eq!(updated_target.resources.uploaded_files[0].id, copied_file.id);
+        assert_eq!(
+            updated_target.resources.uploaded_files[0].id,
+            copied_file.id
+        );
 
         // Verify source file still exists
         let updated_source = manager
@@ -1461,13 +1466,27 @@ mod tests {
 
         // Add a file to source workspace
         let source_file = manager
-            .add_file_from_bytes(&source_workspace.id, "test.txt", b"Source content", None, None, None)
+            .add_file_from_bytes(
+                &source_workspace.id,
+                "test.txt",
+                b"Source content",
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 
         // Add a file with the same name to target workspace
         let _existing_file = manager
-            .add_file_from_bytes(&target_workspace.id, "test.txt", b"Existing content", None, None, None)
+            .add_file_from_bytes(
+                &target_workspace.id,
+                "test.txt",
+                b"Existing content",
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 

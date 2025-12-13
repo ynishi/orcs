@@ -216,19 +216,23 @@ pub async fn execute_shell_command(
         (dir, path)
     } else {
         // Default to workspace directory from active session
-        let workspace = if let Some(session_mgr) = state.session_usecase.active_session().await {
+        let (workspace, sandbox_state) = if let Some(session_mgr) = state.session_usecase.active_session().await {
             let app_mode = state.app_mode.lock().await.clone();
             let session = session_mgr
                 .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
                 .await;
+
+            let sandbox = session.sandbox_state.clone();
+
             if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
                 let workspace_id = &session.workspace_id;
-                state
+                let ws = state
                     .workspace_storage_service
                     .get_workspace(workspace_id)
                     .await
                     .map_err(|e| format!("Failed to get workspace: {}", e))?
-                    .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?
+                    .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
+                (ws, sandbox)
             } else {
                 return Err("No workspace associated with current session".to_string());
             }
@@ -236,10 +240,19 @@ pub async fn execute_shell_command(
             return Err("No active session".to_string());
         };
 
-        let dir = workspace.root_path.to_string_lossy().to_string();
-        tracing::info!("execute_shell_command: Using workspace dir: {}", dir);
-        cmd.current_dir(&workspace.root_path);
-        (dir, workspace.root_path)
+        // Check if session is in sandbox mode
+        if let Some(sandbox) = sandbox_state {
+            let sandbox_path = std::path::PathBuf::from(&sandbox.worktree_path);
+            let dir = sandbox_path.to_string_lossy().to_string();
+            tracing::info!("execute_shell_command: Using sandbox worktree dir: {}", dir);
+            cmd.current_dir(&sandbox_path);
+            (dir, sandbox_path)
+        } else {
+            let dir = workspace.root_path.to_string_lossy().to_string();
+            tracing::info!("execute_shell_command: Using workspace dir: {}", dir);
+            cmd.current_dir(&workspace.root_path);
+            (dir, workspace.root_path)
+        }
     };
 
     // Build enhanced PATH from workspace root (without env_settings for now)

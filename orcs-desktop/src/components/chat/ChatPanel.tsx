@@ -53,6 +53,7 @@ interface ChatPanelProps {
   talkStyle: string | null;
   executionStrategy: string;
   contextMode: ContextMode;
+  sandboxState?: import('../../bindings/generated').SandboxState | null;
   personas: PersonaConfig[];
   activeParticipantIds: string[];
   workspace: Workspace | null;
@@ -154,6 +155,7 @@ export function ChatPanel({
   talkStyle,
   executionStrategy,
   contextMode,
+  sandboxState,
   personas,
   activeParticipantIds,
   workspace,
@@ -1197,6 +1199,7 @@ export function ChatPanel({
         talkStyle={talkStyle}
         executionStrategy={executionStrategy}
         contextMode={contextMode}
+        sandboxState={sandboxState}
         personas={personas}
         activeParticipantIds={activeParticipantIds}
         dialoguePresets={dialoguePresets}

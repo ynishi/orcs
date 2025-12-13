@@ -69,6 +69,9 @@ function App() {
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
+  const [sandboxExitModalOpened, setSandboxExitModalOpened] = useState(false);
+  const [pendingSandboxExit, setPendingSandboxExit] = useState<import('./bindings/generated').SandboxState | null>(null);
+  const [currentSandboxState, setCurrentSandboxState] = useState<import('./bindings/generated').SandboxState | null>(null);
 
   // Task Store
   const {
@@ -204,6 +207,26 @@ function App() {
 
     checkForAppUpdates();
   }, []);
+
+  // Load sandbox state when active session changes
+  useEffect(() => {
+    const loadSandboxState = async () => {
+      if (!currentSessionId) {
+        setCurrentSandboxState(null);
+        return;
+      }
+
+      try {
+        const sandboxState = await invoke<import('./bindings/generated').SandboxState | null>('get_sandbox_state');
+        setCurrentSandboxState(sandboxState);
+      } catch (error) {
+        console.error('[App] Failed to load sandbox state:', error);
+        setCurrentSandboxState(null);
+      }
+    };
+
+    loadSandboxState();
+  }, [currentSessionId]);
 
   // Restore last selected workspace on app startup (Phase 3)
   useEffect(() => {
@@ -390,6 +413,126 @@ function App() {
   // Handler for cancelling tab close
   const handleCancelCloseTab = () => {
     setClosingTabId(null);
+  };
+
+  // Handler for sandbox exit with merge
+  const handleSandboxExitMerge = async () => {
+    if (!pendingSandboxExit) return;
+
+    const sandboxState = pendingSandboxExit;
+    setPendingSandboxExit(null);
+    setSandboxExitModalOpened(false);
+
+    try {
+      await handleAndPersistSystemMessage(
+        conversationMessage(
+          `Exiting sandbox mode...\n\nBranch: ${sandboxState.sandbox_branch}\n\nMerging changes back to ${sandboxState.original_branch}...`,
+          'info',
+          '🚪'
+        ),
+        addMessage,
+        invoke
+      );
+
+      await invoke('exit_sandbox_worktree', {
+        options: {
+          worktreePath: sandboxState.worktree_path,
+          originalBranch: sandboxState.original_branch,
+          sandboxBranch: sandboxState.sandbox_branch,
+          merge: true,
+        },
+      });
+
+      await invoke('exit_sandbox_mode');
+
+      // Clear current sandbox state
+      setCurrentSandboxState(null);
+
+      await handleAndPersistSystemMessage(
+        conversationMessage(
+          `Exited sandbox mode successfully!\n\nChanges have been merged to ${sandboxState.original_branch}.`,
+          'success',
+          '✅'
+        ),
+        addMessage,
+        invoke
+      );
+      await saveCurrentSession();
+    } catch (error) {
+      console.error('Failed to exit sandbox mode:', error);
+      await handleAndPersistSystemMessage(
+        conversationMessage(
+          `Failed to exit sandbox mode: ${error}\n\nYou may need to manually clean up the worktree.`,
+          'error'
+        ),
+        addMessage,
+        invoke
+      );
+      await saveCurrentSession();
+    }
+  };
+
+  // Handler for sandbox exit with discard
+  const handleSandboxExitDiscard = async () => {
+    if (!pendingSandboxExit) return;
+
+    const sandboxState = pendingSandboxExit;
+    setPendingSandboxExit(null);
+    setSandboxExitModalOpened(false);
+
+    try {
+      await handleAndPersistSystemMessage(
+        conversationMessage(
+          `Exiting sandbox mode...\n\nBranch: ${sandboxState.sandbox_branch}\n\nDiscarding all changes...`,
+          'info',
+          '🚪'
+        ),
+        addMessage,
+        invoke
+      );
+
+      await invoke('exit_sandbox_worktree', {
+        options: {
+          worktreePath: sandboxState.worktree_path,
+          originalBranch: sandboxState.original_branch,
+          sandboxBranch: sandboxState.sandbox_branch,
+          merge: false,
+        },
+      });
+
+      await invoke('exit_sandbox_mode');
+
+      // Clear current sandbox state
+      setCurrentSandboxState(null);
+
+      await handleAndPersistSystemMessage(
+        conversationMessage(
+          `Exited sandbox mode successfully!\n\nChanges have been discarded.`,
+          'success',
+          '✅'
+        ),
+        addMessage,
+        invoke
+      );
+      await saveCurrentSession();
+    } catch (error) {
+      console.error('Failed to exit sandbox mode:', error);
+      await handleAndPersistSystemMessage(
+        conversationMessage(
+          `Failed to exit sandbox mode: ${error}\n\nYou may need to manually clean up the worktree.`,
+          'error'
+        ),
+        addMessage,
+        invoke
+      );
+      await saveCurrentSession();
+    }
+  };
+
+  // Handler for cancelling sandbox exit
+  const handleCancelSandboxExit = () => {
+    setPendingSandboxExit(null);
+    setSandboxExitModalOpened(false);
   };
 
   const activeTabScrollKey = useMemo(() => {
@@ -1158,6 +1301,13 @@ function App() {
     },
     refreshPersonas: loadPersonas,
     refreshSessions,
+    onRequestSandboxExit: (sandboxState) => {
+      setPendingSandboxExit(sandboxState);
+      setSandboxExitModalOpened(true);
+    },
+    onSandboxEntered: (sandboxState) => {
+      setCurrentSandboxState(sandboxState);
+    },
   });
 
   useEffect(() => {
@@ -2550,6 +2700,7 @@ function App() {
               talkStyle={talkStyle}
               executionStrategy={executionStrategy}
               contextMode={contextMode}
+              sandboxState={activeTabId === tab.id ? currentSandboxState : null}
                       personas={personas}
                       activeParticipantIds={activeParticipantIds}
                       workspace={workspace}
@@ -2621,6 +2772,45 @@ function App() {
             </Button>
             <Button color="red" onClick={handleConfirmCloseTab}>
               Close
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Sandbox exit confirmation modal */}
+      <Modal
+        opened={sandboxExitModalOpened}
+        onClose={handleCancelSandboxExit}
+        title="Exit Sandbox Mode"
+        centered
+        size="md"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            You are currently in sandbox mode.
+          </Text>
+          {pendingSandboxExit && (
+            <Paper p="sm" bg="dark.6" style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+              <Text size="xs" c="dimmed">Branch:</Text>
+              <Text size="sm">{pendingSandboxExit.sandbox_branch}</Text>
+              <Text size="xs" c="dimmed" mt="xs">Worktree:</Text>
+              <Text size="sm" style={{ wordBreak: 'break-all' }}>
+                {pendingSandboxExit.worktree_path}
+              </Text>
+            </Paper>
+          )}
+          <Text size="sm" fw={500}>
+            What would you like to do with your changes?
+          </Text>
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={handleCancelSandboxExit}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleSandboxExitDiscard}>
+              Discard Changes
+            </Button>
+            <Button color="blue" onClick={handleSandboxExitMerge}>
+              Merge Changes
             </Button>
           </Group>
         </Stack>

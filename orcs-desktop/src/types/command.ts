@@ -129,6 +129,20 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     examples: ['/create-workspace {"name": "my-workspace", ...}'],
     argsDescription: 'JSON workspace definition',
   },
+  {
+    name: 'sandbox',
+    icon: '🔬',
+    description: 'Enter sandbox mode with isolated git worktree',
+    usage: '/sandbox',
+    examples: ['/sandbox'],
+  },
+  {
+    name: 'exit-sandbox',
+    icon: '🚪',
+    description: 'Exit sandbox mode (prompts for merge or discard)',
+    usage: '/exit-sandbox',
+    examples: ['/exit-sandbox'],
+  },
 ];
 
 /**

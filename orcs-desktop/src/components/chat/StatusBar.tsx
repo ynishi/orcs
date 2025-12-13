@@ -24,6 +24,7 @@ interface StatusBarProps {
   talkStyle?: string | null;
   executionStrategy?: string;
   contextMode?: ContextMode;
+  sandboxState?: import('../../bindings/generated').SandboxState | null;
   personas?: PersonaConfig[];
   activeParticipantIds?: string[];
   dialoguePresets?: DialoguePreset[];
@@ -35,7 +36,7 @@ interface StatusBarProps {
   onApplyPreset?: (presetId: string) => void;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', contextMode = 'rich', personas = [], activeParticipantIds = [], dialoguePresets = [], onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange, onContextModeChange, onToggleParticipant, onApplyPreset }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', contextMode = 'rich', sandboxState = null, personas = [], activeParticipantIds = [], dialoguePresets = [], onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange, onContextModeChange, onToggleParticipant, onApplyPreset }: StatusBarProps) {
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -340,6 +341,18 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
                 </>
               )}
             </Group>
+          </>
+        )}
+
+        {/* Sandbox Mode Indicator */}
+        {sandboxState && (
+          <>
+            <Divider orientation="vertical" />
+            <Tooltip label={`Worktree: ${sandboxState.worktree_path}`} withArrow>
+              <Badge color="orange" size="sm" variant="filled">
+                🔬 Sandbox: {sandboxState.sandbox_branch}
+              </Badge>
+            </Tooltip>
           </>
         )}
       </Group>

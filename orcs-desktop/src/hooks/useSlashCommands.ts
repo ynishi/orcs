@@ -46,6 +46,8 @@ interface UseSlashCommandsProps {
   setInput: (value: string) => void;
   refreshPersonas: () => Promise<void>;
   refreshSessions: () => Promise<void>;
+  onRequestSandboxExit?: (sandboxState: import('../bindings/generated').SandboxState) => void;
+  onSandboxEntered?: (sandboxState: import('../bindings/generated').SandboxState) => void;
 }
 
 export function useSlashCommands({
@@ -62,6 +64,8 @@ export function useSlashCommands({
   setInput,
   refreshPersonas,
   refreshSessions,
+  onRequestSandboxExit,
+  onSandboxEntered,
 }: UseSlashCommandsProps) {
   /**
    * SlashCommandを処理する
@@ -732,6 +736,150 @@ Generate the BlueprintWorkflow now.`;
                   invoke
                 );
               }
+            }
+            await saveCurrentSession();
+            break;
+
+          case 'sandbox':
+            try {
+              // Check if already in sandbox mode
+              const currentSandboxState = await invoke<import('../bindings/generated').SandboxState | null>('get_sandbox_state');
+              if (currentSandboxState) {
+                await handleAndPersistSystemMessage(
+                  conversationMessage(
+                    `Already in sandbox mode.\nBranch: ${currentSandboxState.sandbox_branch}\nPath: ${currentSandboxState.worktree_path}\n\nUse /exit-sandbox to exit.`,
+                    'error'
+                  ),
+                  addMessage,
+                  invoke
+                );
+                await saveCurrentSession();
+                break;
+              }
+
+              // Get current session ID
+              const activeSession = await invoke<import('../types/session').Session | null>('get_active_session');
+              if (!activeSession) {
+                await handleAndPersistSystemMessage(
+                  conversationMessage('No active session', 'error'),
+                  addMessage,
+                  invoke
+                );
+                await saveCurrentSession();
+                break;
+              }
+
+              await handleAndPersistSystemMessage(
+                conversationMessage('Creating sandbox worktree...', 'info', '🔬'),
+                addMessage,
+                invoke
+              );
+
+              // Create sandbox worktree
+              const result = await invoke<{
+                worktree_path: string;
+                original_branch: string;
+                sandbox_branch: string;
+              }>('create_sandbox_worktree', {
+                sessionId: activeSession.id,
+              });
+
+              // Save sandbox state to session
+              await invoke('enter_sandbox_mode', {
+                worktreePath: result.worktree_path,
+                originalBranch: result.original_branch,
+                sandboxBranch: result.sandbox_branch,
+              });
+
+              // Notify parent component of sandbox entry
+              const sandboxState = {
+                worktree_path: result.worktree_path,
+                original_branch: result.original_branch,
+                sandbox_branch: result.sandbox_branch,
+              };
+              onSandboxEntered?.(sandboxState);
+
+              await handleAndPersistSystemMessage(
+                conversationMessage(
+                  `Entered sandbox mode!\n\nBranch: ${result.sandbox_branch}\nPath: ${result.worktree_path}\n\nYou can now experiment freely. Use /exit-sandbox when done.`,
+                  'success',
+                  '✅'
+                ),
+                addMessage,
+                invoke
+              );
+            } catch (error) {
+              console.error('Failed to enter sandbox mode:', error);
+              await handleAndPersistSystemMessage(
+                conversationMessage(`Failed to enter sandbox mode: ${error}`, 'error'),
+                addMessage,
+                invoke
+              );
+            }
+            await saveCurrentSession();
+            break;
+
+          case 'exit-sandbox':
+            try {
+              // Get current sandbox state
+              const sandboxState = await invoke<import('../bindings/generated').SandboxState | null>('get_sandbox_state');
+              if (!sandboxState) {
+                await handleAndPersistSystemMessage(
+                  conversationMessage('Not in sandbox mode', 'error'),
+                  addMessage,
+                  invoke
+                );
+                await saveCurrentSession();
+                break;
+              }
+
+              // Request sandbox exit via callback (will show modal dialog)
+              if (onRequestSandboxExit) {
+                onRequestSandboxExit(sandboxState);
+                // Modal will handle the actual exit logic
+              } else {
+                // Fallback: exit without confirmation (shouldn't happen in normal usage)
+                await handleAndPersistSystemMessage(
+                  conversationMessage(
+                    `Exiting sandbox mode...\n\nBranch: ${sandboxState.sandbox_branch}\n\nMerging changes back to ${sandboxState.original_branch}...`,
+                    'info',
+                    '🚪'
+                  ),
+                  addMessage,
+                  invoke
+                );
+
+                await invoke('exit_sandbox_worktree', {
+                  options: {
+                    worktreePath: sandboxState.worktree_path,
+                    originalBranch: sandboxState.original_branch,
+                    sandboxBranch: sandboxState.sandbox_branch,
+                    merge: true,
+                  },
+                });
+
+                await invoke('exit_sandbox_mode');
+
+                await handleAndPersistSystemMessage(
+                  conversationMessage(
+                    `Exited sandbox mode successfully!\n\nChanges have been merged to ${sandboxState.original_branch}.`,
+                    'success',
+                    '✅'
+                  ),
+                  addMessage,
+                  invoke
+                );
+              }
+            } catch (error) {
+              console.error('Failed to exit sandbox mode:', error);
+              await handleAndPersistSystemMessage(
+                conversationMessage(
+                  `Failed to exit sandbox mode: ${error}\n\nYou may need to manually clean up the worktree.`,
+                  'error'
+                ),
+                addMessage,
+                invoke
+              );
             }
             await saveCurrentSession();
             break;

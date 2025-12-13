@@ -493,6 +493,19 @@ impl SessionUseCase {
                         )
                         .await;
 
+                    // Check if session is in sandbox mode - if so, override workspace root
+                    let sandbox_state = manager.get_sandbox_state().await;
+                    if let Some(sandbox) = sandbox_state {
+                        use std::path::PathBuf;
+                        tracing::info!(
+                            "[SessionUseCase] Session is in sandbox mode, setting agent CWD to: {}",
+                            sandbox.worktree_path
+                        );
+                        manager
+                            .set_agent_workspace_root(Some(PathBuf::from(&sandbox.worktree_path)))
+                            .await;
+                    }
+
                     // Update workspace last active session
                     workspace.last_active_session_id = Some(session_id.to_string());
                     if let Err(e) = self

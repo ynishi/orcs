@@ -1702,6 +1702,7 @@ pub async fn enter_sandbox_mode(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     use orcs_core::session::SandboxState;
+    use std::path::PathBuf;
 
     let session_manager = state
         .session_usecase
@@ -1711,12 +1712,17 @@ pub async fn enter_sandbox_mode(
 
     // Set sandbox state in InteractionManager
     let sandbox_state = SandboxState {
-        worktree_path,
+        worktree_path: worktree_path.clone(),
         original_branch,
         sandbox_branch,
         sandbox_root,
     };
     session_manager.set_sandbox_state(Some(sandbox_state)).await;
+
+    // Change agent workspace root to worktree path (so agents run in sandbox)
+    session_manager
+        .set_agent_workspace_root(Some(PathBuf::from(&worktree_path)))
+        .await;
 
     // Save session with updated sandbox state
     let app_mode = state.app_mode.lock().await.clone();
@@ -1730,24 +1736,64 @@ pub async fn enter_sandbox_mode(
         .await
         .map_err(|e| format!("Failed to save session: {}", e))?;
 
-    tracing::info!("[Sandbox] Entered sandbox mode for session {}", session.id);
+    tracing::info!(
+        "[Sandbox] Entered sandbox mode for session {}, agent CWD: {}",
+        session.id,
+        worktree_path
+    );
     Ok(())
 }
 
 /// Exits sandbox mode by removing sandbox state from the current session
 #[tauri::command]
 pub async fn exit_sandbox_mode(state: State<'_, AppState>) -> Result<(), String> {
+    use orcs_core::workspace::manager::WorkspaceStorageService;
+
     let session_manager = state
         .session_usecase
         .active_session()
         .await
         .ok_or("No active session")?;
 
+    // Get current session to retrieve workspace_id
+    let app_mode = state.app_mode.lock().await.clone();
+    let session = session_manager
+        .to_session(app_mode.clone(), PLACEHOLDER_WORKSPACE_ID.to_string())
+        .await;
+    let workspace_id = &session.workspace_id;
+
+    // Restore original workspace root from workspace_id
+    if workspace_id != PLACEHOLDER_WORKSPACE_ID {
+        match state.workspace_storage_service.get_workspace(workspace_id).await {
+            Ok(Some(workspace)) => {
+                session_manager
+                    .set_agent_workspace_root(Some(workspace.root_path.clone()))
+                    .await;
+                tracing::info!(
+                    "[Sandbox] Restored agent CWD to: {:?}",
+                    workspace.root_path
+                );
+            }
+            Ok(None) => {
+                tracing::warn!("[Sandbox] Workspace not found for id: {}", workspace_id);
+                // Set to None as fallback
+                session_manager.set_agent_workspace_root(None).await;
+            }
+            Err(e) => {
+                tracing::warn!("[Sandbox] Failed to get workspace: {}", e);
+                // Set to None as fallback
+                session_manager.set_agent_workspace_root(None).await;
+            }
+        }
+    } else {
+        // No workspace, set to None
+        session_manager.set_agent_workspace_root(None).await;
+    }
+
     // Clear sandbox state in InteractionManager
     session_manager.set_sandbox_state(None).await;
 
     // Save session with cleared sandbox state
-    let app_mode = state.app_mode.lock().await.clone();
     let session = session_manager
         .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
         .await;

@@ -868,6 +868,33 @@ impl InteractionManager {
         );
     }
 
+    /// Sets the agent workspace root (used for Sandbox mode to change CWD).
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_root` - The workspace root path for agents to use as CWD
+    ///
+    /// # Note
+    ///
+    /// This will invalidate the current dialogue instance, which will be recreated
+    /// with the new workspace root on the next interaction.
+    pub async fn set_agent_workspace_root(&self, workspace_root: Option<PathBuf>) {
+        tracing::info!(
+            "[InteractionManager::set_agent_workspace_root] Setting to: {:?}",
+            workspace_root
+        );
+
+        *self.agent_workspace_root.write().await = workspace_root;
+
+        // Invalidate dialogue so agents are recreated with new workspace root
+        self.invalidate_dialogue().await;
+    }
+
+    /// Gets the current agent workspace root.
+    pub async fn get_agent_workspace_root(&self) -> Option<PathBuf> {
+        self.agent_workspace_root.read().await.clone()
+    }
+
     /// Returns a list of available persona IDs.
     pub async fn available_personas(&self) -> Vec<String> {
         self.persona_repository

@@ -5,7 +5,7 @@ use orcs_core::schema::{
 };
 use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMessage, ConversationMode, ErrorSeverity, MessageMetadata,
-    MessageRole, Plan, StopCondition, SystemEventType,
+    MessageRole, Plan, SandboxState, StopCondition, SystemEventType,
 };
 use orcs_core::state::model::{AppState, OpenTab};
 use orcs_core::workspace::model::{
@@ -68,6 +68,7 @@ pub fn generate() -> Result<()> {
     // Session types
     types.push(("AutoChatConfig", AutoChatConfig::to_ts()));
     types.push(("StopCondition", StopCondition::to_ts()));
+    types.push(("SandboxState", SandboxState::to_ts()));
 
     // Workspace types
     types.push(("Workspace", Workspace::to_ts()));

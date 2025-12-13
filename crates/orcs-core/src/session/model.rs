@@ -49,6 +49,20 @@ pub enum StopCondition {
     // Future: ConsensusReached - detect when agents reach consensus
 }
 
+/// Sandbox state for git worktree-based isolated development.
+///
+/// When enabled, the session operates in a separate git worktree,
+/// allowing experimentation without affecting the main workspace.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, SchemaBridge)]
+pub struct SandboxState {
+    /// Absolute path to the worktree directory
+    pub worktree_path: String,
+    /// Original branch name before entering sandbox
+    pub original_branch: String,
+    /// Sandbox branch name (e.g., "sandbox-{session_id}")
+    pub sandbox_branch: String,
+}
+
 /// Context mode for controlling AI context injection.
 ///
 /// Controls the amount of system context provided to AI agents:
@@ -181,6 +195,9 @@ pub struct Session {
     /// Context mode for AI interactions (Rich = full context, Clean = expertise only)
     #[serde(default)]
     pub context_mode: ContextMode,
+    /// Sandbox state (None = normal mode, Some = sandbox mode with git worktree)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox_state: Option<SandboxState>,
 }
 
 fn default_execution_strategy() -> ExecutionModel {

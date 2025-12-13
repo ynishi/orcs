@@ -20,9 +20,9 @@ export type SystemEventType = 'participant_joined' | 'participant_left' | 'execu
 
 export type ErrorSeverity = 'critical' | 'warning' | 'info';
 
-export type MessageMetadata = { systemEventType: 'participant_joined' | 'participant_left' | 'execution_strategy_changed' | 'mode_changed' | 'workspace_switched' | 'notification' | null; errorSeverity: 'critical' | 'warning' | 'info' | null; systemMessageType: string | null; includeInDialogue: boolean; };
+export type MessageMetadata = { systemEventType: 'participant_joined' | 'participant_left' | 'execution_strategy_changed' | 'mode_changed' | 'workspace_switched' | 'notification' | null; errorSeverity: 'critical' | 'warning' | 'info' | null; systemMessageType: string | null; includeInDialogue: boolean; llmDebugInfo: { prompt: string; rawResponse: string; model: string | null; } | null; };
 
-export type ConversationMessage = { role: 'User' | 'Assistant' | 'System'; content: string; timestamp: string; metadata: { systemEventType: 'participant_joined' | 'participant_left' | 'execution_strategy_changed' | 'mode_changed' | 'workspace_switched' | 'notification' | null; errorSeverity: 'critical' | 'warning' | 'info' | null; systemMessageType: string | null; includeInDialogue: boolean; }; attachments: string[]; };
+export type ConversationMessage = { role: 'User' | 'Assistant' | 'System'; content: string; timestamp: string; metadata: { systemEventType: 'participant_joined' | 'participant_left' | 'execution_strategy_changed' | 'mode_changed' | 'workspace_switched' | 'notification' | null; errorSeverity: 'critical' | 'warning' | 'info' | null; systemMessageType: string | null; includeInDialogue: boolean; llmDebugInfo: { prompt: string; rawResponse: string; model: string | null; } | null; }; attachments: string[]; };
 
 export type Plan = { steps: string[]; };
 
@@ -33,6 +33,8 @@ export type ConversationMode = 'detailed' | 'normal' | 'concise' | 'brief' | 'di
 export type AutoChatConfig = { max_iterations: number; stop_condition: 'iteration_count' | 'user_interrupt'; web_search_enabled: boolean; };
 
 export type StopCondition = 'iteration_count' | 'user_interrupt';
+
+export type SandboxState = { worktree_path: string; original_branch: string; sandbox_branch: string; };
 
 export type Workspace = { id: string; name: string; rootPath: string; workspaceDir: string; resources: { uploadedFiles: { id: string; name: string; path: string; mimeType: string; size: number; uploadedAt: number; sessionId: string | null; messageTimestamp: string | null; author: string | null; isArchived: boolean; isFavorite: boolean; sortOrder: number | null; }[]; tempFiles: { id: string; path: string; purpose: string; createdAt: number; autoDelete: boolean; }[]; }; projectContext: { languages: string[]; buildSystem: string | null; description: string | null; repositoryUrl: string | null; metadata: Record<string, string>; }; lastAccessed: number; isFavorite: boolean; lastActiveSessionId: string | null; };
 

@@ -7,11 +7,12 @@ export type {
   ConversationMode,
   AutoChatConfig,
   StopCondition,
+  SandboxState,
   SessionType,
 } from '../bindings/generated';
 
 import type { Message, MessageType } from './message';
-import type { ConversationMessage, MessageMetadata, Plan, AutoChatConfig } from '../bindings/generated';
+import type { ConversationMessage, MessageMetadata, Plan, AutoChatConfig, SandboxState } from '../bindings/generated';
 
 /**
  * Application mode for session state management.
@@ -53,6 +54,7 @@ export interface Session {
   autoChatConfig?: AutoChatConfig; // was auto_chat_config
   isMuted?: boolean; // was is_muted
   contextMode?: ContextMode; // was context_mode
+  sandboxState?: SandboxState; // was sandbox_state (optional - only present in sandbox mode)
 }
 
 /**

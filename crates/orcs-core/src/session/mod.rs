@@ -34,6 +34,8 @@ pub use interaction_manager_trait::InteractionManagerTrait;
 pub use message::{
     ConversationMessage, ErrorSeverity, MessageMetadata, MessageRole, SystemEventType,
 };
-pub use model::{AutoChatConfig, ContextMode, PLACEHOLDER_WORKSPACE_ID, Session, StopCondition};
+pub use model::{
+    AutoChatConfig, ContextMode, SandboxState, Session, StopCondition, PLACEHOLDER_WORKSPACE_ID,
+};
 pub use repository::SessionRepository;
 pub use user_input::UserInput;

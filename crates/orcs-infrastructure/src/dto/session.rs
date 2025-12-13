@@ -7,7 +7,7 @@ use version_migrate::{FromDomain, IntoDomain, MigratesTo, Versioned};
 
 use orcs_core::session::{
     AppMode, AutoChatConfig, ContextMode, ConversationMessage, ConversationMode, MessageRole,
-    PLACEHOLDER_WORKSPACE_ID, Session,
+    SandboxState, Session, PLACEHOLDER_WORKSPACE_ID,
 };
 
 // ============================================================================
@@ -1147,6 +1147,80 @@ pub struct SessionV4_3_0 {
     pub context_mode: ContextModeDto,
 }
 
+/// Represents V4.4.0 of the session data schema.
+/// Added sandbox_state for git worktree-based isolated development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Versioned)]
+#[versioned(version = "4.4.0")]
+pub struct SessionV4_4_0 {
+    /// Unique session identifier
+    pub id: String,
+    /// Human-readable session title
+    pub title: String,
+    /// Timestamp when the session was created (ISO 8601 format)
+    pub created_at: String,
+    /// Timestamp when the session was last updated (ISO 8601 format)
+    pub updated_at: String,
+    /// The currently active persona ID
+    pub current_persona_id: String,
+    /// Conversation history for each persona
+    pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
+    /// Current application mode
+    pub app_mode: AppMode,
+    /// Workspace ID - all sessions must be associated with a workspace
+    pub workspace_id: String,
+    /// Active participant persona IDs
+    #[serde(default)]
+    pub active_participant_ids: Vec<String>,
+    /// Execution strategy (now using ExecutionModel enum)
+    #[serde(default = "default_execution_strategy_v2_0_0")]
+    pub execution_strategy: ExecutionStrategyV2_0_0,
+    /// System messages (join/leave notifications, etc.)
+    #[serde(default)]
+    pub system_messages: Vec<ConversationMessage>,
+    /// Participant persona ID to name mapping for display
+    #[serde(default)]
+    pub participants: HashMap<String, String>,
+    /// Participant persona ID to icon mapping for display
+    #[serde(default)]
+    pub participant_icons: HashMap<String, String>,
+    /// Participant persona ID to base color mapping for UI theming
+    #[serde(default)]
+    pub participant_colors: HashMap<String, String>,
+    /// Participant persona ID to backend mapping (e.g., "claude_api", "gemini_cli")
+    #[serde(default)]
+    pub participant_backends: HashMap<String, String>,
+    /// Participant persona ID to model name mapping (e.g., "claude-sonnet-4-5-20250929")
+    #[serde(default)]
+    pub participant_models: HashMap<String, String>,
+    /// Conversation mode (controls verbosity and style)
+    #[serde(default)]
+    pub conversation_mode: ConversationMode,
+    /// Talk style for dialogue context (Brainstorm, Debate, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub talk_style: Option<TalkStyle>,
+    /// Whether this session is marked as favorite (pinned to top)
+    #[serde(default)]
+    pub is_favorite: bool,
+    /// Whether this session is archived (hidden by default)
+    #[serde(default)]
+    pub is_archived: bool,
+    /// Manual sort order (optional, for custom ordering within favorites)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<i32>,
+    /// AutoChat configuration (None means AutoChat is disabled)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_chat_config: Option<AutoChatConfig>,
+    /// Whether this session is muted (AI won't respond to messages)
+    #[serde(default)]
+    pub is_muted: bool,
+    /// Context mode for AI interactions (Rich = full context, Clean = expertise only)
+    #[serde(default)]
+    pub context_mode: ContextModeDto,
+    /// Sandbox state (None = normal mode, Some = sandbox mode with git worktree)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox_state: Option<SandboxState>,
+}
+
 fn default_execution_strategy() -> String {
     "broadcast".to_string()
 }
@@ -1677,11 +1751,83 @@ impl MigratesTo<SessionV4_3_0> for SessionV4_2_0 {
     }
 }
 
+/// Migration from SessionV4_3_0 to SessionV4_4_0.
+/// Adds sandbox_state field for git worktree-based isolated development.
+impl MigratesTo<SessionV4_4_0> for SessionV4_3_0 {
+    fn migrate(self) -> SessionV4_4_0 {
+        SessionV4_4_0 {
+            id: self.id,
+            title: self.title,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            current_persona_id: self.current_persona_id,
+            persona_histories: self.persona_histories,
+            app_mode: self.app_mode,
+            workspace_id: self.workspace_id,
+            active_participant_ids: self.active_participant_ids,
+            execution_strategy: self.execution_strategy,
+            system_messages: self.system_messages,
+            participants: self.participants,
+            participant_icons: self.participant_icons,
+            participant_colors: self.participant_colors,
+            participant_backends: self.participant_backends,
+            participant_models: self.participant_models,
+            conversation_mode: self.conversation_mode,
+            talk_style: self.talk_style,
+            is_favorite: self.is_favorite,
+            is_archived: self.is_archived,
+            sort_order: self.sort_order,
+            auto_chat_config: self.auto_chat_config,
+            is_muted: self.is_muted,
+            context_mode: self.context_mode,
+            sandbox_state: None, // Existing sessions are not in sandbox mode
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
 
-/// Convert SessionV4_3_0 DTO to domain model.
+/// Convert SessionV4_4_0 DTO to domain model.
+impl IntoDomain<Session> for SessionV4_4_0 {
+    fn into_domain(self) -> Session {
+        Session {
+            id: self.id,
+            title: self.title,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            current_persona_id: self.current_persona_id,
+            persona_histories: self.persona_histories,
+            app_mode: self.app_mode,
+            workspace_id: self.workspace_id,
+            active_participant_ids: self.active_participant_ids,
+            execution_strategy: self.execution_strategy.into_domain(), // DTO → Domain
+            system_messages: self.system_messages,
+            participants: self.participants,
+            participant_icons: self.participant_icons,
+            participant_colors: self.participant_colors,
+            participant_backends: self.participant_backends,
+            // Convert HashMap<String, String> to HashMap<String, Option<String>>
+            participant_models: self
+                .participant_models
+                .into_iter()
+                .map(|(k, v)| (k, Some(v)))
+                .collect(),
+            conversation_mode: self.conversation_mode.into(), // DTO → Domain
+            talk_style: self.talk_style,
+            is_favorite: self.is_favorite,
+            is_archived: self.is_archived,
+            sort_order: self.sort_order,
+            auto_chat_config: self.auto_chat_config,
+            is_muted: self.is_muted,
+            context_mode: self.context_mode.into(), // DTO → Domain
+            sandbox_state: self.sandbox_state,     // Direct mapping
+        }
+    }
+}
+
+/// Convert SessionV4_3_0 DTO to domain model (deprecated, use V4_4_0).
 impl IntoDomain<Session> for SessionV4_3_0 {
     fn into_domain(self) -> Session {
         Session {
@@ -1714,11 +1860,12 @@ impl IntoDomain<Session> for SessionV4_3_0 {
             auto_chat_config: self.auto_chat_config,
             is_muted: self.is_muted,
             context_mode: self.context_mode.into(), // DTO → Domain
+            sandbox_state: None,                   // V4_3_0 doesn't have sandbox_state
         }
     }
 }
 
-/// Convert domain model to SessionV4_3_0 DTO for persistence.
+/// Convert domain model to SessionV4_3_0 DTO for persistence (deprecated, use V4_4_0).
 impl version_migrate::FromDomain<Session> for SessionV4_3_0 {
     fn from_domain(session: Session) -> Self {
         let Session {
@@ -1746,6 +1893,7 @@ impl version_migrate::FromDomain<Session> for SessionV4_3_0 {
             auto_chat_config,
             is_muted,
             context_mode,
+            sandbox_state: _, // V4_3_0 doesn't persist sandbox_state
         } = session;
 
         SessionV4_3_0 {
@@ -1781,6 +1929,73 @@ impl version_migrate::FromDomain<Session> for SessionV4_3_0 {
     }
 }
 
+/// Convert domain model to SessionV4_4_0 DTO for persistence.
+impl version_migrate::FromDomain<Session> for SessionV4_4_0 {
+    fn from_domain(session: Session) -> Self {
+        let Session {
+            id,
+            title,
+            created_at,
+            updated_at,
+            current_persona_id,
+            persona_histories,
+            app_mode,
+            workspace_id,
+            active_participant_ids,
+            execution_strategy,
+            system_messages,
+            participants,
+            participant_icons,
+            participant_colors,
+            participant_backends,
+            participant_models,
+            conversation_mode,
+            talk_style,
+            is_favorite,
+            is_archived,
+            sort_order,
+            auto_chat_config,
+            is_muted,
+            context_mode,
+            sandbox_state,
+        } = session;
+
+        // Convert HashMap<String, Option<String>> to HashMap<String, String>
+        let participant_models = participant_models
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|val| (k, val)))
+            .collect();
+
+        SessionV4_4_0 {
+            id,
+            title,
+            created_at,
+            updated_at,
+            current_persona_id,
+            persona_histories,
+            app_mode,
+            workspace_id,
+            active_participant_ids,
+            execution_strategy: ExecutionStrategyV2_0_0::from_domain(execution_strategy), // Domain → DTO
+            system_messages,
+            participants,
+            participant_icons,
+            participant_colors,
+            participant_backends,
+            participant_models,
+            conversation_mode,
+            talk_style,
+            is_favorite,
+            is_archived,
+            sort_order,
+            auto_chat_config,
+            is_muted,
+            context_mode: context_mode.into(), // Domain → DTO
+            sandbox_state,                     // Direct mapping
+        }
+    }
+}
+
 // ============================================================================
 // Migrator factory
 // ============================================================================
@@ -1793,7 +2008,7 @@ impl version_migrate::FromDomain<Session> for SessionV4_3_0 {
 ///
 /// # Migration Path
 ///
-/// V1.0.0 → V1.1.0 → V2.0.0 → ... → V4.3.0 → Session
+/// V1.0.0 → V1.1.0 → V2.0.0 → ... → V4.3.0 → V4.4.0 → Session
 ///
 /// See individual DTO version structs for detailed migration documentation.
 ///
@@ -1826,6 +2041,7 @@ pub fn create_session_migrator() -> version_migrate::Migrator {
         SessionV4_1_0,
         SessionV4_2_0,
         SessionV4_3_0,
+        SessionV4_4_0,
         Session
     ], save = true)
     .expect("Failed to create session migrator")

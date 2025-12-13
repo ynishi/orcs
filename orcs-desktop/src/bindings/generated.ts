@@ -34,3 +34,23 @@ export type AutoChatConfig = { max_iterations: number; stop_condition: 'iteratio
 
 export type StopCondition = 'iteration_count' | 'user_interrupt';
 
+export type SandboxState = { worktree_path: string; original_branch: string; sandbox_branch: string; sandbox_root: string | null; };
+
+export type ContextMode = 'rich' | 'clean';
+
+export type SessionType = { id: string; title: string; createdAt: string; updatedAt: string; currentPersonaId: string; workspaceId: string; activeParticipantIds: string[]; executionStrategy: 'broadcast' | 'sequential' | 'mentioned'; participants: Record<string, string>; participantIcons: Record<string, string>; participantColors: Record<string, string>; participantBackends: Record<string, string>; participantModels: Record<string, string>; conversationMode: 'detailed' | 'normal' | 'concise' | 'brief' | 'discussion'; talkStyle: 'Brainstorm' | 'Casual' | 'DecisionMaking' | 'Debate' | 'ProblemSolving' | 'Review' | 'Planning' | null; isFavorite: boolean; isArchived: boolean; sortOrder: number | null; isMuted: boolean; };
+
+export type TaskStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
+
+export type TaskType = { id: string; sessionId: string; title: string; description: string; status: 'Pending' | 'Running' | 'Completed' | 'Failed'; createdAt: string; updatedAt: string; completedAt: string | null; stepsExecuted: number; stepsSkipped: number; contextKeys: number; error: string | null; result: string | null; };
+
+export type Workspace = { id: string; name: string; rootPath: string; workspaceDir: string; resources: { uploadedFiles: { id: string; name: string; path: string; mimeType: string; size: number; uploadedAt: number; sessionId: string | null; messageTimestamp: string | null; author: string | null; isArchived: boolean; isFavorite: boolean; sortOrder: number | null; }[]; tempFiles: { id: string; path: string; purpose: string; createdAt: number; autoDelete: boolean; }[]; }; projectContext: { languages: string[]; buildSystem: string | null; description: string | null; repositoryUrl: string | null; metadata: Record<string, string>; }; lastAccessed: number; isFavorite: boolean; lastActiveSessionId: string | null; };
+
+export type WorkspaceResources = { uploadedFiles: { id: string; name: string; path: string; mimeType: string; size: number; uploadedAt: number; sessionId: string | null; messageTimestamp: string | null; author: string | null; isArchived: boolean; isFavorite: boolean; sortOrder: number | null; }[]; tempFiles: { id: string; path: string; purpose: string; createdAt: number; autoDelete: boolean; }[]; };
+
+export type UploadedFile = { id: string; name: string; path: string; mimeType: string; size: number; uploadedAt: number; sessionId: string | null; messageTimestamp: string | null; author: string | null; isArchived: boolean; isFavorite: boolean; sortOrder: number | null; };
+
+export type ProjectContext = { languages: string[]; buildSystem: string | null; description: string | null; repositoryUrl: string | null; metadata: Record<string, string>; };
+
+export type TempFile = { id: string; path: string; purpose: string; createdAt: number; autoDelete: boolean; };
+

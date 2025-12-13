@@ -2,13 +2,15 @@
 // Run with: cargo test -p orcs-core --test generate_typescript_types -- --nocapture
 
 use orcs_core::schema::{
-    ConversationModeType, ExecutionModelType, PresetSourceType, TalkStyleType,
+    ConversationModeType, ExecutionModelType, PresetSourceType, SessionType, TalkStyleType,
+    TaskStatus, TaskType,
 };
 use orcs_core::session::{
-    AppMode, AutoChatConfig, ConversationMessage, ConversationMode, ErrorSeverity, MessageMetadata,
-    MessageRole, Plan, StopCondition, SystemEventType,
+    AppMode, AutoChatConfig, ContextMode, ConversationMessage, ConversationMode, ErrorSeverity,
+    MessageMetadata, MessageRole, Plan, SandboxState, StopCondition, SystemEventType,
 };
 use orcs_core::state::model::{AppState, OpenTab};
+use orcs_core::workspace::{ProjectContext, TempFile, UploadedFile, Workspace, WorkspaceResources};
 use schema_bridge::SchemaBridge;
 use std::fs;
 use std::path::Path;
@@ -45,6 +47,20 @@ fn generate_typescript_types() {
     // Session types
     types.push(("AutoChatConfig", AutoChatConfig::to_ts()));
     types.push(("StopCondition", StopCondition::to_ts()));
+    types.push(("SandboxState", SandboxState::to_ts()));
+    types.push(("ContextMode", ContextMode::to_ts()));
+    types.push(("SessionType", SessionType::to_ts()));
+
+    // Task types
+    types.push(("TaskStatus", TaskStatus::to_ts()));
+    types.push(("TaskType", TaskType::to_ts()));
+
+    // Workspace types
+    types.push(("Workspace", Workspace::to_ts()));
+    types.push(("WorkspaceResources", WorkspaceResources::to_ts()));
+    types.push(("UploadedFile", UploadedFile::to_ts()));
+    types.push(("ProjectContext", ProjectContext::to_ts()));
+    types.push(("TempFile", TempFile::to_ts()));
 
     // Write to file
     let mut content =

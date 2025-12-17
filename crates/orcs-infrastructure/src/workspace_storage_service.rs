@@ -28,6 +28,18 @@ fn infer_mime_type(filename: &str) -> String {
         .to_string()
 }
 
+/// Sanitizes a filename by replacing path separators and other problematic characters.
+///
+/// This ensures that filenames containing `/`, `\`, or other special characters
+/// don't cause issues when used in file paths.
+fn sanitize_filename(filename: &str) -> String {
+    filename
+        .replace('/', "_")
+        .replace('\\', "_")
+        .replace('\0', "_")
+        .replace(':', "_")
+}
+
 /// Generates a unique filename by appending a number suffix if a file with the same name exists.
 ///
 /// For example, if "image.png" already exists, this returns "image(1).png".
@@ -402,6 +414,9 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
         message_timestamp: Option<String>,
         author: Option<String>,
     ) -> Result<UploadedFile> {
+        // Sanitize the filename to prevent path traversal and invalid characters
+        let safe_filename = sanitize_filename(filename);
+
         // Load existing workspace metadata
         let mut workspace = self.load_workspace(workspace_id).await?;
 
@@ -424,7 +439,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
         let file_id = Uuid::new_v4().to_string();
 
         // Construct the destination path
-        let dest_path = uploaded_dir.join(filename);
+        let dest_path = uploaded_dir.join(&safe_filename);
 
         // Write the byte data to the file
         fs::write(&dest_path, data).await.map_err(|e| {
@@ -439,7 +454,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
         let file_size = data.len() as u64;
 
         // Determine MIME type
-        let mime_type = infer_mime_type(filename);
+        let mime_type = infer_mime_type(&safe_filename);
 
         // Get current timestamp
         let uploaded_at = std::time::SystemTime::now()
@@ -450,7 +465,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
         // Create the UploadedFile domain model
         let uploaded_file = UploadedFile {
             id: file_id,
-            name: filename.to_string(),
+            name: safe_filename,
             path: dest_path,
             mime_type,
             size: file_size,
@@ -1606,6 +1621,43 @@ mod tests {
         assert_eq!(
             generate_unique_filename("README", &existing_files),
             "README(1)"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_filename_with_forward_slash() {
+        assert_eq!(
+            sanitize_filename("Concept/Design Issue"),
+            "Concept_Design Issue"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_filename_with_backslash() {
+        assert_eq!(
+            sanitize_filename("path\\to\\file.txt"),
+            "path_to_file.txt"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_filename_with_colon() {
+        assert_eq!(
+            sanitize_filename("2024:01:01_file.txt"),
+            "2024_01_01_file.txt"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_filename_normal() {
+        assert_eq!(sanitize_filename("normal_file.txt"), "normal_file.txt");
+    }
+
+    #[test]
+    fn test_sanitize_filename_complex() {
+        assert_eq!(
+            sanitize_filename("2024-01-01T00:00:00Z_Concept/Design Issue_ai.txt"),
+            "2024-01-01T00_00_00Z_Concept_Design Issue_ai.txt"
         );
     }
 }

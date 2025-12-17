@@ -215,6 +215,11 @@ function resolveMessageType(msg: ConversationMessage): MessageType {
     return metadataType;
   }
 
+  // Map 'ai_response' to 'ai' type (used by Concept/Design Issue, Summary, etc.)
+  if (metadataType === 'ai_response') {
+    return 'ai';
+  }
+
   if (msg.role === 'User') {
     return 'user';
   }

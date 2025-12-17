@@ -120,6 +120,13 @@ pub async fn create_workspace_with_session(
         println!("[Backend] Failed to emit workspace:update: {}", e);
     }
 
+    // Emit workspace-switched event to trigger frontend session switching
+    if let Err(e) = app.emit("workspace-switched", &workspace.id) {
+        println!("[Backend] Failed to emit workspace-switched: {}", e);
+    } else {
+        println!("[Backend] workspace-switched event emitted for {}", workspace.id);
+    }
+
     // Emit app-state:update event for SSOT synchronization
     use orcs_core::state::repository::StateRepository;
     if let Ok(app_state) = state.app_state_service.get_state().await {

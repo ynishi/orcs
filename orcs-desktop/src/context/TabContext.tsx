@@ -111,6 +111,7 @@ export interface TabContextValue {
   getVisibleTabs: (workspaceId: string) => SessionTab[]; // 指定されたWorkspaceのタブのみを取得
   reorderTabs: (fromIndex: number, toIndex: number) => Promise<void>; // タブの順序を変更
   closeAllTabs: () => Promise<void>; // 全タブを閉じる
+  closeWorkspaceTabs: (workspaceId: string) => Promise<void>; // 指定ワークスペースのタブを全て閉じる
 }
 
 const TabContext = createContext<TabContextValue | undefined>(undefined);
@@ -585,6 +586,28 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   }, [tabs, closeTab]);
 
   /**
+   * 指定ワークスペースのタブを全て閉じる
+   * Phase 2: ワークスペースIDでフィルタしてから個別にcloseTabを呼ぶ
+   */
+  const closeWorkspaceTabs = useCallback(async (workspaceId: string) => {
+    console.log('[TabContext] closeWorkspaceTabs called:', { workspaceId });
+    // Phase 2: 指定ワークスペースのタブを取得して個別に閉じる
+    const workspaceTabs = tabs.filter(tab => tab.workspaceId === workspaceId);
+    const tabIds = workspaceTabs.map(tab => tab.id);
+
+    console.log('[TabContext] Closing tabs:', {
+      workspaceId,
+      tabCount: tabIds.length,
+      tabIds
+    });
+
+    for (const tabId of tabIds) {
+      await closeTab(tabId);
+    }
+    // UIState は closeTab で個別にクリアされる
+  }, [tabs, closeTab]);
+
+  /**
    * Workspace切り替え時にタブを切り替える
    * - 新しいWorkspaceのタブがあれば、最後にアクセスしたタブにフォーカス
    * - なければアクティブタブはBackendがnullに設定する
@@ -649,6 +672,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       getVisibleTabs,
       reorderTabs,
       closeAllTabs,
+      closeWorkspaceTabs,
     }),
     [
       tabs,
@@ -675,6 +699,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       getVisibleTabs,
       reorderTabs,
       closeAllTabs,
+      closeWorkspaceTabs,
     ]
   );
 

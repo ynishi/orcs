@@ -19,12 +19,14 @@ import {
   IconCheck,
   IconPlus,
   IconTrash,
+  IconX,
 } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { notifications } from '@mantine/notifications';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useSession } from '../../hooks/useSession';
+import { useTabContext } from '../../context/TabContext';
 import type { Workspace } from '../../types/workspace';
 
 interface WorkspaceSwitcherProps {
@@ -45,6 +47,7 @@ interface WorkspaceSwitcherProps {
 export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
   const { workspace, allWorkspaces, switchWorkspace, toggleFavorite } = useWorkspace();
   const { refreshSessions } = useSession();
+  const { getVisibleTabs, closeWorkspaceTabs } = useTabContext();
   const [isOpen, setIsOpen] = useState(false);
   const [deletingWorkspace, setDeletingWorkspace] = useState<{ id: string; name: string } | null>(null);
 
@@ -182,6 +185,32 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
     setDeletingWorkspace(null);
   };
 
+  /**
+   * Handler for closing all tabs in the current workspace
+   */
+  const handleCloseWorkspaceTabs = async (workspaceId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    try {
+      console.log('[Workspace] Closing all tabs for workspace:', workspaceId);
+      await closeWorkspaceTabs(workspaceId);
+
+      notifications.show({
+        title: 'Tabs Closed',
+        message: 'All tabs in this workspace have been closed',
+        color: 'green',
+        icon: '✅',
+      });
+    } catch (error) {
+      console.error('Failed to close workspace tabs:', error);
+      notifications.show({
+        title: 'Failed to Close Tabs',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
   const formatLastAccessed = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
     const now = new Date();
@@ -199,6 +228,8 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
 
   const renderWorkspaceItem = (ws: Workspace) => {
     const isCurrent = ws.id === workspace?.id;
+    const visibleTabs = getVisibleTabs(ws.id);
+    const hasOpenTabs = visibleTabs.length > 0;
 
     return (
       <Menu.Item
@@ -207,6 +238,18 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
         leftSection={isCurrent ? <IconCheck size={16} /> : <IconFolder size={16} />}
         rightSection={
           <Group gap={4}>
+            {hasOpenTabs && (
+              <Tooltip label={`Close ${visibleTabs.length} tab${visibleTabs.length > 1 ? 's' : ''}`}>
+                <ActionIcon
+                  size="xs"
+                  variant="subtle"
+                  color="gray"
+                  onClick={(e) => handleCloseWorkspaceTabs(ws.id, e)}
+                >
+                  <IconX size={14} />
+                </ActionIcon>
+              </Tooltip>
+            )}
             <ActionIcon
               size="xs"
               variant="subtle"
@@ -231,9 +274,16 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
       >
         <Group justify="space-between" gap="xs" wrap="nowrap">
           <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-            <Text size="sm" fw={isCurrent ? 600 : 400} truncate>
-              {ws.name}
-            </Text>
+            <Group gap={6}>
+              <Text size="sm" fw={isCurrent ? 600 : 400} truncate>
+                {ws.name}
+              </Text>
+              {hasOpenTabs && (
+                <Badge size="xs" variant="light" color="blue">
+                  {visibleTabs.length}
+                </Badge>
+              )}
+            </Group>
             <Text size="xs" c="dimmed" truncate>
               {ws.rootPath}
             </Text>

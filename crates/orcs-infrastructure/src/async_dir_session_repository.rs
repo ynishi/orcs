@@ -72,6 +72,68 @@ impl AsyncDirSessionRepository {
 
         Ok(Self { storage })
     }
+
+    /// Fallback implementation that loads sessions individually, skipping corrupt files.
+    async fn list_all_with_fallback(&self) -> Result<Vec<Session>> {
+        use tokio::fs;
+
+        let sessions_dir = self.storage.base_path().join("sessions");
+
+        if !sessions_dir.exists() {
+            return Ok(vec![]);
+        }
+
+        let mut entries = fs::read_dir(&sessions_dir).await?;
+        let mut sessions = Vec::new();
+
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+
+            // Only process .toml files
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                continue;
+            }
+
+            // Extract session ID from filename (without .toml extension)
+            let session_id = match path.file_stem().and_then(|s| s.to_str()) {
+                Some(id) => id.to_string(),
+                None => continue,
+            };
+
+            // Try to load the session, skip if it fails
+            match self
+                .storage
+                .load::<Session>(Self::ENTITY_NAME, &session_id)
+                .await
+            {
+                Ok(session) => {
+                    tracing::debug!(
+                        "[AsyncDirSessionRepository] Loaded session via fallback: id={}, title={}",
+                        session.id,
+                        session.title
+                    );
+                    sessions.push(session);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "[AsyncDirSessionRepository] Skipping corrupt session file {}: {:?}",
+                        session_id,
+                        e
+                    );
+                }
+            }
+        }
+
+        // Sort by updated_at descending (most recent first)
+        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+
+        tracing::debug!(
+            "[AsyncDirSessionRepository] list_all_with_fallback() returning {} sessions",
+            sessions.len()
+        );
+
+        Ok(sessions)
+    }
 }
 
 #[async_trait]
@@ -124,36 +186,47 @@ impl SessionRepository for AsyncDirSessionRepository {
     }
 
     async fn list_all(&self) -> Result<Vec<Session>> {
-        let sessions_with_ids = self.storage.load_all::<Session>(Self::ENTITY_NAME).await?;
-
-        tracing::debug!(
-            "[AsyncDirSessionRepository] list_all() loaded {} sessions from storage",
-            sessions_with_ids.len()
-        );
-
-        let mut sessions: Vec<Session> = sessions_with_ids
-            .into_iter()
-            .map(|(file_id, session)| {
+        // Try the fast path first using load_all
+        match self.storage.load_all::<Session>(Self::ENTITY_NAME).await {
+            Ok(sessions_with_ids) => {
                 tracing::debug!(
-                    "[AsyncDirSessionRepository] Loaded session: file_id={}, session.id={}, title={}, is_favorite={}",
-                    file_id,
-                    session.id,
-                    session.title,
-                    session.is_favorite
+                    "[AsyncDirSessionRepository] list_all() loaded {} sessions from storage",
+                    sessions_with_ids.len()
                 );
-                session
-            })
-            .collect();
 
-        // Sort by updated_at descending (most recent first)
-        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+                let mut sessions: Vec<Session> = sessions_with_ids
+                    .into_iter()
+                    .map(|(file_id, session)| {
+                        tracing::debug!(
+                            "[AsyncDirSessionRepository] Loaded session: file_id={}, session.id={}, title={}, is_favorite={}",
+                            file_id,
+                            session.id,
+                            session.title,
+                            session.is_favorite
+                        );
+                        session
+                    })
+                    .collect();
 
-        tracing::debug!(
-            "[AsyncDirSessionRepository] list_all() returning {} sessions",
-            sessions.len()
-        );
+                // Sort by updated_at descending (most recent first)
+                sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
 
-        Ok(sessions)
+                tracing::debug!(
+                    "[AsyncDirSessionRepository] list_all() returning {} sessions",
+                    sessions.len()
+                );
+
+                Ok(sessions)
+            }
+            Err(e) => {
+                // If load_all fails (e.g., one corrupt file), fall back to individual loading
+                tracing::warn!(
+                    "[AsyncDirSessionRepository] load_all failed: {:?}, falling back to individual loading",
+                    e
+                );
+                self.list_all_with_fallback().await
+            }
+        }
     }
 }
 

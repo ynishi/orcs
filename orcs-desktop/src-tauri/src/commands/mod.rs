@@ -22,6 +22,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         personas::create_adhoc_persona,
         personas::save_adhoc_persona,
         session::switch_session,
+        session::get_session,
         session::delete_session,
         session::rename_session,
         session::toggle_session_favorite,

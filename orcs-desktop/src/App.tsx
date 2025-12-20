@@ -1963,9 +1963,15 @@ function App() {
   // セッションをワークスペースに保存するハンドラー
   const handleSaveSessionToWorkspace = async (session: Session) => {
     try {
+      // Fetch latest session data from backend (includes personaHistories with all messages)
+      const latestSession = await invoke<Session | null>('get_session', { sessionId: session.id });
+      if (!latestSession) {
+        throw new Error(`Session not found: ${session.id}`);
+      }
+
       // Markdownを生成
       const { filename, content, latestMessageTimestamp } = exportSessionToMarkdown(
-        session,
+        latestSession,
         userProfile?.nickname ?? 'You'
       );
 

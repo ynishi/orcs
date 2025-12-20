@@ -189,6 +189,28 @@ pub async fn switch_session(
     Ok(session)
 }
 
+/// Gets a session by ID without switching to it
+#[tauri::command]
+pub async fn get_session(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<Option<Session>, String> {
+    let session = state
+        .session_repository
+        .find_by_id(&session_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Enrich with participant info if session exists
+    match session {
+        Some(s) => {
+            let enriched = state.session_usecase.enrich_session_participants(s).await;
+            Ok(Some(enriched))
+        }
+        None => Ok(None),
+    }
+}
+
 /// Deletes a session
 #[tauri::command]
 pub async fn delete_session(session_id: String, state: State<'_, AppState>) -> Result<(), String> {

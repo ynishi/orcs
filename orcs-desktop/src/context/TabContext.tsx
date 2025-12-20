@@ -19,6 +19,7 @@ export interface TabUIState {
   isDragging: boolean; // ドラッグ中かどうか
   isAiThinking: boolean; // AI思考中かどうか
   thinkingPersona: string; // 思考中のペルソナ名
+  isNonInteractiveCommand: boolean; // 非対話的コマンド実行中かどうか（ホバーメニュー等から）
 
   // AutoChat状態
   autoMode: boolean; // AutoChatモードが有効かどうか
@@ -38,6 +39,7 @@ function getDefaultTabUIState(): TabUIState {
     isDragging: false,
     isAiThinking: false,
     thinkingPersona: 'AI',
+    isNonInteractiveCommand: false,
     autoMode: false,
     autoChatIteration: null,
     isDirty: false,
@@ -67,6 +69,7 @@ export interface SessionTab {
   isDragging: boolean; // ドラッグ中かどうか
   isAiThinking: boolean; // AI思考中かどうか
   thinkingPersona: string; // 思考中のペルソナ名
+  isNonInteractiveCommand: boolean; // 非対話的コマンド実行中かどうか
   autoMode: boolean; // AutoChatモードが有効かどうか
   autoChatIteration: number | null; // 現在のAutoChat iteration番号 (null = 未実行)
   isDirty: boolean; // 未保存データがあるか
@@ -98,7 +101,7 @@ export interface TabContextValue {
   
   // UI状態
   setTabDragging: (tabId: string, isDragging: boolean) => void; // タブのドラッグ状態を更新
-  setTabThinking: (tabId: string, isThinking: boolean, personaName?: string) => void; // タブのAI思考状態を更新
+  setTabThinking: (tabId: string, isThinking: boolean, personaName?: string, isNonInteractive?: boolean) => void; // タブのAI思考状態を更新
 
   // AutoChat状態
   setTabAutoMode: (tabId: string, autoMode: boolean) => void; // タブのAutoMode状態を更新
@@ -169,6 +172,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
         isDragging: localUIState?.isDragging ?? defaultUIState.isDragging,
         isAiThinking: localUIState?.isAiThinking ?? defaultUIState.isAiThinking,
         thinkingPersona: localUIState?.thinkingPersona ?? defaultUIState.thinkingPersona,
+        isNonInteractiveCommand: localUIState?.isNonInteractiveCommand ?? defaultUIState.isNonInteractiveCommand,
         autoMode: openTab.autoMode ?? localUIState?.autoMode ?? defaultUIState.autoMode,
         autoChatIteration: openTab.autoChatIteration ?? localUIState?.autoChatIteration ?? defaultUIState.autoChatIteration,
         isDirty: openTab.isDirty ?? localUIState?.isDirty ?? defaultUIState.isDirty,
@@ -488,13 +492,19 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   /**
    * タブのAI思考状態を更新
    * Phase 2: tabUIStates のみを更新（tabs は computed）
+   * @param isNonInteractive - 非対話的コマンド（ホバーメニュー等）からの実行かどうか
    */
-  const setTabThinking = useCallback((tabId: string, isThinking: boolean, personaName: string = 'AI') => {
+  const setTabThinking = useCallback((tabId: string, isThinking: boolean, personaName: string = 'AI', isNonInteractive: boolean = false) => {
     setTabUIStates((prev) => {
       const current = prev.get(tabId);
       if (!current) return prev;
       const newMap = new Map(prev);
-      newMap.set(tabId, { ...current, isAiThinking: isThinking, thinkingPersona: personaName });
+      newMap.set(tabId, {
+        ...current,
+        isAiThinking: isThinking,
+        thinkingPersona: personaName,
+        isNonInteractiveCommand: isNonInteractive
+      });
       return newMap;
     });
   }, []);

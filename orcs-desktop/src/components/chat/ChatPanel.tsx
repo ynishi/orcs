@@ -505,7 +505,7 @@ export function ChatPanel({
       });
 
       // Set thinking state
-      setTabThinking(tab.id, true, 'Summary');
+      setTabThinking(tab.id, true, 'Summary', true); // Non-interactive command
 
       // Call backend to generate summary
       const summary = await invoke<string>('generate_summary', {
@@ -591,7 +591,7 @@ export function ChatPanel({
       });
 
       // Set thinking state
-      setTabThinking(tab.id, true, 'ActionPlan');
+      setTabThinking(tab.id, true, 'ActionPlan', true); // Non-interactive command
 
       // Call backend to generate action plan
       const actionPlan = await invoke<string>('generate_action_plan', {
@@ -677,7 +677,7 @@ export function ChatPanel({
       });
 
       // Set thinking state
-      setTabThinking(tab.id, true, 'Expertise');
+      setTabThinking(tab.id, true, 'Expertise', true); // Non-interactive command
 
       // Call backend to generate expertise
       const expertise = await invoke<string>('generate_expertise', {
@@ -763,7 +763,7 @@ export function ChatPanel({
       });
 
       // Set thinking state
-      setTabThinking(tab.id, true, 'Concept/Design Issue');
+      setTabThinking(tab.id, true, 'Concept/Design Issue', true); // Non-interactive command
 
       // Call backend to generate concept/design issue
       const conceptIssue = await invoke<string>('generate_concept_issue', {
@@ -931,7 +931,7 @@ export function ChatPanel({
                 <Text size="sm">{tab.messages.length} messages (tab inactive)</Text>
               </Box>
             )}
-            {tab.isAiThinking && activeParticipantIds.length > 0 && !isMuted && (
+            {tab.isAiThinking && activeParticipantIds.length > 0 && (!isMuted || !tab.isNonInteractiveCommand) && (
               <ThinkingIndicator personaName={tab.thinkingPersona} onCancel={handleCancelOperation} />
             )}
           </Stack>

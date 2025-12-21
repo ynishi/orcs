@@ -35,6 +35,9 @@ pub struct SecretConfig {
     /// OpenAI API configuration
     #[serde(default)]
     pub openai: Option<OpenAIConfig>,
+    /// Kaiba API configuration
+    #[serde(default)]
+    pub kaiba: Option<KaibaConfig>,
 }
 
 impl Default for SecretConfig {
@@ -43,6 +46,7 @@ impl Default for SecretConfig {
             claude: Some(Default::default()),
             gemini: Some(Default::default()),
             openai: Some(Default::default()),
+            kaiba: Some(Default::default()),
         }
     }
 }
@@ -79,6 +83,23 @@ pub struct GeminiConfig {
 pub struct OpenAIConfig {
     /// API key for OpenAI API
     pub api_key: String,
+}
+
+/// Kaiba API secret configuration.
+///
+/// Contains configuration for the Kaiba autonomous persona service.
+/// Kaiba provides persistent memory and context across sessions.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct KaibaConfig {
+    /// URL of the Kaiba service (defaults to https://kaiba.shuttleapp.rs)
+    #[serde(default)]
+    pub url: Option<String>,
+    /// Optional API key for Kaiba service
+    #[serde(default)]
+    pub api_key: Option<String>,
+    /// Default Rei ID to use if not specified elsewhere
+    #[serde(default)]
+    pub default_rei_id: Option<String>,
 }
 
 // ============================================================================

@@ -16,6 +16,7 @@ const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
   gemini_api: 'Gemini API',
   open_ai_api: 'OpenAI API',
   codex_cli: 'Codex CLI',
+  kaiba_api: 'Kaiba API',
 };
 
 interface PersonasListProps {

@@ -122,6 +122,7 @@ impl AdhocPersonaService {
             icon: definition.icon,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         // Save adhoc persona to repository (temporary)

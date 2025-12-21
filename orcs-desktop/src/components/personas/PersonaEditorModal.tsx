@@ -53,6 +53,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
     icon: undefined,
     base_color: undefined,
     gemini_options: undefined,
+    kaiba_options: undefined,
   });
 
   // Fetch backend options on mount
@@ -85,6 +86,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         icon: persona.icon,
         base_color: persona.base_color,
         gemini_options: persona.gemini_options,
+        kaiba_options: persona.kaiba_options,
       });
     } else {
       setFormData({
@@ -99,6 +101,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         icon: undefined,
         base_color: undefined,
         gemini_options: undefined,
+        kaiba_options: undefined,
       });
     }
   }, [persona]);
@@ -125,6 +128,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         icon: formData.icon || undefined,
         base_color: formData.base_color || undefined,
         gemini_options: formData.gemini_options || undefined,
+        kaiba_options: formData.kaiba_options || undefined,
       };
 
       onSave(updatedPersona);
@@ -144,6 +148,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         icon: formData.icon || undefined,
         base_color: formData.base_color || undefined,
         gemini_options: formData.gemini_options || undefined,
+        kaiba_options: formData.kaiba_options || undefined,
       };
 
       // Call unified create_persona command
@@ -275,6 +280,23 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
               })}
             />
           </>
+        )}
+
+        {formData.backend === 'kaiba_api' && (
+          <TextInput
+            label="Rei ID"
+            placeholder="e.g., rei_abc123"
+            description="The Kaiba Rei ID for persistent memory and context. Get this from the Kaiba dashboard."
+            value={formData.kaiba_options?.rei_id || ''}
+            onChange={(e) => setFormData({
+              ...formData,
+              kaiba_options: {
+                ...formData.kaiba_options,
+                rei_id: e.currentTarget.value || undefined,
+              }
+            })}
+            required
+          />
         )}
 
         <Textarea

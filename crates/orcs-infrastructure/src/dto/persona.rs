@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use version_migrate::{IntoDomain, MigratesTo, Versioned};
 
-use orcs_core::persona::{GeminiOptions, Persona, PersonaBackend, PersonaSource};
+use orcs_core::persona::{GeminiOptions, KaibaOptions, Persona, PersonaBackend, PersonaSource};
 
 /// Represents the source of a persona.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -27,6 +27,7 @@ pub enum PersonaBackendDTO {
     GeminiApi,
     OpenAiApi,
     CodexCli,
+    KaibaApi,
 }
 
 /// Gemini-specific options DTO
@@ -36,6 +37,13 @@ pub struct GeminiOptionsDTO {
     pub thinking_level: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub google_search: Option<bool>,
+}
+
+/// Kaiba-specific options DTO (Autonomous persona with persistent memory)
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KaibaOptionsDTO {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rei_id: Option<String>,
 }
 
 /// Represents V1 of the persona config schema for serialization.
@@ -216,6 +224,47 @@ pub struct PersonaConfigV1_5_0 {
     pub gemini_options: Option<GeminiOptionsDTO>,
 }
 
+/// V1.6.0: Added kaiba_options for Kaiba API support (persistent memory persona)
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.6.0")]
+pub struct PersonaConfigV1_6_0 {
+    /// Unique persona identifier (UUID format).
+    pub id: String,
+    /// Display name of the persona.
+    pub name: String,
+    /// Role or title of the persona.
+    pub role: String,
+    /// Background description of the persona.
+    pub background: String,
+    /// Communication style of the persona.
+    pub communication_style: String,
+    /// Whether this persona is a default participant in new sessions.
+    #[serde(default)]
+    pub default_participant: bool,
+    /// Source of the persona (System or User).
+    #[serde(default)]
+    pub source: PersonaSourceDTO,
+    /// Backend to execute persona with (supports all 7 backends).
+    #[serde(default)]
+    pub backend: PersonaBackendDTO,
+    /// Model name for the backend (e.g., "claude-sonnet-4-5-20250929", "gemini-3-pro-preview")
+    /// If None, uses the backend's default model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_name: Option<String>,
+    /// Visual icon/emoji representing this persona (e.g., "🎨", "🔧", "📊")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Base color for UI theming (e.g., "#FF5733", "#3357FF")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_color: Option<String>,
+    /// Gemini-specific options (thinking level, Google Search)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gemini_options: Option<GeminiOptionsDTO>,
+    /// Kaiba-specific options (Rei ID for persistent memory)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kaiba_options: Option<KaibaOptionsDTO>,
+}
+
 // ============================================================================
 // Migration implementations
 // ============================================================================
@@ -323,6 +372,27 @@ impl MigratesTo<PersonaConfigV1_5_0> for PersonaConfigV1_4_0 {
     }
 }
 
+/// Migration from PersonaConfigV1_5_0 to PersonaConfigV1_6_0.
+impl MigratesTo<PersonaConfigV1_6_0> for PersonaConfigV1_5_0 {
+    fn migrate(self) -> PersonaConfigV1_6_0 {
+        PersonaConfigV1_6_0 {
+            id: self.id,
+            name: self.name,
+            role: self.role,
+            background: self.background,
+            communication_style: self.communication_style,
+            default_participant: self.default_participant,
+            source: self.source,
+            backend: self.backend,
+            model_name: self.model_name,
+            icon: self.icon,
+            base_color: self.base_color,
+            gemini_options: self.gemini_options,
+            kaiba_options: None, // V1_5_0 doesn't have kaiba_options field
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
@@ -343,6 +413,22 @@ impl From<GeminiOptions> for GeminiOptionsDTO {
         GeminiOptionsDTO {
             thinking_level: options.thinking_level,
             google_search: options.google_search,
+        }
+    }
+}
+
+/// Convert KaibaOptionsDTO to domain model.
+impl From<KaibaOptionsDTO> for KaibaOptions {
+    fn from(dto: KaibaOptionsDTO) -> Self {
+        KaibaOptions { rei_id: dto.rei_id }
+    }
+}
+
+/// Convert KaibaOptions to DTO.
+impl From<KaibaOptions> for KaibaOptionsDTO {
+    fn from(options: KaibaOptions) -> Self {
+        KaibaOptionsDTO {
+            rei_id: options.rei_id,
         }
     }
 }
@@ -378,6 +464,7 @@ impl From<PersonaBackendDTO> for PersonaBackend {
             PersonaBackendDTO::GeminiApi => PersonaBackend::GeminiApi,
             PersonaBackendDTO::OpenAiApi => PersonaBackend::OpenAiApi,
             PersonaBackendDTO::CodexCli => PersonaBackend::CodexCli,
+            PersonaBackendDTO::KaibaApi => PersonaBackend::KaibaApi,
         }
     }
 }
@@ -391,18 +478,19 @@ impl From<PersonaBackend> for PersonaBackendDTO {
             PersonaBackend::GeminiApi => PersonaBackendDTO::GeminiApi,
             PersonaBackend::OpenAiApi => PersonaBackendDTO::OpenAiApi,
             PersonaBackend::CodexCli => PersonaBackendDTO::CodexCli,
+            PersonaBackend::KaibaApi => PersonaBackendDTO::KaibaApi,
         }
     }
 }
 
-/// Convert PersonaConfigV1_5_0 DTO to domain model.
-impl IntoDomain<Persona> for PersonaConfigV1_5_0 {
+/// Convert PersonaConfigV1_6_0 DTO to domain model.
+impl IntoDomain<Persona> for PersonaConfigV1_6_0 {
     fn into_domain(self) -> Persona {
         // Validate and fix ID if needed
         let id = if Uuid::parse_str(&self.id).is_ok() {
             self.id
         } else {
-            // Legacy data: V1.5.0 schema but non-UUID ID
+            // Legacy data: V1.6.0 schema but non-UUID ID
             generate_uuid_from_name(&self.name)
         };
 
@@ -419,14 +507,15 @@ impl IntoDomain<Persona> for PersonaConfigV1_5_0 {
             icon: self.icon,
             base_color: self.base_color,
             gemini_options: self.gemini_options.map(Into::into),
+            kaiba_options: self.kaiba_options.map(Into::into),
         }
     }
 }
 
-/// Convert domain model to PersonaConfigV1_5_0 DTO for persistence.
-impl version_migrate::FromDomain<Persona> for PersonaConfigV1_5_0 {
+/// Convert domain model to PersonaConfigV1_6_0 DTO for persistence.
+impl version_migrate::FromDomain<Persona> for PersonaConfigV1_6_0 {
     fn from_domain(persona: Persona) -> Self {
-        PersonaConfigV1_5_0 {
+        PersonaConfigV1_6_0 {
             id: persona.id,
             name: persona.name,
             role: persona.role,
@@ -439,6 +528,7 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_5_0 {
             icon: persona.icon,
             base_color: persona.base_color,
             gemini_options: persona.gemini_options.map(Into::into),
+            kaiba_options: persona.kaiba_options.map(Into::into),
         }
     }
 }
@@ -449,7 +539,7 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_5_0 {
 
 /// Creates and configures a Migrator instance for Persona entities.
 ///
-/// The migrator handles automatic schema migration from V1.0.0 to V1.4.0
+/// The migrator handles automatic schema migration from V1.0.0 to V1.6.0
 /// and conversion to the domain model.
 ///
 /// # Migration Path
@@ -458,7 +548,9 @@ impl version_migrate::FromDomain<Persona> for PersonaConfigV1_5_0 {
 /// - V1.1.0 → V1.2.0: Adds `model_name` field (optional)
 /// - V1.2.0 → V1.3.0: Adds `icon` field (optional)
 /// - V1.3.0 → V1.4.0: Adds `base_color` field (optional)
-/// - V1.4.0 → Persona: Converts DTO to domain model (supports all 6 backends via enum expansion)
+/// - V1.4.0 → V1.5.0: Adds `gemini_options` field (optional)
+/// - V1.5.0 → V1.6.0: Adds `kaiba_options` field (optional)
+/// - V1.6.0 → Persona: Converts DTO to domain model (supports all 7 backends via enum expansion)
 ///
 /// # Example
 ///
@@ -474,6 +566,7 @@ pub fn create_persona_migrator() -> version_migrate::Migrator {
         PersonaConfigV1_3_0,
         PersonaConfigV1_4_0,
         PersonaConfigV1_5_0,
+        PersonaConfigV1_6_0,
         Persona
     ], save = true)
     .expect("Failed to create persona migrator")

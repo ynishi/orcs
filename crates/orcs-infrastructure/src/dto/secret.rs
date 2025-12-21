@@ -1,6 +1,6 @@
 //! Secret configuration DTOs and migrator.
 
-use orcs_core::config::{ClaudeConfig, GeminiConfig, OpenAIConfig, SecretConfig};
+use orcs_core::config::{ClaudeConfig, GeminiConfig, KaibaConfig, OpenAIConfig, SecretConfig};
 use serde::{Deserialize, Serialize};
 use version_migrate::{IntoDomain, Versioned};
 
@@ -19,6 +19,9 @@ pub struct SecretConfigV1_0_0 {
     /// OpenAI API configuration
     #[serde(default)]
     pub openai: Option<OpenAIConfig>,
+    /// Kaiba API configuration
+    #[serde(default)]
+    pub kaiba: Option<KaibaConfig>,
 }
 
 impl Default for SecretConfigV1_0_0 {
@@ -28,6 +31,7 @@ impl Default for SecretConfigV1_0_0 {
             claude: default.claude,
             gemini: default.gemini,
             openai: default.openai,
+            kaiba: default.kaiba,
         }
     }
 }
@@ -42,6 +46,7 @@ impl IntoDomain<SecretConfig> for SecretConfigV1_0_0 {
             claude: self.claude,
             gemini: self.gemini,
             openai: self.openai,
+            kaiba: self.kaiba,
         }
     }
 }
@@ -52,6 +57,7 @@ impl version_migrate::FromDomain<SecretConfig> for SecretConfigV1_0_0 {
             claude: config.claude,
             gemini: config.gemini,
             openai: config.openai,
+            kaiba: config.kaiba,
         }
     }
 }

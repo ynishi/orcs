@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Stack, Text, ActionIcon, Group, Tooltip, Switch, ScrollArea, Box, Center } from '@mantine/core';
-import { IconPlus, IconFolder, IconTerminal } from '@tabler/icons-react';
+import { IconPlus, IconFolder, IconTerminal, IconClipboardPaste } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { notifications } from '@mantine/notifications';
@@ -258,6 +258,59 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
     }
   };
 
+  // Handle pasting from clipboard
+  const handlePasteFromClipboard = async () => {
+    if (!workspace) return;
+
+    try {
+      // Read clipboard content using Tauri clipboard plugin
+      const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+      const clipboardText = await readText();
+
+      if (!clipboardText || clipboardText.trim().length === 0) {
+        notifications.show({
+          title: 'Empty clipboard',
+          message: 'No text content in clipboard',
+          color: 'yellow',
+        });
+        return;
+      }
+
+      // Generate filename with timestamp
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' +
+                        now.toTimeString().split(' ')[0].replace(/:/g, '-');
+      const filename = `clipboard_${timestamp}.txt`;
+
+      // Convert text to bytes
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(clipboardText);
+      const fileData = Array.from(bytes);
+
+      // Upload to workspace
+      await invoke('upload_file_from_bytes', {
+        workspaceId: workspace.id,
+        filename: filename,
+        fileData: fileData,
+        sessionId: null,
+        messageTimestamp: null,
+      });
+
+      notifications.show({
+        title: 'Clipboard pasted',
+        message: `Created "${filename}" from clipboard`,
+        color: 'green',
+      });
+    } catch (err) {
+      console.error('Failed to paste from clipboard:', err);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to paste from clipboard: ${err instanceof Error ? err.message : String(err)}`,
+        color: 'red',
+      });
+    }
+  };
+
   // Phase 4: No loading/error states - workspace data comes from event-driven store
 
   // No files state
@@ -289,6 +342,18 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
                 aria-label="Open terminal"
               >
                 <IconTerminal size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Paste from clipboard as file" withArrow>
+              <ActionIcon
+                onClick={() => {
+                  void handlePasteFromClipboard();
+                }}
+                variant="subtle"
+                color="teal"
+                aria-label="Paste from clipboard"
+              >
+                <IconClipboardPaste size={18} />
               </ActionIcon>
             </Tooltip>
             <ActionIcon
@@ -358,6 +423,18 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
               aria-label="Open terminal"
             >
               <IconTerminal size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Paste from clipboard as file" withArrow>
+            <ActionIcon
+              onClick={() => {
+                void handlePasteFromClipboard();
+              }}
+              variant="subtle"
+              color="teal"
+              aria-label="Paste from clipboard"
+            >
+              <IconClipboardPaste size={18} />
             </ActionIcon>
           </Tooltip>
           <ActionIcon

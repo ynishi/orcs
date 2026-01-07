@@ -140,6 +140,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         // Save
@@ -172,6 +173,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         let persona2 = Persona {
@@ -187,6 +189,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         // Save multiple
@@ -224,6 +227,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         let persona2 = Persona {
@@ -239,6 +243,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         repo.save_all(&[persona1.clone()]).await.unwrap();
@@ -282,6 +287,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         // Save persona
@@ -317,6 +323,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         // Save
@@ -349,6 +356,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         // Save original
@@ -387,6 +395,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         // Save

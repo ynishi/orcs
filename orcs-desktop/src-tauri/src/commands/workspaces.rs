@@ -127,7 +127,10 @@ pub async fn create_workspace_with_session(
     if let Err(e) = app.emit("workspace-switched", &workspace.id) {
         println!("[Backend] Failed to emit workspace-switched: {}", e);
     } else {
-        println!("[Backend] workspace-switched event emitted for {}", workspace.id);
+        println!(
+            "[Backend] workspace-switched event emitted for {}",
+            workspace.id
+        );
     }
 
     // Emit app-state:update event for SSOT synchronization
@@ -514,7 +517,10 @@ pub async fn investigate_workspace(
     investigation_focus: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    println!("[Backend] investigate_workspace called: workspace_id={}", workspace_id);
+    println!(
+        "[Backend] investigate_workspace called: workspace_id={}",
+        workspace_id
+    );
 
     // Get workspace information
     let workspace = state
@@ -545,7 +551,8 @@ pub async fn investigate_workspace(
         .map(|f| format!("\n\n## 特に注目してほしい点\n{}", f))
         .unwrap_or_default();
 
-    let prompt = format!(r#"# Workspace Investigation Report Request
+    let prompt = format!(
+        r#"# Workspace Investigation Report Request
 
 あなたはプロジェクト分析のエキスパートです。以下のワークスペースを調査し、**実用的なレポート**を作成してください。
 

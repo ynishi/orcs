@@ -60,9 +60,10 @@ impl PersonaBackend {
             PersonaBackend::ClaudeCli | PersonaBackend::GeminiCli | PersonaBackend::CodexCli => {
                 "Local CLI"
             }
-            PersonaBackend::ClaudeApi | PersonaBackend::GeminiApi | PersonaBackend::OpenAiApi | PersonaBackend::KaibaApi => {
-                "Remote API"
-            }
+            PersonaBackend::ClaudeApi
+            | PersonaBackend::GeminiApi
+            | PersonaBackend::OpenAiApi
+            | PersonaBackend::KaibaApi => "Remote API",
         }
     }
 

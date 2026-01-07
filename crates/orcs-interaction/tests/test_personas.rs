@@ -39,6 +39,7 @@ async fn test_save_and_load_personas() {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         },
         Persona {
             id: uuid::Uuid::new_v4().to_string(),
@@ -53,6 +54,7 @@ async fn test_save_and_load_personas() {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         },
     ];
 
@@ -98,6 +100,7 @@ async fn test_persona_fields() {
         icon: None,
         base_color: None,
         gemini_options: None,
+        kaiba_options: None,
     };
 
     // Save
@@ -144,6 +147,7 @@ async fn test_multiple_personas_stored_separately() {
         icon: None,
         base_color: None,
         gemini_options: None,
+        kaiba_options: None,
     };
 
     let persona2 = Persona {
@@ -159,6 +163,7 @@ async fn test_multiple_personas_stored_separately() {
         icon: None,
         base_color: None,
         gemini_options: None,
+        kaiba_options: None,
     };
 
     // Save first persona

@@ -103,66 +103,67 @@ impl KaibaApiAgent {
     /// Kaiba URL defaults to `https://kaiba.shuttleapp.rs` if not specified.
     pub async fn try_from_env() -> Result<Self, AgentError> {
         // Try loading from SecretService first
-        let (kaiba_url, kaiba_api_key, rei_id, anthropic_api_key, model) =
-            if let Ok(service) = SecretServiceImpl::new_default()
-                && let Ok(secret_config) = service.load_secrets().await
-            {
-                let kaiba_url = secret_config.kaiba
-                    .as_ref()
-                    .and_then(|k| k.url.clone())
-                    .unwrap_or_else(|| DEFAULT_KAIBA_URL.to_string());
+        let (kaiba_url, kaiba_api_key, rei_id, anthropic_api_key, model) = if let Ok(service) =
+            SecretServiceImpl::new_default()
+            && let Ok(secret_config) = service.load_secrets().await
+        {
+            let kaiba_url = secret_config
+                .kaiba
+                .as_ref()
+                .and_then(|k| k.url.clone())
+                .unwrap_or_else(|| DEFAULT_KAIBA_URL.to_string());
 
-                let kaiba_api_key = secret_config.kaiba
-                    .as_ref()
-                    .and_then(|k| k.api_key.clone());
+            let kaiba_api_key = secret_config.kaiba.as_ref().and_then(|k| k.api_key.clone());
 
-                let rei_id = secret_config.kaiba
-                    .as_ref()
-                    .and_then(|k| k.default_rei_id.clone())
-                    .or_else(|| env::var("KAIBA_REI_ID").ok())
-                    .ok_or_else(|| {
-                        AgentError::ExecutionFailed(
-                            "KAIBA_REI_ID not found in secret.json or environment variables".into(),
-                        )
-                    })?;
-
-                let anthropic_api_key = secret_config.claude
-                    .as_ref()
-                    .and_then(|c| Some(c.api_key.clone()))
-                    .or_else(|| env::var("ANTHROPIC_API_KEY").ok())
-                    .ok_or_else(|| {
-                        AgentError::ExecutionFailed(
-                            "ANTHROPIC_API_KEY not found in secret.json or environment variables".into(),
-                        )
-                    })?;
-
-                let model = DEFAULT_CLAUDE_MODEL.to_string();
-
-                (kaiba_url, kaiba_api_key, rei_id, anthropic_api_key, model)
-            } else {
-                // Fallback to environment variables
-                let kaiba_url = env::var("KAIBA_URL")
-                    .unwrap_or_else(|_| DEFAULT_KAIBA_URL.to_string());
-
-                let kaiba_api_key = env::var("KAIBA_API_KEY").ok();
-
-                let rei_id = env::var("KAIBA_REI_ID").map_err(|_| {
+            let rei_id = secret_config
+                .kaiba
+                .as_ref()
+                .and_then(|k| k.default_rei_id.clone())
+                .or_else(|| env::var("KAIBA_REI_ID").ok())
+                .ok_or_else(|| {
                     AgentError::ExecutionFailed(
-                        "KAIBA_REI_ID not found in environment variables".into(),
+                        "KAIBA_REI_ID not found in secret.json or environment variables".into(),
                     )
                 })?;
 
-                let anthropic_api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| {
+            let anthropic_api_key = secret_config
+                .claude
+                .as_ref()
+                .map(|c| c.api_key.clone())
+                .or_else(|| env::var("ANTHROPIC_API_KEY").ok())
+                .ok_or_else(|| {
                     AgentError::ExecutionFailed(
-                        "ANTHROPIC_API_KEY not found in environment variables".into(),
+                        "ANTHROPIC_API_KEY not found in secret.json or environment variables"
+                            .into(),
                     )
                 })?;
 
-                let model = env::var("CLAUDE_MODEL_NAME")
-                    .unwrap_or_else(|_| DEFAULT_CLAUDE_MODEL.to_string());
+            let model = DEFAULT_CLAUDE_MODEL.to_string();
 
-                (kaiba_url, kaiba_api_key, rei_id, anthropic_api_key, model)
-            };
+            (kaiba_url, kaiba_api_key, rei_id, anthropic_api_key, model)
+        } else {
+            // Fallback to environment variables
+            let kaiba_url = env::var("KAIBA_URL").unwrap_or_else(|_| DEFAULT_KAIBA_URL.to_string());
+
+            let kaiba_api_key = env::var("KAIBA_API_KEY").ok();
+
+            let rei_id = env::var("KAIBA_REI_ID").map_err(|_| {
+                AgentError::ExecutionFailed(
+                    "KAIBA_REI_ID not found in environment variables".into(),
+                )
+            })?;
+
+            let anthropic_api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| {
+                AgentError::ExecutionFailed(
+                    "ANTHROPIC_API_KEY not found in environment variables".into(),
+                )
+            })?;
+
+            let model =
+                env::var("CLAUDE_MODEL_NAME").unwrap_or_else(|_| DEFAULT_CLAUDE_MODEL.to_string());
+
+            (kaiba_url, kaiba_api_key, rei_id, anthropic_api_key, model)
+        };
 
         Ok(Self::new(
             rei_id,
@@ -187,13 +188,10 @@ impl KaibaApiAgent {
 
     /// Fetches the Rei prompt from Kaiba service.
     async fn fetch_rei_prompt(&self, context: &str) -> Result<KaibaPromptResponse, AgentError> {
-        let url = format!(
-            "{}/kaiba/rei/{}/prompt",
-            self.kaiba_url,
-            self.rei_id
-        );
+        let url = format!("{}/kaiba/rei/{}/prompt", self.kaiba_url, self.rei_id);
 
-        let mut request = self.client
+        let mut request = self
+            .client
             .get(&url)
             .query(&[("format", "raw"), ("context", context)])
             .timeout(Duration::from_secs(30));
@@ -202,19 +200,25 @@ impl KaibaApiAgent {
             request = request.header("Authorization", format!("Bearer {}", api_key));
         }
 
-        let response = request.send().await
-            .map_err(|e| AgentError::ExecutionFailed(format!("Failed to fetch Rei prompt: {}", e)))?;
+        let response = request.send().await.map_err(|e| {
+            AgentError::ExecutionFailed(format!("Failed to fetch Rei prompt: {}", e))
+        })?;
 
         let status = response.status();
         if !status.is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(AgentError::ExecutionFailed(
-                format!("Kaiba API error ({}): {}", status, error_text)
-            ));
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(AgentError::ExecutionFailed(format!(
+                "Kaiba API error ({}): {}",
+                status, error_text
+            )));
         }
 
-        response.json::<KaibaPromptResponse>().await
-            .map_err(|e| AgentError::ExecutionFailed(format!("Failed to parse Kaiba response: {}", e)))
+        response.json::<KaibaPromptResponse>().await.map_err(|e| {
+            AgentError::ExecutionFailed(format!("Failed to parse Kaiba response: {}", e))
+        })
     }
 
     /// Executes the prompt using Claude API.
@@ -226,16 +230,15 @@ impl KaibaApiAgent {
         let request_body = ClaudeRequest {
             model: self.model.clone(),
             system: system_prompt.to_string(),
-            messages: vec![
-                ClaudeMessage {
-                    role: "user".to_string(),
-                    content: user_message.to_string(),
-                },
-            ],
+            messages: vec![ClaudeMessage {
+                role: "user".to_string(),
+                content: user_message.to_string(),
+            }],
             max_tokens: self.max_tokens,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post("https://api.anthropic.com/v1/messages")
             .header("x-api-key", &self.anthropic_api_key)
             .header("anthropic-version", "2023-06-01")
@@ -244,24 +247,33 @@ impl KaibaApiAgent {
             .timeout(Duration::from_secs(120))
             .send()
             .await
-            .map_err(|e| AgentError::ExecutionFailed(format!("Claude API request failed: {}", e)))?;
+            .map_err(|e| {
+                AgentError::ExecutionFailed(format!("Claude API request failed: {}", e))
+            })?;
 
         let status = response.status();
         if !status.is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(AgentError::ExecutionFailed(
-                format!("Claude API error ({}): {}", status, error_text)
-            ));
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(AgentError::ExecutionFailed(format!(
+                "Claude API error ({}): {}",
+                status, error_text
+            )));
         }
 
-        let claude_response: ClaudeResponse = response.json().await
-            .map_err(|e| AgentError::ExecutionFailed(format!("Failed to parse Claude response: {}", e)))?;
+        let claude_response: ClaudeResponse = response.json().await.map_err(|e| {
+            AgentError::ExecutionFailed(format!("Failed to parse Claude response: {}", e))
+        })?;
 
         // Extract text from response
-        Ok(claude_response.content
+        Ok(claude_response
+            .content
             .into_iter()
-            .filter_map(|block| match block {
-                ContentBlock::Text { text } => Some(text),
+            .map(|block| {
+                let ContentBlock::Text { text } = block;
+                text
             })
             .collect::<Vec<_>>()
             .join("\n"))
@@ -284,7 +296,8 @@ impl KaibaApiAgent {
 
         let url = format!("{}/personas/{}/memories", self.kaiba_url, self.rei_id);
 
-        let mut request = self.client
+        let mut request = self
+            .client
             .post(&url)
             .json(&request_body)
             .timeout(Duration::from_secs(10));
@@ -293,12 +306,17 @@ impl KaibaApiAgent {
             request = request.header("Authorization", format!("Bearer {}", api_key));
         }
 
-        let response = request.send().await
+        let response = request
+            .send()
+            .await
             .map_err(|e| AgentError::ExecutionFailed(format!("Failed to store memory: {}", e)))?;
 
         if !response.status().is_success() {
             // Log but don't fail - memory storage is best-effort
-            eprintln!("Warning: Failed to store memory to Kaiba (status: {})", response.status());
+            eprintln!(
+                "Warning: Failed to store memory to Kaiba (status: {})",
+                response.status()
+            );
         }
 
         Ok(())
@@ -336,10 +354,9 @@ impl Agent for KaibaApiAgent {
         );
 
         // Execute with Claude using the Rei prompt
-        let response = self.execute_with_claude(
-            &kaiba_response.system_prompt,
-            &user_message,
-        ).await?;
+        let response = self
+            .execute_with_claude(&kaiba_response.system_prompt, &user_message)
+            .await?;
 
         // Store the conversation as memory (best-effort, don't fail on error)
         let memory_content = format!("User: {}\n\nAssistant: {}", user_message, response);

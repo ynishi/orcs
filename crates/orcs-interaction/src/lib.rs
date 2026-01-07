@@ -294,11 +294,11 @@ impl PersonaBackendAgent {
             PersonaBackend::KaibaApi => {
                 let mut agent = KaibaApiAgent::try_from_env().await?;
                 // Override Rei ID if specified in kaiba_options
-                if let Some(ref kaiba_opts) = self.kaiba_options {
-                    if let Some(ref rei_id) = kaiba_opts.rei_id {
-                        tracing::info!("[PersonaBackendAgent] Using Kaiba Rei ID: {}", rei_id);
-                        agent = agent.with_rei_id(rei_id);
-                    }
+                if let Some(ref kaiba_opts) = self.kaiba_options
+                    && let Some(ref rei_id) = kaiba_opts.rei_id
+                {
+                    tracing::info!("[PersonaBackendAgent] Using Kaiba Rei ID: {}", rei_id);
+                    agent = agent.with_rei_id(rei_id);
                 }
                 agent.execute(payload).await
             }

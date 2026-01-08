@@ -33,11 +33,7 @@ fn infer_mime_type(filename: &str) -> String {
 /// This ensures that filenames containing `/`, `\`, or other special characters
 /// don't cause issues when used in file paths.
 fn sanitize_filename(filename: &str) -> String {
-    filename
-        .replace('/', "_")
-        .replace('\\', "_")
-        .replace('\0', "_")
-        .replace(':', "_")
+    filename.replace(['/', '\\', '\0', ':'], "_")
 }
 
 /// Generates a unique filename by appending a number suffix if a file with the same name exists.
@@ -1634,10 +1630,7 @@ mod tests {
 
     #[test]
     fn test_sanitize_filename_with_backslash() {
-        assert_eq!(
-            sanitize_filename("path\\to\\file.txt"),
-            "path_to_file.txt"
-        );
+        assert_eq!(sanitize_filename("path\\to\\file.txt"), "path_to_file.txt");
     }
 
     #[test]

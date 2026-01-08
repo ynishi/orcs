@@ -91,6 +91,9 @@ const MODEL_OPTIONS: Record<PersonaBackend, { value: string; label: string }[]> 
   codex_cli: [
     { value: 'default', label: 'Default (CLI)' },
   ],
+  kaiba_api: [
+    { value: 'default', label: 'Default (Kaiba)' },
+  ],
 };
 
 /**
@@ -124,6 +127,7 @@ const BACKEND_LABELS: Record<PersonaBackend, string> = {
   gemini_cli: '💎 Gemini CLI',
   open_ai_api: '🤖 OpenAI API',
   codex_cli: '⚡ Codex CLI',
+  kaiba_api: '🧠 Kaiba API',
 };
 
 export function AgentConfigSelector({ value, onChange }: AgentConfigSelectorProps) {

@@ -18,7 +18,7 @@ import {
   Paper,
   Text,
 } from '@mantine/core';
-import { IconSettings, IconClipboardList, IconFileText, IconBulb, IconFileCode, IconVolume, IconVolumeOff, IconPlayerPlay, IconPlayerStop, IconFile, IconCheck, IconPaperclip, IconFileExport } from '@tabler/icons-react';
+import { IconSettings, IconClipboardList, IconFileText, IconBulb, IconFileCode, IconVolume, IconVolumeOff, IconPlayerPlay, IconPlayerStop, IconFile, IconCheck, IconPaperclip, IconFileExport, IconSearch } from '@tabler/icons-react';
 import { MessageItem } from './MessageItem';
 import { StatusBar } from './StatusBar';
 import { AgentConfigSelector } from './AgentConfigSelector';
@@ -28,6 +28,7 @@ import { AgentSuggestions } from './AgentSuggestions';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { AutoChatSettingsModal } from './AutoChatSettingsModal';
 import { SlashCommandEditorModal } from '../slash_commands/SlashCommandEditorModal';
+import { QuickActionDock } from './QuickActionDock';
 import { useTabContext } from '../../context/TabContext';
 import type { SessionTab } from '../../context/TabContext';
 import type { StatusInfo } from '../../types/status';
@@ -227,6 +228,95 @@ export function ChatPanel({
     },
     sessionScope: 'full',
   });
+
+  // SlashCommands for QuickActionDock
+  const [availableSlashCommands, setAvailableSlashCommands] = useState<SlashCommand[]>([]);
+
+  // Load available slash commands
+  useEffect(() => {
+    const loadSlashCommands = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const commands = await invoke<SlashCommand[]>('list_slash_commands');
+        setAvailableSlashCommands(commands);
+      } catch (error) {
+        console.error('[ChatPanel] Failed to load slash commands:', error);
+      }
+    };
+
+    loadSlashCommands();
+  }, []);
+
+  // Handle QuickAction command execution
+  const handleExecuteQuickAction = useCallback(async (commandName: string) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      // Get the command details
+      const command = availableSlashCommands.find((c) => c.name === commandName);
+      if (!command) {
+        throw new Error(`Command not found: ${commandName}`);
+      }
+
+      // Expand the command template
+      const expanded = await invoke<{ content: string; workingDir?: string }>('expand_command_template', {
+        commandName,
+        args: null,
+      });
+
+      // Handle based on command type
+      if (command.type === 'prompt') {
+        // For prompt commands, send the expanded content as user input
+        onInputChange(expanded.content);
+      } else if (command.type === 'shell') {
+        // For shell commands, execute and show output
+        setTabThinking(tab.id, true, `Running /${commandName}`, true);
+        const output = await invoke<string>('execute_shell_command', {
+          command: expanded.content,
+          workingDir: expanded.workingDir,
+        });
+
+        // Add output as system message
+        const outputMessage: Message = {
+          id: `${Date.now()}-shell-output`,
+          type: 'ai',
+          author: `Shell: /${commandName}`,
+          text: `\`\`\`\n${output}\n\`\`\``,
+          timestamp: new Date(),
+        };
+        addMessageToTab(tab.id, outputMessage);
+        setTabThinking(tab.id, false);
+
+        notifications.show({
+          title: 'Command Executed',
+          message: `/${commandName} completed`,
+          color: 'green',
+        });
+      } else if (command.type === 'task') {
+        // For task commands, execute as task
+        setTabThinking(tab.id, true, `Executing /${commandName}`, true);
+        await invoke<string>('execute_task_command', {
+          commandName,
+          args: null,
+        });
+        setTabThinking(tab.id, false);
+
+        notifications.show({
+          title: 'Task Started',
+          message: `/${commandName} task is running`,
+          color: 'blue',
+        });
+      }
+    } catch (error) {
+      console.error('[ChatPanel] Failed to execute quick action:', error);
+      setTabThinking(tab.id, false);
+      notifications.show({
+        title: 'Error',
+        message: error instanceof Error ? error.message : `Failed to execute /${commandName}`,
+        color: 'red',
+      });
+    }
+  }, [availableSlashCommands, tab.id, onInputChange, setTabThinking, addMessageToTab]);
 
   // Load AutoChat config from backend when tab changes
   // Only load for active tab to avoid Session ID mismatch errors
@@ -741,6 +831,108 @@ export function ChatPanel({
     }
   }, [getThreadAsText, tab.id, tab.sessionId, agentConfig, setTabThinking, addMessageToTab]);
 
+  // Handle investigating workspace structure and status
+  const handleInvestigateWorkspace = useCallback(async () => {
+    if (!workspace) {
+      notifications.show({
+        title: 'Error',
+        message: 'No workspace selected',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      // Reset cancel flag before starting
+      await invoke('reset_cancel_flag');
+
+      // Persist system message for investigation request
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: '🔍 Investigating workspace structure and status...',
+            messageType: 'info',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Set thinking state
+      setTabThinking(tab.id, true, 'Investigating', true); // Non-interactive command
+
+      // Call backend to investigate workspace
+      const investigationResult = await invoke<any>('investigate_workspace', {
+        workspaceId: workspace.id,
+        investigationType: 'comprehensive',
+      });
+
+      // Format the investigation result for display
+      const formattedResult = formatInvestigationResult(investigationResult);
+
+      // Persist AI response with investigation result
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: formattedResult,
+            messageType: 'ai_response',
+            severity: 'info',
+          },
+        ],
+      });
+
+      // Add investigation message to frontend tab
+      const investigationMessage: Message = {
+        id: `${Date.now()}-investigation`,
+        type: 'ai',
+        author: 'Workspace Investigation',
+        text: formattedResult,
+        timestamp: new Date(),
+      };
+      addMessageToTab(tab.id, investigationMessage);
+
+      notifications.show({
+        title: 'Success',
+        message: 'Workspace investigation completed!',
+        color: 'green',
+      });
+    } catch (error) {
+      console.error('[ChatPanel] Failed to investigate workspace:', error);
+
+      // Persist error message
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('append_system_messages', {
+        messages: [
+          {
+            content: `❌ Failed to investigate workspace: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            messageType: 'error',
+            severity: 'error',
+          },
+        ],
+      }).catch((e: unknown) => console.error('[ChatPanel] Failed to persist error message:', e));
+
+      notifications.show({
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to investigate workspace',
+        color: 'red',
+      });
+    } finally {
+      setTabThinking(tab.id, false);
+    }
+  }, [workspace, tab.id, setTabThinking, addMessageToTab]);
+
+  // Helper function to format investigation result
+  const formatInvestigationResult = (result: any): string => {
+    // New format: Agent returns report directly as Markdown
+    if (result.report) {
+      return result.report;
+    }
+
+    // Fallback for unexpected format
+    return `## Investigation Result\n\n${JSON.stringify(result, null, 2)}`;
+  };
+
   // Handle generating Concept/Design Issue from thread
   const handleGenerateConceptIssue = useCallback(async () => {
     const threadContent = getThreadAsText();
@@ -931,7 +1123,7 @@ export function ChatPanel({
                 <Text size="sm">{tab.messages.length} messages (tab inactive)</Text>
               </Box>
             )}
-            {tab.isAiThinking && activeParticipantIds.length > 0 && (!isMuted || !tab.isNonInteractiveCommand) && (
+            {tab.isAiThinking && (activeParticipantIds.length > 0 || tab.isNonInteractiveCommand) && (
               <ThinkingIndicator personaName={tab.thinkingPersona} onCancel={handleCancelOperation} />
             )}
           </Stack>
@@ -952,6 +1144,13 @@ export function ChatPanel({
             }}
           >
             <Group gap={4}>
+              {/* Quick Action Dock */}
+              <QuickActionDock
+                workspaceId={workspace?.id || null}
+                slashCommands={availableSlashCommands}
+                onExecuteCommand={handleExecuteQuickAction}
+              />
+
               {/* Agent Configuration */}
               <AgentConfigSelector
                 value={agentConfig}
@@ -1044,6 +1243,23 @@ export function ChatPanel({
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <IconFileCode size={18} />
+                </ActionIcon>
+              </Tooltip>
+
+              <Tooltip label="Investigate Workspace" withArrow>
+                <ActionIcon
+                  variant="transparent"
+                  onClick={handleInvestigateWorkspace}
+                  size="lg"
+                  style={{
+                    color: 'var(--mantine-color-gray-6)',
+                    borderRadius: '6px',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mantine-color-blue-0)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  <IconSearch size={18} />
                 </ActionIcon>
               </Tooltip>
 

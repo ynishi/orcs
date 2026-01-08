@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Stack, Text, ActionIcon, Group, Tooltip, Switch, ScrollArea, Box, Center } from '@mantine/core';
-import { IconPlus, IconFolder, IconTerminal } from '@tabler/icons-react';
+import { IconPlus, IconFolder, IconTerminal, IconClipboard, IconSearch } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { notifications } from '@mantine/notifications';
@@ -216,6 +216,58 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
     }
   };
 
+  // Handle investigating workspace
+  const handleInvestigateWorkspace = async () => {
+    if (!workspace) return;
+
+    try {
+      const result = await invoke<any>('investigate_workspace', {
+        workspaceId: workspace.id,
+        investigationType: 'comprehensive',
+      });
+
+      // Format the investigation result
+      const formattedResult = formatInvestigationResult(result);
+
+      // Create a temporary file with the result
+      const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+      const fileName = `workspace-investigation-${timestamp}.md`;
+
+      // Upload the investigation result as a workspace file
+      await invoke('upload_file_from_bytes', {
+        workspaceId: workspace.id,
+        filename: fileName,
+        fileData: Array.from(new TextEncoder().encode(formattedResult)),
+        sessionId: null,
+        messageTimestamp: null,
+      });
+
+      notifications.show({
+        title: 'Investigation Complete',
+        message: `Results saved to ${fileName}`,
+        color: 'green',
+      });
+    } catch (error) {
+      console.error('Failed to investigate workspace:', error);
+      notifications.show({
+        title: 'Investigation Failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        color: 'red',
+      });
+    }
+  };
+
+  // Helper function to format investigation result
+  const formatInvestigationResult = (result: any): string => {
+    // New format: Agent returns report directly as Markdown
+    if (result.report) {
+      return result.report;
+    }
+
+    // Fallback for unexpected format
+    return `# Investigation Result\n\n${JSON.stringify(result, null, 2)}`;
+  };
+
   // Handle opening copy to workspace modal
   const handleOpenCopyModal = (file: UploadedFile) => {
     setFileToCopy(file);
@@ -258,6 +310,59 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
     }
   };
 
+  // Handle pasting from clipboard
+  const handlePasteFromClipboard = async () => {
+    if (!workspace) return;
+
+    try {
+      // Read clipboard content using Tauri clipboard plugin
+      const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+      const clipboardText = await readText();
+
+      if (!clipboardText || clipboardText.trim().length === 0) {
+        notifications.show({
+          title: 'Empty clipboard',
+          message: 'No text content in clipboard',
+          color: 'yellow',
+        });
+        return;
+      }
+
+      // Generate filename with timestamp
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' +
+                        now.toTimeString().split(' ')[0].replace(/:/g, '-');
+      const filename = `clipboard_${timestamp}.txt`;
+
+      // Convert text to bytes
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(clipboardText);
+      const fileData = Array.from(bytes);
+
+      // Upload to workspace
+      await invoke('upload_file_from_bytes', {
+        workspaceId: workspace.id,
+        filename: filename,
+        fileData: fileData,
+        sessionId: null,
+        messageTimestamp: null,
+      });
+
+      notifications.show({
+        title: 'Clipboard pasted',
+        message: `Created "${filename}" from clipboard`,
+        color: 'green',
+      });
+    } catch (err) {
+      console.error('Failed to paste from clipboard:', err);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to paste from clipboard: ${err instanceof Error ? err.message : String(err)}`,
+        color: 'red',
+      });
+    }
+  };
+
   // Phase 4: No loading/error states - workspace data comes from event-driven store
 
   // No files state
@@ -289,6 +394,30 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
                 aria-label="Open terminal"
               >
                 <IconTerminal size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Paste from clipboard as file" withArrow>
+              <ActionIcon
+                onClick={() => {
+                  void handlePasteFromClipboard();
+                }}
+                variant="subtle"
+                color="teal"
+                aria-label="Paste from clipboard"
+              >
+                <IconClipboard size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Investigate workspace" withArrow>
+              <ActionIcon
+                onClick={() => {
+                  void handleInvestigateWorkspace();
+                }}
+                variant="subtle"
+                color="indigo"
+                aria-label="Investigate workspace"
+              >
+                <IconSearch size={18} />
               </ActionIcon>
             </Tooltip>
             <ActionIcon
@@ -358,6 +487,18 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
               aria-label="Open terminal"
             >
               <IconTerminal size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Paste from clipboard as file" withArrow>
+            <ActionIcon
+              onClick={() => {
+                void handlePasteFromClipboard();
+              }}
+              variant="subtle"
+              color="teal"
+              aria-label="Paste from clipboard"
+            >
+              <IconClipboard size={18} />
             </ActionIcon>
           </Tooltip>
           <ActionIcon

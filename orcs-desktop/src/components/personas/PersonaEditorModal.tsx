@@ -6,6 +6,7 @@ import { CreatePersonaRequest } from '../../types/persona_request';
 
 const CLAUDE_MODEL_OPTIONS = [
   { value: '', label: 'Default (Sonnet 4.5)' },
+  { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5 (2025-11-01) 🧠' },
   { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1 (2025-08-05)' },
   { value: 'claude-opus-4-20250514', label: 'Claude Opus 4.0 (2025-05-14)' },
   { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5 (2025-09-29)' },
@@ -53,6 +54,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
     icon: undefined,
     base_color: undefined,
     gemini_options: undefined,
+    kaiba_options: undefined,
   });
 
   // Fetch backend options on mount
@@ -85,6 +87,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         icon: persona.icon,
         base_color: persona.base_color,
         gemini_options: persona.gemini_options,
+        kaiba_options: persona.kaiba_options,
       });
     } else {
       setFormData({
@@ -99,6 +102,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         icon: undefined,
         base_color: undefined,
         gemini_options: undefined,
+        kaiba_options: undefined,
       });
     }
   }, [persona]);
@@ -125,6 +129,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         icon: formData.icon || undefined,
         base_color: formData.base_color || undefined,
         gemini_options: formData.gemini_options || undefined,
+        kaiba_options: formData.kaiba_options || undefined,
       };
 
       onSave(updatedPersona);
@@ -144,6 +149,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
         icon: formData.icon || undefined,
         base_color: formData.base_color || undefined,
         gemini_options: formData.gemini_options || undefined,
+        kaiba_options: formData.kaiba_options || undefined,
       };
 
       // Call unified create_persona command
@@ -222,7 +228,7 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
           allowDeselect={false}
         />
 
-        {formData.backend === 'claude_cli' && (
+        {(formData.backend === 'claude_cli' || formData.backend === 'claude_api') && (
           <Select
             label="Model"
             placeholder="Select Claude model"
@@ -275,6 +281,23 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
               })}
             />
           </>
+        )}
+
+        {formData.backend === 'kaiba_api' && (
+          <TextInput
+            label="Rei ID"
+            placeholder="e.g., rei_abc123"
+            description="The Kaiba Rei ID for persistent memory and context. Get this from the Kaiba dashboard."
+            value={formData.kaiba_options?.rei_id || ''}
+            onChange={(e) => setFormData({
+              ...formData,
+              kaiba_options: {
+                ...formData.kaiba_options,
+                rei_id: e.currentTarget.value || undefined,
+              }
+            })}
+            required
+          />
         )}
 
         <Textarea

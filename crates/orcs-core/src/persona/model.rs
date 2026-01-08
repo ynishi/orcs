@@ -23,6 +23,8 @@ pub enum PersonaBackend {
     OpenAiApi,
     /// Codex CLI backend
     CodexCli,
+    /// Kaiba API backend (Autonomous persona with persistent memory)
+    KaibaApi,
 }
 
 impl PersonaBackend {
@@ -35,6 +37,7 @@ impl PersonaBackend {
             ("gemini_api".to_string(), "Gemini API".to_string()),
             ("open_ai_api".to_string(), "OpenAI API".to_string()),
             ("codex_cli".to_string(), "Codex CLI".to_string()),
+            ("kaiba_api".to_string(), "Kaiba API".to_string()),
         ]
     }
 
@@ -47,6 +50,7 @@ impl PersonaBackend {
             PersonaBackend::GeminiApi => "Gemini API",
             PersonaBackend::OpenAiApi => "OpenAI API",
             PersonaBackend::CodexCli => "Codex CLI",
+            PersonaBackend::KaibaApi => "Kaiba API",
         }
     }
 
@@ -56,9 +60,10 @@ impl PersonaBackend {
             PersonaBackend::ClaudeCli | PersonaBackend::GeminiCli | PersonaBackend::CodexCli => {
                 "Local CLI"
             }
-            PersonaBackend::ClaudeApi | PersonaBackend::GeminiApi | PersonaBackend::OpenAiApi => {
-                "Remote API"
-            }
+            PersonaBackend::ClaudeApi
+            | PersonaBackend::GeminiApi
+            | PersonaBackend::OpenAiApi
+            | PersonaBackend::KaibaApi => "Remote API",
         }
     }
 
@@ -199,6 +204,14 @@ pub struct GeminiOptions {
     pub google_search: Option<bool>,
 }
 
+/// Options specific to Kaiba API (Autonomous persona with persistent memory).
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Default)]
+pub struct KaibaOptions {
+    /// Rei ID for the Kaiba persona
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rei_id: Option<String>,
+}
+
 /// A persona representing an AI agent with specific characteristics and expertise.
 ///
 /// Personas define the behavior, expertise, and communication style of AI agents
@@ -239,6 +252,9 @@ pub struct Persona {
     /// Gemini-specific options (thinking level, Google Search)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gemini_options: Option<GeminiOptions>,
+    /// Kaiba-specific options (Rei ID for persistent memory)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kaiba_options: Option<KaibaOptions>,
 }
 
 #[cfg(test)]
@@ -249,8 +265,8 @@ mod tests {
     fn test_persona_backend_all_variants() {
         let variants = PersonaBackend::all_variants();
 
-        // Should have exactly 6 backend options
-        assert_eq!(variants.len(), 6);
+        // Should have exactly 7 backend options
+        assert_eq!(variants.len(), 7);
 
         // Verify each variant exists and has correct snake_case format
         let keys: Vec<String> = variants.iter().map(|(k, _)| k.clone()).collect();
@@ -260,11 +276,13 @@ mod tests {
         assert!(keys.contains(&"gemini_api".to_string()));
         assert!(keys.contains(&"open_ai_api".to_string())); // Note: two underscores
         assert!(keys.contains(&"codex_cli".to_string()));
+        assert!(keys.contains(&"kaiba_api".to_string()));
 
         // Verify display names are present
         let labels: Vec<String> = variants.iter().map(|(_, v)| v.clone()).collect();
         assert!(labels.contains(&"Claude CLI".to_string()));
         assert!(labels.contains(&"OpenAI API".to_string()));
+        assert!(labels.contains(&"Kaiba API".to_string()));
     }
 
     #[test]

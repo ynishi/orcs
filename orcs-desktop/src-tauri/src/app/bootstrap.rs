@@ -7,6 +7,7 @@ use orcs_application::{AdhocPersonaService, SessionUseCase, UtilityAgentService}
 use orcs_core::{
     dialogue::DialoguePresetRepository,
     persona::{PersonaRepository, get_default_presets},
+    quick_action::QuickActionRepository,
     repository::SessionRepository,
     secret::SecretService,
     session::{AppMode, PLACEHOLDER_WORKSPACE_ID},
@@ -20,8 +21,8 @@ use orcs_execution::{TaskExecutor, tracing_layer::OrchestratorEvent};
 use orcs_infrastructure::{
     AppStateService, AsyncDirDialoguePresetRepository, AsyncDirPersonaRepository,
     AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
-    SecretServiceImpl, paths::OrcsPaths, user_service::ConfigBasedUserService,
-    workspace_storage_service::FileSystemWorkspaceManager,
+    FileQuickActionRepository, SecretServiceImpl, paths::OrcsPaths,
+    user_service::ConfigBasedUserService, workspace_storage_service::FileSystemWorkspaceManager,
 };
 use tokio::sync::{Mutex, mpsc::UnboundedSender};
 
@@ -251,6 +252,15 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
             .with_utility_service(utility_service.clone()),
     );
 
+    // Create QuickAction Repository
+    let quick_action_repository_concrete = Arc::new(
+        FileQuickActionRepository::new()
+            .await
+            .expect("Failed to initialize Quick Action Repository"),
+    );
+    let quick_action_repository =
+        quick_action_repository_concrete.clone() as Arc<dyn QuickActionRepository>;
+
     // Try to restore last session using SessionUseCase
     let restored = session_usecase.restore_last_session().await.ok().flatten();
 
@@ -338,6 +348,8 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         task_repository_concrete,
         task_executor,
         cancel_flag: Arc::new(AtomicBool::new(false)),
+        quick_action_repository,
+        quick_action_repository_concrete,
     };
 
     AppBootstrap { app_state }

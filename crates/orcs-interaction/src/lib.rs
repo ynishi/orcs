@@ -1,11 +1,13 @@
 pub mod claude_api_agent;
 pub mod gemini_api_agent;
+pub mod kaiba_api_agent;
 pub mod local_agents;
 pub mod openai_api_agent;
 
 // Re-export API agents for external use
 pub use crate::claude_api_agent::ClaudeApiAgent;
 pub use crate::gemini_api_agent::GeminiApiAgent;
+pub use crate::kaiba_api_agent::KaibaApiAgent;
 pub use crate::openai_api_agent::OpenAIApiAgent;
 use llm_toolkit::agent::dialogue::{
     Dialogue, DialogueTurn, ExecutionModel, ReactionStrategy, Speaker, TalkStyle,
@@ -143,6 +145,7 @@ struct PersonaBackendAgent {
     backend: PersonaBackend,
     model_name: Option<String>,
     gemini_options: Option<orcs_core::persona::GeminiOptions>,
+    kaiba_options: Option<orcs_core::persona::KaibaOptions>,
     workspace_root: Arc<RwLock<Option<PathBuf>>>,
     env_settings: Arc<RwLock<EnvSettings>>,
 }
@@ -152,6 +155,7 @@ impl PersonaBackendAgent {
         backend: PersonaBackend,
         model_name: Option<String>,
         gemini_options: Option<orcs_core::persona::GeminiOptions>,
+        kaiba_options: Option<orcs_core::persona::KaibaOptions>,
         workspace_root: Arc<RwLock<Option<PathBuf>>>,
         env_settings: Arc<RwLock<EnvSettings>>,
     ) -> Self {
@@ -159,6 +163,7 @@ impl PersonaBackendAgent {
             backend,
             model_name,
             gemini_options,
+            kaiba_options,
             workspace_root,
             env_settings,
         }
@@ -286,6 +291,17 @@ impl PersonaBackendAgent {
                 }
                 agent.execute(payload).await
             }
+            PersonaBackend::KaibaApi => {
+                let mut agent = KaibaApiAgent::try_from_env().await?;
+                // Override Rei ID if specified in kaiba_options
+                if let Some(ref kaiba_opts) = self.kaiba_options
+                    && let Some(ref rei_id) = kaiba_opts.rei_id
+                {
+                    tracing::info!("[PersonaBackendAgent] Using Kaiba Rei ID: {}", rei_id);
+                    agent = agent.with_rei_id(rei_id);
+                }
+                agent.execute(payload).await
+            }
         }
     }
 }
@@ -302,6 +318,7 @@ impl Agent for PersonaBackendAgent {
             PersonaBackend::GeminiApi => "Gemini API persona agent",
             PersonaBackend::OpenAiApi => "OpenAI API persona agent",
             PersonaBackend::CodexCli => "Codex CLI persona agent",
+            PersonaBackend::KaibaApi => "Kaiba API persona agent (with persistent memory)",
         }
     }
 
@@ -328,6 +345,7 @@ fn agent_for_persona(
         persona.backend.clone(),
         persona.model_name.clone(),
         persona.gemini_options.clone(),
+        persona.kaiba_options.clone(),
         workspace_root,
         env_settings,
     );

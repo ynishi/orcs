@@ -28,7 +28,7 @@ export interface PersonaInfo {
 /**
  * ペルソナ設定(バックエンドのPersonaConfigに対応)
  */
-export type PersonaBackend = 'claude_cli' | 'claude_api' | 'gemini_cli' | 'gemini_api' | 'open_ai_api' | 'codex_cli';
+export type PersonaBackend = 'claude_cli' | 'claude_api' | 'gemini_cli' | 'gemini_api' | 'open_ai_api' | 'codex_cli' | 'kaiba_api';
 
 /**
  * Gemini-specific options
@@ -36,6 +36,13 @@ export type PersonaBackend = 'claude_cli' | 'claude_api' | 'gemini_cli' | 'gemin
 export interface GeminiOptions {
   thinking_level?: string; // LOW, MEDIUM, HIGH
   google_search?: boolean;
+}
+
+/**
+ * Kaiba-specific options (Autonomous persona with persistent memory)
+ */
+export interface KaibaOptions {
+  rei_id?: string; // Rei ID for the Kaiba persona
 }
 
 export interface PersonaConfig {
@@ -51,6 +58,7 @@ export interface PersonaConfig {
   icon?: string;
   base_color?: string;
   gemini_options?: GeminiOptions;
+  kaiba_options?: KaibaOptions;
 }
 
 /**

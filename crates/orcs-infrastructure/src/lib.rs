@@ -32,6 +32,7 @@ pub mod async_dir_task_repository;
 pub mod async_dir_workspace_repository;
 pub mod dto;
 pub mod paths;
+pub mod quick_action_repository;
 pub mod search;
 pub mod secret_service;
 pub mod state_repository;
@@ -46,5 +47,6 @@ pub use crate::async_dir_slash_command_repository::AsyncDirSlashCommandRepositor
 pub use crate::async_dir_task_repository::AsyncDirTaskRepository;
 pub use crate::async_dir_workspace_repository::AsyncDirWorkspaceRepository;
 pub use crate::paths::{OrcsPaths, PathType, ServiceType};
+pub use crate::quick_action_repository::FileQuickActionRepository;
 pub use crate::secret_service::SecretServiceImpl;
 pub use crate::state_repository::AppStateService;

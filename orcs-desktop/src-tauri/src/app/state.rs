@@ -4,15 +4,15 @@ use std::sync::atomic::AtomicBool;
 use orcs_application::session::SessionMetadataService;
 use orcs_application::{AdhocPersonaService, SessionUseCase};
 use orcs_core::{
-    dialogue::DialoguePresetRepository, persona::PersonaRepository, secret::SecretService,
-    session::AppMode, slash_command::SlashCommandRepository, task::TaskRepository,
-    user::UserService,
+    dialogue::DialoguePresetRepository, persona::PersonaRepository,
+    quick_action::QuickActionRepository, secret::SecretService, session::AppMode,
+    slash_command::SlashCommandRepository, task::TaskRepository, user::UserService,
 };
 use orcs_execution::TaskExecutor;
 use orcs_infrastructure::{
     AppStateService, AsyncDirDialoguePresetRepository, AsyncDirPersonaRepository,
     AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
-    workspace_storage_service::FileSystemWorkspaceManager,
+    FileQuickActionRepository, workspace_storage_service::FileSystemWorkspaceManager,
 };
 use tokio::sync::Mutex;
 
@@ -38,4 +38,7 @@ pub struct AppState {
     pub task_repository_concrete: Arc<AsyncDirTaskRepository>,
     pub task_executor: Arc<TaskExecutor>,
     pub cancel_flag: Arc<AtomicBool>,
+    pub quick_action_repository: Arc<dyn QuickActionRepository>,
+    #[allow(dead_code)]
+    pub quick_action_repository_concrete: Arc<FileQuickActionRepository>,
 }

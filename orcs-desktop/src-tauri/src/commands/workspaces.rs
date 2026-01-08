@@ -1,5 +1,8 @@
 use std::path::{Path, PathBuf};
 
+use llm_toolkit::agent::Agent;
+use llm_toolkit::agent::impls::claude_code::ClaudeCodeAgent;
+use orcs_core::agent::build_enhanced_path;
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::state::repository::StateRepository;
 use orcs_core::workspace::{UploadedFile, Workspace, manager::WorkspaceStorageService};
@@ -124,7 +127,10 @@ pub async fn create_workspace_with_session(
     if let Err(e) = app.emit("workspace-switched", &workspace.id) {
         println!("[Backend] Failed to emit workspace-switched: {}", e);
     } else {
-        println!("[Backend] workspace-switched event emitted for {}", workspace.id);
+        println!(
+            "[Backend] workspace-switched event emitted for {}",
+            workspace.id
+        );
     }
 
     // Emit app-state:update event for SSOT synchronization
@@ -498,6 +504,132 @@ pub async fn move_workspace_file_sort_order(
     }
 
     Ok(())
+}
+
+/// Investigates the current workspace using Claude Code Agent
+///
+/// This command launches a Claude Code Agent to perform comprehensive
+/// investigation of the workspace, including project structure, recent
+/// development activity, and technical analysis.
+#[tauri::command]
+pub async fn investigate_workspace(
+    workspace_id: String,
+    investigation_focus: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    println!(
+        "[Backend] investigate_workspace called: workspace_id={}",
+        workspace_id
+    );
+
+    // Get workspace information
+    let workspace = state
+        .workspace_storage_service
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("Workspace not found")?;
+
+    let workspace_path = workspace.root_path.clone();
+    let workspace_name = workspace.name.clone();
+
+    // Build enhanced PATH for the agent
+    let enhanced_path = build_enhanced_path(&workspace_path, None);
+
+    // Create Claude Code Agent with workspace context
+    // Allow tools needed for investigation: Read, Bash, Glob, Grep, Edit, Write
+    let agent = ClaudeCodeAgent::new()
+        .with_args(vec![
+            "--allowed-tools".to_string(),
+            "Read,Bash,Glob,Grep,Edit,Write".to_string(),
+        ])
+        .with_cwd(workspace_path.clone())
+        .with_env("PATH", enhanced_path);
+
+    // Build investigation prompt
+    let focus_instruction = investigation_focus
+        .map(|f| format!("\n\n## 特に注目してほしい点\n{}", f))
+        .unwrap_or_default();
+
+    let prompt = format!(
+        r#"# Workspace Investigation Report Request
+
+あなたはプロジェクト分析のエキスパートです。以下のワークスペースを調査し、**実用的なレポート**を作成してください。
+
+## 対象ワークスペース
+- **名前**: {workspace_name}
+- **パス**: {workspace_path}
+
+## 調査項目と出力形式
+
+### 1. プロジェクト概要 (Project Overview)
+- プロジェクトの目的・ゴール
+- 主要な技術スタック（言語、フレームワーク、ライブラリ）
+- アーキテクチャの特徴（モノレポ、マイクロサービス、モノリス等）
+
+### 2. ディレクトリ構造 (Directory Structure)
+- 主要なディレクトリとその役割
+- 重要な設定ファイル（Cargo.toml, package.json, tsconfig.json等）の概要
+
+### 3. 特徴的な機能・モジュール (Key Features)
+- このプロジェクト固有の特徴的な実装
+- 主要なモジュール/クレート/パッケージとその責務
+- 外部APIやサービスとの連携
+
+### 4. 開発状況 (Development Status)
+- 現在のGitブランチと最近のコミット（直近5-10件）
+- 最近活発に開発されている機能・ファイル
+- 未解決のTODO/FIXME（主要なもの）
+
+### 5. コードベースの健全性 (Code Health)
+- テストの有無と概要
+- CI/CD設定の有無
+- ドキュメントの充実度
+
+### 6. 推奨アクション (Recommendations)
+- 改善が必要な箇所
+- 技術的負債の兆候
+- 次に取り組むべき優先事項
+{focus_instruction}
+
+## 出力形式
+- Markdown形式で構造化
+- 各セクションは具体的な情報を含める
+- コードパスは相対パスで記載
+- 不明な点は「調査が必要」と明記
+
+## 注意事項
+- ファイルを読んで実際の内容を確認すること
+- 推測ではなく、実際のコードに基づいた分析を行うこと
+- 長すぎるファイルは冒頭部分のみで判断してよい
+"#,
+        workspace_name = workspace_name,
+        workspace_path = workspace_path.display(),
+        focus_instruction = focus_instruction
+    );
+
+    // Execute the agent
+    let report = agent
+        .execute(prompt.as_str().into())
+        .await
+        .map_err(|e| format!("Agent execution failed: {}", e))?;
+
+    // Build response
+    let result = serde_json::json!({
+        "workspace": {
+            "id": workspace.id,
+            "name": workspace_name,
+            "path": workspace_path,
+            "last_accessed": workspace.last_accessed,
+            "is_favorite": workspace.is_favorite
+        },
+        "report": report,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "agent": "ClaudeCodeAgent"
+    });
+
+    println!("[Backend] Workspace investigation completed via Claude Code Agent");
+    Ok(result)
 }
 
 /// Copies a file from one workspace to another

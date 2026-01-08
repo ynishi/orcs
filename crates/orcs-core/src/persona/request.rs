@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{GeminiOptions, Persona, PersonaBackend, PersonaSource};
+use super::{GeminiOptions, KaibaOptions, Persona, PersonaBackend, PersonaSource};
 
 /// Request to create a new persona.
 ///
@@ -46,6 +46,10 @@ pub struct CreatePersonaRequest {
     /// Gemini-specific options (thinking level, Google Search)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gemini_options: Option<GeminiOptions>,
+
+    /// Kaiba-specific options (Rei ID for persistent memory)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kaiba_options: Option<KaibaOptions>,
 }
 
 impl CreatePersonaRequest {
@@ -91,6 +95,7 @@ impl CreatePersonaRequest {
             icon: self.icon,
             base_color: self.base_color,
             gemini_options: self.gemini_options,
+            kaiba_options: self.kaiba_options,
         }
     }
 
@@ -107,6 +112,7 @@ impl CreatePersonaRequest {
             icon: persona.icon.clone(),
             base_color: persona.base_color.clone(),
             gemini_options: persona.gemini_options.clone(),
+            kaiba_options: persona.kaiba_options.clone(),
         }
     }
 }
@@ -128,6 +134,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         assert!(req.validate().is_ok());
@@ -146,6 +153,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         assert!(req.validate().is_err());
@@ -164,6 +172,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         assert!(req.validate().is_err());
@@ -182,6 +191,7 @@ mod tests {
             icon: None,
             base_color: None,
             gemini_options: None,
+            kaiba_options: None,
         };
 
         let persona = req.into_persona();
@@ -203,6 +213,7 @@ mod tests {
             icon: Some("🎨".to_string()),
             base_color: Some("#FF5733".to_string()),
             gemini_options: None,
+            kaiba_options: None,
         };
 
         let req = CreatePersonaRequest::from_persona(&persona);

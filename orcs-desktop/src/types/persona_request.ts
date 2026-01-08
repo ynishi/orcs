@@ -1,4 +1,4 @@
-import { GeminiOptions } from './agent';
+import { GeminiOptions, KaibaOptions } from './agent';
 
 /**
  * Unified request model for creating a persona.
@@ -22,7 +22,7 @@ export interface CreatePersonaRequest {
   default_participant?: boolean;
 
   /** LLM backend to use */
-  backend: 'claude_cli' | 'claude_api' | 'gemini_cli' | 'gemini_api' | 'open_ai_api' | 'codex_cli';
+  backend: 'claude_cli' | 'claude_api' | 'gemini_cli' | 'gemini_api' | 'open_ai_api' | 'codex_cli' | 'kaiba_api';
 
   /** Optional specific model name */
   model_name?: string;
@@ -35,4 +35,7 @@ export interface CreatePersonaRequest {
 
   /** Gemini-specific options (thinking level, Google Search) */
   gemini_options?: GeminiOptions;
+
+  /** Kaiba-specific options (Rei ID for persistent memory persona) */
+  kaiba_options?: KaibaOptions;
 }

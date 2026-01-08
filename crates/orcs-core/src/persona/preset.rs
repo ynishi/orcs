@@ -25,6 +25,7 @@ pub fn get_default_presets() -> Vec<Persona> {
             icon: Some("🎨".to_string()),
             base_color: Some("#FFB6C1".to_string()), // Light pink for UX
             gemini_options: None,
+            kaiba_options: None,
         },
         Persona {
             id: Uuid::new_v4().to_string(),
@@ -39,6 +40,7 @@ pub fn get_default_presets() -> Vec<Persona> {
             icon: Some("🔧".to_string()),
             base_color: Some("#ADD8E6".to_string()), // Light blue for Engineer
             gemini_options: None,
+            kaiba_options: None,
         },
     ]
 }

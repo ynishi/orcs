@@ -24,6 +24,7 @@ mod app_state;
 mod config_root;
 mod dialogue_preset;
 mod persona;
+mod quick_action;
 mod secret;
 mod session;
 mod slash_command;
@@ -47,6 +48,11 @@ pub use dialogue_preset::{DialoguePresetV1_0_0, create_dialogue_preset_migrator}
 pub use persona::{
     PersonaBackendDTO, PersonaConfigV1_0_0, PersonaConfigV1_1_0, PersonaSourceDTO,
     create_persona_migrator,
+};
+
+// Re-export quick_action DTOs and migrator
+pub use quick_action::{
+    QuickActionConfigV1_0_0, QuickActionSlotV1_0_0, create_quick_action_migrator,
 };
 
 // Re-export secret DTOs and migrator

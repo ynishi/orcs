@@ -3,6 +3,7 @@ pub mod config;
 pub mod dialogue;
 pub mod error;
 pub mod persona;
+pub mod quick_action;
 pub mod repository;
 pub mod schema;
 pub mod search;

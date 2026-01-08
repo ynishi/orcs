@@ -4,6 +4,7 @@ pub mod files;
 pub mod git;
 pub mod paths;
 pub mod personas;
+pub mod quick_actions;
 pub mod search;
 pub mod session;
 pub mod slash_commands;
@@ -105,6 +106,9 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         slash_commands::expand_command_template,
         slash_commands::execute_shell_command,
         slash_commands::execute_task_command,
+        quick_actions::get_quick_actions,
+        quick_actions::save_quick_actions,
+        quick_actions::update_quick_action_slot,
         session::get_auto_chat_config,
         session::update_auto_chat_config,
         session::get_auto_chat_status,

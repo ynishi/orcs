@@ -77,13 +77,15 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   {
     name: 'search',
     icon: '🔍',
-    description: 'Search files using ripgrep in the current or local workspace scope',
-    usage: '/search <query> [scope:workspace|local|global]',
+    description: 'Search sessions and workspace files',
+    usage: '/search <query> [-p|-a|-f]',
     examples: [
-      '/search useSlashCommands',
-      '/search scope:local session.rs',
+      '/search error handling',
+      '/search -p function definition',
+      '/search -a rust async',
+      '/search -f todo',
     ],
-    argsDescription: 'Provide a search query. Optionally prepend scope:workspace, scope:local, or scope:global to control where the search runs.',
+    argsDescription: '(default) sessions + workspace files | -p: + project files | -a: all workspaces | -f: full (all + project)',
   },
   {
     name: 'expert',

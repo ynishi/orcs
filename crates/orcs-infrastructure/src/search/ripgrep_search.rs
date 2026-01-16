@@ -7,7 +7,7 @@ use std::process::Command;
 use orcs_core::agent::build_enhanced_path;
 use orcs_core::error::{OrcsError, Result};
 use orcs_core::search::model::SearchResultItem;
-use orcs_core::search::{SearchFilters, SearchResult, SearchScope, SearchService};
+use orcs_core::search::{SearchFilters, SearchOptions, SearchResult, SearchService};
 
 /// Search service implementation using ripgrep.
 pub struct RipgrepSearchService;
@@ -209,54 +209,23 @@ impl SearchService for RipgrepSearchService {
     async fn search(
         &self,
         query: &str,
-        scope: SearchScope,
-        workspace_paths: Vec<PathBuf>,
+        options: SearchOptions,
+        search_paths: Vec<PathBuf>,
         filters: Option<SearchFilters>,
     ) -> Result<SearchResult> {
-        match scope {
-            SearchScope::Workspace => {
-                // Search in current workspace
-                if workspace_paths.is_empty() {
-                    return Err(OrcsError::internal(
-                        "Workspace paths required for workspace search",
-                    ));
-                }
-
-                // Search both file contents and filenames
-                let content_items = self.execute_ripgrep(query, &workspace_paths, &filters)?;
-                let filename_items = self.search_by_filename(query, &workspace_paths, &filters)?;
-
-                // Merge results (filename matches first, then content matches)
-                let mut all_items = filename_items;
-                all_items.extend(content_items);
-
-                Ok(SearchResult::new(query.to_string(), scope, all_items))
-            }
-            SearchScope::Local => {
-                // TODO: Implement cross-workspace search
-                // For now, just search in current workspace
-                if workspace_paths.is_empty() {
-                    return Err(OrcsError::internal(
-                        "Workspace paths required for local search",
-                    ));
-                }
-
-                // Search both file contents and filenames
-                let content_items = self.execute_ripgrep(query, &workspace_paths, &filters)?;
-                let filename_items = self.search_by_filename(query, &workspace_paths, &filters)?;
-
-                // Merge results (filename matches first, then content matches)
-                let mut all_items = filename_items;
-                all_items.extend(content_items);
-
-                Ok(SearchResult::new(query.to_string(), scope, all_items))
-            }
-            SearchScope::Global => {
-                // Web search not implemented in ripgrep service
-                Err(OrcsError::internal(
-                    "Global (web) search not supported by RipgrepSearchService",
-                ))
-            }
+        if search_paths.is_empty() {
+            // No paths to search - return empty result
+            return Ok(SearchResult::empty(query.to_string(), options));
         }
+
+        // Search both file contents and filenames
+        let content_items = self.execute_ripgrep(query, &search_paths, &filters)?;
+        let filename_items = self.search_by_filename(query, &search_paths, &filters)?;
+
+        // Merge results (filename matches first, then content matches)
+        let mut all_items = filename_items;
+        all_items.extend(content_items);
+
+        Ok(SearchResult::new(query.to_string(), options, all_items))
     }
 }

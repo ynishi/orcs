@@ -4,17 +4,17 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 
 use crate::error::Result;
-use crate::search::{SearchFilters, SearchResult, SearchScope};
+use crate::search::{SearchFilters, SearchOptions, SearchResult};
 
-/// Service for executing unified searches across different scopes.
+/// Service for executing unified searches.
 #[async_trait]
 pub trait SearchService: Send + Sync {
-    /// Executes a search with the given query and scope.
+    /// Executes a search with the given query and paths.
     ///
     /// # Arguments
     /// * `query` - The search query string
-    /// * `scope` - The scope in which to search (workspace, local, global)
-    /// * `workspace_paths` - Paths to search within (e.g., project root and workspace storage)
+    /// * `options` - Search options (all_workspaces, include_project)
+    /// * `search_paths` - Paths to search within
     /// * `filters` - Optional filters to refine search results
     ///
     /// # Returns
@@ -22,8 +22,8 @@ pub trait SearchService: Send + Sync {
     async fn search(
         &self,
         query: &str,
-        scope: SearchScope,
-        workspace_paths: Vec<PathBuf>,
+        options: SearchOptions,
+        search_paths: Vec<PathBuf>,
         filters: Option<SearchFilters>,
     ) -> Result<SearchResult>;
 }

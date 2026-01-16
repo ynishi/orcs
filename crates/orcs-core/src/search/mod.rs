@@ -1,11 +1,12 @@
-//! Unified search functionality across workspace, local, and global scopes.
+//! Unified search functionality for sessions and workspace files.
 //!
-//! This module provides a unified search interface that abstracts over different
-//! search backends and scopes, allowing AI agents to transparently access information
-//! from various sources.
+//! This module provides a unified search interface that searches across:
+//! - Session histories (conversation logs)
+//! - Workspace files (uploaded files, etc.)
+//! - Project files (source code in workspace.root_path)
 
 pub mod model;
 pub mod service;
 
-pub use model::{SearchFilters, SearchResult, SearchResultItem, SearchScope};
+pub use model::{SearchFilters, SearchOptions, SearchResult, SearchResultItem};
 pub use service::SearchService;

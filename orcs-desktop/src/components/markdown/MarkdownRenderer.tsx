@@ -1,8 +1,9 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Paper, Text, Box, CopyButton, ActionIcon, Tooltip, Badge } from '@mantine/core';
+import { Paper, Text, Box, CopyButton, ActionIcon, Tooltip, Badge, Anchor } from '@mantine/core';
 import { SaveableCodeBlock } from './SaveableCodeBlock';
+import { openPath } from '@tauri-apps/plugin-opener';
 import 'highlight.js/styles/github-dark.css';
 import React from 'react';
 
@@ -292,6 +293,49 @@ export function MarkdownRenderer({ content, onSaveFile, workspaceRootPath }: Mar
               >
                 {children}
               </td>
+            );
+          },
+
+          // Custom link renderer - handle file paths
+          a({ href, children }) {
+            // Check if it's a file path (starts with / or file://)
+            const isFilePath = href && (
+              href.startsWith('/') ||
+              href.startsWith('file://') ||
+              href.startsWith('orcs-file://')
+            );
+
+            if (isFilePath) {
+              const filePath = href
+                .replace('file://', '')
+                .replace('orcs-file://', '');
+
+              const handleClick = async (e: React.MouseEvent) => {
+                e.preventDefault();
+                try {
+                  await openPath(filePath);
+                } catch (err) {
+                  console.error('Failed to open file:', err);
+                }
+              };
+
+              return (
+                <Anchor
+                  href={href}
+                  onClick={handleClick}
+                  size="sm"
+                  style={{ cursor: 'pointer' }}
+                >
+                  {children}
+                </Anchor>
+              );
+            }
+
+            // Regular external link
+            return (
+              <Anchor href={href} target="_blank" rel="noopener noreferrer" size="sm">
+                {children}
+              </Anchor>
             );
           },
         }}

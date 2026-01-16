@@ -2,17 +2,56 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Scope of the search operation.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum SearchScope {
-    /// Search within the current workspace (default)
-    #[default]
-    Workspace,
-    /// Search across all workspaces (local RAG)
-    Local,
-    /// Search the web (global)
-    Global,
+/// Search options to control what is searched.
+///
+/// Default: searches current workspace's sessions and files.
+/// - `-p`: also search project files (root_path)
+/// - `-a`: search all workspaces' sessions and files
+/// - `-f` (or `-ap`): search everything (all workspaces + project files)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SearchOptions {
+    /// Search all workspaces instead of just current workspace
+    #[serde(default)]
+    pub all_workspaces: bool,
+
+    /// Include project files (workspace.root_path) in search
+    #[serde(default)]
+    pub include_project: bool,
+}
+
+impl SearchOptions {
+    /// Default: current workspace sessions + workspace files
+    pub fn default_workspace() -> Self {
+        Self {
+            all_workspaces: false,
+            include_project: false,
+        }
+    }
+
+    /// -p: current workspace + project files
+    pub fn with_project() -> Self {
+        Self {
+            all_workspaces: false,
+            include_project: true,
+        }
+    }
+
+    /// -a: all workspaces sessions + files
+    pub fn all() -> Self {
+        Self {
+            all_workspaces: true,
+            include_project: false,
+        }
+    }
+
+    /// -f: full search (all workspaces + project files)
+    pub fn full() -> Self {
+        Self {
+            all_workspaces: true,
+            include_project: true,
+        }
+    }
 }
 
 /// Filters to refine search results.
@@ -67,13 +106,13 @@ pub struct SearchResult {
     /// The search query that was executed
     pub query: String,
 
-    /// The scope in which the search was performed
-    pub scope: SearchScope,
+    /// The options used for this search
+    pub options: SearchOptions,
 
     /// Search result items
     pub items: Vec<SearchResultItem>,
 
-    /// Optional summary/answer describing the results (used for global web search)
+    /// Optional summary/answer describing the results
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
 
@@ -83,10 +122,10 @@ pub struct SearchResult {
 
 impl SearchResult {
     /// Creates a new empty search result.
-    pub fn empty(query: String, scope: SearchScope) -> Self {
+    pub fn empty(query: String, options: SearchOptions) -> Self {
         Self {
             query,
-            scope,
+            options,
             items: Vec::new(),
             summary: None,
             total_matches: 0,
@@ -94,11 +133,11 @@ impl SearchResult {
     }
 
     /// Creates a new search result with items.
-    pub fn new(query: String, scope: SearchScope, items: Vec<SearchResultItem>) -> Self {
+    pub fn new(query: String, options: SearchOptions, items: Vec<SearchResultItem>) -> Self {
         let total_matches = items.len();
         Self {
             query,
-            scope,
+            options,
             items,
             summary: None,
             total_matches,

@@ -17,7 +17,7 @@ import type { StatusInfo } from '../types/status';
 import type { Workspace } from '../types/workspace';
 import type { UploadedFile } from '../types/workspace';
 import type { SlashCommand, ExpandedSlashCommand } from '../types/slash_command';
-import type { SearchResult, SearchScope as SearchScopeType } from '../types/search';
+import type { SearchResult } from '../types/search';
 
 export interface SlashCommandResult {
   nextInput: string | null;
@@ -486,7 +486,7 @@ Generate the BlueprintWorkflow now.`;
             if (!parsed.args || parsed.args.length === 0) {
               await handleAndPersistSystemMessage(
                 conversationMessage(
-                  'Usage: /search <query> [scope:workspace|local|global]\nExample: /search session.rs\nExample: /search scope:local agent.rs',
+                  'Usage: /search <query> [-p|-a|-f]\n\nOptions:\n  (default) Search current workspace sessions + files\n  -p        + project files (source code)\n  -a        All workspaces sessions + files\n  -f        Full: all + project files\n\nExamples:\n  /search error handling\n  /search -p function definition\n  /search -a rust async',
                   'error'
                 ),
                 addMessage,
@@ -496,36 +496,24 @@ Generate the BlueprintWorkflow now.`;
               break;
             }
 
-            let scope: SearchScopeType = 'workspace';
+            // Parse options: -p (project), -a (all), -f (full)
+            let allWorkspaces = false;
+            let includeProject = false;
             const queryParts: string[] = [];
-            let invalidScope = false;
 
             parsed.args.forEach((part) => {
               const normalized = part.toLowerCase();
-              if (normalized.startsWith('scope:') || normalized.startsWith('scope=')) {
-                const [, rawValue = ''] = normalized.split(/[:=]/, 2);
-                if (rawValue === 'workspace' || rawValue === 'local' || rawValue === 'global') {
-                  scope = rawValue as SearchScopeType;
-                } else {
-                  invalidScope = true;
-                }
+              if (normalized === '-p' || normalized === '--project') {
+                includeProject = true;
+              } else if (normalized === '-a' || normalized === '--all') {
+                allWorkspaces = true;
+              } else if (normalized === '-f' || normalized === '--full') {
+                allWorkspaces = true;
+                includeProject = true;
               } else {
                 queryParts.push(part);
               }
             });
-
-            if (invalidScope) {
-              await handleAndPersistSystemMessage(
-                conversationMessage(
-                  'Invalid scope. Available scopes: workspace, local, global.',
-                  'error'
-                ),
-                addMessage,
-                invoke
-              );
-              await saveCurrentSession();
-              break;
-            }
 
             if (queryParts.length === 0) {
               await handleAndPersistSystemMessage(
@@ -538,14 +526,25 @@ Generate the BlueprintWorkflow now.`;
             }
 
             const query = queryParts.join(' ');
+            const searchOptions = {
+              all_workspaces: allWorkspaces,
+              include_project: includeProject,
+            };
+
             try {
               const result = await invoke<SearchResult>('execute_search', {
                 request: {
                   query,
-                  scope,
+                  options: searchOptions,
                   filters: null,
                 },
               });
+
+              // Format options for display
+              const optionFlags = [];
+              if (result.options.all_workspaces) optionFlags.push('all');
+              if (result.options.include_project) optionFlags.push('project');
+              const optionStr = optionFlags.length > 0 ? ` [${optionFlags.join(', ')}]` : '';
 
               const maxDisplay = 20;
               const displayedItems = result.items.slice(0, maxDisplay);
@@ -554,13 +553,18 @@ Generate the BlueprintWorkflow now.`;
                 displayedItems.length > 0
                   ? displayedItems
                       .map((item) => {
-                        const location = item.line_number
+                        // Display location as clickable link
+                        const locationLabel = item.line_number
                           ? `${item.path}:${item.line_number}`
                           : item.path;
+                        // Use markdown link format - MarkdownRenderer handles file:// links
+                        const linkPath = item.path;
                         const snippet = item.content.trim();
-                        return `• ${location}\n  ${snippet}`;
+                        // Show 3 lines of content for better context
+                        const contentLines = snippet.split('\n').slice(0, 3).join('\n  ');
+                        return `• [${locationLabel}](${linkPath})\n  ${contentLines}`;
                       })
-                      .join('\n')
+                      .join('\n\n')
                   : '_No matches found._';
               const overflow =
                 result.total_matches > maxDisplay
@@ -569,7 +573,7 @@ Generate the BlueprintWorkflow now.`;
 
               await handleAndPersistSystemMessage(
                 conversationMessage(
-                  `Search results for "${result.query}" (scope: ${result.scope})\n\n${summaryText}${resultLines}${overflow}`,
+                  `Search results for "${result.query}"${optionStr}\n\n${summaryText}${resultLines}${overflow}`,
                   'info',
                   '🔍'
                 ),

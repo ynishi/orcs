@@ -1,4 +1,17 @@
-export type SearchScope = 'workspace' | 'local' | 'global';
+/**
+ * Search options to control what is searched.
+ *
+ * Default: searches current workspace's sessions and files.
+ * - `-p`: also search project files (root_path)
+ * - `-a`: search all workspaces' sessions and files
+ * - `-f` (or `-ap`): search everything (all workspaces + project files)
+ */
+export interface SearchOptions {
+  /** Search all workspaces instead of just current workspace */
+  all_workspaces: boolean;
+  /** Include project files (workspace.root_path) in search */
+  include_project: boolean;
+}
 
 export interface SearchFilters {
   file_types?: string[];
@@ -18,7 +31,7 @@ export interface SearchResultItem {
 
 export interface SearchResult {
   query: string;
-  scope: SearchScope;
+  options: SearchOptions;
   items: SearchResultItem[];
   summary?: string;
   total_matches: number;

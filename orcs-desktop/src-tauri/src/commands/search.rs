@@ -1,14 +1,19 @@
 //! Tauri commands for unified search functionality.
+//!
+//! Search options:
+//! - Default: current workspace sessions + workspace files
+//! - `-p`: + project files (workspace.root_path)
+//! - `-a`: all workspaces sessions + files
+//! - `-f` (or `-ap`): all + project files
 
-use llm_toolkit::agent::{Agent, Payload};
-use orcs_core::agent::{WebSearchAgent, WebSearchReference};
-use orcs_core::search::{
-    SearchFilters, SearchResult, SearchResultItem, SearchScope, SearchService,
-};
+use orcs_core::repository::SessionRepository;
+use orcs_core::search::{SearchFilters, SearchOptions, SearchResult, SearchService};
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::workspace::manager::WorkspaceStorageService;
+use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
 use orcs_infrastructure::search::RipgrepSearchService;
 use serde::Deserialize;
+use std::path::PathBuf;
 use tauri::State;
 
 use crate::app::AppState;
@@ -20,9 +25,9 @@ pub struct SearchRequest {
     /// The search query string
     pub query: String,
 
-    /// The scope in which to search (workspace, local, global)
+    /// Search options
     #[serde(default)]
-    pub scope: SearchScope,
+    pub options: SearchOptions,
 
     /// Optional filters to refine search results
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,56 +35,43 @@ pub struct SearchRequest {
 }
 
 /// Executes a unified search command.
+///
+/// Builds search paths based on options:
+/// - Default: sessions (current workspace) + workspace_dir
+/// - `-p`: + project root_path
+/// - `-a`: all sessions + all workspace_dirs
+/// - `-f`: all + project root_path
 #[tauri::command]
 pub async fn execute_search(
     request: SearchRequest,
     state: State<'_, AppState>,
 ) -> Result<SearchResult, String> {
-    if request.scope == SearchScope::Global {
-        return execute_global_search(&request.query, state).await;
+    tracing::info!(
+        "execute_search: Query: {}, Options: {:?}",
+        request.query,
+        request.options
+    );
+
+    // Build search paths based on options
+    let search_paths =
+        build_search_paths(&request.options, &state).await?;
+
+    tracing::info!("execute_search: Search paths: {:?}", search_paths);
+
+    if search_paths.is_empty() {
+        return Ok(SearchResult::empty(
+            request.query,
+            request.options,
+        ));
     }
-
-    tracing::info!("execute_search: Query: {}", request.query);
-    tracing::info!("execute_search: Scope: {:?}", request.scope);
-
-    // Get workspace paths from active session
-    let workspace_paths = if request.scope != SearchScope::Global {
-        let session_mgr = state
-            .session_usecase
-            .active_session()
-            .await
-            .ok_or("No active session")?;
-
-        let app_mode = state.app_mode.lock().await.clone();
-        let session = session_mgr
-            .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
-            .await;
-
-        if session.workspace_id != PLACEHOLDER_WORKSPACE_ID {
-            let workspace_id = &session.workspace_id;
-            let workspace = state
-                .workspace_storage_service
-                .get_workspace(workspace_id)
-                .await
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| format!("Workspace not found: {}", workspace_id))?;
-
-            // Search both the project root path and the workspace storage directory
-            vec![workspace.root_path, workspace.workspace_dir]
-        } else {
-            vec![]
-        }
-    } else {
-        vec![]
-    };
 
     // Execute search using RipgrepSearchService
     let search_service = RipgrepSearchService::new();
     let result = search_service
         .search(
             &request.query,
-            request.scope,
-            workspace_paths,
+            request.options,
+            search_paths,
             request.filters,
         )
         .await
@@ -90,67 +82,120 @@ pub async fn execute_search(
     Ok(result)
 }
 
-async fn execute_global_search(
-    query: &str,
-    state: State<'_, AppState>,
-) -> Result<SearchResult, String> {
-    if query.trim().is_empty() {
-        return Err("Search query cannot be empty".to_string());
+/// Builds search paths based on search options.
+async fn build_search_paths(
+    options: &SearchOptions,
+    state: &State<'_, AppState>,
+) -> Result<Vec<PathBuf>, String> {
+    let mut paths = Vec::new();
+
+    // Get sessions directory
+    let sessions_dir = OrcsPaths::new(None)
+        .get_path(ServiceType::Session)
+        .map_err(|e| e.to_string())?
+        .into_path_buf();
+
+    // Get current workspace info
+    let current_workspace = get_current_workspace(state).await?;
+
+    if options.all_workspaces {
+        // -a or -f: Search all sessions
+        if sessions_dir.exists() {
+            paths.push(sessions_dir);
+        }
+
+        // Search all workspace storage directories
+        let workspace_storage_dir = OrcsPaths::new(None)
+            .get_path(ServiceType::WorkspaceStorage)
+            .map_err(|e| e.to_string())?
+            .into_path_buf();
+
+        if workspace_storage_dir.exists() {
+            paths.push(workspace_storage_dir);
+        }
+    } else {
+        // Default or -p: Search current workspace only
+        if let Some(ref ws) = current_workspace {
+            // Search sessions for current workspace (filtered by workspace_id)
+            if sessions_dir.exists() {
+                let workspace_session_paths =
+                    get_workspace_session_paths(&ws.id, &sessions_dir, state).await?;
+                paths.extend(workspace_session_paths);
+            }
+
+            // Search current workspace storage directory
+            if ws.workspace_dir.exists() {
+                paths.push(ws.workspace_dir.clone());
+            }
+        }
     }
 
-    let secrets = state
-        .secret_service
-        .load_secrets()
-        .await
-        .map_err(|e| format!("Failed to load secrets: {e}"))?;
-
-    let gemini_config = secrets
-        .gemini
-        .ok_or_else(|| "Gemini configuration missing in secret.json".to_string())?;
-
-    if gemini_config.api_key.trim().is_empty() {
-        return Err("Gemini API key is not configured".to_string());
+    // -p or -f: Include project files
+    if options.include_project {
+        if let Some(ref ws) = current_workspace {
+            if ws.root_path.exists() {
+                paths.push(ws.root_path.clone());
+            }
+        }
     }
 
-    let agent = WebSearchAgent::new(gemini_config.api_key);
-    let payload: Payload = query.to_string().into();
-    let response = agent
-        .execute(payload)
-        .await
-        .map_err(|e| format!("WebSearch failed: {e}"))?;
-
-    let items: Vec<SearchResultItem> = response
-        .references
-        .iter()
-        .map(|reference| SearchResultItem {
-            path: reference.title.clone(),
-            line_number: None,
-            content: format_reference(reference),
-            context_before: None,
-            context_after: None,
-        })
-        .collect();
-
-    let mut result = SearchResult::new(query.to_string(), SearchScope::Global, items);
-    if !response.answer.trim().is_empty() {
-        result.summary = Some(response.answer);
-    }
-
-    Ok(result)
+    Ok(paths)
 }
 
-fn format_reference(reference: &WebSearchReference) -> String {
-    let mut lines = Vec::new();
-    if let Some(snippet) = &reference.snippet
-        && !snippet.trim().is_empty()
-    {
-        lines.push(snippet.trim().to_string());
+/// Gets the current workspace from the active session.
+async fn get_current_workspace(
+    state: &State<'_, AppState>,
+) -> Result<Option<orcs_core::workspace::Workspace>, String> {
+    let session_mgr = match state.session_usecase.active_session().await {
+        Some(mgr) => mgr,
+        None => return Ok(None),
+    };
+
+    let app_mode = state.app_mode.lock().await.clone();
+    let session = session_mgr
+        .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+        .await;
+
+    if session.workspace_id == PLACEHOLDER_WORKSPACE_ID {
+        return Ok(None);
     }
-    lines.push(reference.url.clone());
-    if let Some(source) = &reference.source
-        && !source.trim().is_empty()
-    {
-        lines.push(format!("Source: {}", source));
-    }
-    lines.join("\n")
+
+    let workspace = state
+        .workspace_storage_service
+        .get_workspace(&session.workspace_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(workspace)
+}
+
+/// Gets session file paths for a specific workspace.
+async fn get_workspace_session_paths(
+    workspace_id: &str,
+    sessions_dir: &PathBuf,
+    state: &State<'_, AppState>,
+) -> Result<Vec<PathBuf>, String> {
+    // Get all sessions from repository
+    let all_sessions = state
+        .session_repository
+        .list_all()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Filter sessions by workspace_id and build file paths
+    // sessions_dir is data_dir/sessions, so session files are at sessions_dir/{session_id}.toml
+    let session_paths: Vec<PathBuf> = all_sessions
+        .iter()
+        .filter(|session| session.workspace_id == workspace_id)
+        .map(|session| sessions_dir.join(format!("{}.toml", session.id)))
+        .filter(|path| path.exists())
+        .collect();
+
+    tracing::info!(
+        "get_workspace_session_paths: Found {} sessions for workspace {}",
+        session_paths.len(),
+        workspace_id
+    );
+
+    Ok(session_paths)
 }

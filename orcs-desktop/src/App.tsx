@@ -38,7 +38,7 @@ import { extractMentions, getCurrentMention, normalizeMentionsInText } from "./u
 import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
-import { convertSessionToMessages, exportSessionToMarkdown } from "./types/session";
+import { convertSessionToMessages, exportSessionToMarkdown, getAllMessages } from "./types/session";
 import { SlashCommand } from "./types/slash_command";
 import { useTabContext } from "./context/TabContext";
 import { useSlashCommands } from "./hooks/useSlashCommands";
@@ -69,6 +69,7 @@ function App() {
   const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
+  const [tabPreviewCache, setTabPreviewCache] = useState<Record<string, string>>({});
   const [sandboxExitModalOpened, setSandboxExitModalOpened] = useState(false);
   const [pendingSandboxExit, setPendingSandboxExit] = useState<import('./bindings/generated').SandboxState | null>(null);
   const [currentSandboxState, setCurrentSandboxState] = useState<import('./bindings/generated').SandboxState | null>(null);
@@ -2514,7 +2515,27 @@ function App() {
               const name = getWorkspaceName(wsId);
               return name.slice(0, 3).toUpperCase();
             };
-            
+
+            // タブホバー時にセッション内容のプレビューを生成
+            const handleTabHover = (tab: typeof sortedTabs[0]) => {
+              if (tabPreviewCache[tab.id]) return;
+
+              const session = sessions.find(s => s.id === tab.sessionId);
+              if (!session) return;
+
+              const allMessages = getAllMessages(session);
+              const nonSystemMessages = allMessages.filter(msg => msg.role !== 'System');
+              if (nonSystemMessages.length === 0) return;
+
+              const firstMessage = nonSystemMessages[0];
+              const preview = firstMessage.content.slice(0, 50).trim();
+
+              setTabPreviewCache(prev => ({
+                ...prev,
+                [tab.id]: preview,
+              }));
+            };
+
             return (
               <Tabs
                 value={activeTabId}
@@ -2565,13 +2586,16 @@ function App() {
                     return (
                     <Tooltip
                       key={tab.id}
-                      label={`${wsName} / ${tab.title}`}
+                      label={tabPreviewCache[tab.id] || `${wsName} / ${tab.title}`}
                       withArrow
                       position="bottom"
+                      multiline
+                      w={220}
                     >
                     <Tabs.Tab
                       value={tab.id}
                       data-tab-id={tab.id}
+                      onMouseEnter={() => handleTabHover(tab)}
                       style={{
                         minWidth: isOtherWorkspace ? '150px' : '120px',
                         maxWidth: '220px',

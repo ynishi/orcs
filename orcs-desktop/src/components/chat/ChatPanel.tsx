@@ -90,6 +90,7 @@ interface ChatPanelProps {
   onSelectAgent: (agent: Agent) => void;
   onHoverSuggestion: (index: number) => void;
   onSaveSessionToWorkspace?: () => void;
+  onPasteAndAttach?: () => Promise<void>;
 }
 
 interface MessageListProps {
@@ -192,6 +193,7 @@ export function ChatPanel({
   onSelectAgent,
   onHoverSuggestion,
   onSaveSessionToWorkspace,
+  onPasteAndAttach,
 }: ChatPanelProps) {
   const viewport = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1372,6 +1374,18 @@ export function ChatPanel({
                 <input type="file" multiple hidden onChange={onFileSelect} />
               </Button>
             </Tooltip>
+
+            {onPasteAndAttach && (
+              <Tooltip label="Paste from clipboard & attach">
+                <ActionIcon
+                  variant="light"
+                  size="lg"
+                  onClick={() => { void onPasteAndAttach(); }}
+                >
+                  <IconClipboardList size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
 
             <Button type="submit" style={{ flex: 1 }}>
               Send

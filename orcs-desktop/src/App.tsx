@@ -1700,6 +1700,71 @@ function App() {
     });
   };
 
+  // クリップボードからペーストしてWorkspaceに保存し、セッションにアタッチするハンドラー
+  const handlePasteAndAttach = async () => {
+    if (!workspace || !activeTabId) {
+      notifications.show({
+        title: 'Error',
+        message: 'No workspace or active session',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      // 1. クリップボード読み取り
+      const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+      const clipboardText = await readText();
+
+      if (!clipboardText || clipboardText.trim() === '') {
+        notifications.show({
+          title: 'Clipboard Empty',
+          message: 'No text content in clipboard',
+          color: 'yellow',
+        });
+        return;
+      }
+
+      // 2. ファイル名生成（タイムスタンプ付き）
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' +
+                        now.toTimeString().split(' ')[0].replace(/:/g, '-');
+      const filename = `clipboard_${timestamp}.txt`;
+
+      // 3. テキストをバイト列に変換
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(clipboardText);
+      const fileData = Array.from(bytes);
+
+      // 4. Workspace にアップロード
+      await invoke('upload_file_from_bytes', {
+        workspaceId: workspace.id,
+        filename: filename,
+        fileData: fileData,
+        sessionId: null,
+        messageTimestamp: null,
+      });
+
+      // 5. セッションにアタッチ
+      const file = new File([new Uint8Array(bytes)], filename, { type: 'text/plain' });
+      addAttachedFileToTab(activeTabId, file);
+
+      // 6. 成功通知
+      notifications.show({
+        title: 'Pasted & Attached',
+        message: `Created "${filename}" and attached to session`,
+        color: 'green',
+      });
+    } catch (error) {
+      console.error('[handlePasteAndAttach] Error:', error);
+      notifications.show({
+        title: 'Paste Failed',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
   // ワークスペースファイルから新規セッションを作成するハンドラー
   const handleNewSessionWithFile = async (file: File) => {
     if (!workspace) {
@@ -2772,6 +2837,7 @@ function App() {
                           void handleSaveSessionToWorkspace(session);
                         }
                       }}
+                      onPasteAndAttach={handlePasteAndAttach}
                     />
                   </Tabs.Panel>
                 ))}

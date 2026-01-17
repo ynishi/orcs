@@ -53,16 +53,12 @@ pub async fn execute_search(
     );
 
     // Build search paths based on options
-    let search_paths =
-        build_search_paths(&request.options, &state).await?;
+    let search_paths = build_search_paths(&request.options, &state).await?;
 
     tracing::info!("execute_search: Search paths: {:?}", search_paths);
 
     if search_paths.is_empty() {
-        return Ok(SearchResult::empty(
-            request.query,
-            request.options,
-        ));
+        return Ok(SearchResult::empty(request.query, request.options));
     }
 
     // Execute search using RipgrepSearchService

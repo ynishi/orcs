@@ -9,7 +9,9 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::app::AppState;
-use crate::slash_commands::{ExpandedSlashCommand, expand_slash_command, get_git_branch, get_git_status};
+use crate::slash_commands::{
+    ExpandedSlashCommand, expand_slash_command, get_git_branch, get_git_status,
+};
 
 /// Persona info for action result display
 #[derive(Debug, Clone, Serialize)]
@@ -367,14 +369,12 @@ pub async fn execute_action_command(
                 .and_then(|p| p.gemini_options.as_ref())
                 .and_then(|o| o.thinking_level.as_deref())
         });
-    let google_search = config
-        .and_then(|c| c.gemini_google_search)
-        .or_else(|| {
-            persona
-                .as_ref()
-                .and_then(|p| p.gemini_options.as_ref())
-                .and_then(|o| o.google_search)
-        });
+    let google_search = config.and_then(|c| c.gemini_google_search).or_else(|| {
+        persona
+            .as_ref()
+            .and_then(|p| p.gemini_options.as_ref())
+            .and_then(|o| o.google_search)
+    });
 
     let result = SessionSupportAgentService::execute_custom_prompt(
         &final_prompt,

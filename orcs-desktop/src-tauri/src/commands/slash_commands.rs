@@ -5,10 +5,28 @@ use orcs_core::agent::build_enhanced_path;
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::slash_command::{CommandType, CreateSlashCommandRequest, SlashCommand};
 use orcs_core::workspace::manager::WorkspaceStorageService;
+use serde::Serialize;
 use tauri::State;
 
 use crate::app::AppState;
 use crate::slash_commands::{ExpandedSlashCommand, expand_slash_command, get_git_branch, get_git_status};
+
+/// Persona info for action result display
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionPersonaInfo {
+    pub name: String,
+    pub icon: Option<String>,
+    pub backend: String,
+}
+
+/// Result of executing an action command
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionCommandResult {
+    pub result: String,
+    pub persona_info: Option<ActionPersonaInfo>,
+}
 
 /// Lists all available slash commands
 #[tauri::command]
@@ -193,14 +211,15 @@ pub async fn execute_task_command(
 /// - Workspace: `{workspace}`, `{workspace_path}`, `{files}`, `{git_branch}`, `{git_status}`
 /// - Runtime: `{args}`
 ///
-/// The expanded prompt is sent to AI and the result is returned.
+/// The expanded prompt is sent to AI and the result is returned along with
+/// optional persona info for display purposes.
 #[tauri::command]
 pub async fn execute_action_command(
     command_name: String,
     thread_content: String,
     args: Option<String>,
     state: State<'_, AppState>,
-) -> Result<String, String> {
+) -> Result<ActionCommandResult, String> {
     // Get the command
     let command = state
         .slash_command_repository
@@ -368,12 +387,22 @@ pub async fn execute_action_command(
     .await
     .map_err(|e| format!("Failed to execute action: {}", e))?;
 
+    // Build persona info for display
+    let persona_info = persona.map(|p| ActionPersonaInfo {
+        name: p.name,
+        icon: p.icon,
+        backend: p.backend.as_str().to_string(),
+    });
+
     tracing::info!(
         "[SlashCommand] Action command '{}' completed successfully",
         command_name
     );
 
-    Ok(result)
+    Ok(ActionCommandResult {
+        result,
+        persona_info,
+    })
 }
 
 /// Extract recent messages from thread content

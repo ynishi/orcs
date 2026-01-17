@@ -315,20 +315,26 @@ export function ChatPanel({
         // For action commands, execute with session context
         setTabThinking(tab.id, true, `Executing /${commandName}`, true);
         const threadContent = getThreadAsText();
-        const actionResult = await invoke<string>('execute_action_command', {
+        const actionResponse = await invoke<{ result: string; personaInfo?: { name: string; icon?: string; backend: string } }>('execute_action_command', {
           commandName,
           threadContent,
           args: null,
         });
         setTabThinking(tab.id, false);
 
-        // Add result as action_result message with command header
-        const commandHeader = `${command.icon || '⚡'} /${commandName}\n\n`;
+        // Build command header with persona info if available
+        let commandHeader = `${command.icon || '⚡'} /${commandName}`;
+        if (actionResponse.personaInfo) {
+          const pi = actionResponse.personaInfo;
+          commandHeader += ` by ${pi.icon || '👤'} ${pi.name} (${pi.backend})`;
+        }
+        commandHeader += '\n\n';
+
         const resultMessage: Message = {
           id: `${Date.now()}-action-result`,
           type: 'action_result',
           author: 'SYSTEM',
-          text: commandHeader + actionResult,
+          text: commandHeader + actionResponse.result,
           timestamp: new Date(),
         };
         addMessageToTab(tab.id, resultMessage);

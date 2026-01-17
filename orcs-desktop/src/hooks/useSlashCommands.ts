@@ -17,7 +17,7 @@ import type { MessageType } from '../types/message';
 import type { StatusInfo } from '../types/status';
 import type { Workspace } from '../types/workspace';
 import type { UploadedFile } from '../types/workspace';
-import type { SlashCommand, ExpandedSlashCommand } from '../types/slash_command';
+import type { SlashCommand, ExpandedSlashCommand, ActionCommandResult } from '../types/slash_command';
 import type { SearchResult } from '../types/search';
 
 export interface SlashCommandResult {
@@ -995,16 +995,22 @@ Generate the BlueprintWorkflow now.`;
                   );
 
                   const threadContent = getThreadAsText();
-                  const actionResult = await invoke<string>('execute_action_command', {
+                  const actionResponse = await invoke<ActionCommandResult>('execute_action_command', {
                     commandName: parsed.command,
                     threadContent,
                     args: argsStr || null,
                   });
 
-                  // Add command header for context and copy-paste usability
-                  const commandHeader = `${customCommand.icon || '⚡'} /${parsed.command}${argsStr ? ` ${argsStr}` : ''}\n\n`;
+                  // Build command header with persona info if available
+                  let commandHeader = `${customCommand.icon || '⚡'} /${parsed.command}${argsStr ? ` ${argsStr}` : ''}`;
+                  if (actionResponse.personaInfo) {
+                    const pi = actionResponse.personaInfo;
+                    commandHeader += ` by ${pi.icon || '👤'} ${pi.name} (${pi.backend})`;
+                  }
+                  commandHeader += '\n\n';
+
                   await handleAndPersistSystemMessage(
-                    actionResultMessage(commandHeader + actionResult),
+                    actionResultMessage(commandHeader + actionResponse.result),
                     addMessage,
                     invoke
                   );

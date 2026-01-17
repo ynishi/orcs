@@ -55,6 +55,23 @@ export interface ExpandedSlashCommand {
 }
 
 /**
+ * Persona info returned with action command result
+ */
+export interface ActionPersonaInfo {
+  name: string;
+  icon?: string;
+  backend: string;
+}
+
+/**
+ * Result of executing an action command
+ */
+export interface ActionCommandResult {
+  result: string;
+  personaInfo?: ActionPersonaInfo;
+}
+
+/**
  * Extended command definition including custom commands
  */
 export interface ExtendedCommandDefinition {

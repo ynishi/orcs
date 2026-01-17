@@ -215,14 +215,8 @@ export function Navbar({
           {activeTab === 'personas' && (
             <PersonasList
               onMessage={onMessage}
-              onConversationModeChange={onConversationModeChange}
-              onTalkStyleChange={onTalkStyleChange}
-              onStrategyChange={onStrategyChange}
               personas={personas}
               activeParticipantIds={activeParticipantIds}
-              executionStrategy={executionStrategy}
-              conversationMode={conversationMode}
-              talkStyle={talkStyle}
               onRefresh={onRefreshPersonas}
               onRefreshSessions={onRefreshSessions}
               onToggleParticipant={onToggleParticipant}
@@ -238,7 +232,14 @@ export function Navbar({
           )}
 
           {activeTab === 'presets' && (
-            <DialoguePresetList />
+            <DialoguePresetList
+              onStrategyChange={onStrategyChange}
+              onConversationModeChange={onConversationModeChange}
+              onTalkStyleChange={onTalkStyleChange}
+              executionStrategy={executionStrategy}
+              conversationMode={conversationMode}
+              talkStyle={talkStyle}
+            />
           )}
         </Box>
       </ScrollArea>

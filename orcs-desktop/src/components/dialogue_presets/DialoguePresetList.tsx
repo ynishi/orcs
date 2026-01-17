@@ -1,12 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Stack, Button, Group, Text, ScrollArea, ActionIcon, Modal, TextInput, Select, Tooltip, Badge } from '@mantine/core';
+import { Stack, Button, Group, Text, ScrollArea, ActionIcon, Modal, TextInput, Select, Tooltip, Badge, Box } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { notifications } from '@mantine/notifications';
 import type { DialoguePreset } from '../../types/conversation';
-import { EXECUTION_STRATEGIES, CONVERSATION_MODES, TALK_STYLES } from '../../types/conversation';
+import { EXECUTION_STRATEGIES, CONVERSATION_MODES, TALK_STYLES, DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL } from '../../types/conversation';
 
-export function DialoguePresetList() {
+interface DialoguePresetListProps {
+  onStrategyChange?: (strategy: string) => void;
+  onConversationModeChange?: (mode: string) => void;
+  onTalkStyleChange?: (style: string | null) => void;
+  executionStrategy?: string;
+  conversationMode?: string;
+  talkStyle?: string | null;
+}
+
+export function DialoguePresetList({
+  onStrategyChange,
+  onConversationModeChange,
+  onTalkStyleChange,
+  executionStrategy,
+  conversationMode,
+  talkStyle,
+}: DialoguePresetListProps) {
   const [presets, setPresets] = useState<DialoguePreset[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpened, setModalOpened] = useState(false);
@@ -127,6 +143,71 @@ export function DialoguePresetList() {
           </ActionIcon>
         </Tooltip>
       </Group>
+
+      {/* Current Session Settings */}
+      <Box p="sm" style={{ backgroundColor: 'var(--mantine-color-gray-0)', borderRadius: 8 }}>
+        <Text size="xs" fw={600} c="dimmed" mb="xs">
+          Current Session
+        </Text>
+        <Stack gap="xs">
+          {/* Talk Style Selection */}
+          <Box>
+            <Text size="xs" c="dimmed" mb={4}>
+              Talk Style
+            </Text>
+            <Select
+              size="xs"
+              data={[
+                { value: '', label: `${DEFAULT_STYLE_ICON} ${DEFAULT_STYLE_LABEL}` },
+                ...TALK_STYLES.map(style => ({
+                  value: style.value,
+                  label: `${style.icon} ${style.label}`,
+                })),
+              ]}
+              value={talkStyle || ''}
+              onChange={(value) => onTalkStyleChange?.(value || null)}
+              placeholder={DEFAULT_STYLE_LABEL}
+              clearable
+            />
+          </Box>
+
+          {/* Strategy Selection */}
+          <Box>
+            <Text size="xs" c="dimmed" mb={4}>
+              Execution Strategy
+            </Text>
+            <Select
+              size="xs"
+              data={EXECUTION_STRATEGIES.map(strategy => ({
+                value: strategy.value,
+                label: `${strategy.icon} ${strategy.label}`,
+              }))}
+              value={executionStrategy || 'broadcast'}
+              onChange={(value) => onStrategyChange?.(value || 'broadcast')}
+              placeholder="Select strategy"
+              allowDeselect={false}
+            />
+          </Box>
+
+          {/* Conversation Mode Selection */}
+          <Box>
+            <Text size="xs" c="dimmed" mb={4}>
+              Conversation Mode
+            </Text>
+            <Select
+              size="xs"
+              data={CONVERSATION_MODES.map(mode => ({
+                value: mode.value,
+                label: `${mode.icon} ${mode.label}`,
+              }))}
+              value={conversationMode || 'normal'}
+              onChange={(value) => onConversationModeChange?.(value || 'normal')}
+              placeholder="Select mode"
+              allowDeselect={false}
+            />
+          </Box>
+        </Stack>
+      </Box>
 
       <ScrollArea style={{ flex: 1 }}>
         <Stack gap="xs">

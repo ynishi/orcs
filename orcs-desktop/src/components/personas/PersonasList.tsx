@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip, Select, Badge, Modal, Button } from '@mantine/core';
+import { Stack, ScrollArea, Group, Text, Box, Checkbox, ActionIcon, Tooltip, Badge, Modal, Button } from '@mantine/core';
 import { IconPlus, IconPencil, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
 import { PersonaEditorModal } from './PersonaEditorModal';
 import { handleAndPersistSystemMessage, conversationMessage } from '../../utils/systemMessage';
-import { CONVERSATION_MODES, DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL, TALK_STYLES, EXECUTION_STRATEGIES } from '../../types/conversation';
 import { MessageType } from '../../types/message';
 import { usePersonaStore } from '../../stores/personaStore';
 
@@ -20,31 +19,19 @@ const BACKEND_LABELS: Record<PersonaConfig['backend'], string> = {
 };
 
 interface PersonasListProps {
-  onStrategyChange?: (strategy: string) => void;
-  onConversationModeChange?: (mode: string) => void;
-  onTalkStyleChange?: (style: string | null) => void;
   onToggleParticipant?: (personaId: string, isActive: boolean) => Promise<void>;
   onMessage?: (type: MessageType, author: string, text: string) => void;
   personas?: PersonaConfig[];
   activeParticipantIds?: string[];
-  executionStrategy?: string;
-  conversationMode?: string;
-  talkStyle?: string | null;
   onRefresh?: () => Promise<void>;
   onRefreshSessions?: () => Promise<void>;
 }
 
 export function PersonasList({
-  onStrategyChange,
-  onConversationModeChange,
-  onTalkStyleChange,
   onToggleParticipant,
   onMessage,
   personas: propsPersonas,
   activeParticipantIds: propsActiveParticipantIds,
-  executionStrategy: propsExecutionStrategy,
-  conversationMode: propsConversationMode,
-  talkStyle: propsTalkStyle,
   onRefresh,
   onRefreshSessions,
 }: PersonasListProps) {
@@ -59,67 +46,15 @@ export function PersonasList({
   const activeIds = propsActiveParticipantIds ?? activeParticipantIds;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPersona, setEditingPersona] = useState<Partial<PersonaConfig> | null>(null);
-  const [selectedStrategy, setSelectedStrategy] = useState<string>('default');
-  const [selectedConversationMode, setSelectedConversationMode] = useState<string>('normal');
-  const [selectedTalkStyle, setSelectedTalkStyle] = useState<string | null>(null);
   const [deletingPersonaId, setDeletingPersonaId] = useState<string | null>(null);
-
-  const handleStrategyChange = (value: string | null) => {
-    const strategy = value || 'broadcast';
-
-    // Update local state
-    setSelectedStrategy(strategy);
-
-    // Notify parent component (parent will handle backend and system message)
-    onStrategyChange?.(strategy);
-  };
-
-  const handleConversationModeChange = (value: string | null) => {
-    const mode = value || 'normal';
-
-    // Update local state
-    setSelectedConversationMode(mode);
-
-    // Notify parent component (parent will handle backend and system message)
-    onConversationModeChange?.(mode);
-  };
-
-  const handleTalkStyleChange = (value: string | null) => {
-    const style = value || null;
-
-    // Update local state
-    setSelectedTalkStyle(style);
-
-    // Notify parent component (parent will handle backend and system message)
-    onTalkStyleChange?.(style);
-  };
-
-  // Sync local state with props (for global changes from StatusBar)
-  useEffect(() => {
-    if (propsTalkStyle !== undefined) {
-      setSelectedTalkStyle(propsTalkStyle);
-    }
-  }, [propsTalkStyle]);
-
-  useEffect(() => {
-    if (propsConversationMode !== undefined) {
-      setSelectedConversationMode(propsConversationMode);
-    }
-  }, [propsConversationMode]);
 
   // Fetch personas from backend (only if not provided via props)
   const fetchPersonas = async () => {
     try {
       const personas = await invoke<PersonaConfig[]>('get_personas');
       const activeIds = await invoke<string[]>('get_active_participants');
-      const strategy = await invoke<string>('get_execution_strategy');
-      const conversationMode = await invoke<string>('get_conversation_mode');
-      const talkStyle = await invoke<string | null>('get_talk_style');
       setPersonaConfigs(personas);
       setActiveParticipantIds(activeIds);
-      setSelectedStrategy(strategy);
-      setSelectedConversationMode(conversationMode);
-      setSelectedTalkStyle(talkStyle);
     } catch (error) {
       console.error('Failed to fetch personas:', error);
     }
@@ -131,13 +66,6 @@ export function PersonasList({
       fetchPersonas();
     }
   }, [propsPersonas]);
-
-  // Sync execution strategy from props
-  useEffect(() => {
-    if (propsExecutionStrategy) {
-      setSelectedStrategy(propsExecutionStrategy);
-    }
-  }, [propsExecutionStrategy]);
 
   const handleToggleParticipant = async (personaId: string, isChecked: boolean) => {
     // If onToggleParticipant provided (from App.tsx via sessionSettingsStore), use it
@@ -403,63 +331,6 @@ export function PersonasList({
             {activeIds.length} participating
           </Text>
         </Group>
-
-        {/* Talk Style Selection */}
-        <Box>
-          <Text size="xs" c="dimmed" mb={4}>
-            Talk Style
-          </Text>
-          <Select
-            size="xs"
-            data={[
-              { value: '', label: `${DEFAULT_STYLE_ICON} ${DEFAULT_STYLE_LABEL}` },
-              ...TALK_STYLES.map(style => ({
-                value: style.value,
-                label: `${style.icon} ${style.label}`,
-              })),
-            ]}
-            value={selectedTalkStyle || ''}
-            onChange={handleTalkStyleChange}
-            placeholder={DEFAULT_STYLE_LABEL}
-            clearable
-          />
-        </Box>
-
-        {/* Strategy Selection */}
-        <Box>
-          <Text size="xs" c="dimmed" mb={4}>
-            Execution Strategy
-          </Text>
-          <Select
-            size="xs"
-            data={EXECUTION_STRATEGIES.map(strategy => ({
-              value: strategy.value,
-              label: `${strategy.icon} ${strategy.label}`,
-            }))}
-            value={selectedStrategy}
-            onChange={handleStrategyChange}
-            placeholder="Select strategy"
-            allowDeselect={false}
-          />
-        </Box>
-
-        {/* Conversation Mode Selection */}
-        <Box>
-          <Text size="xs" c="dimmed" mb={4}>
-            Conversation Mode
-          </Text>
-          <Select
-            size="xs"
-            data={CONVERSATION_MODES.map(mode => ({
-              value: mode.value,
-              label: `${mode.icon} ${mode.label}`,
-            }))}
-            value={selectedConversationMode}
-            onChange={handleConversationModeChange}
-            placeholder="Select mode"
-            allowDeselect={false}
-          />
-        </Box>
       </Stack>
 
       {/* ペルソナリスト */}

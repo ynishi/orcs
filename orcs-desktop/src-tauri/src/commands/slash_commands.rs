@@ -291,16 +291,74 @@ pub async fn execute_action_command(
         prompt.len()
     );
 
-    // Execute with configured backend
+    // Get persona if specified
+    let persona = if let Some(persona_id) = config.and_then(|c| c.persona_id.as_deref()) {
+        match state.persona_repository.find_by_id(persona_id).await {
+            Ok(Some(p)) => {
+                tracing::info!(
+                    "[SlashCommand] Using persona '{}' ({}) for action",
+                    p.name,
+                    persona_id
+                );
+                Some(p)
+            }
+            Ok(None) => {
+                tracing::warn!(
+                    "[SlashCommand] Persona '{}' not found, continuing without persona",
+                    persona_id
+                );
+                None
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "[SlashCommand] Failed to get persona '{}': {}, continuing without persona",
+                    persona_id,
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // If persona is specified, prepend persona context to prompt
+    let final_prompt = if let Some(ref p) = persona {
+        format!(
+            "# Persona: {}\n\n## Role\n{}\n\n## Background\n{}\n\n## Communication Style\n{}\n\n---\n\n{}",
+            p.name, p.role, p.background, p.communication_style, prompt
+        )
+    } else {
+        prompt
+    };
+
+    // Execute with configured backend (persona settings as defaults, ActionConfig can override)
     let backend = config
         .and_then(|c| c.backend.as_deref())
+        .or_else(|| persona.as_ref().map(|p| p.backend.as_str()))
         .unwrap_or("gemini_api");
-    let model_name = config.and_then(|c| c.model_name.as_deref());
-    let thinking_level = config.and_then(|c| c.gemini_thinking_level.as_deref());
-    let google_search = config.and_then(|c| c.gemini_google_search);
+    let model_name = config
+        .and_then(|c| c.model_name.as_deref())
+        .or_else(|| persona.as_ref().and_then(|p| p.model_name.as_deref()));
+    let thinking_level = config
+        .and_then(|c| c.gemini_thinking_level.as_deref())
+        .or_else(|| {
+            persona
+                .as_ref()
+                .and_then(|p| p.gemini_options.as_ref())
+                .and_then(|o| o.thinking_level.as_deref())
+        });
+    let google_search = config
+        .and_then(|c| c.gemini_google_search)
+        .or_else(|| {
+            persona
+                .as_ref()
+                .and_then(|p| p.gemini_options.as_ref())
+                .and_then(|o| o.google_search)
+        });
 
     let result = SessionSupportAgentService::execute_custom_prompt(
-        &prompt,
+        &final_prompt,
         backend,
         model_name,
         thinking_level,

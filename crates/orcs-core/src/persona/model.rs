@@ -54,6 +54,19 @@ impl PersonaBackend {
         }
     }
 
+    /// Returns the backend identifier string (e.g., "claude_api", "gemini_api").
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PersonaBackend::ClaudeCli => "claude_cli",
+            PersonaBackend::ClaudeApi => "claude_api",
+            PersonaBackend::GeminiCli => "gemini_cli",
+            PersonaBackend::GeminiApi => "gemini_api",
+            PersonaBackend::OpenAiApi => "open_ai_api",
+            PersonaBackend::CodexCli => "codex_cli",
+            PersonaBackend::KaibaApi => "kaiba_api",
+        }
+    }
+
     /// Returns the access type for this backend.
     pub fn access_type(&self) -> &'static str {
         match self {

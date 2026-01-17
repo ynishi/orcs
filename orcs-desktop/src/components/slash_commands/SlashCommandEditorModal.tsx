@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, TextInput, Textarea, Button, Stack, Group, Select } from '@mantine/core';
+import { invoke } from '@tauri-apps/api/core';
 import { SlashCommand, CommandType } from '../../types/slash_command';
+import type { PersonaConfig } from '../../types/agent';
 
 const COMMAND_TYPE_OPTIONS = [
   { value: 'prompt', label: 'Prompt (template expansion)' },
@@ -30,7 +32,22 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
     content: '',
     workingDir: undefined,
     argsDescription: undefined,
+    actionConfig: undefined,
   });
+  const [personas, setPersonas] = useState<PersonaConfig[]>([]);
+
+  // Load personas for Action type
+  useEffect(() => {
+    const loadPersonas = async () => {
+      try {
+        const loadedPersonas = await invoke<PersonaConfig[]>('get_personas');
+        setPersonas(loadedPersonas);
+      } catch (error) {
+        console.error('Failed to load personas:', error);
+      }
+    };
+    loadPersonas();
+  }, []);
 
   // Update form data when command prop changes
   useEffect(() => {
@@ -43,6 +60,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
         content: command.content || '',
         workingDir: command.workingDir || undefined,
         argsDescription: command.argsDescription || undefined,
+        actionConfig: command.actionConfig || undefined,
       });
     } else {
       setFormData({
@@ -53,6 +71,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
         content: '',
         workingDir: undefined,
         argsDescription: undefined,
+        actionConfig: undefined,
       });
     }
   }, [command]);
@@ -73,6 +92,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
       content: formData.content,
       workingDir: formData.workingDir || undefined,
       argsDescription: formData.argsDescription || undefined,
+      actionConfig: formData.type === 'action' ? formData.actionConfig : undefined,
     };
 
     onSave(validatedCommand);
@@ -170,6 +190,31 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
             description="Directory to execute command in. Supports {workspace_path} variable."
             value={formData.workingDir || ''}
             onChange={(e) => setFormData({ ...formData, workingDir: e.currentTarget.value || undefined })}
+          />
+        )}
+
+        {isActionCommand && (
+          <Select
+            label="Persona (Optional)"
+            placeholder="Select a persona..."
+            description="Use a persona's background, style, and backend settings for this action."
+            data={[
+              { value: '__none__', label: '(None - use default)' },
+              ...personas.map((p) => ({
+                value: p.id,
+                label: `${p.icon || '👤'} ${p.name} - ${p.role}`,
+              })),
+            ]}
+            value={formData.actionConfig?.personaId || '__none__'}
+            onChange={(value) =>
+              setFormData({
+                ...formData,
+                actionConfig: value === '__none__'
+                  ? undefined
+                  : { ...formData.actionConfig, personaId: value || undefined },
+              })
+            }
+            clearable={false}
           />
         )}
 

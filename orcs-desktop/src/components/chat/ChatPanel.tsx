@@ -311,6 +311,33 @@ export function ChatPanel({
           message: `/${commandName} task is running`,
           color: 'blue',
         });
+      } else if (command.type === 'action') {
+        // For action commands, execute with session context
+        setTabThinking(tab.id, true, `Executing /${commandName}`, true);
+        const threadContent = getThreadAsText();
+        const actionResult = await invoke<string>('execute_action_command', {
+          commandName,
+          threadContent,
+          args: null,
+        });
+        setTabThinking(tab.id, false);
+
+        // Add result as action_result message with command header
+        const commandHeader = `${command.icon || '⚡'} /${commandName}\n\n`;
+        const resultMessage: Message = {
+          id: `${Date.now()}-action-result`,
+          type: 'action_result',
+          author: 'SYSTEM',
+          text: commandHeader + actionResult,
+          timestamp: new Date(),
+        };
+        addMessageToTab(tab.id, resultMessage);
+
+        notifications.show({
+          title: 'Action Completed',
+          message: `/${commandName} completed`,
+          color: 'green',
+        });
       }
     } catch (error) {
       console.error('[ChatPanel] Failed to execute quick action:', error);

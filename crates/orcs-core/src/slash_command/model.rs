@@ -81,6 +81,16 @@ pub struct SlashCommand {
     #[serde(default = "default_include_in_system_prompt")]
     #[serde(rename = "includeInSystemPrompt")]
     pub include_in_system_prompt: bool,
+
+    /// Whether this command is marked as favorite.
+    #[serde(default)]
+    #[serde(rename = "isFavorite")]
+    pub is_favorite: bool,
+
+    /// Sort order within favorites (lower = higher priority).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "sortOrder")]
+    pub sort_order: Option<u32>,
 }
 
 /// Default value for include_in_system_prompt (true).
@@ -103,6 +113,8 @@ impl SlashCommand {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: true,
+            is_favorite: false,
+            sort_order: None,
         }
     }
 
@@ -138,6 +150,8 @@ impl SlashCommand {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: true,
+            is_favorite: false,
+            sort_order: None,
         }
     }
 
@@ -175,6 +189,8 @@ impl SlashCommand {
             task_blueprint,
             action_config: None,
             include_in_system_prompt: false, // Task commands excluded by default
+            is_favorite: false,
+            sort_order: None,
         }
     }
 
@@ -212,6 +228,8 @@ impl SlashCommand {
             task_blueprint: None,
             action_config,
             include_in_system_prompt: true,
+            is_favorite: false,
+            sort_order: None,
         }
     }
 

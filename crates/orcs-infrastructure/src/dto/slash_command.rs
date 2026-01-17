@@ -183,8 +183,58 @@ fn default_include_in_system_prompt() -> bool {
     true
 }
 
-/// Convert SlashCommandV1_4 DTO to domain model
-impl IntoDomain<SlashCommand> for SlashCommandV1_4 {
+/// Migration from SlashCommandV1_4 to SlashCommandV1_5.
+/// Adds is_favorite and sort_order fields.
+impl MigratesTo<SlashCommandV1_5> for SlashCommandV1_4 {
+    fn migrate(self) -> SlashCommandV1_5 {
+        SlashCommandV1_5 {
+            name: self.name,
+            icon: self.icon,
+            description: self.description,
+            command_type: self.command_type,
+            content: self.content,
+            working_dir: self.working_dir,
+            args_description: self.args_description,
+            task_blueprint: self.task_blueprint,
+            action_config: self.action_config,
+            include_in_system_prompt: self.include_in_system_prompt,
+            is_favorite: false,
+            sort_order: None,
+        }
+    }
+}
+
+/// Slash command DTO V1.5.0 (adds is_favorite, sort_order)
+/// Supports favorites and custom sorting within favorites.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.5.0")]
+pub struct SlashCommandV1_5 {
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub command_type: CommandType,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_blueprint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_config: Option<ActionConfig>,
+    #[serde(default = "default_include_in_system_prompt")]
+    pub include_in_system_prompt: bool,
+    /// Whether this command is marked as favorite.
+    #[serde(default)]
+    pub is_favorite: bool,
+    /// Sort order within favorites (lower = higher priority).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<u32>,
+}
+
+/// Convert SlashCommandV1_5 DTO to domain model
+impl IntoDomain<SlashCommand> for SlashCommandV1_5 {
     fn into_domain(self) -> SlashCommand {
         SlashCommand {
             name: self.name,
@@ -197,14 +247,16 @@ impl IntoDomain<SlashCommand> for SlashCommandV1_4 {
             task_blueprint: self.task_blueprint,
             action_config: self.action_config,
             include_in_system_prompt: self.include_in_system_prompt,
+            is_favorite: self.is_favorite,
+            sort_order: self.sort_order,
         }
     }
 }
 
-/// Convert domain model to SlashCommandV1_4 DTO for persistence
-impl From<&SlashCommand> for SlashCommandV1_4 {
+/// Convert domain model to SlashCommandV1_5 DTO for persistence
+impl From<&SlashCommand> for SlashCommandV1_5 {
     fn from(cmd: &SlashCommand) -> Self {
-        SlashCommandV1_4 {
+        SlashCommandV1_5 {
             name: cmd.name.clone(),
             icon: cmd.icon.clone(),
             description: cmd.description.clone(),
@@ -215,14 +267,16 @@ impl From<&SlashCommand> for SlashCommandV1_4 {
             task_blueprint: cmd.task_blueprint.clone(),
             action_config: cmd.action_config.clone(),
             include_in_system_prompt: cmd.include_in_system_prompt,
+            is_favorite: cmd.is_favorite,
+            sort_order: cmd.sort_order,
         }
     }
 }
 
-/// Convert domain model to SlashCommandV1_4 DTO (for version-migrate save support)
-impl FromDomain<SlashCommand> for SlashCommandV1_4 {
+/// Convert domain model to SlashCommandV1_5 DTO (for version-migrate save support)
+impl FromDomain<SlashCommand> for SlashCommandV1_5 {
     fn from_domain(cmd: SlashCommand) -> Self {
-        SlashCommandV1_4 {
+        SlashCommandV1_5 {
             name: cmd.name,
             icon: cmd.icon,
             description: cmd.description,
@@ -233,6 +287,8 @@ impl FromDomain<SlashCommand> for SlashCommandV1_4 {
             task_blueprint: cmd.task_blueprint,
             action_config: cmd.action_config,
             include_in_system_prompt: cmd.include_in_system_prompt,
+            is_favorite: cmd.is_favorite,
+            sort_order: cmd.sort_order,
         }
     }
 }
@@ -249,6 +305,7 @@ pub fn create_slash_command_migrator() -> version_migrate::Migrator {
         SlashCommandV1_2,
         SlashCommandV1_3,
         SlashCommandV1_4,
+        SlashCommandV1_5,
         SlashCommand
     ], save = true)
     .expect("Failed to create slash_command migrator")

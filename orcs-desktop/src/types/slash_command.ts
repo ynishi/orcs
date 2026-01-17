@@ -52,6 +52,10 @@ export interface SlashCommand {
    * Default: true for Prompt/Shell/Action, false for Task
    */
   includeInSystemPrompt?: boolean;
+  /** Whether this command is marked as favorite */
+  isFavorite?: boolean;
+  /** Sort order within favorites (lower = higher priority) */
+  sortOrder?: number;
 }
 
 export interface ExpandedSlashCommand {

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, Badge, Modal, Textarea, Button } from '@mantine/core';
-import { IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Stack, ScrollArea, Group, Text, Box, ActionIcon, Tooltip, Badge, Modal, Textarea, Button, TextInput, Menu } from '@mantine/core';
+import { IconPlus, IconSearch, IconDotsVertical, IconStar, IconStarFilled, IconPencil, IconTrash, IconArrowUp, IconArrowDown, IconBrain } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
-import { SlashCommand } from '../../types/slash_command';
+import { SlashCommand, CommandType } from '../../types/slash_command';
 import { SlashCommandEditorModal } from './SlashCommandEditorModal';
 
 const COMMAND_TYPE_LABELS: Record<SlashCommand['type'], string> = {
@@ -19,6 +19,8 @@ const COMMAND_TYPE_COLORS: Record<SlashCommand['type'], string> = {
   action: 'teal',
 };
 
+type FilterType = 'all' | 'favorites' | CommandType;
+
 interface SlashCommandListProps {
   onMessage?: (type: 'system' | 'error', author: string, text: string) => void;
   onCommandsUpdated?: (commands: SlashCommand[]) => void;
@@ -34,6 +36,10 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
   const [isRunning, setIsRunning] = useState(false);
   const [deletingCommand, setDeletingCommand] = useState<string | null>(null);
 
+  // New states for filtering
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<FilterType>('all');
+
   // Fetch slash commands from backend
   const fetchCommands = async () => {
     try {
@@ -48,9 +54,107 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
 
   useEffect(() => {
     fetchCommands();
-    // We intentionally ignore exhaustive-deps to avoid recreating fetchCommands
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onCommandsUpdated]);
+
+  // Filter and sort commands
+  const { favoriteCommands, regularCommands, filteredCount } = useMemo(() => {
+    let filtered = commands;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (c) =>
+          c.name.toLowerCase().includes(query) ||
+          c.description.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply type filter
+    if (filterType === 'favorites') {
+      filtered = filtered.filter((c) => c.isFavorite);
+    } else if (filterType !== 'all') {
+      filtered = filtered.filter((c) => c.type === filterType);
+    }
+
+    // Separate favorites and regular commands
+    const favorites = filtered
+      .filter((c) => c.isFavorite)
+      .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+
+    const regular = filtered
+      .filter((c) => !c.isFavorite)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+      favoriteCommands: favorites,
+      regularCommands: regular,
+      filteredCount: filtered.length,
+    };
+  }, [commands, searchQuery, filterType]);
+
+  // Handler to toggle favorite
+  const handleToggleFavorite = useCallback(async (command: SlashCommand) => {
+    try {
+      const updated = await invoke<SlashCommand>('toggle_slash_command_favorite', {
+        name: command.name,
+        isFavorite: !command.isFavorite,
+      });
+      setCommands((prev) =>
+        prev.map((c) => (c.name === updated.name ? updated : c))
+      );
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      onMessage?.('error', 'SYSTEM', `Failed to toggle favorite: ${error}`);
+    }
+  }, [onMessage]);
+
+  // Handler to toggle includeInSystemPrompt
+  const handleToggleIncludeInSystemPrompt = useCallback(async (command: SlashCommand) => {
+    try {
+      const updated = await invoke<SlashCommand>('toggle_slash_command_include_in_system_prompt', {
+        name: command.name,
+        includeInSystemPrompt: !command.includeInSystemPrompt,
+      });
+      setCommands((prev) =>
+        prev.map((c) => (c.name === updated.name ? updated : c))
+      );
+    } catch (error) {
+      console.error('Failed to toggle includeInSystemPrompt:', error);
+      onMessage?.('error', 'SYSTEM', `Failed to toggle system prompt inclusion: ${error}`);
+    }
+  }, [onMessage]);
+
+  // Handler to move favorite up/down
+  const handleMoveFavorite = useCallback(async (command: SlashCommand, direction: 'up' | 'down') => {
+    const currentIndex = favoriteCommands.findIndex((c) => c.name === command.name);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= favoriteCommands.length) return;
+
+    const targetCommand = favoriteCommands[targetIndex];
+
+    // Swap sort orders
+    const currentOrder = command.sortOrder ?? currentIndex;
+    const targetOrder = targetCommand.sortOrder ?? targetIndex;
+
+    try {
+      await invoke('update_slash_command_sort_order', {
+        name: command.name,
+        sortOrder: targetOrder,
+      });
+      await invoke('update_slash_command_sort_order', {
+        name: targetCommand.name,
+        sortOrder: currentOrder,
+      });
+      await fetchCommands();
+    } catch (error) {
+      console.error('Failed to move favorite:', error);
+      onMessage?.('error', 'SYSTEM', `Failed to move favorite: ${error}`);
+    }
+  }, [favoriteCommands, onMessage]);
 
   // Handler to open modal for creating or editing
   const handleOpenModal = (command?: SlashCommand) => {
@@ -147,75 +251,137 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
     }
   };
 
-  const renderCommand = (command: SlashCommand) => {
+  const renderCommand = (command: SlashCommand, showMoveButtons: boolean = false) => {
+    const favoriteIndex = favoriteCommands.findIndex((c) => c.name === command.name);
+    const canMoveUp = showMoveButtons && favoriteIndex > 0;
+    const canMoveDown = showMoveButtons && favoriteIndex < favoriteCommands.length - 1;
+
     return (
-      <Group
+      <Box
         key={command.name}
-        gap="sm"
-        wrap="nowrap"
-        p="xs"
         style={{
           borderRadius: '8px',
-          backgroundColor: 'transparent',
-          transition: 'background-color 0.15s ease',
+          border: '1px solid var(--mantine-color-gray-3)',
+          backgroundColor: command.isFavorite ? 'var(--mantine-color-yellow-0)' : 'transparent',
+          transition: 'all 0.15s ease',
           cursor: 'pointer',
+          overflow: 'hidden',
         }}
         onClick={() => handleRunCommand(command)}
       >
-        {/* Command icon */}
-        <Text size="lg">{command.icon}</Text>
+        {/* Header with actions */}
+        <Group
+          gap="xs"
+          px="sm"
+          py={4}
+          justify="flex-end"
+          style={{
+            backgroundColor: command.isFavorite
+              ? 'var(--mantine-color-yellow-1)'
+              : 'var(--mantine-color-gray-1)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Include in system prompt toggle */}
+          <Tooltip label={command.includeInSystemPrompt ? 'Exclude from system prompt' : 'Include in system prompt'} withArrow>
+            <ActionIcon
+              variant="subtle"
+              color={command.includeInSystemPrompt ? 'cyan' : 'gray'}
+              size="xs"
+              onClick={() => handleToggleIncludeInSystemPrompt(command)}
+              style={{ opacity: command.includeInSystemPrompt ? 1 : 0.4 }}
+            >
+              <IconBrain size={14} />
+            </ActionIcon>
+          </Tooltip>
 
-        {/* Command info */}
-        <Box style={{ flex: 1, minWidth: 0 }}>
-          <Group gap="xs" mb={4}>
-            <Text size="sm" fw={600} truncate>
+          {/* Favorite toggle */}
+          <Tooltip label={command.isFavorite ? 'Remove from favorites' : 'Add to favorites'} withArrow>
+            <ActionIcon
+              variant="subtle"
+              color={command.isFavorite ? 'yellow' : 'gray'}
+              size="xs"
+              onClick={() => handleToggleFavorite(command)}
+            >
+              {command.isFavorite ? <IconStarFilled size={14} /> : <IconStar size={14} />}
+            </ActionIcon>
+          </Tooltip>
+
+          {/* Context menu */}
+          <Menu position="bottom-end" withinPortal>
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray" size="xs">
+                <IconDotsVertical size={14} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+              {command.isFavorite && favoriteCommands.length >= 2 && (
+                <>
+                  <Menu.Item
+                    leftSection={<IconArrowUp size={14} />}
+                    onClick={() => handleMoveFavorite(command, 'up')}
+                    disabled={!canMoveUp}
+                  >
+                    Move Up
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<IconArrowDown size={14} />}
+                    onClick={() => handleMoveFavorite(command, 'down')}
+                    disabled={!canMoveDown}
+                  >
+                    Move Down
+                  </Menu.Item>
+                  <Menu.Divider />
+                </>
+              )}
+              <Menu.Item
+                leftSection={<IconPencil size={14} />}
+                onClick={() => handleOpenModal(command)}
+              >
+                Edit
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconTrash size={14} />}
+                color="red"
+                onClick={() => handleRequestDelete(command.name)}
+              >
+                Delete
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+
+        {/* Content */}
+        <Box p="sm">
+          <Group gap="xs" mb={4} wrap="nowrap">
+            <Text size="lg">{command.icon}</Text>
+            <Text size="sm" fw={600} truncate style={{ flex: 1 }}>
               /{command.name}
             </Text>
             <Badge size="xs" color={COMMAND_TYPE_COLORS[command.type]}>
               {COMMAND_TYPE_LABELS[command.type]}
             </Badge>
           </Group>
-          <Text size="xs" c="dimmed" truncate>
+          <Text size="xs" c="dimmed" lineClamp={2}>
             {command.description}
           </Text>
         </Box>
-
-        {/* Action buttons */}
-        <Group gap={4}>
-          <Tooltip label="Edit" withArrow>
-            <ActionIcon
-              variant="subtle"
-              color="blue"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenModal(command);
-              }}
-            >
-              <IconPencil size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Delete" withArrow>
-            <ActionIcon
-              variant="subtle"
-              color="red"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRequestDelete(command.name);
-              }}
-            >
-              <IconTrash size={14} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      </Group>
+      </Box>
     );
   };
 
   const requiresArgs = runningCommand
     ? runningCommand.content.includes('{args}') || runningCommand.workingDir?.includes('{args}')
     : false;
+
+  const filterButtons: { type: FilterType; label: string; color?: string }[] = [
+    { type: 'all', label: 'All' },
+    { type: 'favorites', label: 'Fav', color: 'yellow' },
+    { type: 'prompt', label: 'Prompt', color: 'blue' },
+    { type: 'shell', label: 'Shell', color: 'violet' },
+    { type: 'task', label: 'Task', color: 'orange' },
+    { type: 'action', label: 'Action', color: 'teal' },
+  ];
 
   return (
     <Stack gap="md" h="100%">
@@ -233,31 +399,88 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
             </Tooltip>
           </Group>
           <Text size="sm" c="dimmed">
-            {commands.length} commands
+            {filteredCount} / {commands.length}
           </Text>
+        </Group>
+
+        {/* Search input */}
+        <TextInput
+          placeholder="Search commands..."
+          leftSection={<IconSearch size={14} />}
+          size="xs"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.currentTarget.value)}
+        />
+
+        {/* Type filter buttons */}
+        <Group gap={4}>
+          {filterButtons.map((btn) => (
+            <Badge
+              key={btn.type}
+              size="sm"
+              variant={filterType === btn.type ? 'filled' : 'light'}
+              color={btn.color || 'gray'}
+              style={{ cursor: 'pointer' }}
+              onClick={() => setFilterType(btn.type)}
+            >
+              {btn.label}
+            </Badge>
+          ))}
         </Group>
       </Stack>
 
       {/* Command list */}
       <ScrollArea style={{ flex: 1 }} px="sm">
         <Stack gap="md">
-          {commands.length > 0 && (
+          {/* Favorites section */}
+          {favoriteCommands.length > 0 && filterType !== 'favorites' && (
             <Box>
-              <Stack gap={4}>
-                {commands.map(renderCommand)}
+              <Text size="xs" fw={600} c="dimmed" mb="xs" tt="uppercase">
+                Favorites
+              </Text>
+              <Stack gap="xs">
+                {favoriteCommands.map((cmd) => renderCommand(cmd, true))}
               </Stack>
             </Box>
           )}
 
+          {/* Regular commands or filtered favorites */}
+          {filterType === 'favorites' ? (
+            favoriteCommands.length > 0 ? (
+              <Box>
+                <Stack gap="xs">
+                  {favoriteCommands.map((cmd) => renderCommand(cmd, true))}
+                </Stack>
+              </Box>
+            ) : null
+          ) : (
+            regularCommands.length > 0 && (
+              <Box>
+                {favoriteCommands.length > 0 && (
+                  <Text size="xs" fw={600} c="dimmed" mb="xs" tt="uppercase">
+                    Commands
+                  </Text>
+                )}
+                <Stack gap="xs">
+                  {regularCommands.map((cmd) => renderCommand(cmd, false))}
+                </Stack>
+              </Box>
+            )
+          )}
+
           {/* Empty state */}
-          {commands.length === 0 && (
+          {filteredCount === 0 && (
             <Box p="md" style={{ textAlign: 'center' }}>
               <Text size="sm" c="dimmed">
-                No custom commands yet
+                {commands.length === 0
+                  ? 'No custom commands yet'
+                  : 'No commands match your filter'}
               </Text>
-              <Text size="xs" c="dimmed" mt="xs">
-                Click the + button to create your first slash command
-              </Text>
+              {commands.length === 0 && (
+                <Text size="xs" c="dimmed" mt="xs">
+                  Click the + button to create your first slash command
+                </Text>
+              )}
             </Box>
           )}
         </Stack>

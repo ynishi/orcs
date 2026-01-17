@@ -506,3 +506,119 @@ pub async fn execute_shell_command(
         Err(format!("Command failed: {}", stderr))
     }
 }
+
+/// Toggles the favorite status of a slash command
+#[tauri::command]
+pub async fn toggle_slash_command_favorite(
+    name: String,
+    is_favorite: bool,
+    state: State<'_, AppState>,
+) -> Result<SlashCommand, String> {
+    // Get the command
+    let mut command = state
+        .slash_command_repository
+        .get_command(&name)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Command not found: {}", name))?;
+
+    // Update favorite status
+    command.is_favorite = is_favorite;
+
+    // If marking as favorite and no sort_order, assign one
+    if is_favorite && command.sort_order.is_none() {
+        // Get max sort_order among favorites and add 1
+        let all_commands = state
+            .slash_command_repository
+            .list_commands()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let max_order = all_commands
+            .iter()
+            .filter(|c| c.is_favorite)
+            .filter_map(|c| c.sort_order)
+            .max()
+            .unwrap_or(0);
+
+        command.sort_order = Some(max_order + 1);
+    }
+
+    // If removing from favorites, clear sort_order
+    if !is_favorite {
+        command.sort_order = None;
+    }
+
+    // Save updated command
+    state
+        .slash_command_repository
+        .save_command(command.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(command)
+}
+
+/// Updates the sort order of a favorite slash command
+#[tauri::command]
+pub async fn update_slash_command_sort_order(
+    name: String,
+    sort_order: u32,
+    state: State<'_, AppState>,
+) -> Result<SlashCommand, String> {
+    // Get the command
+    let mut command = state
+        .slash_command_repository
+        .get_command(&name)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Command not found: {}", name))?;
+
+    // Only allow sort_order update for favorites
+    if !command.is_favorite {
+        return Err(format!(
+            "Cannot set sort order for non-favorite command: {}",
+            name
+        ));
+    }
+
+    // Update sort_order
+    command.sort_order = Some(sort_order);
+
+    // Save updated command
+    state
+        .slash_command_repository
+        .save_command(command.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(command)
+}
+
+/// Toggles the include_in_system_prompt setting of a slash command
+#[tauri::command]
+pub async fn toggle_slash_command_include_in_system_prompt(
+    name: String,
+    include_in_system_prompt: bool,
+    state: State<'_, AppState>,
+) -> Result<SlashCommand, String> {
+    // Get the command
+    let mut command = state
+        .slash_command_repository
+        .get_command(&name)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Command not found: {}", name))?;
+
+    // Update include_in_system_prompt
+    command.include_in_system_prompt = include_in_system_prompt;
+
+    // Save updated command
+    state
+        .slash_command_repository
+        .save_command(command.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(command)
+}

@@ -55,6 +55,16 @@ pub struct CreateSlashCommandRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "includeInSystemPrompt")]
     pub include_in_system_prompt: Option<bool>,
+
+    /// Whether this command is marked as favorite.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "isFavorite")]
+    pub is_favorite: Option<bool>,
+
+    /// Sort order within favorites (lower = higher priority).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "sortOrder")]
+    pub sort_order: Option<u32>,
 }
 
 fn default_icon() -> String {
@@ -120,6 +130,8 @@ impl CreateSlashCommandRequest {
             task_blueprint: self.task_blueprint,
             action_config: self.action_config,
             include_in_system_prompt,
+            is_favorite: self.is_favorite.unwrap_or(false),
+            sort_order: self.sort_order,
         }
     }
 
@@ -136,6 +148,8 @@ impl CreateSlashCommandRequest {
             task_blueprint: cmd.task_blueprint.clone(),
             action_config: cmd.action_config.clone(),
             include_in_system_prompt: Some(cmd.include_in_system_prompt),
+            is_favorite: Some(cmd.is_favorite),
+            sort_order: cmd.sort_order,
         }
     }
 }
@@ -157,6 +171,8 @@ mod tests {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: None,
+            is_favorite: None,
+            sort_order: None,
         };
 
         assert!(req.validate().is_ok());
@@ -175,6 +191,8 @@ mod tests {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: None,
+            is_favorite: None,
+            sort_order: None,
         };
 
         assert!(req.validate().is_err());
@@ -193,6 +211,8 @@ mod tests {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: None,
+            is_favorite: None,
+            sort_order: None,
         };
 
         assert!(req.validate().is_err());
@@ -211,6 +231,8 @@ mod tests {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: None,
+            is_favorite: None,
+            sort_order: None,
         };
 
         assert!(req.validate().is_err());
@@ -229,6 +251,8 @@ mod tests {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: None,
+            is_favorite: None,
+            sort_order: None,
         };
 
         assert!(req.validate().is_err());
@@ -247,6 +271,8 @@ mod tests {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: None,
+            is_favorite: None,
+            sort_order: None,
         };
 
         assert!(req.validate().is_ok());
@@ -265,6 +291,8 @@ mod tests {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: None,
+            is_favorite: None,
+            sort_order: None,
         };
 
         let cmd = req.into_slash_command();
@@ -272,6 +300,8 @@ mod tests {
         assert_eq!(cmd.icon, "🔧");
         assert_eq!(cmd.command_type, CommandType::Shell);
         assert!(cmd.include_in_system_prompt); // Shell defaults to true
+        assert!(!cmd.is_favorite); // Defaults to false
+        assert!(cmd.sort_order.is_none());
     }
 
     #[test]
@@ -287,6 +317,8 @@ mod tests {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: None,
+            is_favorite: None,
+            sort_order: None,
         };
 
         let cmd = req.into_slash_command();
@@ -306,9 +338,33 @@ mod tests {
             task_blueprint: None,
             action_config: None,
             include_in_system_prompt: Some(true), // Explicitly override to true
+            is_favorite: None,
+            sort_order: None,
         };
 
         let cmd = req.into_slash_command();
         assert!(cmd.include_in_system_prompt); // Explicit override
+    }
+
+    #[test]
+    fn test_into_slash_command_with_favorite() {
+        let req = CreateSlashCommandRequest {
+            name: "fav-cmd".to_string(),
+            icon: "⭐".to_string(),
+            description: "Favorite command".to_string(),
+            command_type: CommandType::Prompt,
+            content: "Test".to_string(),
+            working_dir: None,
+            args_description: None,
+            task_blueprint: None,
+            action_config: None,
+            include_in_system_prompt: None,
+            is_favorite: Some(true),
+            sort_order: Some(1),
+        };
+
+        let cmd = req.into_slash_command();
+        assert!(cmd.is_favorite);
+        assert_eq!(cmd.sort_order, Some(1));
     }
 }

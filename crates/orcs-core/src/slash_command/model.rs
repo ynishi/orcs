@@ -75,6 +75,18 @@ pub struct SlashCommand {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "actionConfig")]
     pub action_config: Option<ActionConfig>,
+
+    /// Whether to include this command in system prompts for personas.
+    /// Default: true for Prompt/Shell/Action, false for Task
+    #[serde(default = "default_include_in_system_prompt")]
+    #[serde(rename = "includeInSystemPrompt")]
+    pub include_in_system_prompt: bool,
+}
+
+/// Default value for include_in_system_prompt (true).
+/// Note: Task commands should explicitly set this to false on creation.
+fn default_include_in_system_prompt() -> bool {
+    true
 }
 
 impl SlashCommand {
@@ -90,6 +102,7 @@ impl SlashCommand {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            include_in_system_prompt: true,
         }
     }
 
@@ -124,6 +137,7 @@ impl SlashCommand {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            include_in_system_prompt: true,
         }
     }
 
@@ -142,6 +156,7 @@ impl SlashCommand {
     }
 
     /// Creates a new task-type slash command.
+    /// Note: Task commands default to include_in_system_prompt = false
     pub fn new_task(
         name: String,
         icon: String,
@@ -159,6 +174,7 @@ impl SlashCommand {
             args_description: None,
             task_blueprint,
             action_config: None,
+            include_in_system_prompt: false, // Task commands excluded by default
         }
     }
 
@@ -195,6 +211,7 @@ impl SlashCommand {
             args_description: None,
             task_blueprint: None,
             action_config,
+            include_in_system_prompt: true,
         }
     }
 

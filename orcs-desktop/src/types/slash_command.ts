@@ -47,6 +47,11 @@ export interface SlashCommand {
   taskBlueprint?: string;
   /** Configuration for Action type commands (backend, model, etc.) */
   actionConfig?: ActionConfig;
+  /**
+   * Whether to include this command in system prompts for personas.
+   * Default: true for Prompt/Shell/Action, false for Task
+   */
+  includeInSystemPrompt?: boolean;
 }
 
 export interface ExpandedSlashCommand {

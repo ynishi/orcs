@@ -47,10 +47,26 @@ pub struct CreateSlashCommandRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "actionConfig")]
     pub action_config: Option<ActionConfig>,
+
+    /// Whether to include this command in system prompts for personas.
+    /// If not provided, defaults based on command_type:
+    /// - Prompt/Shell/Action: true
+    /// - Task: false
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "includeInSystemPrompt")]
+    pub include_in_system_prompt: Option<bool>,
 }
 
 fn default_icon() -> String {
     "⚡".to_string()
+}
+
+/// Returns the default value for include_in_system_prompt based on command type.
+fn default_include_for_type(command_type: &CommandType) -> bool {
+    match command_type {
+        CommandType::Task => false,
+        _ => true, // Prompt, Shell, Action default to true
+    }
 }
 
 impl CreateSlashCommandRequest {
@@ -89,6 +105,10 @@ impl CreateSlashCommandRequest {
 
     /// Convert this request into a SlashCommand.
     pub fn into_slash_command(self) -> SlashCommand {
+        let include_in_system_prompt = self
+            .include_in_system_prompt
+            .unwrap_or_else(|| default_include_for_type(&self.command_type));
+
         SlashCommand {
             name: self.name,
             icon: self.icon,
@@ -99,6 +119,7 @@ impl CreateSlashCommandRequest {
             args_description: self.args_description,
             task_blueprint: self.task_blueprint,
             action_config: self.action_config,
+            include_in_system_prompt,
         }
     }
 
@@ -114,6 +135,7 @@ impl CreateSlashCommandRequest {
             args_description: cmd.args_description.clone(),
             task_blueprint: cmd.task_blueprint.clone(),
             action_config: cmd.action_config.clone(),
+            include_in_system_prompt: Some(cmd.include_in_system_prompt),
         }
     }
 }
@@ -134,6 +156,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            include_in_system_prompt: None,
         };
 
         assert!(req.validate().is_ok());
@@ -151,6 +174,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            include_in_system_prompt: None,
         };
 
         assert!(req.validate().is_err());
@@ -168,6 +192,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            include_in_system_prompt: None,
         };
 
         assert!(req.validate().is_err());
@@ -185,6 +210,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            include_in_system_prompt: None,
         };
 
         assert!(req.validate().is_err());
@@ -202,6 +228,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            include_in_system_prompt: None,
         };
 
         assert!(req.validate().is_err());
@@ -219,6 +246,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            include_in_system_prompt: None,
         };
 
         assert!(req.validate().is_ok());
@@ -236,11 +264,51 @@ mod tests {
             args_description: Some("args".to_string()),
             task_blueprint: None,
             action_config: None,
+            include_in_system_prompt: None,
         };
 
         let cmd = req.into_slash_command();
         assert_eq!(cmd.name, "test");
         assert_eq!(cmd.icon, "🔧");
         assert_eq!(cmd.command_type, CommandType::Shell);
+        assert!(cmd.include_in_system_prompt); // Shell defaults to true
+    }
+
+    #[test]
+    fn test_into_slash_command_task_default() {
+        let req = CreateSlashCommandRequest {
+            name: "build".to_string(),
+            icon: "🔨".to_string(),
+            description: "Build project".to_string(),
+            command_type: CommandType::Task,
+            content: "Build the project".to_string(),
+            working_dir: None,
+            args_description: None,
+            task_blueprint: None,
+            action_config: None,
+            include_in_system_prompt: None,
+        };
+
+        let cmd = req.into_slash_command();
+        assert!(!cmd.include_in_system_prompt); // Task defaults to false
+    }
+
+    #[test]
+    fn test_into_slash_command_explicit_override() {
+        let req = CreateSlashCommandRequest {
+            name: "build".to_string(),
+            icon: "🔨".to_string(),
+            description: "Build project".to_string(),
+            command_type: CommandType::Task,
+            content: "Build the project".to_string(),
+            working_dir: None,
+            args_description: None,
+            task_blueprint: None,
+            action_config: None,
+            include_in_system_prompt: Some(true), // Explicitly override to true
+        };
+
+        let cmd = req.into_slash_command();
+        assert!(cmd.include_in_system_prompt); // Explicit override
     }
 }

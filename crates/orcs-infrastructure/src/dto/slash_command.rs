@@ -131,8 +131,60 @@ impl MigratesTo<SlashCommandV1_3> for SlashCommandV1_2 {
     }
 }
 
-/// Convert SlashCommandV1_3 DTO to domain model
-impl IntoDomain<SlashCommand> for SlashCommandV1_3 {
+/// Migration from SlashCommandV1_3 to SlashCommandV1_4.
+/// Adds include_in_system_prompt field (defaults based on command_type).
+impl MigratesTo<SlashCommandV1_4> for SlashCommandV1_3 {
+    fn migrate(self) -> SlashCommandV1_4 {
+        // Task commands default to false, all others default to true
+        let include_in_system_prompt = self.command_type != CommandType::Task;
+
+        SlashCommandV1_4 {
+            name: self.name,
+            icon: self.icon,
+            description: self.description,
+            command_type: self.command_type,
+            content: self.content,
+            working_dir: self.working_dir,
+            args_description: self.args_description,
+            task_blueprint: self.task_blueprint,
+            action_config: self.action_config,
+            include_in_system_prompt,
+        }
+    }
+}
+
+/// Slash command DTO V1.4.0 (adds include_in_system_prompt)
+/// Controls whether the command is included in system prompts for personas.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.4.0")]
+pub struct SlashCommandV1_4 {
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub command_type: CommandType,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_blueprint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_config: Option<ActionConfig>,
+    /// Whether to include this command in system prompts for personas.
+    /// Default: true for Prompt/Shell/Action, false for Task
+    #[serde(default = "default_include_in_system_prompt")]
+    pub include_in_system_prompt: bool,
+}
+
+/// Default value for include_in_system_prompt during deserialization.
+fn default_include_in_system_prompt() -> bool {
+    true
+}
+
+/// Convert SlashCommandV1_4 DTO to domain model
+impl IntoDomain<SlashCommand> for SlashCommandV1_4 {
     fn into_domain(self) -> SlashCommand {
         SlashCommand {
             name: self.name,
@@ -144,14 +196,15 @@ impl IntoDomain<SlashCommand> for SlashCommandV1_3 {
             args_description: self.args_description,
             task_blueprint: self.task_blueprint,
             action_config: self.action_config,
+            include_in_system_prompt: self.include_in_system_prompt,
         }
     }
 }
 
-/// Convert domain model to SlashCommandV1_3 DTO for persistence
-impl From<&SlashCommand> for SlashCommandV1_3 {
+/// Convert domain model to SlashCommandV1_4 DTO for persistence
+impl From<&SlashCommand> for SlashCommandV1_4 {
     fn from(cmd: &SlashCommand) -> Self {
-        SlashCommandV1_3 {
+        SlashCommandV1_4 {
             name: cmd.name.clone(),
             icon: cmd.icon.clone(),
             description: cmd.description.clone(),
@@ -161,14 +214,15 @@ impl From<&SlashCommand> for SlashCommandV1_3 {
             args_description: cmd.args_description.clone(),
             task_blueprint: cmd.task_blueprint.clone(),
             action_config: cmd.action_config.clone(),
+            include_in_system_prompt: cmd.include_in_system_prompt,
         }
     }
 }
 
-/// Convert domain model to SlashCommandV1_3 DTO (for version-migrate save support)
-impl FromDomain<SlashCommand> for SlashCommandV1_3 {
+/// Convert domain model to SlashCommandV1_4 DTO (for version-migrate save support)
+impl FromDomain<SlashCommand> for SlashCommandV1_4 {
     fn from_domain(cmd: SlashCommand) -> Self {
-        SlashCommandV1_3 {
+        SlashCommandV1_4 {
             name: cmd.name,
             icon: cmd.icon,
             description: cmd.description,
@@ -178,6 +232,7 @@ impl FromDomain<SlashCommand> for SlashCommandV1_3 {
             args_description: cmd.args_description,
             task_blueprint: cmd.task_blueprint,
             action_config: cmd.action_config,
+            include_in_system_prompt: cmd.include_in_system_prompt,
         }
     }
 }
@@ -193,6 +248,7 @@ pub fn create_slash_command_migrator() -> version_migrate::Migrator {
         SlashCommandV1_1,
         SlashCommandV1_2,
         SlashCommandV1_3,
+        SlashCommandV1_4,
         SlashCommand
     ], save = true)
     .expect("Failed to create slash_command migrator")

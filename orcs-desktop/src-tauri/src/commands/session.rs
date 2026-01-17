@@ -468,6 +468,14 @@ You are authorized to execute slash commands to accomplish user tasks. When you 
 {% endfor %}
 {%- endif %}
 
+{%- if action_commands is defined and action_commands|length > 0 %}
+
+### Custom Action Commands
+{% for cmd in action_commands -%}
+- `{{ cmd }}`
+{% endfor %}
+{%- endif %}
+
 ## Execution Authorization
 
 ✅ **You are fully authorized to execute any of these commands**
@@ -496,6 +504,7 @@ struct SlashCommandPromptDto {
     task_commands: Vec<CustomCommandInfo>,
     prompt_commands: Vec<CustomCommandInfo>,
     shell_commands: Vec<CustomCommandInfo>,
+    action_commands: Vec<CustomCommandInfo>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, ToPrompt)]
@@ -632,23 +641,35 @@ fn build_slash_command_prompt(commands: &[SlashCommand]) -> Option<String> {
     // Convert built-in commands using From impl
     let builtin_commands: Vec<BuiltInCommand> = BUILT_IN_COMMANDS.iter().map(|cmd| cmd.1).collect();
 
+    // Filter commands that should be included in system prompt
+    let included_commands: Vec<&SlashCommand> = commands
+        .iter()
+        .filter(|c| c.include_in_system_prompt)
+        .collect();
+
     // Group custom commands by type using From impl
-    let task_commands: Vec<CustomCommandInfo> = commands
+    let task_commands: Vec<CustomCommandInfo> = included_commands
         .iter()
         .filter(|c| c.command_type == CommandType::Task)
-        .map(|cmd| cmd.into())
+        .map(|cmd| (*cmd).into())
         .collect();
 
-    let prompt_commands: Vec<CustomCommandInfo> = commands
+    let prompt_commands: Vec<CustomCommandInfo> = included_commands
         .iter()
         .filter(|c| c.command_type == CommandType::Prompt)
-        .map(|cmd| cmd.into())
+        .map(|cmd| (*cmd).into())
         .collect();
 
-    let shell_commands: Vec<CustomCommandInfo> = commands
+    let shell_commands: Vec<CustomCommandInfo> = included_commands
         .iter()
         .filter(|c| c.command_type == CommandType::Shell)
-        .map(|cmd| cmd.into())
+        .map(|cmd| (*cmd).into())
+        .collect();
+
+    let action_commands: Vec<CustomCommandInfo> = included_commands
+        .iter()
+        .filter(|c| c.command_type == CommandType::Action)
+        .map(|cmd| (*cmd).into())
         .collect();
 
     // Build DTO and render template
@@ -657,6 +678,7 @@ fn build_slash_command_prompt(commands: &[SlashCommand]) -> Option<String> {
         task_commands,
         prompt_commands,
         shell_commands,
+        action_commands,
     };
 
     Some(dto.to_prompt())

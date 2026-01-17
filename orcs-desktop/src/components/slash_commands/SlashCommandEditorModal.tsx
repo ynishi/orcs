@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, TextInput, Textarea, Button, Stack, Group, Select } from '@mantine/core';
+import { Modal, TextInput, Textarea, Button, Stack, Group, Select, Checkbox } from '@mantine/core';
 import { invoke } from '@tauri-apps/api/core';
 import { SlashCommand, CommandType } from '../../types/slash_command';
 import type { PersonaConfig } from '../../types/agent';
+
+/** Get default value for includeInSystemPrompt based on command type */
+function getDefaultIncludeInSystemPrompt(type: CommandType): boolean {
+  return type !== 'task'; // Task defaults to false, all others default to true
+}
 
 const COMMAND_TYPE_OPTIONS = [
   { value: 'prompt', label: 'Prompt (template expansion)' },
@@ -33,6 +38,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
     workingDir: undefined,
     argsDescription: undefined,
     actionConfig: undefined,
+    includeInSystemPrompt: true, // Default for prompt type
   });
   const [personas, setPersonas] = useState<PersonaConfig[]>([]);
 
@@ -52,15 +58,17 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
   // Update form data when command prop changes
   useEffect(() => {
     if (command) {
+      const cmdType = command.type || 'prompt';
       setFormData({
         name: command.name || '',
         icon: command.icon || '⚡',
         description: command.description || '',
-        type: command.type || 'prompt',
+        type: cmdType,
         content: command.content || '',
         workingDir: command.workingDir || undefined,
         argsDescription: command.argsDescription || undefined,
         actionConfig: command.actionConfig || undefined,
+        includeInSystemPrompt: command.includeInSystemPrompt ?? getDefaultIncludeInSystemPrompt(cmdType),
       });
     } else {
       setFormData({
@@ -72,6 +80,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
         workingDir: undefined,
         argsDescription: undefined,
         actionConfig: undefined,
+        includeInSystemPrompt: true,
       });
     }
   }, [command]);
@@ -83,16 +92,19 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
       return;
     }
 
+    const cmdType = formData.type as CommandType;
+
     // Cast to SlashCommand since we've validated required fields
     const validatedCommand: SlashCommand = {
       name: formData.name,
       icon: formData.icon || '⚡',
       description: formData.description,
-      type: formData.type as CommandType,
+      type: cmdType,
       content: formData.content,
       workingDir: formData.workingDir || undefined,
       argsDescription: formData.argsDescription || undefined,
       actionConfig: formData.type === 'action' ? formData.actionConfig : undefined,
+      includeInSystemPrompt: formData.includeInSystemPrompt ?? getDefaultIncludeInSystemPrompt(cmdType),
     };
 
     onSave(validatedCommand);
@@ -143,7 +155,20 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
           description="Prompt: expands templates. Shell: executes commands. Task: runs orchestrated workflows."
           data={COMMAND_TYPE_OPTIONS}
           value={formData.type}
-          onChange={(value) => setFormData({ ...formData, type: value as CommandType })}
+          onChange={(value) => {
+            const newType = value as CommandType;
+            // When type changes, update includeInSystemPrompt to the new default
+            // only if the user hasn't explicitly set it (i.e., it's currently at the old default)
+            const currentDefault = getDefaultIncludeInSystemPrompt(formData.type as CommandType);
+            const newDefault = getDefaultIncludeInSystemPrompt(newType);
+            const shouldUpdateInclude = formData.includeInSystemPrompt === currentDefault;
+
+            setFormData({
+              ...formData,
+              type: newType,
+              includeInSystemPrompt: shouldUpdateInclude ? newDefault : formData.includeInSystemPrompt,
+            });
+          }}
           allowDeselect={false}
           required
         />
@@ -226,6 +251,13 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
           onChange={(e) => setFormData({ ...formData, argsDescription: e.currentTarget.value || undefined })}
           minRows={2}
           autosize
+        />
+
+        <Checkbox
+          label="Include in system prompt"
+          description={`When enabled, this command will be visible to AI agents. ${isTaskCommand ? '(Task commands default to disabled)' : ''}`}
+          checked={formData.includeInSystemPrompt ?? getDefaultIncludeInSystemPrompt(formData.type as CommandType)}
+          onChange={(e) => setFormData({ ...formData, includeInSystemPrompt: e.currentTarget.checked })}
         />
 
         <Group justify="flex-end" gap="sm">

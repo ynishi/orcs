@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use version_migrate::{FromDomain, IntoDomain, MigratesTo, Versioned};
 
-use orcs_core::slash_command::{CommandType, SlashCommand};
+use orcs_core::slash_command::{ActionConfig, CommandType, SlashCommand};
 
 /// Slash command DTO V1.0.0
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
@@ -92,8 +92,47 @@ impl MigratesTo<SlashCommandV1_2> for SlashCommandV1_1 {
     }
 }
 
-/// Convert SlashCommandV1_2 DTO to domain model
-impl IntoDomain<SlashCommand> for SlashCommandV1_2 {
+/// Slash command DTO V1.3.0 (adds action_config for Action type)
+/// Action type uses content field as prompt template with variables like {session_all}, {session_recent}
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.3.0")]
+pub struct SlashCommandV1_3 {
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub command_type: CommandType,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_blueprint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_config: Option<ActionConfig>,
+}
+
+/// Migration from SlashCommandV1_2 to SlashCommandV1_3.
+/// Adds action_config field (defaults to None for existing commands).
+impl MigratesTo<SlashCommandV1_3> for SlashCommandV1_2 {
+    fn migrate(self) -> SlashCommandV1_3 {
+        SlashCommandV1_3 {
+            name: self.name,
+            icon: self.icon,
+            description: self.description,
+            command_type: self.command_type,
+            content: self.content,
+            working_dir: self.working_dir,
+            args_description: self.args_description,
+            task_blueprint: self.task_blueprint,
+            action_config: None,
+        }
+    }
+}
+
+/// Convert SlashCommandV1_3 DTO to domain model
+impl IntoDomain<SlashCommand> for SlashCommandV1_3 {
     fn into_domain(self) -> SlashCommand {
         SlashCommand {
             name: self.name,
@@ -104,14 +143,15 @@ impl IntoDomain<SlashCommand> for SlashCommandV1_2 {
             working_dir: self.working_dir,
             args_description: self.args_description,
             task_blueprint: self.task_blueprint,
+            action_config: self.action_config,
         }
     }
 }
 
-/// Convert domain model to SlashCommandV1_2 DTO for persistence
-impl From<&SlashCommand> for SlashCommandV1_2 {
+/// Convert domain model to SlashCommandV1_3 DTO for persistence
+impl From<&SlashCommand> for SlashCommandV1_3 {
     fn from(cmd: &SlashCommand) -> Self {
-        SlashCommandV1_2 {
+        SlashCommandV1_3 {
             name: cmd.name.clone(),
             icon: cmd.icon.clone(),
             description: cmd.description.clone(),
@@ -120,14 +160,15 @@ impl From<&SlashCommand> for SlashCommandV1_2 {
             working_dir: cmd.working_dir.clone(),
             args_description: cmd.args_description.clone(),
             task_blueprint: cmd.task_blueprint.clone(),
+            action_config: cmd.action_config.clone(),
         }
     }
 }
 
-/// Convert domain model to SlashCommandV1_2 DTO (for version-migrate save support)
-impl FromDomain<SlashCommand> for SlashCommandV1_2 {
+/// Convert domain model to SlashCommandV1_3 DTO (for version-migrate save support)
+impl FromDomain<SlashCommand> for SlashCommandV1_3 {
     fn from_domain(cmd: SlashCommand) -> Self {
-        SlashCommandV1_2 {
+        SlashCommandV1_3 {
             name: cmd.name,
             icon: cmd.icon,
             description: cmd.description,
@@ -136,6 +177,7 @@ impl FromDomain<SlashCommand> for SlashCommandV1_2 {
             working_dir: cmd.working_dir,
             args_description: cmd.args_description,
             task_blueprint: cmd.task_blueprint,
+            action_config: cmd.action_config,
         }
     }
 }
@@ -150,6 +192,7 @@ pub fn create_slash_command_migrator() -> version_migrate::Migrator {
         SlashCommandV1,
         SlashCommandV1_1,
         SlashCommandV1_2,
+        SlashCommandV1_3,
         SlashCommand
     ], save = true)
     .expect("Failed to create slash_command migrator")

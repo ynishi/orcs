@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{CommandType, SlashCommand};
+use super::{ActionConfig, CommandType, SlashCommand};
 
 /// Request to create a new slash command.
 ///
@@ -42,6 +42,11 @@ pub struct CreateSlashCommandRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "taskBlueprint")]
     pub task_blueprint: Option<String>,
+
+    /// Configuration for Action type commands (backend, model, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "actionConfig")]
+    pub action_config: Option<ActionConfig>,
 }
 
 fn default_icon() -> String {
@@ -74,7 +79,7 @@ impl CreateSlashCommandRequest {
             return Err("Description is required and cannot be empty".to_string());
         }
 
-        // Validate content
+        // Validate content (required for all types)
         if self.content.trim().is_empty() {
             return Err("Content is required and cannot be empty".to_string());
         }
@@ -93,6 +98,7 @@ impl CreateSlashCommandRequest {
             working_dir: self.working_dir,
             args_description: self.args_description,
             task_blueprint: self.task_blueprint,
+            action_config: self.action_config,
         }
     }
 
@@ -107,6 +113,7 @@ impl CreateSlashCommandRequest {
             working_dir: cmd.working_dir.clone(),
             args_description: cmd.args_description.clone(),
             task_blueprint: cmd.task_blueprint.clone(),
+            action_config: cmd.action_config.clone(),
         }
     }
 }
@@ -126,6 +133,7 @@ mod tests {
             working_dir: None,
             args_description: None,
             task_blueprint: None,
+            action_config: None,
         };
 
         assert!(req.validate().is_ok());
@@ -142,6 +150,7 @@ mod tests {
             working_dir: None,
             args_description: None,
             task_blueprint: None,
+            action_config: None,
         };
 
         assert!(req.validate().is_err());
@@ -158,6 +167,7 @@ mod tests {
             working_dir: None,
             args_description: None,
             task_blueprint: None,
+            action_config: None,
         };
 
         assert!(req.validate().is_err());
@@ -174,9 +184,44 @@ mod tests {
             working_dir: None,
             args_description: None,
             task_blueprint: None,
+            action_config: None,
         };
 
         assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_action_requires_content() {
+        let req = CreateSlashCommandRequest {
+            name: "summary".to_string(),
+            icon: "📝".to_string(),
+            description: "Generate summary".to_string(),
+            command_type: CommandType::Action,
+            content: "".to_string(),
+            working_dir: None,
+            args_description: None,
+            task_blueprint: None,
+            action_config: None,
+        };
+
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_action_success() {
+        let req = CreateSlashCommandRequest {
+            name: "summary".to_string(),
+            icon: "📝".to_string(),
+            description: "Generate summary".to_string(),
+            command_type: CommandType::Action,
+            content: "{session_all}\n\nSummarize the above conversation.".to_string(),
+            working_dir: None,
+            args_description: None,
+            task_blueprint: None,
+            action_config: None,
+        };
+
+        assert!(req.validate().is_ok());
     }
 
     #[test]
@@ -190,6 +235,7 @@ mod tests {
             working_dir: Some("/tmp".to_string()),
             args_description: Some("args".to_string()),
             task_blueprint: None,
+            action_config: None,
         };
 
         let cmd = req.into_slash_command();

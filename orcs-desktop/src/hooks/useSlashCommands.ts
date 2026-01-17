@@ -11,6 +11,7 @@ import {
   conversationMessage,
   commandMessage,
   shellOutputMessage,
+  actionResultMessage,
 } from '../utils/systemMessage';
 import type { MessageType } from '../types/message';
 import type { StatusInfo } from '../types/status';
@@ -48,6 +49,8 @@ interface UseSlashCommandsProps {
   refreshSessions: () => Promise<void>;
   onRequestSandboxExit?: (sandboxState: import('../bindings/generated').SandboxState) => void;
   onSandboxEntered?: (sandboxState: import('../bindings/generated').SandboxState) => void;
+  /** Get thread content as text for action commands */
+  getThreadAsText?: () => string;
 }
 
 export function useSlashCommands({
@@ -66,6 +69,7 @@ export function useSlashCommands({
   refreshSessions,
   onRequestSandboxExit,
   onSandboxEntered,
+  getThreadAsText,
 }: UseSlashCommandsProps) {
   /**
    * SlashCommandを処理する
@@ -971,6 +975,53 @@ Generate the BlueprintWorkflow now.`;
                 nextInput = null;
                 suppressUserMessage = true;
               }
+            } else if (customCommand.type === 'action') {
+              // Execute action command (uses content as prompt template with session variables)
+              try {
+                // Check if getThreadAsText is available
+                if (!getThreadAsText) {
+                  await handleAndPersistSystemMessage(
+                    conversationMessage('Action commands require thread context. Please use from chat panel.', 'error', '❌'),
+                    addMessage,
+                    invoke
+                  );
+                  nextInput = null;
+                  suppressUserMessage = true;
+                } else {
+                  await handleAndPersistSystemMessage(
+                    conversationMessage(`Executing /${parsed.command}...`, 'info', customCommand.icon || '⚡'),
+                    addMessage,
+                    invoke
+                  );
+
+                  const threadContent = getThreadAsText();
+                  const actionResult = await invoke<string>('execute_action_command', {
+                    commandName: parsed.command,
+                    threadContent,
+                    args: argsStr || null,
+                  });
+
+                  // Add command header for context and copy-paste usability
+                  const commandHeader = `${customCommand.icon || '⚡'} /${parsed.command}${argsStr ? ` ${argsStr}` : ''}\n\n`;
+                  await handleAndPersistSystemMessage(
+                    actionResultMessage(commandHeader + actionResult),
+                    addMessage,
+                    invoke
+                  );
+
+                  nextInput = null;
+                  suppressUserMessage = true;
+                }
+              } catch (error) {
+                console.error(`Failed to execute action command /${parsed.command}:`, error);
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Action execution failed: ${error}`, 'error', '❌'),
+                  addMessage,
+                  invoke
+                );
+                nextInput = null;
+                suppressUserMessage = true;
+              }
             } else {
               // Shell command execution
               try {
@@ -1073,6 +1124,7 @@ Generate the BlueprintWorkflow now.`;
       setInput,
       refreshPersonas,
       refreshSessions,
+      getThreadAsText,
     ]
   );
 

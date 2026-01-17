@@ -8,6 +8,6 @@ pub mod model;
 pub mod repository;
 pub mod request;
 
-pub use model::{CommandType, SlashCommand};
+pub use model::{ActionConfig, CommandType, SlashCommand};
 pub use repository::SlashCommandRepository;
 pub use request::CreateSlashCommandRequest;

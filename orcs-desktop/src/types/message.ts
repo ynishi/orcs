@@ -1,7 +1,7 @@
 /**
  * メッセージタイプの定義
  */
-export type MessageType = 'user' | 'ai' | 'system' | 'error' | 'command' | 'task' | 'thinking' | 'shell_output';
+export type MessageType = 'user' | 'ai' | 'system' | 'error' | 'command' | 'task' | 'thinking' | 'shell_output' | 'action_result';
 
 /**
  * Streaming dialogue turn from Rust backend
@@ -172,6 +172,16 @@ export const getMessageStyle = (type: MessageType): MessageStyle => {
         textColor: '#00ff00',
         borderColor: '#4a4a4a',
         iconColor: '#00ff00',
+        align: 'left',
+        showAvatar: false,
+        showBadge: true,
+      };
+    case 'action_result':
+      return {
+        backgroundColor: '#f1f3f5',
+        textColor: '#495057',
+        borderColor: '#dee2e6',
+        iconColor: '#868e96',
         align: 'left',
         showAvatar: false,
         showBadge: true,

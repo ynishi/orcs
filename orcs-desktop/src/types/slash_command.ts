@@ -1,7 +1,23 @@
 /**
  * Type of slash command execution
  */
-export type CommandType = 'prompt' | 'shell' | 'task';
+export type CommandType = 'prompt' | 'shell' | 'task' | 'action';
+
+/**
+ * Configuration for Action type commands
+ */
+export interface ActionConfig {
+  /** Backend to use for execution (e.g., "gemini_api", "claude_api", "open_ai_api") */
+  backend?: string;
+  /** Model name override */
+  modelName?: string;
+  /** Persona ID to use for execution (Phase 2) */
+  personaId?: string;
+  /** Gemini thinking level (LOW/MEDIUM/HIGH) */
+  geminiThinkingLevel?: string;
+  /** Enable Gemini Google Search */
+  geminiGoogleSearch?: boolean;
+}
 
 /**
  * Custom slash command definition
@@ -13,9 +29,15 @@ export interface SlashCommand {
   icon: string;
   /** Human-readable description */
   description: string;
-  /** Type of command (prompt, shell, or task) */
+  /** Type of command (prompt, shell, task, or action) */
   type: CommandType;
-  /** Command content (prompt template, shell command, or task description) */
+  /**
+   * Command content:
+   * - Prompt: Prompt template with variables ({workspace}, {args}, etc.)
+   * - Shell: Shell command to execute
+   * - Task: Task description
+   * - Action: Prompt template with all variables ({session_all}, {session_recent}, {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args})
+   */
   content: string;
   /** Working directory for shell commands (supports variables like {workspace_path}) */
   workingDir?: string;
@@ -23,6 +45,8 @@ export interface SlashCommand {
   argsDescription?: string;
   /** Task execution strategy blueprint (JSON serialized) for task type commands */
   taskBlueprint?: string;
+  /** Configuration for Action type commands (backend, model, etc.) */
+  actionConfig?: ActionConfig;
 }
 
 export interface ExpandedSlashCommand {

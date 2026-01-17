@@ -1191,6 +1191,13 @@ pub async fn handle_input(
                                     cmd_name
                                 )
                             }
+                            CommandType::Action => {
+                                // Action commands should be handled separately via execute_action_command
+                                format!(
+                                    "Action command '{}' requires async execution via the slash command handler.",
+                                    cmd_name
+                                )
+                            }
                         }
                     }
                     Ok(None) => format!(

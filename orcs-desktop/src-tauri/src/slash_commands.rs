@@ -61,6 +61,11 @@ pub async fn expand_slash_command(
                 command.content.clone()
             }
         }
+        CommandType::Action => {
+            // Action commands don't use content for templates, they execute actions directly
+            // Return empty string or action description
+            command.content.clone()
+        }
     };
 
     // Get workspace info from active session
@@ -152,7 +157,7 @@ pub async fn expand_slash_command(
 
 // Helper functions
 
-fn get_git_branch(working_dir: Option<&std::path::Path>) -> Option<String> {
+pub fn get_git_branch(working_dir: Option<&std::path::Path>) -> Option<String> {
     let mut cmd = Command::new("git");
     cmd.args(["rev-parse", "--abbrev-ref", "HEAD"]);
 
@@ -171,7 +176,7 @@ fn get_git_branch(working_dir: Option<&std::path::Path>) -> Option<String> {
     })
 }
 
-fn get_git_status(working_dir: Option<&std::path::Path>) -> Option<String> {
+pub fn get_git_status(working_dir: Option<&std::path::Path>) -> Option<String> {
     let mut cmd = Command::new("git");
     cmd.args(["status", "--short"]);
 

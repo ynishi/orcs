@@ -349,6 +349,19 @@ export function taskMessage(message: string): SystemMessage {
 }
 
 /**
+ * Helper: Create action result message (displayed with gray styling like AI responses)
+ */
+export function actionResultMessage(message: string, icon?: string): SystemMessage {
+  return {
+    category: MessageCategory.CONVERSATION_EVENT,
+    message,
+    severity: 'info',
+    icon,
+    messageType: 'action_result',
+  };
+}
+
+/**
  * Handles system message with both immediate UI display AND backend persistence
  *
  * This is the recommended method for important conversation events that should:

@@ -9,12 +9,14 @@ const COMMAND_TYPE_LABELS: Record<SlashCommand['type'], string> = {
   prompt: 'Prompt',
   shell: 'Shell',
   task: 'Task',
+  action: 'Action',
 };
 
 const COMMAND_TYPE_COLORS: Record<SlashCommand['type'], string> = {
   prompt: 'blue',
   shell: 'violet',
   task: 'orange',
+  action: 'teal',
 };
 
 interface SlashCommandListProps {

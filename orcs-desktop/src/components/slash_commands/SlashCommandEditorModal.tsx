@@ -6,6 +6,7 @@ const COMMAND_TYPE_OPTIONS = [
   { value: 'prompt', label: 'Prompt (template expansion)' },
   { value: 'shell', label: 'Shell (command execution)' },
   { value: 'task', label: 'Task (orchestrated workflow)' },
+  { value: 'action', label: 'Action (AI execution with session context)' },
 ];
 
 interface SlashCommandEditorModalProps {
@@ -80,6 +81,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
   const isEditing = !!command?.name;
   const isShellCommand = formData.type === 'shell';
   const isTaskCommand = formData.type === 'task';
+  const isActionCommand = formData.type === 'action';
 
   return (
     <Modal
@@ -132,21 +134,27 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
               ? 'Shell Command'
               : isTaskCommand
                 ? 'Task Description'
-                : 'Prompt Template'
+                : isActionCommand
+                  ? 'Action Prompt Template'
+                  : 'Prompt Template'
           }
           placeholder={
             isShellCommand
               ? 'git status'
               : isTaskCommand
                 ? 'Create a comprehensive README file with project overview, setup instructions, and usage examples'
-                : 'Analyze the files in {workspace}:\n{files}\n\nCurrent branch: {git_branch}'
+                : isActionCommand
+                  ? '{session_all}\n\nSummarize the above conversation in 3 bullet points.'
+                  : 'Analyze the files in {workspace}:\n{files}\n\nCurrent branch: {git_branch}'
           }
           description={
             isShellCommand
               ? 'Command to execute. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
               : isTaskCommand
                 ? 'Task description that will be executed using ParallelOrchestrator. Can use {args} for runtime arguments.'
-                : 'Prompt template. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
+                : isActionCommand
+                  ? 'Prompt template sent to AI. Variables: {session_all}, {session_recent}, {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
+                  : 'Prompt template. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
           }
           value={formData.content}
           onChange={(e) => setFormData({ ...formData, content: e.currentTarget.value })}

@@ -861,6 +861,84 @@ impl SessionSupportAgentService {
 
         Ok(markdown)
     }
+
+    /// Execute a custom prompt with configurable backend
+    ///
+    /// # Arguments
+    ///
+    /// * `prompt` - The prompt text to send to the AI
+    /// * `backend` - Backend type (e.g., "gemini_api", "claude_api", "open_ai_api")
+    /// * `model_name` - Optional model name override
+    /// * `gemini_thinking_level` - Optional Gemini thinking level (LOW/MEDIUM/HIGH)
+    /// * `gemini_google_search` - Optional Google Search enablement
+    /// * `cancel_flag` - Optional atomic flag to check for cancellation
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(String)` - AI response
+    pub async fn execute_custom_prompt(
+        prompt: &str,
+        backend: &str,
+        model_name: Option<&str>,
+        gemini_thinking_level: Option<&str>,
+        gemini_google_search: Option<bool>,
+        cancel_flag: Option<Arc<AtomicBool>>,
+    ) -> Result<String> {
+        use llm_toolkit::agent::Agent;
+        use orcs_interaction::{ClaudeApiAgent, GeminiApiAgent, OpenAIApiAgent};
+
+        // Check cancellation before starting
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
+        }
+
+        let response: String = match backend {
+            "gemini_api" => {
+                let mut agent = GeminiApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                if let Some(level) = gemini_thinking_level {
+                    agent = agent.with_thinking_level(level);
+                }
+                if let Some(search) = gemini_google_search {
+                    agent = agent.with_google_search(search);
+                }
+                agent.execute(prompt.into()).await?
+            }
+            "claude_api" => {
+                let mut agent = ClaudeApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.into()).await?
+            }
+            "open_ai_api" => {
+                let mut agent = OpenAIApiAgent::try_from_env().await?;
+                if let Some(model) = model_name {
+                    agent = agent.with_model(model);
+                }
+                agent.execute(prompt.into()).await?
+            }
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported backend: {}. Supported: gemini_api, claude_api, open_ai_api",
+                    backend
+                ));
+            }
+        };
+
+        // Check cancellation after LLM execution
+        if let Some(ref flag) = cancel_flag
+            && flag.load(Ordering::SeqCst)
+        {
+            return Err(anyhow::anyhow!("Operation cancelled"));
+        }
+
+        Ok(response)
+    }
 }
 
 impl Default for SessionSupportAgentService {

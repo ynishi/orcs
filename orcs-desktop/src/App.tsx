@@ -1283,6 +1283,20 @@ function App() {
     }
   }, [activeTabInput, customCommands, personas, activeParticipantIds]);
 
+  // Get thread content as text for action commands
+  const getThreadAsText = useCallback((): string => {
+    if (!activeTabId) return '';
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    if (!activeTab) return '';
+
+    return activeTab.messages
+      .map((msg) => {
+        const time = msg.timestamp.toLocaleString();
+        return `[${time}] ${msg.author} (${msg.type}):\n${msg.text}\n`;
+      })
+      .join('\n---\n\n');
+  }, [activeTabId, tabs]);
+
   // SlashCommand処理（addMessage, refreshPersonasの定義後に配置）
   const { handleSlashCommand } = useSlashCommands({
     addMessage,
@@ -1309,6 +1323,7 @@ function App() {
     onSandboxEntered: (sandboxState) => {
       setCurrentSandboxState(sandboxState);
     },
+    getThreadAsText,
   });
 
   useEffect(() => {

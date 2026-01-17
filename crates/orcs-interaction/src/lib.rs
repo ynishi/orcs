@@ -1356,6 +1356,60 @@ impl InteractionManager {
         self.sandbox_state.read().await.clone()
     }
 
+    /// Updates the content of a message in persona history.
+    ///
+    /// # Arguments
+    ///
+    /// * `persona_id` - The persona ID (author) of the message
+    /// * `timestamp` - The timestamp of the message to update
+    /// * `new_content` - The new content for the message
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the message was found and updated, `Err` otherwise.
+    pub async fn update_message_content(
+        &self,
+        persona_id: &str,
+        timestamp: &str,
+        new_content: String,
+    ) -> Result<(), String> {
+        let mut histories = self.persona_histories.write().await;
+
+        // Normalize timestamp for comparison:
+        // Frontend sends ISO8601 with 'Z' suffix (e.g., "2026-01-16T14:09:41.495Z")
+        // Backend stores RFC3339 with '+00:00' suffix (e.g., "2026-01-16T14:09:41.495123+00:00")
+        // Compare by prefix up to milliseconds (first 23 chars: "2026-01-16T14:09:41.495")
+        let timestamp_prefix = if timestamp.len() >= 23 {
+            &timestamp[..23]
+        } else {
+            timestamp
+        };
+
+        if let Some(messages) = histories.get_mut(persona_id) {
+            for message in messages.iter_mut() {
+                let msg_timestamp_prefix = if message.timestamp.len() >= 23 {
+                    &message.timestamp[..23]
+                } else {
+                    &message.timestamp
+                };
+
+                if msg_timestamp_prefix == timestamp_prefix {
+                    message.content = new_content;
+                    // Invalidate dialogue cache so changes are reflected
+                    drop(histories);
+                    self.invalidate_dialogue().await;
+                    return Ok(());
+                }
+            }
+            Err(format!(
+                "Message with timestamp {} not found for persona {}",
+                timestamp, persona_id
+            ))
+        } else {
+            Err(format!("Persona {} not found in history", persona_id))
+        }
+    }
+
     /// Handles user input based on the current application mode.
     ///
     /// # Arguments

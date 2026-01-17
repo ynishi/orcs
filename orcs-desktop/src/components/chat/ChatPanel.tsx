@@ -100,6 +100,7 @@ interface MessageListProps {
   onCreateSlashCommand: (message: Message) => void;
   onCreatePersona: (message: Message) => void;
   onRedo: (message: Message) => void;
+  onCloseMessage: (message: Message, isClosed: boolean) => Promise<void>;
   workspaceRootPath?: string;
 }
 
@@ -111,6 +112,7 @@ const MessageList = memo(
     onCreateSlashCommand,
     onCreatePersona,
     onRedo,
+    onCloseMessage,
     workspaceRootPath,
   }: MessageListProps) => (
     <>
@@ -123,6 +125,7 @@ const MessageList = memo(
           onCreateSlashCommand={onCreateSlashCommand}
           onCreatePersona={onCreatePersona}
           onRedo={onRedo}
+          onCloseMessage={onCloseMessage}
           workspaceRootPath={workspaceRootPath}
         />
       ))}
@@ -202,7 +205,7 @@ export function ChatPanel({
   const hasScrolledForTab = useRef<Set<string>>(new Set()); // Track which tabs have been scrolled
 
   // TabContext for adding messages and managing tab state
-  const { addMessageToTab, setTabThinking, updateTabInput, updateTabAttachedFiles } = useTabContext();
+  const { addMessageToTab, setTabThinking, updateTabInput, updateTabAttachedFiles, updateTabMessages } = useTabContext();
 
   // AutoChat settings state
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
@@ -1055,6 +1058,47 @@ export function ChatPanel({
     onInputChange(message.text);
   }, [onInputChange]);
 
+  // Handle close/open message (add/remove ~~ prefix)
+  const handleCloseMessage = useCallback(async (message: Message, isClosed: boolean) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      // Calculate new content: add ~~ prefix if closing, remove if opening
+      const currentText = message.text;
+      const newContent = isClosed
+        ? `~~${currentText}`
+        : currentText.startsWith('~~')
+          ? currentText.slice(2)
+          : currentText;
+
+      // Get the persona_id (author) - for user messages, it's the user nickname
+      const personaId = message.author;
+      // Convert timestamp to ISO string for backend
+      const timestamp = message.timestamp.toISOString();
+
+      // Update in backend
+      await invoke('update_message_content', {
+        personaId,
+        timestamp,
+        newContent,
+      });
+
+      // Update local messages
+      const updatedMessages = tab.messages.map((m) =>
+        m.id === message.id ? { ...m, text: newContent } : m
+      );
+      updateTabMessages(tab.id, updatedMessages);
+
+    } catch (error) {
+      console.error('Failed to close/open message:', error);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to ${isClosed ? 'close' : 'open'} message: ${error}`,
+        color: 'red',
+      });
+    }
+  }, [tab.messages, tab.id, updateTabMessages]);
+
   // Handle saving the new slash command
   const handleSaveSlashCommand = async (command: SlashCommand) => {
     try {
@@ -1117,6 +1161,7 @@ export function ChatPanel({
                 onCreateSlashCommand={handleCreateSlashCommand}
                 onCreatePersona={handleCreatePersona}
                 onRedo={handleRedo}
+                onCloseMessage={handleCloseMessage}
                 workspaceRootPath={workspace?.rootPath}
               />
             ) : (

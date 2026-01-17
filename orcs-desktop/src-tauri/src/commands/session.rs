@@ -1853,3 +1853,34 @@ pub async fn get_sandbox_state(
 
     Ok(session_manager.get_sandbox_state().await)
 }
+
+/// Updates the content of a message in the active session.
+///
+/// Used for features like "Close" (strikethrough) on messages.
+#[tauri::command]
+pub async fn update_message_content(
+    persona_id: String,
+    timestamp: String,
+    new_content: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let session_manager = state
+        .session_usecase
+        .active_session()
+        .await
+        .ok_or("No active session")?;
+
+    session_manager
+        .update_message_content(&persona_id, &timestamp, new_content)
+        .await?;
+
+    // Save the session to persist the change
+    let app_mode = state.app_mode.lock().await.clone();
+    state
+        .session_usecase
+        .save_active_session(app_mode)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}

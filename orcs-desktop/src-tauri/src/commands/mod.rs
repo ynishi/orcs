@@ -122,6 +122,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         session::enter_sandbox_mode,
         session::exit_sandbox_mode,
         session::get_sandbox_state,
+        session::update_message_content,
         search::execute_search,
         app_state::get_app_state_snapshot,
         app_state::set_last_selected_workspace,

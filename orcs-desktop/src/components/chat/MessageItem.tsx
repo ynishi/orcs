@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Paper, Text, Group, Badge, Avatar, Box, ActionIcon, CopyButton, Tooltip, Anchor, Image, Stack, Collapse, Code } from '@mantine/core';
-import { IconDeviceFloppy, IconRocket, IconCommand, IconUser, IconCheck, IconClipboard, IconChevronDown, IconChevronUp, IconBug, IconRefresh } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRocket, IconCommand, IconUser, IconCheck, IconClipboard, IconChevronDown, IconChevronUp, IconBug, IconRefresh, IconSquareCheck, IconSquare } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Message, getMessageStyle } from '../../types/message';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
@@ -13,6 +13,7 @@ interface MessageItemProps {
   onCreateSlashCommand?: (message: Message) => void;
   onCreatePersona?: (message: Message) => void;
   onRedo?: (message: Message) => void;
+  onCloseMessage?: (message: Message, isClosed: boolean) => Promise<void>;
   workspaceRootPath?: string;
 }
 
@@ -156,24 +157,37 @@ function formatModelName(modelName: string | null | undefined): string | null {
   return modelName.slice(0, 20);
 }
 
-export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCreateSlashCommand, onCreatePersona, onRedo, workspaceRootPath }: MessageItemProps) {
+export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCreateSlashCommand, onCreatePersona, onRedo, onCloseMessage, workspaceRootPath }: MessageItemProps) {
   const style = getMessageStyle(message.type);
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [debugExpanded, setDebugExpanded] = useState(false);
+  const [closedExpanded, setClosedExpanded] = useState(false);
 
   const { debugSettings } = useDebugStore();
 
+  // Check if message is "closed" (starts with ~~)
+  const isClosed = message.text.startsWith('~~');
+  // Get the actual content without ~~ prefix
+  const actualText = isClosed ? message.text.slice(2) : message.text;
+
   // Apply base color with opacity for subtle background tinting
-  const backgroundColor = message.baseColor && message.type === 'ai'
-    ? `${message.baseColor}20` // Add alpha channel for ~12% opacity
-    : style.backgroundColor;
+  // Closed messages get a more muted background
+  const backgroundColor = isClosed
+    ? '#f0f0f0'
+    : message.baseColor && message.type === 'ai'
+      ? `${message.baseColor}20` // Add alpha channel for ~12% opacity
+      : style.backgroundColor;
 
   // テキストが長い場合の判定
-  const isLongText = message.text.length > COLLAPSE_THRESHOLD;
-  const displayText = isLongText && !isExpanded
-    ? message.text.slice(0, COLLAPSE_THRESHOLD) + '...'
-    : message.text;
+  const isLongText = actualText.length > COLLAPSE_THRESHOLD;
+  // For closed messages, show only first line unless expanded
+  const firstLine = actualText.split('\n')[0];
+  const displayText = isClosed && !closedExpanded
+    ? firstLine + (actualText.length > firstLine.length ? '...' : '')
+    : isLongText && !isExpanded
+      ? actualText.slice(0, COLLAPSE_THRESHOLD) + '...'
+      : actualText;
 
   // Handle file save from markdown code blocks
   const handleSaveFile = async (path: string, content: string) => {
@@ -537,13 +551,36 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
                     </ActionIcon>
                   </Tooltip>
                 )}
+
+                {/* Close/Open button for user messages */}
+                {onCloseMessage && message.type === 'user' && (
+                  <Tooltip label={isClosed ? 'Open' : 'Close'} withArrow>
+                    <ActionIcon
+                      color={isClosed ? 'green' : 'gray'}
+                      variant="subtle"
+                      onClick={() => onCloseMessage(message, !isClosed)}
+                      size="sm"
+                    >
+                      {isClosed ? <IconSquareCheck size={16} /> : <IconSquare size={16} />}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
               </Group>
             )}
           </Group>
 
-          <Box>
+          {/* Content area - clickable to expand/collapse for closed messages */}
+          <Box
+            onClick={isClosed ? () => setClosedExpanded(!closedExpanded) : undefined}
+            style={isClosed ? { cursor: 'pointer', opacity: 0.7 } : undefined}
+          >
+            {isClosed && (
+              <Badge size="xs" variant="light" color="gray" mb="xs">
+                ✓ Closed
+              </Badge>
+            )}
             <MarkdownRenderer
-              content={message.text}
+              content={displayText}
               onSaveFile={handleSaveFile}
               workspaceRootPath={workspaceRootPath}
             />

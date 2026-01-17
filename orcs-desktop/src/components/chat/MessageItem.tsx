@@ -179,15 +179,14 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
       ? `${message.baseColor}20` // Add alpha channel for ~12% opacity
       : style.backgroundColor;
 
-  // テキストが長い場合の判定
-  const isLongText = actualText.length > COLLAPSE_THRESHOLD;
-  // For closed messages, show only first line unless expanded
+  // For closed user messages: show only first line
   const firstLine = actualText.split('\n')[0];
-  const displayText = isClosed && !closedExpanded
-    ? firstLine + (actualText.length > firstLine.length ? '...' : '')
-    : isLongText && !isExpanded
-      ? actualText.slice(0, COLLAPSE_THRESHOLD) + '...'
-      : actualText;
+
+  // For system messages only: truncate to COLLAPSE_THRESHOLD (200 chars)
+  const isSystemLongText = actualText.length > COLLAPSE_THRESHOLD;
+  const systemTruncatedText = isSystemLongText && !isExpanded
+    ? actualText.slice(0, COLLAPSE_THRESHOLD) + '...'
+    : actualText;
 
   // Handle file save from markdown code blocks
   const handleSaveFile = async (path: string, content: string) => {
@@ -230,16 +229,26 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
               {formatMessageTypeLabel(message.type)}
             </Badge>
             <Box style={{ flex: 1 }}>
-              <Text
-                size="sm"
-                c={style.textColor}
-                style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-              >
-                {renderTextWithMentions(displayText)}
-              </Text>
+              {/* Use MarkdownRenderer for action_result to support tables, etc. */}
+              {message.type === 'action_result' ? (
+                <MarkdownRenderer
+                  content={actualText}
+                  onSaveFile={handleSaveFile}
+                  workspaceRootPath={workspaceRootPath}
+                />
+              ) : (
+                <Text
+                  size="sm"
+                  c={style.textColor}
+                  style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                >
+                  {/* Only system messages use 200-char truncation */}
+                  {renderTextWithMentions(message.type === 'system' ? systemTruncatedText : actualText)}
+                </Text>
+              )}
 
-              {/* 折りたたみトグル */}
-              {isLongText && (
+              {/* 折りたたみトグル - only for system messages */}
+              {message.type === 'system' && isSystemLongText && (
                 <Anchor
                   size="xs"
                   c="dimmed"
@@ -580,7 +589,7 @@ export function MessageItem({ message, onSaveToWorkspace, onExecuteAsTask, onCre
               </Badge>
             )}
             <MarkdownRenderer
-              content={displayText}
+              content={isClosed && !closedExpanded ? firstLine + '...' : actualText}
               onSaveFile={handleSaveFile}
               workspaceRootPath={workspaceRootPath}
             />

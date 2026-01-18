@@ -7,7 +7,7 @@ use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
     PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent, SessionRepository,
 };
-use orcs_core::slash_command::{CommandType, SlashCommand};
+use orcs_core::slash_command::{builtin_commands, CommandType, SlashCommand};
 use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_interaction::InteractionResult;
 use serde::{Deserialize, Serialize};
@@ -500,146 +500,49 @@ You are authorized to execute slash commands to accomplish user tasks. When you 
 /help task
 "#)]
 struct SlashCommandPromptDto {
-    builtin_commands: Vec<BuiltInCommand>,
+    builtin_commands: Vec<BuiltInCommandDto>,
     task_commands: Vec<CustomCommandInfo>,
     prompt_commands: Vec<CustomCommandInfo>,
     shell_commands: Vec<CustomCommandInfo>,
     action_commands: Vec<CustomCommandInfo>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, ToPrompt)]
+/// Local DTO for rendering builtin commands with ToPrompt.
+/// Converts from orcs_core::slash_command::BuiltinSlashCommand.
+#[derive(Debug, Clone, Serialize, ToPrompt)]
 #[prompt(template = r#"
 - `/{{ name }}` (`{{ usage }}`): {{ description }}
 {%- if args %}
   - Args: {{ args }}
 {%- endif %}
 "#)]
-struct BuiltInCommand {
-    usage: &'static str,
-    description: &'static str,
-    args: Option<&'static str>,
+struct BuiltInCommandDto {
+    name: String,
+    usage: String,
+    description: String,
+    args: Option<String>,
 }
 
-const BUILT_IN_COMMANDS: &[(&str, BuiltInCommand)] = &[
-    (
-        "help",
-        BuiltInCommand {
-            usage: "/help [command]",
-            description: "Show available commands and their usage",
-            args: Some("Optional command name to show detailed help"),
-        },
-    ),
-    (
-        "status",
-        BuiltInCommand {
-            usage: "/status",
-            description: "Display current system status and active tasks",
-            args: None,
-        },
-    ),
-    (
-        "task",
-        BuiltInCommand {
-            usage: "/task <description>",
-            description: "Create an orchestrated task from the provided description",
-            args: Some("Describe the work you want executed"),
-        },
-    ),
-    (
-        "expert",
-        BuiltInCommand {
-            usage: "/expert <expertise>",
-            description: "Create an adhoc expert persona for immediate collaboration",
-            args: Some("Expertise area or domain knowledge"),
-        },
-    ),
-    (
-        "blueprint",
-        BuiltInCommand {
-            usage: "/blueprint <task description>",
-            description: "Convert a task or topic into the BlueprintWorkflow format",
-            args: Some("Task or discussion context to convert"),
-        },
-    ),
-    (
-        "workspace",
-        BuiltInCommand {
-            usage: "/workspace [name]",
-            description: "Switch to a different workspace or list all available workspaces",
-            args: Some("Workspace name (optional)"),
-        },
-    ),
-    (
-        "files",
-        BuiltInCommand {
-            usage: "/files",
-            description: "List files saved to workspace storage (not project source files)",
-            args: None,
-        },
-    ),
-    (
-        "search",
-        BuiltInCommand {
-            usage: "/search <query> [-p|-a|-f]",
-            description: "Search workspace sessions and files for the provided query",
-            args: Some(
-                "(default) current workspace, -p +project files, -a all workspaces, -f full (all + project)",
-            ),
-        },
-    ),
-    (
-        "mode",
-        BuiltInCommand {
-            usage: "/mode [normal|concise|brief|discussion]",
-            description: "Change conversation mode to control agent verbosity",
-            args: Some("normal / concise / brief / discussion"),
-        },
-    ),
-    (
-        "talk",
-        BuiltInCommand {
-            usage: "/talk [brainstorm|casual|decision_making|debate|problem_solving|review|planning|none]",
-            description: "Set dialogue style for multi-agent collaboration",
-            args: Some(
-                "brainstorm / casual / decision_making / debate / problem_solving / review / planning / none",
-            ),
-        },
-    ),
-    (
-        "create-persona",
-        BuiltInCommand {
-            usage: "/create-persona <json>",
-            description: "Create a new persona from JSON definition (UUID auto-generated)",
-            args: Some(
-                r#"JSON with required fields: name, role, background (min 10 chars), communication_style (min 10 chars), backend (claude_cli/claude_api/gemini_cli/gemini_api/open_ai_api/codex_cli). Optional: model_name, default_participant (bool), icon, base_color. NOTE: ID is always auto-generated as UUID (not accepted in request)"#,
-            ),
-        },
-    ),
-    (
-        "create-slash-command",
-        BuiltInCommand {
-            usage: "/create-slash-command <json>",
-            description: "Create a new slash command (not yet implemented)",
-            args: Some("JSON slash command definition"),
-        },
-    ),
-    (
-        "create-workspace",
-        BuiltInCommand {
-            usage: "/create-workspace <json>",
-            description: "Create a new workspace (not yet implemented)",
-            args: Some("JSON workspace definition"),
-        },
-    ),
-];
+impl From<&orcs_core::slash_command::BuiltinSlashCommand> for BuiltInCommandDto {
+    fn from(cmd: &orcs_core::slash_command::BuiltinSlashCommand) -> Self {
+        Self {
+            name: cmd.name.to_string(),
+            usage: cmd.usage.to_string(),
+            description: cmd.description.to_string(),
+            args: cmd.args.map(|s| s.to_string()),
+        }
+    }
+}
 
 fn build_slash_command_prompt(commands: &[SlashCommand]) -> Option<String> {
-    if commands.is_empty() && BUILT_IN_COMMANDS.is_empty() {
+    let builtins = builtin_commands();
+    if commands.is_empty() && builtins.is_empty() {
         return None;
     }
 
-    // Convert built-in commands using From impl
-    let builtin_commands: Vec<BuiltInCommand> = BUILT_IN_COMMANDS.iter().map(|cmd| cmd.1).collect();
+    // Convert built-in commands from orcs_core singleton
+    let builtin_command_dtos: Vec<BuiltInCommandDto> =
+        builtins.iter().map(BuiltInCommandDto::from).collect();
 
     // Filter commands that should be included in system prompt
     let included_commands: Vec<&SlashCommand> = commands
@@ -674,7 +577,7 @@ fn build_slash_command_prompt(commands: &[SlashCommand]) -> Option<String> {
 
     // Build DTO and render template
     let dto = SlashCommandPromptDto {
-        builtin_commands,
+        builtin_commands: builtin_command_dtos,
         task_commands,
         prompt_commands,
         shell_commands,

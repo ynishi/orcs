@@ -150,6 +150,7 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
   // Handler for initiating delete confirmation
   const handleRequestDelete = (workspaceId: string, workspaceName: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    setIsOpen(false); // Close menu first so modal appears on top
     setDeletingWorkspace({ id: workspaceId, name: workspaceName });
   };
 
@@ -301,83 +302,85 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
   const recent = allWorkspaces.filter(ws => !ws.isFavorite);
 
   return (
-    <Menu
-      opened={isOpen}
-      onChange={setIsOpen}
-      width={550}
-      position="bottom-end"
-      shadow="md"
-      withArrow
-    >
-      <Menu.Target>
-        <Tooltip label="Switch workspace" position="right">
-          <ActionIcon
-            variant={isOpen ? 'filled' : 'subtle'}
-            color={isOpen ? 'blue' : 'gray'}
-            size="lg"
+    <>
+      <Menu
+        opened={isOpen}
+        onChange={setIsOpen}
+        width={550}
+        position="bottom-end"
+        shadow="md"
+        withArrow
+      >
+        <Menu.Target>
+          <Tooltip label="Switch workspace" position="right">
+            <ActionIcon
+              variant={isOpen ? 'filled' : 'subtle'}
+              color={isOpen ? 'blue' : 'gray'}
+              size="lg"
+            >
+              {isOpen ? <IconFolderOpen size={20} /> : <IconFolder size={20} />}
+            </ActionIcon>
+          </Tooltip>
+        </Menu.Target>
+
+        <Menu.Dropdown>
+          <Menu.Label>
+            <Group justify="space-between">
+              <Text size="xs">Workspaces</Text>
+              {workspace && (
+                <Badge size="xs" variant="light">
+                  {allWorkspaces.length} total
+                </Badge>
+              )}
+            </Group>
+          </Menu.Label>
+
+          <Menu.Item
+            leftSection={<IconPlus size={16} />}
+            onClick={handleCreateWorkspace}
+            style={{
+              backgroundColor: 'var(--mantine-color-green-light)',
+              fontWeight: 500,
+            }}
           >
-            {isOpen ? <IconFolderOpen size={20} /> : <IconFolder size={20} />}
-          </ActionIcon>
-        </Tooltip>
-      </Menu.Target>
+            Create New Workspace
+          </Menu.Item>
 
-      <Menu.Dropdown>
-        <Menu.Label>
-          <Group justify="space-between">
-            <Text size="xs">Workspaces</Text>
-            {workspace && (
-              <Badge size="xs" variant="light">
-                {allWorkspaces.length} total
-              </Badge>
+          <Menu.Divider />
+
+          <ScrollArea.Autosize mah={500} type="auto">
+            {favorites.length > 0 && (
+              <>
+                <Menu.Label>
+                  <Group gap={4}>
+                    <IconStarFilled size={12} />
+                    <Text size="xs">Favorites</Text>
+                  </Group>
+                </Menu.Label>
+                {favorites.map(renderWorkspaceItem)}
+                <Menu.Divider />
+              </>
             )}
-          </Group>
-        </Menu.Label>
 
-        <Menu.Item
-          leftSection={<IconPlus size={16} />}
-          onClick={handleCreateWorkspace}
-          style={{
-            backgroundColor: 'var(--mantine-color-green-light)',
-            fontWeight: 500,
-          }}
-        >
-          Create New Workspace
-        </Menu.Item>
+            {recent.length > 0 && (
+              <>
+                <Menu.Label>Recent</Menu.Label>
+                {recent.map(renderWorkspaceItem)}
+              </>
+            )}
 
-        <Menu.Divider />
+            {allWorkspaces.length === 0 && (
+              <Menu.Item disabled>
+                <Text size="sm" c="dimmed">
+                  No workspaces found
+                </Text>
+              </Menu.Item>
+            )}
+          </ScrollArea.Autosize>
+        </Menu.Dropdown>
+      </Menu>
 
-        <ScrollArea.Autosize mah={500} type="auto">
-          {favorites.length > 0 && (
-            <>
-              <Menu.Label>
-                <Group gap={4}>
-                  <IconStarFilled size={12} />
-                  <Text size="xs">Favorites</Text>
-                </Group>
-              </Menu.Label>
-              {favorites.map(renderWorkspaceItem)}
-              <Menu.Divider />
-            </>
-          )}
-
-          {recent.length > 0 && (
-            <>
-              <Menu.Label>Recent</Menu.Label>
-              {recent.map(renderWorkspaceItem)}
-            </>
-          )}
-
-          {allWorkspaces.length === 0 && (
-            <Menu.Item disabled>
-              <Text size="sm" c="dimmed">
-                No workspaces found
-              </Text>
-            </Menu.Item>
-          )}
-        </ScrollArea.Autosize>
-      </Menu.Dropdown>
-
-      {/* Delete confirmation modal */}
+      {/* Delete confirmation modal - outside Menu to avoid z-index issues */}
       <Modal
         opened={!!deletingWorkspace}
         onClose={handleCancelDelete}
@@ -402,6 +405,6 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
           </Group>
         </Stack>
       </Modal>
-    </Menu>
+    </>
   );
 }

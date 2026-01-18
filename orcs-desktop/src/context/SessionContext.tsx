@@ -14,6 +14,7 @@ export interface SessionContextValue {
   renameSession: (sessionId: string, newTitle: string) => Promise<void>;
   saveCurrentSession: () => Promise<void>;
   refreshSessions: () => Promise<void>;
+  updateSession: (sessionId: string) => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -149,6 +150,19 @@ export function SessionProvider({ children }: SessionProviderProps) {
     await loadSessions();
   }, [loadSessions]);
 
+  const updateSession = useCallback(async (sessionId: string) => {
+    try {
+      const updatedSession = await invoke<Session | null>('get_session', { sessionId });
+      if (updatedSession) {
+        setSessions((prev) =>
+          prev.map((s) => (s.id === sessionId ? updatedSession : s))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update session:', err);
+    }
+  }, []);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       sessions,
@@ -161,6 +175,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
       renameSession,
       saveCurrentSession,
       refreshSessions,
+      updateSession,
     }),
     [
       sessions,
@@ -172,6 +187,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
       renameSession,
       saveCurrentSession,
       refreshSessions,
+      updateSession,
     ],
   );
 

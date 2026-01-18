@@ -108,6 +108,7 @@ function App() {
     renameSession,
     saveCurrentSession,
     refreshSessions,
+    updateSession,
   } = useSessions();
 
   // Get currentSessionId from appStateStore (SSOT)
@@ -656,6 +657,8 @@ function App() {
               timestamp: new Date(),
               icon: persona?.icon,
               baseColor: persona?.base_color,
+              backend: persona?.backend,
+              modelName: persona?.model_name,
             };
 
             addMessageToTabRef.current(targetTab.id, newMessage);
@@ -1487,6 +1490,10 @@ function App() {
         }
 
         await saveCurrentSession();
+        // Update only the current session to refresh MessageCount in SessionList
+        if (currentSessionId) {
+          await updateSession(currentSessionId);
+        }
       } catch (error) {
         console.error("Error calling backend:", error);
         addMessage('error', 'System', `Error: ${error}`);
@@ -1504,6 +1511,7 @@ function App() {
       includeWorkspaceInPrompt,
       invoke,
       saveCurrentSession,
+      updateSession,
       setTabThinking,
       activeTabId,
       setStatus,

@@ -386,6 +386,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
             author: None,
             is_archived: false,
             is_favorite: false,
+            is_default_attachment: false,
             sort_order: None,
         };
 
@@ -471,6 +472,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
             author,
             is_archived: false,
             is_favorite: false,
+            is_default_attachment: false,
             sort_order: None,
         };
 
@@ -643,6 +645,33 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
                 .unwrap_or(-1);
             workspace.resources.uploaded_files[file_idx].sort_order = Some(max_sort_order + 1);
         }
+
+        // Save the updated workspace metadata
+        self.save_workspace(&workspace).await?;
+
+        Ok(())
+    }
+
+    async fn toggle_file_default_attachment(
+        &self,
+        workspace_id: &str,
+        file_id: &str,
+    ) -> Result<()> {
+        // Load existing workspace metadata
+        let mut workspace = self.load_workspace(workspace_id).await?;
+
+        // Find the file in the uploaded_files list
+        let file = workspace
+            .resources
+            .uploaded_files
+            .iter_mut()
+            .find(|f| f.id == file_id)
+            .ok_or_else(|| {
+                OrcsError::io(format!("File with ID '{}' not found in workspace", file_id))
+            })?;
+
+        // Toggle the default attachment status
+        file.is_default_attachment = !file.is_default_attachment;
 
         // Save the updated workspace metadata
         self.save_workspace(&workspace).await?;
@@ -994,6 +1023,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
             // Reset workspace-specific state
             is_archived: false,
             is_favorite: false,
+            is_default_attachment: false,
             sort_order: None,
         };
 
@@ -1552,6 +1582,7 @@ mod tests {
             author: None,
             is_archived: false,
             is_favorite: false,
+            is_default_attachment: false,
             sort_order: None,
         }];
         assert_eq!(
@@ -1575,6 +1606,7 @@ mod tests {
                 author: None,
                 is_archived: false,
                 is_favorite: false,
+                is_default_attachment: false,
                 sort_order: None,
             },
             UploadedFile {
@@ -1589,6 +1621,7 @@ mod tests {
                 author: None,
                 is_archived: false,
                 is_favorite: false,
+                is_default_attachment: false,
                 sort_order: None,
             },
         ];
@@ -1612,6 +1645,7 @@ mod tests {
             author: None,
             is_archived: false,
             is_favorite: false,
+            is_default_attachment: false,
             sort_order: None,
         }];
         assert_eq!(

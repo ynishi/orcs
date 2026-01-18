@@ -12,6 +12,7 @@ export interface WorkspaceContextValue {
   switchWorkspace: (sessionId: string, workspaceId: string) => Promise<void>;
   toggleFavorite: (workspaceId: string) => Promise<void>;
   toggleFileArchive: (file: UploadedFile) => Promise<void>;
+  toggleFileDefaultAttachment: (file: UploadedFile) => Promise<void>;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
@@ -91,6 +92,33 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     [workspace],
   );
 
+  const toggleFileDefaultAttachment = useCallback(
+    async (file: UploadedFile) => {
+      if (!workspace) return;
+
+      try {
+        await invoke('toggle_workspace_file_default_attachment', {
+          workspaceId: workspace.id,
+          fileId: file.id,
+        });
+
+        // Event-driven update via workspace:update event
+        notifications.show({
+          title: file.isDefaultAttachment ? 'Default Attachment Removed' : 'Default Attachment Set',
+          message: `${file.name} ${file.isDefaultAttachment ? 'will no longer be' : 'will be'} auto-attached to new sessions`,
+          color: 'blue',
+        });
+      } catch (err) {
+        notifications.show({
+          title: 'Error',
+          message: `Failed to update default attachment: ${err}`,
+          color: 'red',
+        });
+      }
+    },
+    [workspace],
+  );
+
   const value = useMemo<WorkspaceContextValue>(
     () => ({
       workspace,
@@ -99,8 +127,9 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       switchWorkspace,
       toggleFavorite,
       toggleFileArchive,
+      toggleFileDefaultAttachment,
     }),
-    [workspace, allWorkspaces, files, switchWorkspace, toggleFavorite, toggleFileArchive],
+    [workspace, allWorkspaces, files, switchWorkspace, toggleFavorite, toggleFileArchive, toggleFileDefaultAttachment],
   );
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

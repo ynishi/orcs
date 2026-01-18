@@ -477,6 +477,34 @@ pub async fn toggle_workspace_file_favorite(
     Ok(())
 }
 
+/// Toggles the default attachment status of a file in a workspace
+#[tauri::command]
+pub async fn toggle_workspace_file_default_attachment(
+    workspace_id: String,
+    file_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .workspace_storage_service
+        .toggle_file_default_attachment(&workspace_id, &file_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Get updated workspace and emit event (Phase 4)
+    if let Some(workspace) = state
+        .workspace_storage_service
+        .get_workspace(&workspace_id)
+        .await
+        .map_err(|e| e.to_string())?
+        && let Err(e) = app.emit("workspace:update", &workspace)
+    {
+        tracing::error!("Failed to emit workspace:update: {}", e);
+    }
+
+    Ok(())
+}
+
 /// Moves a file's sort order within favorited files
 #[tauri::command]
 pub async fn move_workspace_file_sort_order(

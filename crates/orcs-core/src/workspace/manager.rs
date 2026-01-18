@@ -179,6 +179,25 @@ pub trait WorkspaceStorageService: Send + Sync {
     /// - The update operation fails
     async fn toggle_file_favorite(&self, workspace_id: &str, file_id: &str) -> Result<()>;
 
+    /// Toggles the default attachment status of a file in a workspace.
+    ///
+    /// Files marked as default attachment will be automatically attached
+    /// to new sessions in this workspace.
+    ///
+    /// # Arguments
+    ///
+    /// * `workspace_id` - The ID of the workspace
+    /// * `file_id` - The ID of the file to toggle
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The workspace does not exist
+    /// - The file does not exist
+    /// - The update operation fails
+    async fn toggle_file_default_attachment(&self, workspace_id: &str, file_id: &str)
+        -> Result<()>;
+
     /// Moves a file's sort order within the favorited files list.
     ///
     /// # Arguments

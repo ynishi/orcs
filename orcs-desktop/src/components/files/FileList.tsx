@@ -1,5 +1,5 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton, Tooltip, Switch } from '@mantine/core';
-import { IconMessage, IconMessages, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown, IconFile, IconFileText, IconBrandJavascript, IconBrandTypescript, IconSettings, IconClipboard, IconFolderShare, IconChecklist } from '@tabler/icons-react';
+import { IconMessage, IconMessages, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown, IconFile, IconFileText, IconBrandJavascript, IconBrandTypescript, IconSettings, IconClipboard, IconFolderShare, IconChecklist, IconPaperclip } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
 import { useState, useMemo } from 'react';
@@ -15,11 +15,12 @@ interface FileListProps {
   onNewSessionWithFile?: (file: UploadedFile) => void;
   onToggleArchive?: (file: UploadedFile) => void;
   onToggleFavorite?: (file: UploadedFile) => void;
+  onToggleDefaultAttachment?: (file: UploadedFile) => void;
   onMoveSortOrder?: (fileId: string, direction: 'up' | 'down') => void;
   onCopyToWorkspace?: (file: UploadedFile) => void;
 }
 
-export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession, onNewSessionWithFile, onToggleArchive, onToggleFavorite, onMoveSortOrder, onCopyToWorkspace }: FileListProps) {
+export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDeleteFile, onGoToSession, onNewSessionWithFile, onToggleArchive, onToggleFavorite, onToggleDefaultAttachment, onMoveSortOrder, onCopyToWorkspace }: FileListProps) {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
@@ -202,7 +203,12 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
         if (b.sortOrder != null) return 1;
       }
 
-      // 4. それ以外はuploadedAtで降順
+      // 4. DefaultAttachmentはFavoriteの次
+      if (a.isDefaultAttachment !== b.isDefaultAttachment) {
+        return a.isDefaultAttachment ? -1 : 1;
+      }
+
+      // 5. それ以外はuploadedAtで降順
       return b.uploadedAt - a.uploadedAt;
     });
   }, [files]);
@@ -215,10 +221,11 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
   }, [sortedFiles, showArchived]);
 
   // カテゴリ別ファイル（メモ化）- SessionListパターン
-  const { favoriteFiles, recentFiles, archivedFiles } = useMemo(() => {
+  const { favoriteFiles, defaultAttachmentFiles, recentFiles, archivedFiles } = useMemo(() => {
     return {
       favoriteFiles: visibleFiles.filter(f => f.isFavorite && !f.isArchived),
-      recentFiles: visibleFiles.filter(f => !f.isFavorite && !f.isArchived),
+      defaultAttachmentFiles: visibleFiles.filter(f => f.isDefaultAttachment && !f.isFavorite && !f.isArchived),
+      recentFiles: visibleFiles.filter(f => !f.isFavorite && !f.isDefaultAttachment && !f.isArchived),
       archivedFiles: visibleFiles.filter(f => f.isArchived),
     };
   }, [visibleFiles]);
@@ -308,6 +315,23 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
                     }}
                   >
                     {file.isFavorite ? <IconStar size={16} fill="currentColor" /> : <IconStar size={16} />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
+
+              {/* Default Attachmentボタン */}
+              {onToggleDefaultAttachment && (
+                <Tooltip label={file.isDefaultAttachment ? "Remove from auto-attach" : "Auto-attach to new sessions"} withArrow>
+                  <ActionIcon
+                    size="sm"
+                    color={file.isDefaultAttachment ? "blue" : "gray"}
+                    variant="subtle"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleDefaultAttachment(file);
+                    }}
+                  >
+                    {file.isDefaultAttachment ? <IconPaperclip size={16} style={{ transform: 'rotate(-45deg)' }} /> : <IconPaperclip size={16} />}
                   </ActionIcon>
                 </Tooltip>
               )}
@@ -528,6 +552,18 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
               </Text>
               <Stack gap={4}>
                 {favoriteFiles.map(renderFile)}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Default Attachmentsセクション */}
+          {defaultAttachmentFiles.length > 0 && (
+            <Box>
+              <Text size="xs" fw={600} c="dimmed" mb="xs" px="xs">
+                AUTO-ATTACH
+              </Text>
+              <Stack gap={4}>
+                {defaultAttachmentFiles.map(renderFile)}
               </Stack>
             </Box>
           )}

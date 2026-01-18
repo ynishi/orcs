@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, useRef, type ReactNode } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import type { Session } from '../types/session';
 import type { Message } from '../types/message';
 import { useAppStateStore } from '../stores/appStateStore';
@@ -225,27 +226,89 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
     // Phase 2: UIState を初期化（既に存在する場合はスキップ）
     // V1.6+: Backend に保存された input を復元（アプリ再起動時のデグレ修正）
-    setTabUIStates((prev) => {
-      if (!prev.has(tabId)) {
+    // V1.7+: Backend に保存された attachedFilePaths からファイルを復元
+    const initializeUIState = async () => {
+      const currentUIState = tabUIStates.get(tabId);
+      if (currentUIState) {
+        // 既に初期化済み
+        return;
+      }
+
+      // Backend から保存された状態を取得
+      const backendTab = useAppStateStore.getState().appState?.openTabs.find((t) => t.id === tabId);
+      const restoredInput = backendTab?.input ?? '';
+      const attachedFilePaths = backendTab?.attachedFilePaths ?? [];
+
+      console.log('[TabContext] Restoring state from backend:', {
+        tabId,
+        inputLength: restoredInput.length,
+        attachedFilePathsCount: attachedFilePaths.length,
+      });
+
+      // 添付ファイルパスから File オブジェクトを復元
+      const attachedFiles: File[] = [];
+      for (const filePath of attachedFilePaths) {
+        try {
+          // ファイル内容を読み込み
+          const fileData = await invoke<number[]>('read_workspace_file', { filePath });
+          const uint8Array = new Uint8Array(fileData);
+
+          // ファイル名を抽出
+          const fileName = filePath.split('/').pop() || 'unknown';
+
+          // MIME タイプを推定（拡張子から）
+          const ext = fileName.split('.').pop()?.toLowerCase() || '';
+          const mimeTypes: Record<string, string> = {
+            'txt': 'text/plain',
+            'md': 'text/markdown',
+            'json': 'application/json',
+            'js': 'text/javascript',
+            'ts': 'text/typescript',
+            'tsx': 'text/typescript',
+            'jsx': 'text/javascript',
+            'html': 'text/html',
+            'css': 'text/css',
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'gif': 'image/gif',
+            'svg': 'image/svg+xml',
+            'pdf': 'application/pdf',
+          };
+          const mimeType = mimeTypes[ext] || 'application/octet-stream';
+
+          // Blob から File を作成
+          const blob = new Blob([uint8Array], { type: mimeType });
+          const file = new File([blob], fileName, { type: mimeType });
+          attachedFiles.push(file);
+
+          console.log('[TabContext] Restored attached file:', { fileName, size: file.size });
+        } catch (error) {
+          console.error('[TabContext] Failed to restore attached file:', { filePath, error });
+        }
+      }
+
+      setTabUIStates((prev) => {
         const newMap = new Map(prev);
-        // Backend から保存された input を取得して復元
-        const backendTab = useAppStateStore.getState().appState?.openTabs.find((t) => t.id === tabId);
-        const restoredInput = backendTab?.input ?? '';
-        console.log('[TabContext] Restoring input from backend:', { tabId, inputLength: restoredInput.length });
         newMap.set(tabId, {
           ...getDefaultTabUIState(),
           input: restoredInput,
+          attachedFiles,
         });
         return newMap;
-      }
-      return prev;
+      });
+    };
+
+    // 非同期で初期化（UI をブロックしない）
+    initializeUIState().catch((error) => {
+      console.error('[TabContext] Failed to initialize UI state:', error);
     });
 
     // Note: Backend が app-state:update イベントを発火し、activeTabId も自動更新される
     // switchToTab パラメータは現在無視される（Backend は常にタブをアクティブにする）
 
     return tabId;
-  }, []);
+  }, [tabUIStates]);
 
   // Phase 3: initializeTabUIState 関数を削除
   // Backend SSOT により、タブは自動的にレンダリングされるため不要

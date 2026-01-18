@@ -65,6 +65,9 @@ pub struct UploadedFile {
     /// Whether this file is marked as favorite (pinned to top)
     #[serde(default)]
     pub is_favorite: bool,
+    /// Whether this file should be auto-attached to new sessions
+    #[serde(default)]
+    pub is_default_attachment: bool,
     /// Manual sort order (optional, for custom ordering within favorites)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort_order: Option<i32>,

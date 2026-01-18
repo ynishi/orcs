@@ -9,7 +9,7 @@ use orcs_core::workspace::{
     ProjectContext, SessionWorkspace, TempFile, Workspace, WorkspaceResources,
 };
 
-use super::uploaded_file::UploadedFileV1_4_0;
+use super::uploaded_file::UploadedFileV1_5_0;
 
 /// Represents a temporary file created during operations (DTO V1).
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
@@ -54,7 +54,7 @@ pub struct ProjectContextV1 {
 pub struct WorkspaceResourcesV1 {
     /// Files uploaded by the user or system
     #[serde(default)]
-    pub uploaded_files: Vec<UploadedFileV1_4_0>,
+    pub uploaded_files: Vec<UploadedFileV1_5_0>,
     /// Temporary files created during session operations
     #[serde(default)]
     pub temp_files: Vec<TempFileV1>,
@@ -245,7 +245,7 @@ impl From<&WorkspaceResources> for WorkspaceResourcesV1 {
             uploaded_files: resources
                 .uploaded_files
                 .iter()
-                .map(UploadedFileV1_4_0::from)
+                .map(UploadedFileV1_5_0::from)
                 .collect(),
             temp_files: resources.temp_files.iter().map(TempFileV1::from).collect(),
         }

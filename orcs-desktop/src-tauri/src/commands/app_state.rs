@@ -1,4 +1,5 @@
 use orcs_core::state::{model::AppState as CoreAppState, repository::StateRepository};
+use orcs_core::workspace::manager::WorkspaceStorageService;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::app::AppState;
@@ -123,6 +124,7 @@ pub async fn clear_active_session_in_app_state(
 
 /// Opens a tab for the given session. If a tab for this session already exists,
 /// returns the existing tab ID and sets it as active. Otherwise creates a new tab.
+/// For new tabs, auto-attaches files marked as default attachments in the workspace.
 #[tauri::command]
 pub async fn open_tab(
     session_id: String,
@@ -130,11 +132,55 @@ pub async fn open_tab(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let tab_id = state
+    // Check if tab already exists for this session
+    let existing_state = state
         .app_state_service
-        .open_tab(session_id, workspace_id)
+        .get_state()
         .await
         .map_err(|e| e.to_string())?;
+    let tab_exists = existing_state
+        .open_tabs
+        .iter()
+        .any(|tab| tab.session_id == session_id);
+
+    let tab_id = state
+        .app_state_service
+        .open_tab(session_id, workspace_id.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // If this is a new tab, auto-attach default attachment files
+    if !tab_exists {
+        // Get workspace to find default attachment files
+        if let Ok(Some(workspace)) = state
+            .workspace_storage_service
+            .get_workspace(&workspace_id)
+            .await
+        {
+            let default_attachment_paths: Vec<String> = workspace
+                .resources
+                .uploaded_files
+                .iter()
+                .filter(|f| f.is_default_attachment && !f.is_archived)
+                .map(|f| f.path.to_string_lossy().to_string())
+                .collect();
+
+            if !default_attachment_paths.is_empty() {
+                // Update tab with default attachment files
+                let _ = state
+                    .app_state_service
+                    .update_tab_ui_state(
+                        tab_id.clone(),
+                        None,
+                        Some(default_attachment_paths),
+                        None,
+                        None,
+                        None,
+                    )
+                    .await;
+            }
+        }
+    }
 
     let updated_state = state
         .app_state_service

@@ -18,7 +18,7 @@ interface WorkspacePanelProps {
 }
 
 export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeInPrompt, onGoToSession, onNewSessionWithFile }: WorkspacePanelProps) {
-  const { workspace, files, toggleFileArchive, allWorkspaces } = useWorkspace();
+  const { workspace, files, toggleFileArchive, toggleFileDefaultAttachment, allWorkspaces } = useWorkspace();
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [fileToCopy, setFileToCopy] = useState<UploadedFile | null>(null);
 
@@ -540,6 +540,7 @@ export function WorkspacePanel({ onAttachFile, includeInPrompt, onToggleIncludeI
           onNewSessionWithFile={handleNewSessionWithFile}
           onToggleArchive={toggleFileArchive}
           onToggleFavorite={handleToggleFavorite}
+          onToggleDefaultAttachment={toggleFileDefaultAttachment}
           onMoveSortOrder={handleMoveSortOrder}
           onCopyToWorkspace={handleOpenCopyModal}
         />

@@ -89,6 +89,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         workspaces::rename_file_in_workspace,
         workspaces::toggle_workspace_file_archive,
         workspaces::toggle_workspace_file_favorite,
+        workspaces::toggle_workspace_file_default_attachment,
         workspaces::move_workspace_file_sort_order,
         workspaces::copy_file_to_workspace,
         workspaces::investigate_workspace,

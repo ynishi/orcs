@@ -94,6 +94,59 @@ fn main() {
                     println!("[EventListener] Orchestrator event listener stopped");
                 });
 
+                // Set up memory sync service (Kaiba) and error callback
+                let handle_for_memory_sync = app.handle().clone();
+                let session_usecase_for_memory = session_usecase_for_setup.clone();
+                tauri::async_runtime::spawn(async move {
+                    println!("[Startup] Attempting to initialize KaibaMemorySyncService...");
+                    tracing::info!("[Startup] Attempting to initialize KaibaMemorySyncService...");
+                    // Try to initialize Kaiba memory sync service
+                    match orcs_interaction::KaibaMemorySyncService::try_from_env().await {
+                        Ok(kaiba_service) => {
+                            println!("[Startup] KaibaMemorySyncService initialized successfully");
+                            tracing::info!("[Startup] KaibaMemorySyncService initialized successfully");
+
+                            // Set the memory sync service
+                            let service: Arc<dyn orcs_core::memory::MemorySyncService> =
+                                Arc::new(kaiba_service);
+                            session_usecase_for_memory
+                                .set_memory_sync_service(service)
+                                .await;
+
+                            // Set error callback
+                            let callback = std::sync::Arc::new(move |error_msg: String| {
+                                tracing::warn!("[MemorySync] Error: {}", error_msg);
+                                // Emit toast event to frontend
+                                if let Err(e) = handle_for_memory_sync.emit("toast", serde_json::json!({
+                                    "type": "error",
+                                    "title": "Memory Sync Error",
+                                    "message": error_msg,
+                                })) {
+                                    tracing::error!("[MemorySync] Failed to emit toast event: {}", e);
+                                }
+                            });
+                            session_usecase_for_memory
+                                .set_memory_sync_error_callback(callback)
+                                .await;
+
+                            // Start background memory sync scheduler (60s interval)
+                            session_usecase_for_memory.start_memory_sync_scheduler();
+
+                            tracing::info!("[Startup] Memory sync service, error callback, and scheduler configured");
+                        }
+                        Err(e) => {
+                            println!(
+                                "[Startup] KaibaMemorySyncService not configured (optional): {}",
+                                e
+                            );
+                            tracing::info!(
+                                "[Startup] KaibaMemorySyncService not configured (optional): {}",
+                                e
+                            );
+                        }
+                    }
+                });
+
                 let handle = app.handle().clone();
                 let session_usecase_for_setup = session_usecase_for_setup.clone();
                 let app_state_service_clone = app_state_service_for_setup.clone();

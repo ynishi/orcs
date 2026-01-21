@@ -6,6 +6,7 @@
 
 use crate::session::{SessionCache, SessionFactory, SessionUpdater};
 use anyhow::{Result, anyhow};
+use orcs_core::memory::MemorySyncService;
 use orcs_core::repository::PersonaRepository;
 use orcs_core::session::{AppMode, PLACEHOLDER_WORKSPACE_ID, Session, SessionRepository};
 use orcs_core::state::repository::StateRepository;
@@ -13,6 +14,7 @@ use orcs_core::user::UserService;
 use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_interaction::InteractionManager;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 /// Use case for managing sessions with workspace context.
@@ -33,6 +35,9 @@ use uuid::Uuid;
 ///
 /// All internal components are wrapped in `Arc` and use interior mutability
 /// (`RwLock`, `Mutex`) for thread-safe concurrent access.
+/// Callback type for memory sync errors.
+pub type MemorySyncErrorCallback = Arc<dyn Fn(String) + Send + Sync>;
+
 pub struct SessionUseCase {
     /// Repository for session data persistence
     session_repository: Arc<dyn SessionRepository>,
@@ -48,6 +53,10 @@ pub struct SessionUseCase {
     persona_repository: Arc<dyn PersonaRepository>,
     /// Service for user information (for enrich_session_participants)
     user_service: Arc<dyn UserService>,
+    /// Optional memory sync service for RAG integration
+    memory_sync_service: Arc<RwLock<Option<Arc<dyn MemorySyncService>>>>,
+    /// Optional callback for memory sync errors (for UI notifications)
+    memory_sync_error_callback: Arc<RwLock<Option<MemorySyncErrorCallback>>>,
 }
 
 impl SessionUseCase {
@@ -78,7 +87,240 @@ impl SessionUseCase {
             app_state_service,
             persona_repository,
             user_service,
+            memory_sync_service: Arc::new(RwLock::new(None)),
+            memory_sync_error_callback: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Sets the memory sync service for RAG integration.
+    ///
+    /// When set, session saves will trigger background memory synchronization
+    /// to the configured RAG backend (e.g., Kaiba).
+    pub async fn set_memory_sync_service(&self, service: Arc<dyn MemorySyncService>) {
+        *self.memory_sync_service.write().await = Some(service);
+    }
+
+    /// Sets a callback to be invoked when memory sync errors occur.
+    ///
+    /// This is used to notify the UI (e.g., show a toast notification).
+    pub async fn set_memory_sync_error_callback(&self, callback: MemorySyncErrorCallback) {
+        *self.memory_sync_error_callback.write().await = Some(callback);
+    }
+
+    /// Starts a background scheduler for memory synchronization.
+    ///
+    /// The scheduler runs every 60 seconds and syncs sessions that have been
+    /// updated since their last memory sync (`updated_at > last_memory_sync_at`).
+    ///
+    /// This approach avoids the parallel execution issues that occurred when
+    /// triggering sync on every `save_active_session` call.
+    pub fn start_memory_sync_scheduler(self: &Arc<Self>) {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::time::Duration;
+        use tokio::time::interval;
+
+        // Prevent multiple scheduler instances
+        static SCHEDULER_RUNNING: AtomicBool = AtomicBool::new(false);
+        if SCHEDULER_RUNNING.swap(true, Ordering::SeqCst) {
+            tracing::warn!("[MemorySyncScheduler] Scheduler already running, skipping");
+            return;
+        }
+
+        let usecase = Arc::clone(self);
+
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(60));
+            tracing::info!("[MemorySyncScheduler] Started (60s interval)");
+
+            loop {
+                ticker.tick().await;
+                tracing::debug!("[MemorySyncScheduler] Tick - checking for sessions to sync");
+
+                if let Err(e) = usecase.run_memory_sync_batch().await {
+                    tracing::error!("[MemorySyncScheduler] Batch sync failed: {}", e);
+                }
+            }
+        });
+    }
+
+    /// Runs a single batch of memory synchronization.
+    ///
+    /// Scans all sessions and syncs those where `updated_at > last_memory_sync_at`.
+    async fn run_memory_sync_batch(&self) -> Result<()> {
+        use chrono::DateTime;
+
+        // Check if memory sync service is configured
+        let sync_service = {
+            let guard = self.memory_sync_service.read().await;
+            guard.clone()
+        };
+
+        let Some(sync_service) = sync_service else {
+            tracing::debug!("[MemorySyncScheduler] No memory sync service configured, skipping");
+            return Ok(());
+        };
+
+        // Get all sessions
+        let sessions = self.session_repository.list_all().await?;
+        tracing::debug!(
+            "[MemorySyncScheduler] Checking {} sessions for sync",
+            sessions.len()
+        );
+
+        let mut synced_count = 0;
+        let mut skipped_count = 0;
+
+        for session in &sessions {
+            // Check if session needs sync: updated_at > last_memory_sync_at
+            // Use DateTime comparison for accuracy
+            let needs_sync = match &session.last_memory_sync_at {
+                None => true, // Never synced
+                Some(last_sync) => {
+                    match (
+                        DateTime::parse_from_rfc3339(&session.updated_at),
+                        DateTime::parse_from_rfc3339(last_sync),
+                    ) {
+                        (Ok(updated), Ok(last)) => updated > last,
+                        // If parsing fails, fall back to string comparison
+                        _ => session.updated_at.as_str() > last_sync.as_str(),
+                    }
+                }
+            };
+
+            if !needs_sync {
+                skipped_count += 1;
+                continue;
+            }
+
+            synced_count += 1;
+            tracing::info!(
+                "[MemorySyncScheduler] Syncing session {} (updated_at: {}, last_sync: {:?})",
+                session.id,
+                session.updated_at,
+                session.last_memory_sync_at
+            );
+
+            // Get workspace for Rei ID
+            let workspace = match self
+                .workspace_storage_service
+                .get_workspace(&session.workspace_id)
+                .await
+            {
+                Ok(Some(ws)) => ws,
+                Ok(None) => {
+                    tracing::warn!(
+                        "[MemorySyncScheduler] Workspace {} not found for session {}",
+                        session.workspace_id,
+                        session.id
+                    );
+                    continue;
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "[MemorySyncScheduler] Error getting workspace {}: {}",
+                        session.workspace_id,
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            // Get or create Rei ID
+            let rei_id = match workspace.kaiba_rei_id.clone() {
+                Some(id) => id,
+                None => {
+                    // Create new Rei
+                    match sync_service
+                        .get_or_create_rei(&workspace.id, &workspace.name)
+                        .await
+                    {
+                        Ok(new_rei_id) => {
+                            // Save Rei ID to workspace
+                            let mut updated_workspace = workspace.clone();
+                            updated_workspace.kaiba_rei_id = Some(new_rei_id.clone());
+                            if let Err(e) = self
+                                .workspace_storage_service
+                                .save_workspace(&updated_workspace)
+                                .await
+                            {
+                                tracing::warn!(
+                                    "[MemorySyncScheduler] Failed to save kaiba_rei_id: {}",
+                                    e
+                                );
+                            }
+                            new_rei_id
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "[MemorySyncScheduler] Failed to create Rei for workspace {}: {}",
+                                workspace.name,
+                                e
+                            );
+                            continue;
+                        }
+                    }
+                }
+            };
+
+            // Collect and sync messages
+            let messages = Self::collect_messages_for_sync(&session);
+            if messages.is_empty() {
+                // Update last_memory_sync_at even if no messages to sync
+                // (prevents re-checking unchanged sessions)
+                let mut updated_session = session.clone();
+                updated_session.last_memory_sync_at = Some(session.updated_at.clone());
+                if let Err(e) = self.session_repository.save(&updated_session).await {
+                    tracing::warn!(
+                        "[MemorySyncScheduler] Failed to update last_memory_sync_at: {}",
+                        e
+                    );
+                }
+                continue;
+            }
+
+            tracing::info!(
+                "[MemorySyncScheduler] Syncing {} messages for session {}",
+                messages.len(),
+                session.id
+            );
+
+            let result = sync_service.sync_messages(&rei_id, messages).await;
+
+            if let Some(error) = &result.error {
+                tracing::warn!(
+                    "[MemorySyncScheduler] Sync partially failed for session {}: {}",
+                    session.id,
+                    error
+                );
+                // Notify via callback if configured
+                if let Some(cb) = &*self.memory_sync_error_callback.read().await {
+                    cb(format!("Memory sync failed: {}", error));
+                }
+            } else {
+                tracing::info!(
+                    "[MemorySyncScheduler] Synced {} messages for session {}",
+                    result.synced_count,
+                    session.id
+                );
+            }
+
+            // Update last_memory_sync_at
+            let mut updated_session = session.clone();
+            updated_session.last_memory_sync_at = Some(session.updated_at.clone());
+            if let Err(e) = self.session_repository.save(&updated_session).await {
+                tracing::warn!(
+                    "[MemorySyncScheduler] Failed to update last_memory_sync_at: {}",
+                    e
+                );
+            }
+        }
+
+        tracing::info!(
+            "[MemorySyncScheduler] Batch complete: {} synced, {} skipped",
+            synced_count, skipped_count
+        );
+
+        Ok(())
     }
 
     /// Creates a new session associated with the specified workspace.
@@ -1052,27 +1294,102 @@ impl SessionUseCase {
             .await
             .ok_or_else(|| anyhow!("Active session {} not found in cache", session_id))?;
 
-        // Load existing session to preserve workspace_id
-        let existing_workspace_id = self
+        // Load existing session to preserve workspace_id and last_memory_sync_at
+        let existing_session = self
             .session_repository
             .list_all()
             .await?
             .into_iter()
-            .find(|s| s.id == session_id)
-            .map(|s| s.workspace_id)
+            .find(|s| s.id == session_id);
+
+        let existing_workspace_id = existing_session
+            .as_ref()
+            .map(|s| s.workspace_id.clone())
             .unwrap_or_else(|| PLACEHOLDER_WORKSPACE_ID.to_string());
 
+        let existing_last_memory_sync_at = existing_session
+            .as_ref()
+            .and_then(|s| s.last_memory_sync_at.clone());
+
         // Convert to session and save
-        let session = self
+        let mut session = self
             .session_factory
-            .to_session(manager.as_ref(), app_mode, existing_workspace_id)
+            .to_session(manager.as_ref(), app_mode, existing_workspace_id.clone())
             .await;
+
+        // Preserve last_memory_sync_at from existing session (to_session always sets it to None)
+        session.last_memory_sync_at = existing_last_memory_sync_at;
+
         self.session_repository
             .save(&session)
             .await
             .map_err(|e| anyhow!("Failed to save session: {}", e))?;
 
+        // Memory sync is now handled by the background scheduler (start_memory_sync_scheduler)
+        // instead of being triggered on every save
+
         Ok(())
+    }
+
+    /// Collects messages from a session for memory sync.
+    ///
+    /// Only collects messages with timestamps after `last_memory_sync_at` for differential sync.
+    /// If `last_memory_sync_at` is None, collects all messages (initial sync).
+    fn collect_messages_for_sync(session: &Session) -> Vec<orcs_core::memory::MemoryMessage> {
+        use chrono::DateTime;
+        use orcs_core::memory::MemoryMessage;
+
+        let mut messages = Vec::new();
+
+        // Parse last sync timestamp for accurate comparison
+        let last_sync_datetime = session
+            .last_memory_sync_at
+            .as_deref()
+            .and_then(|ts| DateTime::parse_from_rfc3339(ts).ok());
+
+        for (persona_id, history) in &session.persona_histories {
+            for (idx, msg) in history.iter().enumerate() {
+                // Skip system messages that shouldn't be synced
+                if matches!(msg.role, orcs_core::session::MessageRole::System)
+                    && !msg.metadata.include_in_dialogue
+                {
+                    continue;
+                }
+
+                // Skip empty content messages
+                if msg.content.trim().is_empty() {
+                    continue;
+                }
+
+                // Differential sync: only include messages after last sync timestamp
+                // Use proper DateTime comparison instead of string comparison
+                if let Some(last_sync) = last_sync_datetime {
+                    if let Ok(msg_datetime) = DateTime::parse_from_rfc3339(&msg.timestamp) {
+                        if msg_datetime <= last_sync {
+                            continue;
+                        }
+                    }
+                    // If parsing fails, fall back to including the message (safer than excluding)
+                }
+
+                messages.push(MemoryMessage {
+                    // Include persona_id and index for unique ID to prevent duplicates
+                    id: format!("{}-{}-{}", session.id, persona_id, idx),
+                    session_id: session.id.clone(),
+                    workspace_id: session.workspace_id.clone(),
+                    role: format!("{:?}", msg.role),
+                    content: msg.content.clone(),
+                    timestamp: msg.timestamp.clone(),
+                    persona_id: Some(persona_id.clone()),
+                    tags: vec![
+                        format!("session:{}", session.id),
+                        format!("workspace:{}", session.workspace_id),
+                    ],
+                });
+            }
+        }
+
+        messages
     }
 
     /// Deletes a session and clears active session if it was the active one.

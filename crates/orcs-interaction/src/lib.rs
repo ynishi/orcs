@@ -1,6 +1,7 @@
 pub mod claude_api_agent;
 pub mod gemini_api_agent;
 pub mod kaiba_api_agent;
+pub mod kaiba_memory_sync;
 pub mod local_agents;
 pub mod openai_api_agent;
 
@@ -8,6 +9,7 @@ pub mod openai_api_agent;
 pub use crate::claude_api_agent::ClaudeApiAgent;
 pub use crate::gemini_api_agent::GeminiApiAgent;
 pub use crate::kaiba_api_agent::KaibaApiAgent;
+pub use crate::kaiba_memory_sync::KaibaMemorySyncService;
 pub use crate::openai_api_agent::OpenAIApiAgent;
 use llm_toolkit::agent::dialogue::{
     Dialogue, DialogueTurn, ExecutionModel, ReactionStrategy, Speaker, TalkStyle,
@@ -854,6 +856,7 @@ impl InteractionManager {
             is_muted,
             context_mode: *self.context_mode.read().await,
             sandbox_state: self.sandbox_state.read().await.clone(),
+            last_memory_sync_at: None, // Managed by SessionUseCase
         }
     }
 

@@ -2,6 +2,7 @@ pub mod agent;
 pub mod config;
 pub mod dialogue;
 pub mod error;
+pub mod memory;
 pub mod persona;
 pub mod quick_action;
 pub mod repository;

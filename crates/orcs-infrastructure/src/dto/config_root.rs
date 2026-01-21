@@ -12,8 +12,8 @@ use version_migrate::{IntoDomain, MigratesTo, Versioned};
 
 use super::{AppStateDTO, UserProfileDTO, WorkspaceV1};
 use orcs_core::config::{
-    ClaudeModelConfig, DebugSettings, EnvSettings, GeminiModelConfig, ModelSettings,
-    OpenAIModelConfig, RootConfig,
+    ClaudeModelConfig, DebugSettings, EnvSettings, GeminiModelConfig, MemorySyncSettings,
+    ModelSettings, OpenAIModelConfig, RootConfig,
 };
 
 // ============================================================================
@@ -231,6 +231,50 @@ impl DebugSettingsDTO {
 }
 
 // ============================================================================
+// MemorySyncSettings DTOs
+// ============================================================================
+
+/// DTO for MemorySyncSettings.
+///
+/// Controls background synchronization of session messages to external memory stores.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemorySyncSettingsDTO {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_memory_sync_interval")]
+    pub interval_secs: u64,
+}
+
+fn default_memory_sync_interval() -> u64 {
+    60
+}
+
+impl Default for MemorySyncSettingsDTO {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            interval_secs: 60,
+        }
+    }
+}
+
+impl MemorySyncSettingsDTO {
+    fn into_domain(self) -> MemorySyncSettings {
+        MemorySyncSettings {
+            enabled: self.enabled,
+            interval_secs: self.interval_secs,
+        }
+    }
+
+    fn from_domain(settings: MemorySyncSettings) -> Self {
+        Self {
+            enabled: settings.enabled,
+            interval_secs: settings.interval_secs,
+        }
+    }
+}
+
+// ============================================================================
 // ConfigRoot DTOs
 // ============================================================================
 
@@ -333,7 +377,7 @@ pub struct ConfigRootV2_2_0 {
     pub env_settings: EnvSettingsDTO,
 }
 
-/// Root configuration structure V2.3.0 for the application config file (current).
+/// Root configuration structure V2.3.0 for the application config file.
 ///
 /// Added debug_settings field to enable LLM debug logging.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
@@ -354,8 +398,32 @@ pub struct ConfigRootV2_3_0 {
     pub debug_settings: DebugSettingsDTO,
 }
 
+/// Root configuration structure V2.4.0 for the application config file (current).
+///
+/// Added memory_sync_settings field for RAG integration.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "2.4.0")]
+#[derive(Default)]
+pub struct ConfigRootV2_4_0 {
+    /// User profile configuration (name, background, etc.).
+    #[serde(default)]
+    pub user_profile: UserProfileDTO,
+    /// LLM model settings (non-sensitive configuration).
+    #[serde(default)]
+    pub model_settings: ModelSettingsDTO,
+    /// Environment PATH configuration for CLI tools.
+    #[serde(default)]
+    pub env_settings: EnvSettingsDTO,
+    /// Debug settings for LLM interactions.
+    #[serde(default)]
+    pub debug_settings: DebugSettingsDTO,
+    /// Memory synchronization settings for RAG integration.
+    #[serde(default)]
+    pub memory_sync_settings: MemorySyncSettingsDTO,
+}
+
 /// Type alias for the latest ConfigRoot version.
-pub type ConfigRoot = ConfigRootV2_3_0;
+pub type ConfigRoot = ConfigRootV2_4_0;
 
 // ============================================================================
 // Default implementations
@@ -425,32 +493,48 @@ impl MigratesTo<ConfigRootV2_3_0> for ConfigRootV2_2_0 {
     }
 }
 
+/// Migration from ConfigRootV2_3_0 to ConfigRootV2_4_0.
+/// Adds memory_sync_settings field with default values (sync disabled).
+impl MigratesTo<ConfigRootV2_4_0> for ConfigRootV2_3_0 {
+    fn migrate(self) -> ConfigRootV2_4_0 {
+        ConfigRootV2_4_0 {
+            user_profile: self.user_profile,
+            model_settings: self.model_settings,
+            env_settings: self.env_settings,
+            debug_settings: self.debug_settings,
+            memory_sync_settings: MemorySyncSettingsDTO::default(),
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
 
-/// IntoDomain implementation for ConfigRootV2_3_0.
+/// IntoDomain implementation for ConfigRootV2_4_0.
 /// Converts DTO to domain RootConfig.
-impl IntoDomain<RootConfig> for ConfigRootV2_3_0 {
+impl IntoDomain<RootConfig> for ConfigRootV2_4_0 {
     fn into_domain(self) -> RootConfig {
         RootConfig {
             user_profile: self.user_profile.into_domain(),
             model_settings: self.model_settings.into_domain(),
             env_settings: self.env_settings.into_domain(),
             debug_settings: self.debug_settings.into_domain(),
+            memory_sync_settings: self.memory_sync_settings.into_domain(),
         }
     }
 }
 
-/// FromDomain implementation for ConfigRootV2_3_0.
+/// FromDomain implementation for ConfigRootV2_4_0.
 /// Converts domain RootConfig to DTO for persistence.
-impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_3_0 {
+impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_4_0 {
     fn from_domain(config: RootConfig) -> Self {
-        ConfigRootV2_3_0 {
+        ConfigRootV2_4_0 {
             user_profile: UserProfileDTO::from_domain(config.user_profile),
             model_settings: ModelSettingsDTO::from_domain(config.model_settings),
             env_settings: EnvSettingsDTO::from_domain(config.env_settings),
             debug_settings: DebugSettingsDTO::from_domain(config.debug_settings),
+            memory_sync_settings: MemorySyncSettingsDTO::from_domain(config.memory_sync_settings),
         }
     }
 }
@@ -470,7 +554,8 @@ impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_3_0 {
 /// - V2.0.0 → V2.1.0: Adds `model_settings` field with default values
 /// - V2.1.0 → V2.2.0: Adds `env_settings` field with default values (auto-detect enabled)
 /// - V2.2.0 → V2.3.0: Adds `debug_settings` field with default values (debug disabled)
-/// - V2.3.0 → RootConfig: Converts DTO to domain model
+/// - V2.3.0 → V2.4.0: Adds `memory_sync_settings` field with default values (sync disabled)
+/// - V2.4.0 → RootConfig: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -486,6 +571,7 @@ pub fn create_config_root_migrator() -> version_migrate::Migrator {
         ConfigRootV2_1_0,
         ConfigRootV2_2_0,
         ConfigRootV2_3_0,
+        ConfigRootV2_4_0,
         RootConfig
     ], save = true)
     .expect("Failed to create config_root migrator")

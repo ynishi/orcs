@@ -209,6 +209,53 @@ impl Default for DebugSettings {
     }
 }
 
+// ============================================================================
+// Memory sync configuration models
+// ============================================================================
+
+/// Memory synchronization settings for RAG integration.
+///
+/// Controls background synchronization of session messages to external
+/// memory stores (e.g., Kaiba) for long-term retrieval.
+///
+/// # Example (config.toml)
+///
+/// ```toml
+/// [memory_sync_settings]
+/// enabled = true
+/// interval_secs = 60
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemorySyncSettings {
+    /// Enable background memory synchronization.
+    ///
+    /// When true, session messages are periodically synced to the configured
+    /// memory backend (requires Kaiba API key in secret.json).
+    ///
+    /// Default: `false`
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Interval in seconds between sync batches.
+    ///
+    /// Default: `60`
+    #[serde(default = "default_memory_sync_interval")]
+    pub interval_secs: u64,
+}
+
+fn default_memory_sync_interval() -> u64 {
+    60
+}
+
+impl Default for MemorySyncSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            interval_secs: 60,
+        }
+    }
+}
+
 fn default_auto_detect_tool_managers() -> bool {
     true
 }
@@ -351,6 +398,10 @@ pub struct RootConfig {
     /// Controls debug logging of prompts and responses.
     #[serde(default)]
     pub debug_settings: DebugSettings,
+    /// Memory synchronization settings for RAG integration.
+    /// Controls background sync of session messages to memory stores.
+    #[serde(default)]
+    pub memory_sync_settings: MemorySyncSettings,
 }
 
 impl Queryable for RootConfig {

@@ -158,6 +158,12 @@ impl UserService for ConfigBasedUserService {
 
         Ok(())
     }
+
+    fn get_memory_sync_settings(&self) -> orcs_core::config::MemorySyncSettings {
+        load_root_config()
+            .map(|config| config.memory_sync_settings)
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]

@@ -109,12 +109,16 @@ impl SessionUseCase {
 
     /// Starts a background scheduler for memory synchronization.
     ///
-    /// The scheduler runs every 60 seconds and syncs sessions that have been
+    /// The scheduler runs at the specified interval and syncs sessions that have been
     /// updated since their last memory sync (`updated_at > last_memory_sync_at`).
     ///
     /// This approach avoids the parallel execution issues that occurred when
     /// triggering sync on every `save_active_session` call.
-    pub fn start_memory_sync_scheduler(self: &Arc<Self>) {
+    ///
+    /// # Arguments
+    ///
+    /// * `interval_secs` - Interval in seconds between sync batches (default: 60)
+    pub fn start_memory_sync_scheduler(self: &Arc<Self>, interval_secs: u64) {
         use std::sync::atomic::{AtomicBool, Ordering};
         use std::time::Duration;
         use tokio::time::interval;
@@ -129,8 +133,8 @@ impl SessionUseCase {
         let usecase = Arc::clone(self);
 
         tokio::spawn(async move {
-            let mut ticker = interval(Duration::from_secs(60));
-            tracing::info!("[MemorySyncScheduler] Started (60s interval)");
+            let mut ticker = interval(Duration::from_secs(interval_secs));
+            tracing::info!("[MemorySyncScheduler] Started ({}s interval)", interval_secs);
 
             loop {
                 ticker.tick().await;

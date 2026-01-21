@@ -61,6 +61,7 @@ fn main() {
         let bootstrap = app::bootstrap(event_tx.clone()).await;
         let session_usecase_for_setup = bootstrap.app_state.session_usecase.clone();
         let app_state_service_for_setup = bootstrap.app_state.app_state_service.clone();
+        let user_service_for_setup = bootstrap.app_state.user_service.clone();
 
         // Flag to track if state has been saved during shutdown
         let state_saved = Arc::new(AtomicBool::new(false));
@@ -97,13 +98,23 @@ fn main() {
                 // Set up memory sync service (Kaiba) and error callback
                 let handle_for_memory_sync = app.handle().clone();
                 let session_usecase_for_memory = session_usecase_for_setup.clone();
+                let user_service_for_memory = user_service_for_setup.clone();
                 tauri::async_runtime::spawn(async move {
-                    println!("[Startup] Attempting to initialize KaibaMemorySyncService...");
-                    tracing::info!("[Startup] Attempting to initialize KaibaMemorySyncService...");
+                    // Check if memory sync is enabled in config
+                    let memory_sync_settings = user_service_for_memory.get_memory_sync_settings();
+                    if !memory_sync_settings.enabled {
+                        tracing::info!("[Startup] Memory sync is disabled in config, skipping");
+                        return;
+                    }
+
+                    tracing::info!(
+                        "[Startup] Memory sync enabled (interval: {}s), attempting to initialize KaibaMemorySyncService...",
+                        memory_sync_settings.interval_secs
+                    );
+
                     // Try to initialize Kaiba memory sync service
                     match orcs_interaction::KaibaMemorySyncService::try_from_env().await {
                         Ok(kaiba_service) => {
-                            println!("[Startup] KaibaMemorySyncService initialized successfully");
                             tracing::info!("[Startup] KaibaMemorySyncService initialized successfully");
 
                             // Set the memory sync service
@@ -129,18 +140,14 @@ fn main() {
                                 .set_memory_sync_error_callback(callback)
                                 .await;
 
-                            // Start background memory sync scheduler (60s interval)
-                            session_usecase_for_memory.start_memory_sync_scheduler();
+                            // Start background memory sync scheduler with configured interval
+                            session_usecase_for_memory.start_memory_sync_scheduler(memory_sync_settings.interval_secs);
 
                             tracing::info!("[Startup] Memory sync service, error callback, and scheduler configured");
                         }
                         Err(e) => {
-                            println!(
-                                "[Startup] KaibaMemorySyncService not configured (optional): {}",
-                                e
-                            );
-                            tracing::info!(
-                                "[Startup] KaibaMemorySyncService not configured (optional): {}",
+                            tracing::warn!(
+                                "[Startup] Memory sync enabled but KaibaMemorySyncService failed to initialize: {}",
                                 e
                             );
                         }

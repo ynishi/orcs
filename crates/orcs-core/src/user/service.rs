@@ -4,7 +4,7 @@
 //! across the application. Currently returns a constant value, but designed
 //! to support future enhancements like user configuration and preferences.
 
-use crate::config::DebugSettings;
+use crate::config::{DebugSettings, MemorySyncSettings};
 
 /// Service for managing user information.
 ///
@@ -51,6 +51,13 @@ pub trait UserService: Send + Sync {
         enable_llm_debug: bool,
         log_level: String,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+
+    /// Returns the current memory sync settings.
+    ///
+    /// # Returns
+    ///
+    /// A MemorySyncSettings containing enabled flag and interval_secs.
+    fn get_memory_sync_settings(&self) -> MemorySyncSettings;
 }
 
 /// Default implementation that returns a constant user name.
@@ -91,6 +98,10 @@ impl UserService for DefaultUserService {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // Default implementation does nothing
         Ok(())
+    }
+
+    fn get_memory_sync_settings(&self) -> MemorySyncSettings {
+        MemorySyncSettings::default()
     }
 }
 

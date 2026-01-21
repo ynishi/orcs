@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 /// - `-p`: also search project files (root_path)
 /// - `-a`: search all workspaces' sessions and files
 /// - `-f` (or `-ap`): search everything (all workspaces + project files)
+/// - `-m`: search Kaiba memory (RAG semantic search)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct SearchOptions {
@@ -18,6 +19,10 @@ pub struct SearchOptions {
     /// Include project files (workspace.root_path) in search
     #[serde(default)]
     pub include_project: bool,
+
+    /// Search Kaiba memory (RAG semantic search)
+    #[serde(default)]
+    pub search_memory: bool,
 }
 
 impl SearchOptions {
@@ -26,6 +31,7 @@ impl SearchOptions {
         Self {
             all_workspaces: false,
             include_project: false,
+            search_memory: false,
         }
     }
 
@@ -34,6 +40,7 @@ impl SearchOptions {
         Self {
             all_workspaces: false,
             include_project: true,
+            search_memory: false,
         }
     }
 
@@ -42,6 +49,7 @@ impl SearchOptions {
         Self {
             all_workspaces: true,
             include_project: false,
+            search_memory: false,
         }
     }
 
@@ -50,6 +58,16 @@ impl SearchOptions {
         Self {
             all_workspaces: true,
             include_project: true,
+            search_memory: false,
+        }
+    }
+
+    /// -m: search Kaiba memory only
+    pub fn memory_only() -> Self {
+        Self {
+            all_workspaces: false,
+            include_project: false,
+            search_memory: true,
         }
     }
 }

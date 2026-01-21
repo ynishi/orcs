@@ -1379,6 +1379,84 @@ pub struct SessionV4_5_0 {
     pub sandbox_state: Option<SandboxStateV1_1_0>,
 }
 
+/// Represents V4.6.0 of the session data schema.
+/// Added last_memory_sync_at for differential memory sync with Kaiba RAG.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Versioned)]
+#[versioned(version = "4.6.0")]
+pub struct SessionV4_6_0 {
+    /// Unique session identifier
+    pub id: String,
+    /// Human-readable session title
+    pub title: String,
+    /// Timestamp when the session was created (ISO 8601 format)
+    pub created_at: String,
+    /// Timestamp when the session was last updated (ISO 8601 format)
+    pub updated_at: String,
+    /// The currently active persona ID
+    pub current_persona_id: String,
+    /// Conversation history for each persona
+    pub persona_histories: HashMap<String, Vec<ConversationMessage>>,
+    /// Current application mode
+    pub app_mode: AppMode,
+    /// Workspace ID - all sessions must be associated with a workspace
+    pub workspace_id: String,
+    /// Active participant persona IDs
+    #[serde(default)]
+    pub active_participant_ids: Vec<String>,
+    /// Execution strategy (now using ExecutionModel enum)
+    #[serde(default = "default_execution_strategy_v2_0_0")]
+    pub execution_strategy: ExecutionStrategyV2_0_0,
+    /// System messages (join/leave notifications, etc.)
+    #[serde(default)]
+    pub system_messages: Vec<ConversationMessage>,
+    /// Participant persona ID to name mapping for display
+    #[serde(default)]
+    pub participants: HashMap<String, String>,
+    /// Participant persona ID to icon mapping for display
+    #[serde(default)]
+    pub participant_icons: HashMap<String, String>,
+    /// Participant persona ID to base color mapping for UI theming
+    #[serde(default)]
+    pub participant_colors: HashMap<String, String>,
+    /// Participant persona ID to backend mapping (e.g., "claude_api", "gemini_cli")
+    #[serde(default)]
+    pub participant_backends: HashMap<String, String>,
+    /// Participant persona ID to model name mapping (e.g., "claude-sonnet-4-5-20250929")
+    #[serde(default)]
+    pub participant_models: HashMap<String, String>,
+    /// Conversation mode (controls verbosity and style)
+    #[serde(default)]
+    pub conversation_mode: ConversationMode,
+    /// Talk style for dialogue context (Brainstorm, Debate, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub talk_style: Option<TalkStyle>,
+    /// Whether this session is marked as favorite (pinned to top)
+    #[serde(default)]
+    pub is_favorite: bool,
+    /// Whether this session is archived (hidden by default)
+    #[serde(default)]
+    pub is_archived: bool,
+    /// Manual sort order (optional, for custom ordering within favorites)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<i32>,
+    /// AutoChat configuration (None means AutoChat is disabled)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_chat_config: Option<AutoChatConfig>,
+    /// Whether this session is muted (AI won't respond to messages)
+    #[serde(default)]
+    pub is_muted: bool,
+    /// Context mode for AI interactions (Rich = full context, Clean = expertise only)
+    #[serde(default)]
+    pub context_mode: ContextModeDto,
+    /// Sandbox state with versioned DTO (None = normal mode, Some = sandbox mode)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox_state: Option<SandboxStateV1_1_0>,
+    /// Timestamp of the last successful memory sync (ISO 8601 format)
+    /// Used for differential sync - only messages after this timestamp are synced
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_memory_sync_at: Option<String>,
+}
+
 fn default_execution_strategy() -> String {
     "broadcast".to_string()
 }
@@ -1981,12 +2059,47 @@ impl MigratesTo<SessionV4_5_0> for SessionV4_4_0 {
     }
 }
 
+/// Migration from SessionV4_5_0 to SessionV4_6_0.
+/// Adds last_memory_sync_at for differential memory sync with Kaiba RAG.
+impl MigratesTo<SessionV4_6_0> for SessionV4_5_0 {
+    fn migrate(self) -> SessionV4_6_0 {
+        SessionV4_6_0 {
+            id: self.id,
+            title: self.title,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            current_persona_id: self.current_persona_id,
+            persona_histories: self.persona_histories,
+            app_mode: self.app_mode,
+            workspace_id: self.workspace_id,
+            active_participant_ids: self.active_participant_ids,
+            execution_strategy: self.execution_strategy,
+            system_messages: self.system_messages,
+            participants: self.participants,
+            participant_icons: self.participant_icons,
+            participant_colors: self.participant_colors,
+            participant_backends: self.participant_backends,
+            participant_models: self.participant_models,
+            conversation_mode: self.conversation_mode,
+            talk_style: self.talk_style,
+            is_favorite: self.is_favorite,
+            is_archived: self.is_archived,
+            sort_order: self.sort_order,
+            auto_chat_config: self.auto_chat_config,
+            is_muted: self.is_muted,
+            context_mode: self.context_mode,
+            sandbox_state: self.sandbox_state,
+            last_memory_sync_at: None, // Default: no sync history
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
 
-/// Convert SessionV4_5_0 DTO to domain model.
-impl IntoDomain<Session> for SessionV4_5_0 {
+/// Convert SessionV4_6_0 DTO to domain model.
+impl IntoDomain<Session> for SessionV4_6_0 {
     fn into_domain(self) -> Session {
         Session {
             id: self.id,
@@ -2019,12 +2132,13 @@ impl IntoDomain<Session> for SessionV4_5_0 {
             is_muted: self.is_muted,
             context_mode: self.context_mode.into(), // DTO → Domain
             sandbox_state: self.sandbox_state.map(|s| s.into_domain()), // DTO → Domain
+            last_memory_sync_at: self.last_memory_sync_at,
         }
     }
 }
 
-/// Convert domain model to SessionV4_5_0 DTO for persistence.
-impl FromDomain<Session> for SessionV4_5_0 {
+/// Convert domain model to SessionV4_6_0 DTO for persistence.
+impl FromDomain<Session> for SessionV4_6_0 {
     fn from_domain(session: Session) -> Self {
         let Session {
             id,
@@ -2052,6 +2166,7 @@ impl FromDomain<Session> for SessionV4_5_0 {
             is_muted,
             context_mode,
             sandbox_state,
+            last_memory_sync_at,
         } = session;
 
         // Convert HashMap<String, Option<String>> to HashMap<String, String>
@@ -2060,7 +2175,7 @@ impl FromDomain<Session> for SessionV4_5_0 {
             .filter_map(|(k, v)| v.map(|model| (k, model)))
             .collect();
 
-        SessionV4_5_0 {
+        SessionV4_6_0 {
             id,
             title,
             created_at,
@@ -2086,6 +2201,7 @@ impl FromDomain<Session> for SessionV4_5_0 {
             is_muted,
             context_mode: context_mode.into(), // Domain → DTO
             sandbox_state: sandbox_state.map(SandboxStateV1_1_0::from_domain), // Domain → DTO
+            last_memory_sync_at,
         }
     }
 }
@@ -2124,11 +2240,12 @@ impl IntoDomain<Session> for SessionV4_4_0 {
             is_muted: self.is_muted,
             context_mode: self.context_mode.into(), // DTO → Domain
             sandbox_state: self.sandbox_state,      // Direct mapping
+            last_memory_sync_at: None,              // V4_4_0 doesn't have last_memory_sync_at
         }
     }
 }
 
-/// Convert SessionV4_3_0 DTO to domain model (deprecated, use V4_5_0).
+/// Convert SessionV4_3_0 DTO to domain model (deprecated, use V4_6_0).
 impl IntoDomain<Session> for SessionV4_3_0 {
     fn into_domain(self) -> Session {
         Session {
@@ -2162,11 +2279,12 @@ impl IntoDomain<Session> for SessionV4_3_0 {
             is_muted: self.is_muted,
             context_mode: self.context_mode.into(), // DTO → Domain
             sandbox_state: None,                    // V4_3_0 doesn't have sandbox_state
+            last_memory_sync_at: None,              // V4_3_0 doesn't have last_memory_sync_at
         }
     }
 }
 
-/// Convert domain model to SessionV4_3_0 DTO for persistence (deprecated, use V4_4_0).
+/// Convert domain model to SessionV4_3_0 DTO for persistence (deprecated, use V4_6_0).
 impl version_migrate::FromDomain<Session> for SessionV4_3_0 {
     fn from_domain(session: Session) -> Self {
         let Session {
@@ -2194,7 +2312,8 @@ impl version_migrate::FromDomain<Session> for SessionV4_3_0 {
             auto_chat_config,
             is_muted,
             context_mode,
-            sandbox_state: _, // V4_3_0 doesn't persist sandbox_state
+            sandbox_state: _,         // V4_3_0 doesn't persist sandbox_state
+            last_memory_sync_at: _,   // V4_3_0 doesn't persist last_memory_sync_at
         } = session;
 
         SessionV4_3_0 {
@@ -2259,6 +2378,7 @@ impl version_migrate::FromDomain<Session> for SessionV4_4_0 {
             is_muted,
             context_mode,
             sandbox_state,
+            last_memory_sync_at: _,   // V4_4_0 doesn't persist last_memory_sync_at
         } = session;
 
         // Convert HashMap<String, Option<String>> to HashMap<String, String>
@@ -2304,12 +2424,12 @@ impl version_migrate::FromDomain<Session> for SessionV4_4_0 {
 /// Creates and configures a Migrator instance for Session entities.
 ///
 /// Uses the `migrator!` macro for simplified migration path definition.
-/// The migrator handles automatic schema migration from V1.0.0 to V4.3.0
+/// The migrator handles automatic schema migration from V1.0.0 to V4.6.0
 /// and conversion to the domain model with save support.
 ///
 /// # Migration Path
 ///
-/// V1.0.0 → V1.1.0 → V2.0.0 → ... → V4.3.0 → V4.4.0 → Session
+/// V1.0.0 → V1.1.0 → V2.0.0 → ... → V4.5.0 → V4.6.0 → Session
 ///
 /// See individual DTO version structs for detailed migration documentation.
 ///
@@ -2344,6 +2464,7 @@ pub fn create_session_migrator() -> version_migrate::Migrator {
         SessionV4_3_0,
         SessionV4_4_0,
         SessionV4_5_0,
+        SessionV4_6_0,
         Session
     ], save = true)
     .expect("Failed to create session migrator")

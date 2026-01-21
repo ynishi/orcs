@@ -89,9 +89,9 @@ pub fn builtin_commands() -> &'static [BuiltinSlashCommand] {
             ),
             BuiltinSlashCommand::new(
                 "search",
-                "/search <query> [-p|-a|-f]",
-                "Search workspace sessions and files for the provided query",
-                Some("(default) current workspace, -p +project files, -a all workspaces, -f full (all + project)"),
+                "/search <query> [-p|-a|-f|-m]",
+                "Search workspace sessions, files, or Kaiba memory for the provided query",
+                Some("(default) current workspace, -p +project files, -a all workspaces, -f full (all + project), -m memory (RAG)"),
             ),
             BuiltinSlashCommand::new(
                 "mode",

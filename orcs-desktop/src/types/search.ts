@@ -5,12 +5,15 @@
  * - `-p`: also search project files (root_path)
  * - `-a`: search all workspaces' sessions and files
  * - `-f` (or `-ap`): search everything (all workspaces + project files)
+ * - `-m`: search Kaiba memory (RAG semantic search)
  */
 export interface SearchOptions {
   /** Search all workspaces instead of just current workspace */
   all_workspaces: boolean;
   /** Include project files (workspace.root_path) in search */
   include_project: boolean;
+  /** Search Kaiba memory (RAG semantic search) */
+  search_memory?: boolean;
 }
 
 export interface SearchFilters {

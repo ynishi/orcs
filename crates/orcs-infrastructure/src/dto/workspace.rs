@@ -151,6 +151,35 @@ pub struct WorkspaceV1_3_0 {
     pub last_active_session_id: Option<String>,
 }
 
+/// Represents a project-level workspace (DTO V1.4.0).
+/// Added kaiba_rei_id for workspace-specific memory sync.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.4.0")]
+pub struct WorkspaceV1_4_0 {
+    /// Unique identifier for the workspace
+    pub id: String,
+    /// Name of the workspace (typically derived from project name)
+    pub name: String,
+    /// Root directory path of the project
+    pub root_path: PathBuf,
+    /// Collection of all workspace resources (with UploadedFile V1.4.0)
+    pub resources: WorkspaceResourcesV1,
+    /// Project-specific context and metadata
+    pub project_context: ProjectContextV1,
+    /// Last accessed timestamp (UNIX timestamp in seconds)
+    #[serde(default)]
+    pub last_accessed: i64,
+    /// Whether this workspace is marked as favorite
+    #[serde(default)]
+    pub is_favorite: bool,
+    /// ID of the last active session in this workspace
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_active_session_id: Option<String>,
+    /// Kaiba Rei ID for memory sync (workspace-specific persona)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kaiba_rei_id: Option<String>,
+}
+
 /// Session-specific workspace view (DTO V1).
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.0.0")]
@@ -307,12 +336,30 @@ impl version_migrate::MigratesTo<WorkspaceV1_3_0> for WorkspaceV1_2_0 {
     }
 }
 
+/// Migration from WorkspaceV1_3_0 to WorkspaceV1_4_0.
+/// Added kaiba_rei_id for workspace-specific memory sync.
+impl version_migrate::MigratesTo<WorkspaceV1_4_0> for WorkspaceV1_3_0 {
+    fn migrate(self) -> WorkspaceV1_4_0 {
+        WorkspaceV1_4_0 {
+            id: self.id,
+            name: self.name,
+            root_path: self.root_path,
+            resources: self.resources,
+            project_context: self.project_context,
+            last_accessed: self.last_accessed,
+            is_favorite: self.is_favorite,
+            last_active_session_id: self.last_active_session_id,
+            kaiba_rei_id: None, // Default: no Kaiba Rei associated yet
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
 
-/// Convert WorkspaceV1_3_0 DTO to domain model.
-impl IntoDomain<Workspace> for WorkspaceV1_3_0 {
+/// Convert WorkspaceV1_4_0 DTO to domain model.
+impl IntoDomain<Workspace> for WorkspaceV1_4_0 {
     fn into_domain(self) -> Workspace {
         Workspace {
             id: self.id,
@@ -326,14 +373,15 @@ impl IntoDomain<Workspace> for WorkspaceV1_3_0 {
             last_accessed: self.last_accessed,
             is_favorite: self.is_favorite,
             last_active_session_id: self.last_active_session_id,
+            kaiba_rei_id: self.kaiba_rei_id,
         }
     }
 }
 
-/// Convert domain model to WorkspaceV1_3_0 DTO for persistence.
-impl FromDomain<Workspace> for WorkspaceV1_3_0 {
+/// Convert domain model to WorkspaceV1_4_0 DTO for persistence.
+impl FromDomain<Workspace> for WorkspaceV1_4_0 {
     fn from_domain(domain: Workspace) -> Self {
-        WorkspaceV1_3_0 {
+        WorkspaceV1_4_0 {
             id: domain.id,
             name: domain.name,
             root_path: domain.root_path,
@@ -342,6 +390,7 @@ impl FromDomain<Workspace> for WorkspaceV1_3_0 {
             last_accessed: domain.last_accessed,
             is_favorite: domain.is_favorite,
             last_active_session_id: domain.last_active_session_id,
+            kaiba_rei_id: domain.kaiba_rei_id,
         }
     }
 }
@@ -417,13 +466,15 @@ pub fn create_workspace_resources_migrator() -> version_migrate::Migrator {
 /// - V1.0.0 → V1.1.0: Added last_accessed and is_favorite fields
 /// - V1.1.0 → V1.2.0: Added last_active_session_id field
 /// - V1.2.0 → V1.3.0: Updated to support UploadedFile V1.4.0 (is_favorite, sort_order)
-/// - V1.3.0 → Workspace: Converts DTO to domain model
+/// - V1.3.0 → V1.4.0: Added kaiba_rei_id for workspace-specific memory sync
+/// - V1.4.0 → Workspace: Converts DTO to domain model
 pub fn create_workspace_migrator() -> version_migrate::Migrator {
     version_migrate::migrator!("workspace" => [
         WorkspaceV1,
         WorkspaceV1_1_0,
         WorkspaceV1_2_0,
         WorkspaceV1_3_0,
+        WorkspaceV1_4_0,
         Workspace
     ], save = true)
     .expect("Failed to create workspace migrator")

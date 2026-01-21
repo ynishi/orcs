@@ -309,6 +309,7 @@ impl From<SessionType> for crate::session::Session {
             is_muted: value.is_muted,
             context_mode: crate::session::ContextMode::default(), // Default to Rich
             sandbox_state: None,                                  // Default to non-sandbox mode
+            last_memory_sync_at: None,                            // Managed by SessionUseCase
         }
     }
 }

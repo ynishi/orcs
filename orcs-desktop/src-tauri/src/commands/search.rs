@@ -5,13 +5,16 @@
 //! - `-p`: + project files (workspace.root_path)
 //! - `-a`: all workspaces sessions + files
 //! - `-f` (or `-ap`): all + project files
+//! - `-m`: search Kaiba memory (RAG semantic search)
 
+use orcs_core::memory::MemorySyncService;
 use orcs_core::repository::SessionRepository;
-use orcs_core::search::{SearchFilters, SearchOptions, SearchResult, SearchService};
+use orcs_core::search::{SearchFilters, SearchOptions, SearchResult, SearchResultItem, SearchService};
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
 use orcs_infrastructure::search::RipgrepSearchService;
+use orcs_interaction::KaibaMemorySyncService;
 use serde::Deserialize;
 use std::path::PathBuf;
 use tauri::State;
@@ -41,6 +44,7 @@ pub struct SearchRequest {
 /// - `-p`: + project root_path
 /// - `-a`: all sessions + all workspace_dirs
 /// - `-f`: all + project root_path
+/// - `-m`: search Kaiba memory (RAG semantic search)
 #[tauri::command]
 pub async fn execute_search(
     request: SearchRequest,
@@ -51,6 +55,11 @@ pub async fn execute_search(
         request.query,
         request.options
     );
+
+    // If memory search is requested, use Kaiba
+    if request.options.search_memory {
+        return execute_memory_search(&request, &state).await;
+    }
 
     // Build search paths based on options
     let search_paths = build_search_paths(&request.options, &state).await?;
@@ -76,6 +85,78 @@ pub async fn execute_search(
     tracing::info!("execute_search: Found {} matches", result.total_matches);
 
     Ok(result)
+}
+
+/// Executes a memory search using Kaiba RAG.
+async fn execute_memory_search(
+    request: &SearchRequest,
+    state: &State<'_, AppState>,
+) -> Result<SearchResult, String> {
+    // Get current workspace to find kaiba_rei_id
+    let workspace = get_current_workspace(state).await?;
+
+    let Some(workspace) = workspace else {
+        return Err("No workspace selected. Memory search requires an active workspace.".to_string());
+    };
+
+    let Some(rei_id) = workspace.kaiba_rei_id else {
+        return Err("No Kaiba Rei configured for this workspace. Memory sync has not been performed yet.".to_string());
+    };
+
+    // Create KaibaMemorySyncService
+    let sync_service = KaibaMemorySyncService::try_from_env()
+        .await
+        .map_err(|e| format!("Failed to initialize Kaiba: {}", e))?;
+
+    // Determine result limit
+    let limit = request
+        .filters
+        .as_ref()
+        .and_then(|f| f.max_results)
+        .unwrap_or(20);
+
+    tracing::info!(
+        "execute_memory_search: Searching Kaiba rei={} query='{}' limit={}",
+        rei_id,
+        request.query,
+        limit
+    );
+
+    // Execute semantic search
+    let memories = sync_service
+        .search_memories(&rei_id, &request.query, limit)
+        .await
+        .map_err(|e| format!("Kaiba search failed: {}", e))?;
+
+    // Convert to SearchResultItems
+    let items: Vec<SearchResultItem> = memories
+        .into_iter()
+        .map(|m| SearchResultItem {
+            path: format!("[memory:{}]", m.id),
+            line_number: None,
+            content: m.content,
+            context_before: None,
+            context_after: None,
+        })
+        .collect();
+
+    let total_matches = items.len();
+
+    tracing::info!(
+        "execute_memory_search: Found {} memories",
+        total_matches
+    );
+
+    Ok(SearchResult {
+        query: request.query.clone(),
+        options: request.options.clone(),
+        items,
+        summary: Some(format!(
+            "Found {} relevant memories from Kaiba RAG",
+            total_matches
+        )),
+        total_matches,
+    })
 }
 
 /// Builds search paths based on search options.

@@ -292,6 +292,7 @@ impl WorkspaceStorageService for FileSystemWorkspaceManager {
             last_accessed: now,
             is_favorite: false,
             last_active_session_id: None,
+            kaiba_rei_id: None, // Created on first memory sync
         };
 
         // Save via repository

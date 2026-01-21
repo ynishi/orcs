@@ -286,6 +286,7 @@ mod tests {
             is_muted: false,
             context_mode: Default::default(),
             sandbox_state: None,
+            last_memory_sync_at: None,
         }
     }
 

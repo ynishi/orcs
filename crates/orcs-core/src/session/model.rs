@@ -202,6 +202,10 @@ pub struct Session {
     /// Sandbox state (None = normal mode, Some = sandbox mode with git worktree)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sandbox_state: Option<SandboxState>,
+    /// Timestamp of the last successful memory sync (ISO 8601 format)
+    /// Used for differential sync - only messages after this timestamp are synced
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_memory_sync_at: Option<String>,
 }
 
 fn default_execution_strategy() -> ExecutionModel {

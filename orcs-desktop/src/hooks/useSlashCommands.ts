@@ -490,7 +490,7 @@ Generate the BlueprintWorkflow now.`;
             if (!parsed.args || parsed.args.length === 0) {
               await handleAndPersistSystemMessage(
                 conversationMessage(
-                  'Usage: /search <query> [-p|-a|-f]\n\nOptions:\n  (default) Search current workspace sessions + files\n  -p        + project files (source code)\n  -a        All workspaces sessions + files\n  -f        Full: all + project files\n\nExamples:\n  /search error handling\n  /search -p function definition\n  /search -a rust async',
+                  'Usage: /search <query> [-p|-a|-f|-m]\n\nOptions:\n  (default) Search current workspace sessions + files\n  -p        + project files (source code)\n  -a        All workspaces sessions + files\n  -f        Full: all + project files\n  -m        Memory: search Kaiba RAG (semantic search)\n\nExamples:\n  /search error handling\n  /search -p function definition\n  /search -a rust async\n  /search -m previous discussion about authentication',
                   'error'
                 ),
                 addMessage,
@@ -500,9 +500,10 @@ Generate the BlueprintWorkflow now.`;
               break;
             }
 
-            // Parse options: -p (project), -a (all), -f (full)
+            // Parse options: -p (project), -a (all), -f (full), -m (memory)
             let allWorkspaces = false;
             let includeProject = false;
+            let searchMemory = false;
             const queryParts: string[] = [];
 
             parsed.args.forEach((part) => {
@@ -514,6 +515,8 @@ Generate the BlueprintWorkflow now.`;
               } else if (normalized === '-f' || normalized === '--full') {
                 allWorkspaces = true;
                 includeProject = true;
+              } else if (normalized === '-m' || normalized === '--memory') {
+                searchMemory = true;
               } else {
                 queryParts.push(part);
               }
@@ -533,6 +536,7 @@ Generate the BlueprintWorkflow now.`;
             const searchOptions = {
               all_workspaces: allWorkspaces,
               include_project: includeProject,
+              search_memory: searchMemory,
             };
 
             try {
@@ -548,6 +552,7 @@ Generate the BlueprintWorkflow now.`;
               const optionFlags = [];
               if (result.options.all_workspaces) optionFlags.push('all');
               if (result.options.include_project) optionFlags.push('project');
+              if (result.options.search_memory) optionFlags.push('memory');
               const optionStr = optionFlags.length > 0 ? ` [${optionFlags.join(', ')}]` : '';
 
               const maxDisplay = 20;

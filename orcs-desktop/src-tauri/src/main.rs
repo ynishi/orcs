@@ -55,6 +55,14 @@ fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 
+    // Print log location to stdout for easy reference
+    println!("===========================================");
+    println!("ORCS Desktop starting...");
+    println!("Log file: {}", log_file_path.display());
+    println!("Log directory: {}", log_dir.display());
+    println!("  (Also available via: Config Menu > Open Logs Directory)");
+    println!("===========================================");
+
     tracing::info!("ORCS Desktop starting...");
 
     tauri::async_runtime::block_on(async move {
@@ -102,20 +110,19 @@ fn main() {
                 tauri::async_runtime::spawn(async move {
                     // Check if memory sync is enabled in config
                     let memory_sync_settings = user_service_for_memory.get_memory_sync_settings();
+                    println!("[MemorySync] Settings: enabled={}, interval={}s",
+                        memory_sync_settings.enabled, memory_sync_settings.interval_secs);
                     if !memory_sync_settings.enabled {
-                        tracing::info!("[Startup] Memory sync is disabled in config, skipping");
+                        println!("[MemorySync] Disabled in config, skipping");
                         return;
                     }
 
-                    tracing::info!(
-                        "[Startup] Memory sync enabled (interval: {}s), attempting to initialize KaibaMemorySyncService...",
-                        memory_sync_settings.interval_secs
-                    );
+                    println!("[MemorySync] Attempting to initialize KaibaMemorySyncService...");
 
                     // Try to initialize Kaiba memory sync service
                     match orcs_interaction::KaibaMemorySyncService::try_from_env().await {
                         Ok(kaiba_service) => {
-                            tracing::info!("[Startup] KaibaMemorySyncService initialized successfully");
+                            println!("[MemorySync] KaibaMemorySyncService initialized successfully");
 
                             // Set the memory sync service
                             let service: Arc<dyn orcs_core::memory::MemorySyncService> =
@@ -143,13 +150,10 @@ fn main() {
                             // Start background memory sync scheduler with configured interval
                             session_usecase_for_memory.start_memory_sync_scheduler(memory_sync_settings.interval_secs);
 
-                            tracing::info!("[Startup] Memory sync service, error callback, and scheduler configured");
+                            println!("[MemorySync] Service, error callback, and scheduler configured");
                         }
                         Err(e) => {
-                            tracing::warn!(
-                                "[Startup] Memory sync enabled but KaibaMemorySyncService failed to initialize: {}",
-                                e
-                            );
+                            println!("[MemorySync] Failed to initialize KaibaMemorySyncService: {}", e);
                         }
                     }
                 });

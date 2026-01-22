@@ -199,6 +199,8 @@ pub struct DebugSettingsDTO {
     pub enable_llm_debug: bool,
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    #[serde(default = "default_log_level")]
+    pub memory_sync_log_level: String,
 }
 
 fn default_log_level() -> String {
@@ -210,6 +212,7 @@ impl Default for DebugSettingsDTO {
         Self {
             enable_llm_debug: false,
             log_level: "info".to_string(),
+            memory_sync_log_level: "info".to_string(),
         }
     }
 }
@@ -219,6 +222,7 @@ impl DebugSettingsDTO {
         DebugSettings {
             enable_llm_debug: self.enable_llm_debug,
             log_level: self.log_level,
+            memory_sync_log_level: self.memory_sync_log_level,
         }
     }
 
@@ -226,6 +230,7 @@ impl DebugSettingsDTO {
         Self {
             enable_llm_debug: settings.enable_llm_debug,
             log_level: settings.log_level,
+            memory_sync_log_level: settings.memory_sync_log_level,
         }
     }
 }

@@ -170,6 +170,7 @@ pub struct EnvSettings {
 /// [debug_settings]
 /// enable_llm_debug = true
 /// log_level = "trace"
+/// memory_sync_log_level = "debug"
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DebugSettings {
@@ -194,6 +195,17 @@ pub struct DebugSettings {
     /// Default: `"info"`
     #[serde(default = "default_log_level")]
     pub log_level: String,
+
+    /// Log level for memory sync operations (target: memory_sync).
+    ///
+    /// Valid values: "off", "error", "warn", "info", "debug", "trace"
+    ///
+    /// Controls verbosity of memory synchronization scheduler logs.
+    /// Set to "debug" or "trace" for detailed sync information.
+    ///
+    /// Default: `"info"`
+    #[serde(default = "default_log_level")]
+    pub memory_sync_log_level: String,
 }
 
 fn default_log_level() -> String {
@@ -205,6 +217,7 @@ impl Default for DebugSettings {
         Self {
             enable_llm_debug: false,
             log_level: "info".to_string(),
+            memory_sync_log_level: "info".to_string(),
         }
     }
 }

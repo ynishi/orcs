@@ -134,14 +134,14 @@ impl SessionUseCase {
 
         tokio::spawn(async move {
             let mut ticker = interval(Duration::from_secs(interval_secs));
-            tracing::info!("[MemorySyncScheduler] Started ({}s interval)", interval_secs);
+            tracing::info!(target: "memory_sync", "Scheduler started ({}s interval)", interval_secs);
 
             loop {
                 ticker.tick().await;
-                tracing::debug!("[MemorySyncScheduler] Tick - checking for sessions to sync");
+                tracing::debug!(target: "memory_sync", "Tick - checking for sessions to sync");
 
                 if let Err(e) = usecase.run_memory_sync_batch().await {
-                    tracing::error!("[MemorySyncScheduler] Batch sync failed: {}", e);
+                    tracing::error!(target: "memory_sync", "Batch sync failed: {}", e);
                 }
             }
         });
@@ -160,19 +160,23 @@ impl SessionUseCase {
         };
 
         let Some(sync_service) = sync_service else {
-            tracing::debug!("[MemorySyncScheduler] No memory sync service configured, skipping");
+            tracing::debug!(target: "memory_sync", "No memory sync service configured, skipping");
             return Ok(());
         };
 
         // Get all sessions
         let sessions = self.session_repository.list_all().await?;
-        tracing::debug!(
-            "[MemorySyncScheduler] Checking {} sessions for sync",
-            sessions.len()
-        );
+        tracing::debug!(target: "memory_sync", "Checking {} sessions for sync", sessions.len());
 
-        let mut synced_count = 0;
-        let mut skipped_count = 0;
+        // Sync result counters
+        let mut sync_success = 0;
+        let mut sync_failed = 0;
+        // Skip reason counters
+        let mut skipped_already_synced = 0;
+        let mut skipped_workspace_not_found = 0;
+        let mut skipped_workspace_error = 0;
+        let mut skipped_rei_create_failed = 0;
+        let mut skipped_no_messages = 0;
 
         for session in &sessions {
             // Check if session needs sync: updated_at > last_memory_sync_at
@@ -192,13 +196,13 @@ impl SessionUseCase {
             };
 
             if !needs_sync {
-                skipped_count += 1;
+                skipped_already_synced += 1;
                 continue;
             }
 
-            synced_count += 1;
-            tracing::info!(
-                "[MemorySyncScheduler] Syncing session {} (updated_at: {}, last_sync: {:?})",
+            tracing::debug!(
+                target: "memory_sync",
+                "Syncing session {} (updated_at: {}, last_sync: {:?})",
                 session.id,
                 session.updated_at,
                 session.last_memory_sync_at
@@ -213,18 +217,31 @@ impl SessionUseCase {
                 Ok(Some(ws)) => ws,
                 Ok(None) => {
                     tracing::warn!(
-                        "[MemorySyncScheduler] Workspace {} not found for session {}",
+                        target: "memory_sync",
+                        "Workspace {} not found for session {}, marking as synced",
                         session.workspace_id,
                         session.id
                     );
+                    // Still update last_memory_sync_at to prevent infinite retry loop
+                    let mut updated_session = session.clone();
+                    updated_session.last_memory_sync_at = Some(session.updated_at.clone());
+                    let _ = self.session_repository.save(&updated_session).await;
+                    skipped_workspace_not_found += 1;
                     continue;
                 }
                 Err(e) => {
                     tracing::warn!(
-                        "[MemorySyncScheduler] Error getting workspace {}: {}",
+                        target: "memory_sync",
+                        "Error getting workspace {} for session {}: {}, marking as synced",
                         session.workspace_id,
+                        session.id,
                         e
                     );
+                    // Still update last_memory_sync_at to prevent infinite retry loop
+                    let mut updated_session = session.clone();
+                    updated_session.last_memory_sync_at = Some(session.updated_at.clone());
+                    let _ = self.session_repository.save(&updated_session).await;
+                    skipped_workspace_error += 1;
                     continue;
                 }
             };
@@ -256,10 +273,17 @@ impl SessionUseCase {
                         }
                         Err(e) => {
                             tracing::warn!(
-                                "[MemorySyncScheduler] Failed to create Rei for workspace {}: {}",
+                                target: "memory_sync",
+                                "Failed to create Rei for workspace {}: {}, marking session {} as synced",
                                 workspace.name,
-                                e
+                                e,
+                                session.id
                             );
+                            // Still update last_memory_sync_at to prevent infinite retry loop
+                            let mut updated_session = session.clone();
+                            updated_session.last_memory_sync_at = Some(session.updated_at.clone());
+                            let _ = self.session_repository.save(&updated_session).await;
+                            skipped_rei_create_failed += 1;
                             continue;
                         }
                     }
@@ -275,15 +299,19 @@ impl SessionUseCase {
                 updated_session.last_memory_sync_at = Some(session.updated_at.clone());
                 if let Err(e) = self.session_repository.save(&updated_session).await {
                     tracing::warn!(
-                        "[MemorySyncScheduler] Failed to update last_memory_sync_at: {}",
+                        target: "memory_sync",
+                        "Failed to update last_memory_sync_at for session {}: {}",
+                        session.id,
                         e
                     );
                 }
+                skipped_no_messages += 1;
                 continue;
             }
 
-            tracing::info!(
-                "[MemorySyncScheduler] Syncing {} messages for session {}",
+            tracing::debug!(
+                target: "memory_sync",
+                "Syncing {} messages for session {}",
                 messages.len(),
                 session.id
             );
@@ -292,36 +320,57 @@ impl SessionUseCase {
 
             if let Some(error) = &result.error {
                 tracing::warn!(
-                    "[MemorySyncScheduler] Sync partially failed for session {}: {}",
+                    target: "memory_sync",
+                    "Sync partially failed for session {}: {}",
                     session.id,
                     error
                 );
+                sync_failed += 1;
                 // Notify via callback if configured
                 if let Some(cb) = &*self.memory_sync_error_callback.read().await {
                     cb(format!("Memory sync failed: {}", error));
                 }
             } else {
-                tracing::info!(
-                    "[MemorySyncScheduler] Synced {} messages for session {}",
+                tracing::debug!(
+                    target: "memory_sync",
+                    "Synced {} messages for session {}",
                     result.synced_count,
                     session.id
                 );
+                sync_success += 1;
             }
 
             // Update last_memory_sync_at
             let mut updated_session = session.clone();
             updated_session.last_memory_sync_at = Some(session.updated_at.clone());
-            if let Err(e) = self.session_repository.save(&updated_session).await {
-                tracing::warn!(
-                    "[MemorySyncScheduler] Failed to update last_memory_sync_at: {}",
-                    e
-                );
+            match self.session_repository.save(&updated_session).await {
+                Ok(_) => {
+                    tracing::debug!(
+                        target: "memory_sync",
+                        "Saved last_memory_sync_at for session {}",
+                        session.id
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "memory_sync",
+                        "Failed to save last_memory_sync_at for session {}: {}",
+                        session.id, e
+                    );
+                }
             }
         }
 
         tracing::info!(
-            "[MemorySyncScheduler] Batch complete: {} synced, {} skipped",
-            synced_count, skipped_count
+            target: "memory_sync",
+            "Batch complete: sync_success={}, sync_failed={}, skipped(already_synced={}, no_messages={}, workspace_not_found={}, workspace_error={}, rei_failed={})",
+            sync_success,
+            sync_failed,
+            skipped_already_synced,
+            skipped_no_messages,
+            skipped_workspace_not_found,
+            skipped_workspace_error,
+            skipped_rei_create_failed
         );
 
         Ok(())

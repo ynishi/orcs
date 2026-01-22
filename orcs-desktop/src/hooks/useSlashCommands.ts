@@ -486,6 +486,10 @@ Generate the BlueprintWorkflow now.`;
             await saveCurrentSession();
             break;
 
+          // NOTE: Builtin command definitions exist in 3 places. Keep them in sync:
+          //   1. crates/orcs-core/src/slash_command/builtin.rs (Persona system prompt)
+          //   2. orcs-desktop/src/types/command.ts (Frontend suggestion UI)
+          //   3. HERE: orcs-desktop/src/hooks/useSlashCommands.ts (Runtime help text)
           case 'search': {
             if (!parsed.args || parsed.args.length === 0) {
               await handleAndPersistSystemMessage(

@@ -1,6 +1,6 @@
 import { Paper, Stack, Group, Text, Box, ScrollArea, Kbd } from '@mantine/core';
 import { CommandDefinition } from '../../types/command';
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 
 interface CommandSuggestionsProps {
   commands: CommandDefinition[];
@@ -9,7 +9,7 @@ interface CommandSuggestionsProps {
   onHover: (index: number) => void;
 }
 
-export function CommandSuggestions({
+export const CommandSuggestions = memo(function CommandSuggestions({
   commands,
   selectedIndex,
   onSelect,
@@ -127,4 +127,4 @@ export function CommandSuggestions({
       </ScrollArea>
     </Paper>
   );
-}
+});

@@ -1,6 +1,6 @@
 import { Paper, Stack, Group, Text, Box, Badge, UnstyledButton } from '@mantine/core';
 import { Agent, getAgentIcon, getAgentColor } from '../../types/agent';
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 
 interface AgentSuggestionsProps {
   agents: Agent[];
@@ -9,7 +9,7 @@ interface AgentSuggestionsProps {
   position?: { top: number; left: number };
 }
 
-export function AgentSuggestions({
+export const AgentSuggestions = memo(function AgentSuggestions({
   agents,
   selectedIndex,
   onSelect,
@@ -88,4 +88,4 @@ export function AgentSuggestions({
       </Stack>
     </Paper>
   );
-}
+});

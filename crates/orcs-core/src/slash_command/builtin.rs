@@ -2,6 +2,11 @@
 //!
 //! These commands are always available and cannot be modified by users.
 //! They are loaded once at startup and cached for the lifetime of the application.
+//!
+//! NOTE: Builtin command definitions exist in 3 places. Keep them in sync:
+//!   1. HERE: crates/orcs-core/src/slash_command/builtin.rs (Persona system prompt)
+//!   2. orcs-desktop/src/types/command.ts (Frontend suggestion UI)
+//!   3. orcs-desktop/src/hooks/useSlashCommands.ts (Runtime help text)
 
 use serde::Serialize;
 use std::sync::OnceLock;

@@ -45,6 +45,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         user::get_user_profile,
         user::get_debug_settings,
         user::update_debug_settings,
+        user::get_memory_sync_settings,
         session::execute_message_as_task,
         session::add_participant,
         session::remove_participant,

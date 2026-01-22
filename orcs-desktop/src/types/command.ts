@@ -14,6 +14,11 @@ export interface CommandDefinition {
 
 /**
  * 利用可能なコマンド定義
+ *
+ * NOTE: Builtin command definitions exist in 3 places. Keep them in sync:
+ *   1. crates/orcs-core/src/slash_command/builtin.rs (Persona system prompt)
+ *   2. HERE: orcs-desktop/src/types/command.ts (Frontend suggestion UI)
+ *   3. orcs-desktop/src/hooks/useSlashCommands.ts (Runtime help text)
  */
 export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   {
@@ -78,14 +83,14 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
     name: 'search',
     icon: '🔍',
     description: 'Search sessions and workspace files',
-    usage: '/search <query> [-p|-a|-f]',
+    usage: '/search <query> [-p|-a|-f|-m]',
     examples: [
       '/search error handling',
       '/search -p function definition',
       '/search -a rust async',
-      '/search -f todo',
+      '/search -m previous discussion',
     ],
-    argsDescription: '(default) sessions + workspace files | -p: + project files | -a: all workspaces | -f: full (all + project)',
+    argsDescription: '(default) sessions + files | -p: + project | -a: all workspaces | -f: full | -m: memory (Kaiba RAG)',
   },
   {
     name: 'expert',

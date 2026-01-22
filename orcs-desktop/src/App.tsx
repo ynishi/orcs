@@ -210,6 +210,31 @@ function App() {
     checkForAppUpdates();
   }, []);
 
+  // Check memory sync (Kaiba Batch) settings on startup (once only)
+  const memorySyncCheckedRef = useRef(false);
+  useEffect(() => {
+    if (memorySyncCheckedRef.current) return;
+    memorySyncCheckedRef.current = true;
+
+    const checkMemorySyncSettings = async () => {
+      try {
+        const settings = await invoke<{ enabled: boolean; interval_secs: number }>('get_memory_sync_settings');
+        if (settings.enabled) {
+          notifications.show({
+            title: 'Kaiba Batch Enabled',
+            message: `Memory sync is active (interval: ${settings.interval_secs}s)`,
+            color: 'blue',
+            autoClose: 5000,
+          });
+        }
+      } catch (error) {
+        console.error('[App] Failed to check memory sync settings:', error);
+      }
+    };
+
+    checkMemorySyncSettings();
+  }, []);
+
   // Load sandbox state when active session changes
   useEffect(() => {
     const loadSandboxState = async () => {
@@ -1239,51 +1264,55 @@ function App() {
     return activeTab?.input || '';
   }, [tabs, activeTabId]);
 
-  // 入力内容が変更されたときにコマンド/エージェントサジェストを更新
+  // 入力内容が変更されたときにコマンド/エージェントサジェストを更新（デバウンス化）
   useEffect(() => {
-    const input = activeTabInput;
-    const cursorPosition = textareaRef.current?.selectionStart || input.length;
-    const spaceIndex = input.indexOf(' ');
-    const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
+    const timer = setTimeout(() => {
+      const input = activeTabInput;
+      const cursorPosition = textareaRef.current?.selectionStart || input.length;
+      const spaceIndex = input.indexOf(' ');
+      const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
 
-    // コマンドサジェスト（コマンド名入力中のみ表示）
-    if (isCommandPhase) {
-      const commands = filterCommandsWithCustom(input, customCommands);
-      setFilteredCommands(commands);
-      setShowSuggestions(commands.length > 0);
-      setSelectedSuggestionIndex(0);
-      setShowAgentSuggestions(false);
-    } else {
-      setShowSuggestions(false);
-    }
+      // コマンドサジェスト（コマンド名入力中のみ表示）
+      if (isCommandPhase) {
+        const commands = filterCommandsWithCustom(input, customCommands);
+        setFilteredCommands(commands);
+        setShowSuggestions(commands.length > 0);
+        setSelectedSuggestionIndex(0);
+        setShowAgentSuggestions(false);
+      } else {
+        setShowSuggestions(false);
+      }
 
-    // エージェントサジェスト（@メンション）
-    const mentionFilter = getCurrentMention(input, cursorPosition);
+      // エージェントサジェスト（@メンション）
+      const mentionFilter = getCurrentMention(input, cursorPosition);
 
-    if (mentionFilter !== null) {
-      // Filter personas by name (case-insensitive)
-      // Support both original name and underscore format (e.g., "Ayaka Nakamura" matches "Ayaka_Nakamura")
-      const filtered: Agent[] = personas
-        .filter(p => {
-          const lowerFilter = mentionFilter.toLowerCase();
-          const nameMatch = p.name.toLowerCase().includes(lowerFilter);
-          const underscoreName = p.name.replace(/ /g, '_').toLowerCase();
-          const underscoreMatch = underscoreName.includes(lowerFilter);
-          return nameMatch || underscoreMatch;
-        })
-        .map(p => ({
-          id: p.id,
-          name: p.name.replace(/ /g, '_'), // Display with underscores for mention input
-          status: activeParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
-          description: `${p.role} - ${p.background}`,
-          isActive: activeParticipantIds.includes(p.id),
-        }));
-      setFilteredAgents(filtered);
-      setShowAgentSuggestions(filtered.length > 0);
-      setSelectedAgentIndex(0);
-    } else {
-      setShowAgentSuggestions(false);
-    }
+      if (mentionFilter !== null) {
+        // Filter personas by name (case-insensitive)
+        // Support both original name and underscore format (e.g., "Ayaka Nakamura" matches "Ayaka_Nakamura")
+        const filtered: Agent[] = personas
+          .filter(p => {
+            const lowerFilter = mentionFilter.toLowerCase();
+            const nameMatch = p.name.toLowerCase().includes(lowerFilter);
+            const underscoreName = p.name.replace(/ /g, '_').toLowerCase();
+            const underscoreMatch = underscoreName.includes(lowerFilter);
+            return nameMatch || underscoreMatch;
+          })
+          .map(p => ({
+            id: p.id,
+            name: p.name.replace(/ /g, '_'), // Display with underscores for mention input
+            status: activeParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
+            description: `${p.role} - ${p.background}`,
+            isActive: activeParticipantIds.includes(p.id),
+          }));
+        setFilteredAgents(filtered);
+        setShowAgentSuggestions(filtered.length > 0);
+        setSelectedAgentIndex(0);
+      } else {
+        setShowAgentSuggestions(false);
+      }
+    }, 50); // 50ms debounce for responsive suggestions
+
+    return () => clearTimeout(timer);
   }, [activeTabInput, customCommands, personas, activeParticipantIds]);
 
   // Get thread content as text for action commands
@@ -1616,20 +1645,20 @@ function App() {
     }
   };
 
-  // コマンドを選択
-  const selectCommand = (command: CommandDefinition) => {
+  // コマンドを選択（メモ化）
+  const selectCommand = useCallback((command: CommandDefinition) => {
     if (!activeTabId) return;
     updateTabInput(activeTabId, `/${command.name} `);
     setShowSuggestions(false);
     textareaRef.current?.focus();
-  };
+  }, [activeTabId, updateTabInput]);
 
-  // エージェントを選択
-  const selectAgent = (agent: Agent) => {
+  // エージェントを選択（メモ化）
+  const selectAgent = useCallback((agent: Agent) => {
     if (!activeTabId) return;
     const activeTab = getActiveTab();
     if (!activeTab) return;
-    
+
     const input = activeTab.input;
     const cursorPosition = textareaRef.current?.selectionStart || input.length;
     const beforeCursor = input.slice(0, cursorPosition);
@@ -1643,7 +1672,14 @@ function App() {
 
     setShowAgentSuggestions(false);
     textareaRef.current?.focus();
-  };
+  }, [activeTabId, getActiveTab, updateTabInput]);
+
+  // 入力変更ハンドラ（メモ化）
+  const handleInputChange = useCallback((value: string) => {
+    if (activeTabId) {
+      updateTabInput(activeTabId, value);
+    }
+  }, [activeTabId, updateTabInput]);
 
   // ドラッグ&ドロップハンドラー
   const handleDragOver = (e: React.DragEvent) => {
@@ -2830,11 +2866,7 @@ function App() {
                       filteredAgents={filteredAgents}
                       selectedAgentIndex={selectedAgentIndex}
                       onSubmit={handleSubmit}
-                      onInputChange={(value) => {
-                        if (activeTabId) {
-                          updateTabInput(activeTabId, value);
-                        }
-                      }}
+                      onInputChange={handleInputChange}
                       onKeyDown={handleKeyDown}
                       onFileSelect={handleFileSelect}
                       onRemoveFile={removeAttachedFile}

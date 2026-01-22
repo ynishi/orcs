@@ -37,3 +37,11 @@ pub async fn update_debug_settings(
         .await
         .map_err(|e| e.to_string())
 }
+
+/// Gets the memory sync settings from the config
+#[tauri::command]
+pub async fn get_memory_sync_settings(
+    state: State<'_, AppState>,
+) -> Result<orcs_core::config::MemorySyncSettings, String> {
+    Ok(state.user_service.get_memory_sync_settings())
+}

@@ -358,6 +358,34 @@ impl Default for OpenAIModelConfig {
 }
 
 // ============================================================================
+// Terminal configuration models
+// ============================================================================
+
+/// Terminal settings for workspace terminal launch.
+///
+/// Allows customization of the terminal application used when opening
+/// a terminal from a workspace.
+///
+/// # Example (config.toml)
+///
+/// ```toml
+/// [terminal_settings]
+/// custom_app = "WezTerm"  # macOS: "iTerm", "Kitty", etc.
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TerminalSettings {
+    /// Custom terminal application name (macOS) or command (Linux/Windows).
+    ///
+    /// - macOS: Application name for `open -a` (e.g., "iTerm", "WezTerm", "Kitty")
+    /// - Linux: Terminal command (e.g., "kitty", "alacritty")
+    /// - Windows: Terminal command (e.g., "wt" for Windows Terminal)
+    ///
+    /// If None, uses the platform default terminal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_app: Option<String>,
+}
+
+// ============================================================================
 // Root configuration model (Domain layer)
 // ============================================================================
 
@@ -415,6 +443,9 @@ pub struct RootConfig {
     /// Controls background sync of session messages to memory stores.
     #[serde(default)]
     pub memory_sync_settings: MemorySyncSettings,
+    /// Terminal settings for workspace terminal launch.
+    #[serde(default)]
+    pub terminal_settings: TerminalSettings,
 }
 
 impl Queryable for RootConfig {

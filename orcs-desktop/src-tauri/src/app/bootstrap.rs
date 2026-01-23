@@ -21,7 +21,7 @@ use orcs_execution::{TaskExecutor, tracing_layer::OrchestratorEvent};
 use orcs_infrastructure::{
     AppStateService, AsyncDirDialoguePresetRepository, AsyncDirPersonaRepository,
     AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
-    FileQuickActionRepository, SecretServiceImpl, paths::OrcsPaths,
+    ConfigService, FileQuickActionRepository, SecretServiceImpl, paths::OrcsPaths,
     user_service::ConfigBasedUserService, workspace_storage_service::FileSystemWorkspaceManager,
 };
 use tokio::sync::{Mutex, mpsc::UnboundedSender};
@@ -207,6 +207,9 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
             .expect("Failed to initialize AppStateService"),
     );
 
+    // Initialize ConfigService
+    let config_service = Arc::new(ConfigService::new());
+
     // Ensure default workspace exists (before session restoration)
     let default_workspace_id =
         ensure_default_workspace(&workspace_storage_service, &app_state_service)
@@ -344,6 +347,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         dialogue_preset_repository,
         dialogue_preset_repository_concrete,
         app_state_service: app_state_service.clone(),
+        config_service,
         task_repository,
         task_repository_concrete,
         task_executor,

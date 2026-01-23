@@ -153,27 +153,74 @@ pub async fn save_code_snippet(
     Ok(())
 }
 
-/// Opens a terminal in the specified directory
+/// Opens a terminal in the specified directory.
+///
+/// Uses the terminal application configured in `config.toml` if available,
+/// otherwise falls back to the platform default.
+///
+/// # Configuration
+///
+/// Set `terminal_settings.custom_app` in config.toml:
+/// - macOS: Application name (e.g., "iTerm", "WezTerm", "Kitty")
+/// - Linux: Terminal command (e.g., "kitty", "alacritty")
+/// - Windows: Terminal command (e.g., "wt" for Windows Terminal)
 #[tauri::command]
-pub async fn open_terminal(directory: String) -> Result<(), String> {
+pub async fn open_terminal(
+    directory: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let config = state.config_service.get_config();
+    let custom_app = config.terminal_settings.custom_app;
+
     #[cfg(target_os = "macos")]
     {
+        let app_name = custom_app.as_deref().unwrap_or("Terminal");
         Command::new("open")
-            .args(["-a", "Terminal", &directory])
+            .args(["-a", app_name, &directory])
             .spawn()
-            .map_err(|e| format!("Failed to open terminal: {}", e))?;
+            .map_err(|e| format!("Failed to open terminal '{}': {}", app_name, e))?;
     }
 
     #[cfg(target_os = "windows")]
     {
-        Command::new("cmd")
-            .args(["/C", "start", "cmd", "/K", "cd", "/D", &directory])
-            .spawn()
-            .map_err(|e| format!("Failed to open terminal: {}", e))?;
+        if let Some(ref custom) = custom_app {
+            // Custom terminal (e.g., "wt" for Windows Terminal)
+            Command::new(custom)
+                .args(["-d", &directory])
+                .spawn()
+                .map_err(|e| format!("Failed to open terminal '{}': {}", custom, e))?;
+        } else {
+            // Default: cmd
+            Command::new("cmd")
+                .args(["/C", "start", "cmd", "/K", "cd", "/D", &directory])
+                .spawn()
+                .map_err(|e| format!("Failed to open terminal: {}", e))?;
+        }
     }
 
     #[cfg(target_os = "linux")]
     {
+        if let Some(ref custom) = custom_app {
+            // Try custom terminal first
+            if Command::new(custom)
+                .args(["--working-directory", &directory])
+                .spawn()
+                .is_ok()
+            {
+                return Ok(());
+            }
+            // Fall back to starting in directory
+            if Command::new(custom)
+                .current_dir(&directory)
+                .spawn()
+                .is_ok()
+            {
+                return Ok(());
+            }
+            return Err(format!("Failed to open terminal '{}'", custom));
+        }
+
+        // Default fallback terminals
         let xterm_cmd = format!("cd '{}' && bash", directory);
         let terminals = [
             (

@@ -13,7 +13,7 @@ use version_migrate::{IntoDomain, MigratesTo, Versioned};
 use super::{AppStateDTO, UserProfileDTO, WorkspaceV1};
 use orcs_core::config::{
     ClaudeModelConfig, DebugSettings, EnvSettings, GeminiModelConfig, MemorySyncSettings,
-    ModelSettings, OpenAIModelConfig, RootConfig,
+    ModelSettings, OpenAIModelConfig, RootConfig, TerminalSettings,
 };
 
 // ============================================================================
@@ -280,6 +280,34 @@ impl MemorySyncSettingsDTO {
 }
 
 // ============================================================================
+// TerminalSettings DTOs
+// ============================================================================
+
+/// DTO for TerminalSettings.
+///
+/// Controls terminal application used when opening terminal from workspace.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TerminalSettingsDTO {
+    /// Custom terminal application name (macOS) or command (Linux/Windows).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_app: Option<String>,
+}
+
+impl TerminalSettingsDTO {
+    fn into_domain(self) -> TerminalSettings {
+        TerminalSettings {
+            custom_app: self.custom_app,
+        }
+    }
+
+    fn from_domain(settings: TerminalSettings) -> Self {
+        Self {
+            custom_app: settings.custom_app,
+        }
+    }
+}
+
+// ============================================================================
 // ConfigRoot DTOs
 // ============================================================================
 
@@ -403,7 +431,7 @@ pub struct ConfigRootV2_3_0 {
     pub debug_settings: DebugSettingsDTO,
 }
 
-/// Root configuration structure V2.4.0 for the application config file (current).
+/// Root configuration structure V2.4.0 for the application config file.
 ///
 /// Added memory_sync_settings field for RAG integration.
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
@@ -427,8 +455,35 @@ pub struct ConfigRootV2_4_0 {
     pub memory_sync_settings: MemorySyncSettingsDTO,
 }
 
+/// Root configuration structure V2.5.0 for the application config file (current).
+///
+/// Added terminal_settings field for custom terminal application configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "2.5.0")]
+#[derive(Default)]
+pub struct ConfigRootV2_5_0 {
+    /// User profile configuration (name, background, etc.).
+    #[serde(default)]
+    pub user_profile: UserProfileDTO,
+    /// LLM model settings (non-sensitive configuration).
+    #[serde(default)]
+    pub model_settings: ModelSettingsDTO,
+    /// Environment PATH configuration for CLI tools.
+    #[serde(default)]
+    pub env_settings: EnvSettingsDTO,
+    /// Debug settings for LLM interactions.
+    #[serde(default)]
+    pub debug_settings: DebugSettingsDTO,
+    /// Memory synchronization settings for RAG integration.
+    #[serde(default)]
+    pub memory_sync_settings: MemorySyncSettingsDTO,
+    /// Terminal settings for workspace terminal launch.
+    #[serde(default)]
+    pub terminal_settings: TerminalSettingsDTO,
+}
+
 /// Type alias for the latest ConfigRoot version.
-pub type ConfigRoot = ConfigRootV2_4_0;
+pub type ConfigRoot = ConfigRootV2_5_0;
 
 // ============================================================================
 // Default implementations
@@ -512,13 +567,28 @@ impl MigratesTo<ConfigRootV2_4_0> for ConfigRootV2_3_0 {
     }
 }
 
+/// Migration from ConfigRootV2_4_0 to ConfigRootV2_5_0.
+/// Adds terminal_settings field with default values.
+impl MigratesTo<ConfigRootV2_5_0> for ConfigRootV2_4_0 {
+    fn migrate(self) -> ConfigRootV2_5_0 {
+        ConfigRootV2_5_0 {
+            user_profile: self.user_profile,
+            model_settings: self.model_settings,
+            env_settings: self.env_settings,
+            debug_settings: self.debug_settings,
+            memory_sync_settings: self.memory_sync_settings,
+            terminal_settings: TerminalSettingsDTO::default(),
+        }
+    }
+}
+
 // ============================================================================
 // Domain model conversions
 // ============================================================================
 
-/// IntoDomain implementation for ConfigRootV2_4_0.
+/// IntoDomain implementation for ConfigRootV2_5_0.
 /// Converts DTO to domain RootConfig.
-impl IntoDomain<RootConfig> for ConfigRootV2_4_0 {
+impl IntoDomain<RootConfig> for ConfigRootV2_5_0 {
     fn into_domain(self) -> RootConfig {
         RootConfig {
             user_profile: self.user_profile.into_domain(),
@@ -526,20 +596,22 @@ impl IntoDomain<RootConfig> for ConfigRootV2_4_0 {
             env_settings: self.env_settings.into_domain(),
             debug_settings: self.debug_settings.into_domain(),
             memory_sync_settings: self.memory_sync_settings.into_domain(),
+            terminal_settings: self.terminal_settings.into_domain(),
         }
     }
 }
 
-/// FromDomain implementation for ConfigRootV2_4_0.
+/// FromDomain implementation for ConfigRootV2_5_0.
 /// Converts domain RootConfig to DTO for persistence.
-impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_4_0 {
+impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_5_0 {
     fn from_domain(config: RootConfig) -> Self {
-        ConfigRootV2_4_0 {
+        ConfigRootV2_5_0 {
             user_profile: UserProfileDTO::from_domain(config.user_profile),
             model_settings: ModelSettingsDTO::from_domain(config.model_settings),
             env_settings: EnvSettingsDTO::from_domain(config.env_settings),
             debug_settings: DebugSettingsDTO::from_domain(config.debug_settings),
             memory_sync_settings: MemorySyncSettingsDTO::from_domain(config.memory_sync_settings),
+            terminal_settings: TerminalSettingsDTO::from_domain(config.terminal_settings),
         }
     }
 }
@@ -560,7 +632,8 @@ impl version_migrate::FromDomain<RootConfig> for ConfigRootV2_4_0 {
 /// - V2.1.0 → V2.2.0: Adds `env_settings` field with default values (auto-detect enabled)
 /// - V2.2.0 → V2.3.0: Adds `debug_settings` field with default values (debug disabled)
 /// - V2.3.0 → V2.4.0: Adds `memory_sync_settings` field with default values (sync disabled)
-/// - V2.4.0 → RootConfig: Converts DTO to domain model
+/// - V2.4.0 → V2.5.0: Adds `terminal_settings` field with default values
+/// - V2.5.0 → RootConfig: Converts DTO to domain model
 ///
 /// # Example
 ///
@@ -577,6 +650,7 @@ pub fn create_config_root_migrator() -> version_migrate::Migrator {
         ConfigRootV2_2_0,
         ConfigRootV2_3_0,
         ConfigRootV2_4_0,
+        ConfigRootV2_5_0,
         RootConfig
     ], save = true)
     .expect("Failed to create config_root migrator")

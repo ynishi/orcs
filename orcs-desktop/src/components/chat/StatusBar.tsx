@@ -1,5 +1,6 @@
-import { Paper, Group, Badge, Text, Divider, Tooltip, Menu, Checkbox, ScrollArea } from '@mantine/core';
-import { IconAdjustments } from '@tabler/icons-react';
+import { useState } from 'react';
+import { Paper, Group, Badge, Text, Divider, Tooltip, Menu, Checkbox, ScrollArea, ActionIcon } from '@mantine/core';
+import { IconAdjustments, IconAt, IconPlayerPlay } from '@tabler/icons-react';
 import { StatusInfo } from '../../types/status';
 import { GitInfo } from '../../types/git';
 import { PersonaConfig } from '../../types/agent';
@@ -34,9 +35,13 @@ interface StatusBarProps {
   onContextModeChange?: (mode: ContextMode) => void;
   onToggleParticipant?: (personaId: string, isChecked: boolean) => void;
   onApplyPreset?: (presetId: string) => void;
+  onMentionPersona?: (personaId: string) => void;
+  onInvokePersona?: (personaId: string) => void;
 }
 
-export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', contextMode = 'rich', sandboxState = null, personas = [], activeParticipantIds = [], dialoguePresets = [], onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange, onContextModeChange, onToggleParticipant, onApplyPreset }: StatusBarProps) {
+export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, totalPersonas = 0, autoMode = false, conversationMode = 'normal', talkStyle = null, executionStrategy = 'sequential', contextMode = 'rich', sandboxState = null, personas = [], activeParticipantIds = [], dialoguePresets = [], onTalkStyleChange, onExecutionStrategyChange, onConversationModeChange, onContextModeChange, onToggleParticipant, onApplyPreset, onMentionPersona, onInvokePersona }: StatusBarProps) {
+  const [personasMenuOpened, setPersonasMenuOpened] = useState(false);
+
   // 接続状態に応じたバッジカラー
   const getConnectionColor = () => {
     switch (status.connection) {
@@ -111,7 +116,7 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
           <Text size="sm" c="dimmed">
             Personas:
           </Text>
-          <Menu position="top" withArrow closeOnItemClick={false}>
+          <Menu position="top" withArrow closeOnItemClick={false} opened={personasMenuOpened} onChange={setPersonasMenuOpened}>
             <Menu.Target>
               <Badge
                 color={participatingAgentsCount > 0 ? 'green' : 'gray'}
@@ -143,9 +148,39 @@ export function StatusBar({ status, gitInfo, participatingAgentsCount = 0, total
                           }}
                           size="sm"
                         />
-                        <Text size="sm" truncate style={{ flex: 1 }}>
+                        <Text size="sm" truncate style={{ flex: 1, minWidth: 0 }}>
                           {persona.icon || '👤'} {persona.name} - {persona.role.length > 20 ? persona.role.substring(0, 20) + '...' : persona.role}
                         </Text>
+                        <Group gap={4} wrap="nowrap">
+                          <Tooltip label="Insert @mention" withArrow position="top">
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="blue"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onMentionPersona?.(persona.id);
+                                setPersonasMenuOpened(false);
+                              }}
+                            >
+                              <IconAt size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Invoke now" withArrow position="top">
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="green"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onInvokePersona?.(persona.id);
+                                setPersonasMenuOpened(false);
+                              }}
+                            >
+                              <IconPlayerPlay size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Group>
                       </Group>
                     </Menu.Item>
                   );

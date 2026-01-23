@@ -1674,6 +1674,35 @@ function App() {
     textareaRef.current?.focus();
   }, [activeTabId, getActiveTab, updateTabInput]);
 
+  // StatusBarからPersonaをメンション挿入（メモ化）
+  const handleMentionPersona = useCallback((personaId: string) => {
+    if (!activeTabId) return;
+    const persona = personas.find(p => p.id === personaId);
+    if (!persona) return;
+
+    const activeTab = getActiveTab();
+    if (!activeTab) return;
+
+    const mentionName = persona.name.replace(/ /g, '_');
+    const currentInput = activeTab.input;
+    const newInput = currentInput + (currentInput.endsWith(' ') || currentInput === '' ? '' : ' ') + `@${mentionName} `;
+    updateTabInput(activeTabId, newInput);
+    textareaRef.current?.focus();
+  }, [activeTabId, personas, getActiveTab, updateTabInput]);
+
+  // StatusBarからPersonaを即時呼び出し（メモ化）
+  const handleInvokePersona = useCallback((personaId: string) => {
+    if (!activeTabId) return;
+    const persona = personas.find(p => p.id === personaId);
+    if (!persona) return;
+
+    const mentionName = persona.name.replace(/ /g, '_');
+    const message = `@${mentionName}`;
+
+    // 直接processInputを呼び出して投稿
+    void processInput(message);
+  }, [activeTabId, personas, processInput]);
+
   // 入力変更ハンドラ（メモ化）
   const handleInputChange = useCallback((value: string) => {
     if (activeTabId) {
@@ -2883,6 +2912,8 @@ function App() {
                       onToggleParticipant={handleToggleParticipant}
                       dialoguePresets={dialoguePresets}
                       onApplyPreset={handleApplyPreset}
+                      onMentionPersona={handleMentionPersona}
+                      onInvokePersona={handleInvokePersona}
                       onSelectCommand={selectCommand}
                       onSelectAgent={selectAgent}
                       onHoverSuggestion={setSelectedSuggestionIndex}

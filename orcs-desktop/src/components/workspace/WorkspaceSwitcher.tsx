@@ -18,6 +18,7 @@ import {
   IconStarFilled,
   IconCheck,
   IconPlus,
+  IconPlayerPlay,
   IconTrash,
   IconX,
 } from '@tabler/icons-react';
@@ -46,7 +47,7 @@ interface WorkspaceSwitcherProps {
  */
 export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
   const { workspace, allWorkspaces, switchWorkspace, toggleFavorite } = useWorkspace();
-  const { refreshSessions } = useSession();
+  const { refreshSessions, createSession, switchSession } = useSession();
   const { getVisibleTabs, closeWorkspaceTabs } = useTabContext();
   const [isOpen, setIsOpen] = useState(false);
   const [deletingWorkspace, setDeletingWorkspace] = useState<{ id: string; name: string } | null>(null);
@@ -132,6 +133,42 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
       console.error('[Workspace] Failed to create workspace:', error);
       notifications.show({
         title: 'Failed to create workspace',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  /**
+   * Creates a new session for the specified workspace and switches to it.
+   * This allows starting fresh in any workspace without affecting existing sessions.
+   */
+  const handleNewSession = async (workspaceId: string, workspaceName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      console.log('[Workspace] Creating new session for workspace:', workspaceId);
+
+      // Create new session for this workspace
+      const newSessionId = await createSession(workspaceId);
+      console.log('[Workspace] New session created:', newSessionId);
+
+      // Switch to the new session
+      await switchSession(newSessionId);
+
+      // Refresh sessions list
+      await refreshSessions();
+
+      setIsOpen(false);
+
+      notifications.show({
+        title: 'New Session Created',
+        message: `Started new session in ${workspaceName}`,
+        color: 'green',
+      });
+    } catch (error) {
+      console.error('[Workspace] Failed to create new session:', error);
+      notifications.show({
+        title: 'Failed to Create Session',
         message: String(error),
         color: 'red',
       });
@@ -251,6 +288,16 @@ export function WorkspaceSwitcher({ sessionId }: WorkspaceSwitcherProps) {
                 </ActionIcon>
               </Tooltip>
             )}
+            <Tooltip label="New session">
+              <ActionIcon
+                size="xs"
+                variant="subtle"
+                color="green"
+                onClick={(e) => handleNewSession(ws.id, ws.name, e)}
+              >
+                <IconPlayerPlay size={14} />
+              </ActionIcon>
+            </Tooltip>
             <ActionIcon
               size="xs"
               variant="subtle"

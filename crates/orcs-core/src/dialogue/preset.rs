@@ -176,6 +176,20 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
         },
+        DialoguePreset {
+            id: "preset-research".to_string(),
+            name: "Research".to_string(),
+            icon: Some("🔬".to_string()),
+            description: Some(
+                "Sequential + Detailed + Research: Fact-focused deep investigation with WebSearch"
+                    .to_string(),
+            ),
+            execution_strategy: ExecutionModel::Sequential,
+            conversation_mode: ConversationMode::Detailed,
+            talk_style: Some(TalkStyle::Research),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            source: PresetSource::System,
+        },
     ]
 }
 
@@ -186,7 +200,7 @@ mod tests {
     #[test]
     fn test_default_presets_count() {
         let presets = get_default_presets();
-        assert_eq!(presets.len(), 7, "Expected 7 system default presets");
+        assert_eq!(presets.len(), 8, "Expected 8 system default presets");
     }
 
     #[test]

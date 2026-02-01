@@ -9,7 +9,9 @@
 
 use orcs_core::memory::MemorySyncService;
 use orcs_core::repository::SessionRepository;
-use orcs_core::search::{SearchFilters, SearchOptions, SearchResult, SearchResultItem, SearchService};
+use orcs_core::search::{
+    SearchFilters, SearchOptions, SearchResult, SearchResultItem, SearchService,
+};
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_infrastructure::paths::{OrcsPaths, ServiceType};
@@ -96,11 +98,16 @@ async fn execute_memory_search(
     let workspace = get_current_workspace(state).await?;
 
     let Some(workspace) = workspace else {
-        return Err("No workspace selected. Memory search requires an active workspace.".to_string());
+        return Err(
+            "No workspace selected. Memory search requires an active workspace.".to_string(),
+        );
     };
 
     let Some(rei_id) = workspace.kaiba_rei_id else {
-        return Err("No Kaiba Rei configured for this workspace. Memory sync has not been performed yet.".to_string());
+        return Err(
+            "No Kaiba Rei configured for this workspace. Memory sync has not been performed yet."
+                .to_string(),
+        );
     };
 
     // Create KaibaMemorySyncService
@@ -142,10 +149,7 @@ async fn execute_memory_search(
 
     let total_matches = items.len();
 
-    tracing::info!(
-        "execute_memory_search: Found {} memories",
-        total_matches
-    );
+    tracing::info!("execute_memory_search: Found {} memories", total_matches);
 
     Ok(SearchResult {
         query: request.query.clone(),

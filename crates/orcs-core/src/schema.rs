@@ -36,6 +36,8 @@ pub enum TalkStyleType {
     Review,
     /// Planning session - structured, forward-thinking, action-oriented.
     Planning,
+    /// Research session - fact-focused, deep investigation, WebSearch-intensive.
+    Research,
 }
 
 impl From<TalkStyle> for TalkStyleType {
@@ -48,6 +50,10 @@ impl From<TalkStyle> for TalkStyleType {
             TalkStyle::ProblemSolving => Self::ProblemSolving,
             TalkStyle::Review => Self::Review,
             TalkStyle::Planning => Self::Planning,
+            TalkStyle::Research => Self::Research,
+            TalkStyle::Template(_) => {
+                unreachable!("Template TalkStyle is not supported in orcs schema")
+            }
         }
     }
 }
@@ -62,6 +68,7 @@ impl From<TalkStyleType> for TalkStyle {
             TalkStyleType::ProblemSolving => Self::ProblemSolving,
             TalkStyleType::Review => Self::Review,
             TalkStyleType::Planning => Self::Planning,
+            TalkStyleType::Research => Self::Research,
         }
     }
 }
@@ -400,7 +407,7 @@ mod tests {
     #[test]
     fn test_talk_style_conversion() {
         let orig = TalkStyle::Brainstorm;
-        let converted: TalkStyleType = orig.into();
+        let converted: TalkStyleType = orig.clone().into();
         let back: TalkStyle = converted.into();
         assert_eq!(orig, back);
     }
@@ -466,6 +473,7 @@ mod tests {
             TalkStyleType::ProblemSolving,
             TalkStyleType::Review,
             TalkStyleType::Planning,
+            TalkStyleType::Research,
         ] {
             let s = variant.to_string();
             let parsed = TalkStyleType::from_str(&s).unwrap();

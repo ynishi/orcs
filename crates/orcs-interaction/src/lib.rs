@@ -311,16 +311,40 @@ impl PersonaBackendAgent {
 #[async_trait::async_trait]
 impl Agent for PersonaBackendAgent {
     type Output = String;
+    type Expertise = String;
 
-    fn expertise(&self) -> &str {
+    fn expertise(&self) -> &String {
+        // Using lazy_static pattern for static storage with dynamic dispatch
+        use std::sync::OnceLock;
+        static EXPERTISE_CLAUDE_CLI: OnceLock<String> = OnceLock::new();
+        static EXPERTISE_CLAUDE_API: OnceLock<String> = OnceLock::new();
+        static EXPERTISE_GEMINI_CLI: OnceLock<String> = OnceLock::new();
+        static EXPERTISE_GEMINI_API: OnceLock<String> = OnceLock::new();
+        static EXPERTISE_OPENAI_API: OnceLock<String> = OnceLock::new();
+        static EXPERTISE_CODEX_CLI: OnceLock<String> = OnceLock::new();
+        static EXPERTISE_KAIBA_API: OnceLock<String> = OnceLock::new();
+
         match self.backend {
-            PersonaBackend::ClaudeCli => "Claude CLI persona agent",
-            PersonaBackend::ClaudeApi => "Claude API persona agent",
-            PersonaBackend::GeminiCli => "Gemini CLI persona agent",
-            PersonaBackend::GeminiApi => "Gemini API persona agent",
-            PersonaBackend::OpenAiApi => "OpenAI API persona agent",
-            PersonaBackend::CodexCli => "Codex CLI persona agent",
-            PersonaBackend::KaibaApi => "Kaiba API persona agent (with persistent memory)",
+            PersonaBackend::ClaudeCli => {
+                EXPERTISE_CLAUDE_CLI.get_or_init(|| "Claude CLI persona agent".to_string())
+            }
+            PersonaBackend::ClaudeApi => {
+                EXPERTISE_CLAUDE_API.get_or_init(|| "Claude API persona agent".to_string())
+            }
+            PersonaBackend::GeminiCli => {
+                EXPERTISE_GEMINI_CLI.get_or_init(|| "Gemini CLI persona agent".to_string())
+            }
+            PersonaBackend::GeminiApi => {
+                EXPERTISE_GEMINI_API.get_or_init(|| "Gemini API persona agent".to_string())
+            }
+            PersonaBackend::OpenAiApi => {
+                EXPERTISE_OPENAI_API.get_or_init(|| "OpenAI API persona agent".to_string())
+            }
+            PersonaBackend::CodexCli => {
+                EXPERTISE_CODEX_CLI.get_or_init(|| "Codex CLI persona agent".to_string())
+            }
+            PersonaBackend::KaibaApi => EXPERTISE_KAIBA_API
+                .get_or_init(|| "Kaiba API persona agent (with persistent memory)".to_string()),
         }
     }
 
@@ -339,7 +363,7 @@ fn agent_for_persona(
     persona: &PersonaDomain,
     workspace_root: Arc<RwLock<Option<PathBuf>>>,
     env_settings: Arc<RwLock<EnvSettings>>,
-) -> Box<dyn Agent<Output = String>> {
+) -> Box<dyn Agent<Output = String, Expertise = String>> {
     use llm_toolkit::agent::chat::Chat;
     use llm_toolkit::agent::persona::ContextConfig;
 
@@ -655,7 +679,7 @@ impl InteractionManager {
         // Read current talk style (only in Rich mode)
         let context_mode = *self.context_mode.read().await;
         let talk_style = if matches!(context_mode, ContextMode::Rich) {
-            *self.talk_style.read().await
+            self.talk_style.read().await.clone()
         } else {
             None // Clean mode: no talk style
         };
@@ -826,7 +850,7 @@ impl InteractionManager {
         }
 
         let conversation_mode = self.conversation_mode.read().await.clone();
-        let talk_style = *self.talk_style.read().await;
+        let talk_style = self.talk_style.read().await.clone();
         let auto_chat_config = self.auto_chat_config.read().await.clone();
         let is_muted = *self.is_muted.read().await;
 
@@ -1257,6 +1281,8 @@ impl InteractionManager {
                 TalkStyle::ProblemSolving => "問題解決",
                 TalkStyle::Review => "レビュー",
                 TalkStyle::Planning => "計画",
+                TalkStyle::Research => "リサーチ",
+                TalkStyle::Template(t) => t.name.as_str(),
             };
             let system_msg = ConversationMessage {
                 role: MessageRole::System,
@@ -1282,7 +1308,7 @@ impl InteractionManager {
 
     /// Gets the current talk style.
     pub async fn get_talk_style(&self) -> Option<TalkStyle> {
-        *self.talk_style.read().await
+        self.talk_style.read().await.clone()
     }
 
     /// Sets an additional prompt extension that will be appended to the system prompt.

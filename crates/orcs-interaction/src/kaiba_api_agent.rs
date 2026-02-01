@@ -326,9 +326,14 @@ impl KaibaApiAgent {
 #[async_trait]
 impl Agent for KaibaApiAgent {
     type Output = String;
+    type Expertise = String;
 
-    fn expertise(&self) -> &str {
-        "Kaiba API agent with persistent memory and context awareness"
+    fn expertise(&self) -> &String {
+        use std::sync::OnceLock;
+        static EXPERTISE: OnceLock<String> = OnceLock::new();
+        EXPERTISE.get_or_init(|| {
+            "Kaiba API agent with persistent memory and context awareness".to_string()
+        })
     }
 
     /// Executes the agent with the given payload.

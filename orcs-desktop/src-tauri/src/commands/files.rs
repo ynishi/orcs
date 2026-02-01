@@ -165,10 +165,7 @@ pub async fn save_code_snippet(
 /// - Linux: Terminal command (e.g., "kitty", "alacritty")
 /// - Windows: Terminal command (e.g., "wt" for Windows Terminal)
 #[tauri::command]
-pub async fn open_terminal(
-    directory: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn open_terminal(directory: String, state: State<'_, AppState>) -> Result<(), String> {
     let config = state.config_service.get_config();
     let custom_app = config.terminal_settings.custom_app;
 
@@ -210,11 +207,7 @@ pub async fn open_terminal(
                 return Ok(());
             }
             // Fall back to starting in directory
-            if Command::new(custom)
-                .current_dir(&directory)
-                .spawn()
-                .is_ok()
-            {
+            if Command::new(custom).current_dir(&directory).spawn().is_ok() {
                 return Ok(());
             }
             return Err(format!("Failed to open terminal '{}'", custom));

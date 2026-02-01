@@ -254,9 +254,12 @@ impl GeminiApiAgent {
 #[async_trait]
 impl Agent for GeminiApiAgent {
     type Output = String;
+    type Expertise = String;
 
-    fn expertise(&self) -> &str {
-        "Gemini API agent for multimodal reasoning"
+    fn expertise(&self) -> &String {
+        use std::sync::OnceLock;
+        static EXPERTISE: OnceLock<String> = OnceLock::new();
+        EXPERTISE.get_or_init(|| "Gemini API agent for multimodal reasoning".to_string())
     }
 
     async fn execute(&self, payload: Payload) -> Result<Self::Output, AgentError> {

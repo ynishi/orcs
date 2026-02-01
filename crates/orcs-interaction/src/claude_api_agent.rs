@@ -180,9 +180,13 @@ impl ClaudeApiAgent {
 #[async_trait]
 impl Agent for ClaudeApiAgent {
     type Output = String;
+    type Expertise = String;
 
-    fn expertise(&self) -> &str {
-        "Claude API agent for advanced reasoning and coding tasks"
+    fn expertise(&self) -> &String {
+        use std::sync::OnceLock;
+        static EXPERTISE: OnceLock<String> = OnceLock::new();
+        EXPERTISE
+            .get_or_init(|| "Claude API agent for advanced reasoning and coding tasks".to_string())
     }
 
     async fn execute(&self, payload: Payload) -> Result<Self::Output, AgentError> {

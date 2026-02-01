@@ -110,8 +110,10 @@ fn main() {
                 tauri::async_runtime::spawn(async move {
                     // Check if memory sync is enabled in config
                     let memory_sync_settings = user_service_for_memory.get_memory_sync_settings();
-                    println!("[MemorySync] Settings: enabled={}, interval={}s",
-                        memory_sync_settings.enabled, memory_sync_settings.interval_secs);
+                    println!(
+                        "[MemorySync] Settings: enabled={}, interval={}s",
+                        memory_sync_settings.enabled, memory_sync_settings.interval_secs
+                    );
                     if !memory_sync_settings.enabled {
                         println!("[MemorySync] Disabled in config, skipping");
                         return;
@@ -122,7 +124,9 @@ fn main() {
                     // Try to initialize Kaiba memory sync service
                     match orcs_interaction::KaibaMemorySyncService::try_from_env().await {
                         Ok(kaiba_service) => {
-                            println!("[MemorySync] KaibaMemorySyncService initialized successfully");
+                            println!(
+                                "[MemorySync] KaibaMemorySyncService initialized successfully"
+                            );
 
                             // Set the memory sync service
                             let service: Arc<dyn orcs_core::memory::MemorySyncService> =
@@ -135,12 +139,18 @@ fn main() {
                             let callback = std::sync::Arc::new(move |error_msg: String| {
                                 tracing::warn!("[MemorySync] Error: {}", error_msg);
                                 // Emit toast event to frontend
-                                if let Err(e) = handle_for_memory_sync.emit("toast", serde_json::json!({
-                                    "type": "error",
-                                    "title": "Memory Sync Error",
-                                    "message": error_msg,
-                                })) {
-                                    tracing::error!("[MemorySync] Failed to emit toast event: {}", e);
+                                if let Err(e) = handle_for_memory_sync.emit(
+                                    "toast",
+                                    serde_json::json!({
+                                        "type": "error",
+                                        "title": "Memory Sync Error",
+                                        "message": error_msg,
+                                    }),
+                                ) {
+                                    tracing::error!(
+                                        "[MemorySync] Failed to emit toast event: {}",
+                                        e
+                                    );
                                 }
                             });
                             session_usecase_for_memory
@@ -148,12 +158,18 @@ fn main() {
                                 .await;
 
                             // Start background memory sync scheduler with configured interval
-                            session_usecase_for_memory.start_memory_sync_scheduler(memory_sync_settings.interval_secs);
+                            session_usecase_for_memory
+                                .start_memory_sync_scheduler(memory_sync_settings.interval_secs);
 
-                            println!("[MemorySync] Service, error callback, and scheduler configured");
+                            println!(
+                                "[MemorySync] Service, error callback, and scheduler configured"
+                            );
                         }
                         Err(e) => {
-                            println!("[MemorySync] Failed to initialize KaibaMemorySyncService: {}", e);
+                            println!(
+                                "[MemorySync] Failed to initialize KaibaMemorySyncService: {}",
+                                e
+                            );
                         }
                     }
                 });

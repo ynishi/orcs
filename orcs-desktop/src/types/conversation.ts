@@ -102,6 +102,12 @@ export const TALK_STYLES: TalkStyleOption[] = [
     icon: '📋',
     description: 'Planning session',
   },
+  {
+    value: 'Research',
+    label: 'Research',
+    icon: '🔬',
+    description: 'Fact-focused deep investigation',
+  },
 ];
 
 export function getConversationModeOption(mode: ConversationModeType): ConversationModeOption | undefined {

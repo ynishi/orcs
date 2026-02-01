@@ -21,12 +21,15 @@ pub mod tracing_layer;
 ///
 /// Wraps any Agent<Output = String> to make it compatible with DynamicAgent trait.
 struct DynamicAgentAdapter {
-    agent: Arc<dyn Agent<Output = String> + Send + Sync>,
+    agent: Arc<dyn Agent<Output = String, Expertise = &'static str> + Send + Sync>,
     name: String,
 }
 
 impl DynamicAgentAdapter {
-    fn new(agent: Arc<dyn Agent<Output = String> + Send + Sync>, name: String) -> Self {
+    fn new(
+        agent: Arc<dyn Agent<Output = String, Expertise = &'static str> + Send + Sync>,
+        name: String,
+    ) -> Self {
         Self { agent, name }
     }
 }
@@ -42,8 +45,12 @@ impl llm_toolkit::agent::DynamicAgent for DynamicAgentAdapter {
         self.name.clone()
     }
 
+    fn description(&self) -> &str {
+        self.agent.description()
+    }
+
     fn expertise(&self) -> &str {
-        self.agent.expertise()
+        *self.agent.expertise()
     }
 }
 
@@ -51,7 +58,7 @@ impl llm_toolkit::agent::DynamicAgent for DynamicAgentAdapter {
 ///
 /// This struct implements task execution logic using ParallelOrchestrator.
 pub struct TaskExecutor {
-    agent: Arc<dyn Agent<Output = String> + Send + Sync>,
+    agent: Arc<dyn Agent<Output = String, Expertise = &'static str> + Send + Sync>,
     task_repository: Option<Arc<dyn TaskRepository>>,
     event_sender: Option<mpsc::UnboundedSender<tracing_layer::OrchestratorEvent>>,
     utility_service: Option<Arc<UtilityAgentService>>,
@@ -75,7 +82,9 @@ impl TaskExecutor {
     }
 
     /// Creates a new `TaskExecutor` instance with a custom agent.
-    pub fn with_agent(agent: Arc<dyn Agent<Output = String> + Send + Sync>) -> Self {
+    pub fn with_agent(
+        agent: Arc<dyn Agent<Output = String, Expertise = &'static str> + Send + Sync>,
+    ) -> Self {
         Self {
             agent,
             task_repository: None,
@@ -205,7 +214,7 @@ impl TaskExecutor {
                 ClaudeCodeAgent::new()
                     .with_cwd(workspace.clone())
                     .with_env("PATH", enhanced_path),
-            ) as Arc<dyn Agent<Output = String> + Send + Sync>
+            ) as Arc<dyn Agent<Output = String, Expertise = &'static str> + Send + Sync>
         } else {
             self.agent.clone()
         };

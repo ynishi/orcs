@@ -103,9 +103,12 @@ impl WebSearchAgent {
 #[async_trait]
 impl Agent for WebSearchAgent {
     type Output = WebSearchResponse;
+    type Expertise = String;
 
-    fn expertise(&self) -> &str {
-        "Google Web Search agent"
+    fn expertise(&self) -> &String {
+        use std::sync::OnceLock;
+        static EXPERTISE: OnceLock<String> = OnceLock::new();
+        EXPERTISE.get_or_init(|| "Google Web Search agent".to_string())
     }
 
     async fn execute(&self, payload: Payload) -> Result<Self::Output, AgentError> {

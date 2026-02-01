@@ -1390,6 +1390,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "fuzzy-parser"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f76a3c3a1bfb60924fded82f72b5e71d375ffc48e9a2f4dc2ae226b89e4a8f89"
+dependencies = [
+ "serde",
+ "serde_json",
+ "strsim",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "fxhash"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2322,14 +2334,15 @@ checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
 
 [[package]]
 name = "llm-toolkit"
-version = "0.55.2"
+version = "0.61.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "660d0f12055eb1d86db8f153835b318f7de1ea1e97fa64887b7a8561ed56761e"
+checksum = "b14f7aa76abb849eeb810864b3f415b9cd111fd74efdd22dbb20bb5649d592d0"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
  "futures",
+ "fuzzy-parser",
  "llm-toolkit-macros",
  "log",
  "mime_guess",
@@ -2337,6 +2350,7 @@ dependencies = [
  "quick-xml 0.38.3",
  "rand 0.8.5",
  "regex",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -2350,9 +2364,9 @@ dependencies = [
 
 [[package]]
 name = "llm-toolkit-macros"
-version = "0.55.2"
+version = "0.61.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "760229ff174c28e321af32173556db22b4b3df5f39fd500196270bfb60496736"
+checksum = "0d35a65288d3f767302d64311c6c0b1d961f10295a8ee516c2ca28243b4e8044"
 dependencies = [
  "minijinja",
  "proc-macro-crate 3.4.0",

@@ -196,7 +196,7 @@ pub trait WorkspaceStorageService: Send + Sync {
     /// - The file does not exist
     /// - The update operation fails
     async fn toggle_file_default_attachment(&self, workspace_id: &str, file_id: &str)
-        -> Result<()>;
+    -> Result<()>;
 
     /// Moves a file's sort order within the favorited files list.
     ///

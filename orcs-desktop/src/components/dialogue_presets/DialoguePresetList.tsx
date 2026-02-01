@@ -168,6 +168,7 @@ export function DialoguePresetList({
               onChange={(value) => onTalkStyleChange?.(value || null)}
               placeholder={DEFAULT_STYLE_LABEL}
               clearable
+              maxDropdownHeight={280}
             />
           </Box>
 

@@ -107,7 +107,10 @@ impl KaibaMemorySyncService {
                 }
             }
             Err(e) => {
-                tracing::debug!("[KaibaMemorySync] Failed to create SecretServiceImpl: {}", e);
+                tracing::debug!(
+                    "[KaibaMemorySync] Failed to create SecretServiceImpl: {}",
+                    e
+                );
                 None
             }
         };
@@ -120,14 +123,22 @@ impl KaibaMemorySyncService {
             let kaiba_url = env::var("KAIBA_URL").unwrap_or_else(|_| DEFAULT_KAIBA_URL.to_string());
             (kaiba_url, Some(kaiba_api_key))
         } else {
-            tracing::debug!("[KaibaMemorySync] No configuration found in secret.json or environment variables");
-            return Err("No Kaiba configuration found in secret.json or environment variables".to_string());
+            tracing::debug!(
+                "[KaibaMemorySync] No configuration found in secret.json or environment variables"
+            );
+            return Err(
+                "No Kaiba configuration found in secret.json or environment variables".to_string(),
+            );
         };
 
         tracing::info!(
             "[KaibaMemorySync] Initialized with URL: {}, API key: {}",
             kaiba_url,
-            if kaiba_api_key.is_some() { "present" } else { "none" }
+            if kaiba_api_key.is_some() {
+                "present"
+            } else {
+                "none"
+            }
         );
 
         Ok(Self::new(kaiba_url, kaiba_api_key))
@@ -141,7 +152,6 @@ impl KaibaMemorySyncService {
             request
         }
     }
-
 }
 
 #[async_trait]
@@ -149,11 +159,8 @@ impl MemorySyncService for KaibaMemorySyncService {
     async fn ensure_rei_exists(&self, rei_id: &str, workspace_name: &str) -> Result<(), String> {
         // First, check if Rei exists
         let check_url = format!("{}/kaiba/rei/{}", self.kaiba_url, rei_id);
-        let check_request = self.auth_request(
-            self.client
-                .get(&check_url)
-                .timeout(Duration::from_secs(10)),
-        );
+        let check_request =
+            self.auth_request(self.client.get(&check_url).timeout(Duration::from_secs(10)));
 
         match check_request.send().await {
             Ok(response) if response.status().is_success() => {

@@ -2312,8 +2312,8 @@ impl version_migrate::FromDomain<Session> for SessionV4_3_0 {
             auto_chat_config,
             is_muted,
             context_mode,
-            sandbox_state: _,         // V4_3_0 doesn't persist sandbox_state
-            last_memory_sync_at: _,   // V4_3_0 doesn't persist last_memory_sync_at
+            sandbox_state: _,       // V4_3_0 doesn't persist sandbox_state
+            last_memory_sync_at: _, // V4_3_0 doesn't persist last_memory_sync_at
         } = session;
 
         SessionV4_3_0 {
@@ -2378,7 +2378,7 @@ impl version_migrate::FromDomain<Session> for SessionV4_4_0 {
             is_muted,
             context_mode,
             sandbox_state,
-            last_memory_sync_at: _,   // V4_4_0 doesn't persist last_memory_sync_at
+            last_memory_sync_at: _, // V4_4_0 doesn't persist last_memory_sync_at
         } = session;
 
         // Convert HashMap<String, Option<String>> to HashMap<String, String>

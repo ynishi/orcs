@@ -177,9 +177,14 @@ impl OpenAIApiAgent {
 #[async_trait]
 impl Agent for OpenAIApiAgent {
     type Output = String;
+    type Expertise = String;
 
-    fn expertise(&self) -> &str {
-        "OpenAI GPT agent for general-purpose reasoning and coding tasks"
+    fn expertise(&self) -> &String {
+        use std::sync::OnceLock;
+        static EXPERTISE: OnceLock<String> = OnceLock::new();
+        EXPERTISE.get_or_init(|| {
+            "OpenAI GPT agent for general-purpose reasoning and coding tasks".to_string()
+        })
     }
 
     async fn execute(&self, payload: Payload) -> Result<Self::Output, AgentError> {

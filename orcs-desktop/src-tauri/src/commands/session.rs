@@ -7,7 +7,7 @@ use orcs_core::session::{
     AppMode, AutoChatConfig, ConversationMode, ErrorSeverity, ModeratorAction,
     PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent, SessionRepository,
 };
-use orcs_core::slash_command::{builtin_commands, CommandType, SlashCommand};
+use orcs_core::slash_command::{CommandType, SlashCommand, builtin_commands};
 use orcs_core::workspace::manager::WorkspaceStorageService;
 use orcs_interaction::InteractionResult;
 use serde::{Deserialize, Serialize};

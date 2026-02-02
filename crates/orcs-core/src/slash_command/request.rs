@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{ActionConfig, CommandType, SlashCommand};
+use super::{ActionConfig, CommandType, PipelineConfig, SlashCommand};
 
 /// Request to create a new slash command.
 ///
@@ -47,6 +47,11 @@ pub struct CreateSlashCommandRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "actionConfig")]
     pub action_config: Option<ActionConfig>,
+
+    /// Configuration for Pipeline type commands (steps to execute)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "pipelineConfig")]
+    pub pipeline_config: Option<PipelineConfig>,
 
     /// Whether to include this command in system prompts for personas.
     /// If not provided, defaults based on command_type:
@@ -129,6 +134,7 @@ impl CreateSlashCommandRequest {
             args_description: self.args_description,
             task_blueprint: self.task_blueprint,
             action_config: self.action_config,
+            pipeline_config: self.pipeline_config,
             include_in_system_prompt,
             is_favorite: self.is_favorite.unwrap_or(false),
             sort_order: self.sort_order,
@@ -147,6 +153,7 @@ impl CreateSlashCommandRequest {
             args_description: cmd.args_description.clone(),
             task_blueprint: cmd.task_blueprint.clone(),
             action_config: cmd.action_config.clone(),
+            pipeline_config: cmd.pipeline_config.clone(),
             include_in_system_prompt: Some(cmd.include_in_system_prompt),
             is_favorite: Some(cmd.is_favorite),
             sort_order: cmd.sort_order,
@@ -170,6 +177,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: None,
             is_favorite: None,
             sort_order: None,
@@ -190,6 +198,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: None,
             is_favorite: None,
             sort_order: None,
@@ -210,6 +219,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: None,
             is_favorite: None,
             sort_order: None,
@@ -230,6 +240,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: None,
             is_favorite: None,
             sort_order: None,
@@ -250,6 +261,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: None,
             is_favorite: None,
             sort_order: None,
@@ -270,6 +282,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: None,
             is_favorite: None,
             sort_order: None,
@@ -290,6 +303,7 @@ mod tests {
             args_description: Some("args".to_string()),
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: None,
             is_favorite: None,
             sort_order: None,
@@ -316,6 +330,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: None,
             is_favorite: None,
             sort_order: None,
@@ -358,6 +373,7 @@ mod tests {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: None,
             is_favorite: Some(true),
             sort_order: Some(1),

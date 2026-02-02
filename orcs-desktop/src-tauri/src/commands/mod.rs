@@ -109,6 +109,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sy
         slash_commands::execute_shell_command,
         slash_commands::execute_task_command,
         slash_commands::execute_action_command,
+        slash_commands::execute_pipeline_command,
         slash_commands::toggle_slash_command_favorite,
         slash_commands::update_slash_command_sort_order,
         slash_commands::toggle_slash_command_include_in_system_prompt,

@@ -1127,6 +1127,13 @@ pub async fn handle_input(
                                     cmd_name
                                 )
                             }
+                            CommandType::Pipeline => {
+                                // Pipeline commands should be handled separately via execute_pipeline_command
+                                format!(
+                                    "Pipeline command '{}' requires async execution via the slash command handler.",
+                                    cmd_name
+                                )
+                            }
                         }
                     }
                     Ok(None) => format!(

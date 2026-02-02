@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use version_migrate::{FromDomain, IntoDomain, MigratesTo, Versioned};
 
-use orcs_core::slash_command::{ActionConfig, CommandType, SlashCommand};
+use orcs_core::slash_command::{ActionConfig, CommandType, PipelineConfig, SlashCommand};
 
 /// Slash command DTO V1.0.0
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
@@ -233,8 +233,60 @@ pub struct SlashCommandV1_5 {
     pub sort_order: Option<u32>,
 }
 
-/// Convert SlashCommandV1_5 DTO to domain model
-impl IntoDomain<SlashCommand> for SlashCommandV1_5 {
+/// Migration from SlashCommandV1_5 to SlashCommandV1_6.
+/// Adds pipeline_config field for Pipeline type commands.
+impl MigratesTo<SlashCommandV1_6> for SlashCommandV1_5 {
+    fn migrate(self) -> SlashCommandV1_6 {
+        SlashCommandV1_6 {
+            name: self.name,
+            icon: self.icon,
+            description: self.description,
+            command_type: self.command_type,
+            content: self.content,
+            working_dir: self.working_dir,
+            args_description: self.args_description,
+            task_blueprint: self.task_blueprint,
+            action_config: self.action_config,
+            pipeline_config: None, // Default: no pipeline config for existing commands
+            include_in_system_prompt: self.include_in_system_prompt,
+            is_favorite: self.is_favorite,
+            sort_order: self.sort_order,
+        }
+    }
+}
+
+/// Slash command DTO V1.6.0 (adds pipeline_config)
+/// Supports Pipeline type commands that execute multiple commands in sequence.
+#[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
+#[versioned(version = "1.6.0")]
+pub struct SlashCommandV1_6 {
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub command_type: CommandType,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_blueprint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_config: Option<ActionConfig>,
+    /// Configuration for Pipeline type commands (steps to execute)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline_config: Option<PipelineConfig>,
+    #[serde(default = "default_include_in_system_prompt")]
+    pub include_in_system_prompt: bool,
+    #[serde(default)]
+    pub is_favorite: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<u32>,
+}
+
+/// Convert SlashCommandV1_6 DTO to domain model
+impl IntoDomain<SlashCommand> for SlashCommandV1_6 {
     fn into_domain(self) -> SlashCommand {
         SlashCommand {
             name: self.name,
@@ -246,6 +298,7 @@ impl IntoDomain<SlashCommand> for SlashCommandV1_5 {
             args_description: self.args_description,
             task_blueprint: self.task_blueprint,
             action_config: self.action_config,
+            pipeline_config: self.pipeline_config,
             include_in_system_prompt: self.include_in_system_prompt,
             is_favorite: self.is_favorite,
             sort_order: self.sort_order,
@@ -253,10 +306,10 @@ impl IntoDomain<SlashCommand> for SlashCommandV1_5 {
     }
 }
 
-/// Convert domain model to SlashCommandV1_5 DTO for persistence
-impl From<&SlashCommand> for SlashCommandV1_5 {
+/// Convert domain model to SlashCommandV1_6 DTO for persistence
+impl From<&SlashCommand> for SlashCommandV1_6 {
     fn from(cmd: &SlashCommand) -> Self {
-        SlashCommandV1_5 {
+        SlashCommandV1_6 {
             name: cmd.name.clone(),
             icon: cmd.icon.clone(),
             description: cmd.description.clone(),
@@ -266,6 +319,7 @@ impl From<&SlashCommand> for SlashCommandV1_5 {
             args_description: cmd.args_description.clone(),
             task_blueprint: cmd.task_blueprint.clone(),
             action_config: cmd.action_config.clone(),
+            pipeline_config: cmd.pipeline_config.clone(),
             include_in_system_prompt: cmd.include_in_system_prompt,
             is_favorite: cmd.is_favorite,
             sort_order: cmd.sort_order,
@@ -273,10 +327,10 @@ impl From<&SlashCommand> for SlashCommandV1_5 {
     }
 }
 
-/// Convert domain model to SlashCommandV1_5 DTO (for version-migrate save support)
-impl FromDomain<SlashCommand> for SlashCommandV1_5 {
+/// Convert domain model to SlashCommandV1_6 DTO (for version-migrate save support)
+impl FromDomain<SlashCommand> for SlashCommandV1_6 {
     fn from_domain(cmd: SlashCommand) -> Self {
-        SlashCommandV1_5 {
+        SlashCommandV1_6 {
             name: cmd.name,
             icon: cmd.icon,
             description: cmd.description,
@@ -286,6 +340,7 @@ impl FromDomain<SlashCommand> for SlashCommandV1_5 {
             args_description: cmd.args_description,
             task_blueprint: cmd.task_blueprint,
             action_config: cmd.action_config,
+            pipeline_config: cmd.pipeline_config,
             include_in_system_prompt: cmd.include_in_system_prompt,
             is_favorite: cmd.is_favorite,
             sort_order: cmd.sort_order,
@@ -306,6 +361,7 @@ pub fn create_slash_command_migrator() -> version_migrate::Migrator {
         SlashCommandV1_3,
         SlashCommandV1_4,
         SlashCommandV1_5,
+        SlashCommandV1_6,
         SlashCommand
     ], save = true)
     .expect("Failed to create slash_command migrator")

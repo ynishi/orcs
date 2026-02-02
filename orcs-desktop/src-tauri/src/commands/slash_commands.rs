@@ -501,6 +501,316 @@ pub async fn execute_action_command(
     })
 }
 
+/// Result of executing a pipeline command
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineResult {
+    /// Whether all steps completed successfully
+    pub success: bool,
+    /// Results from each step
+    pub step_results: Vec<PipelineStepResult>,
+    /// Total execution summary
+    pub summary: String,
+}
+
+/// Result of a single pipeline step
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineStepResult {
+    /// The command that was executed
+    pub command_name: String,
+    /// Whether this step succeeded
+    pub success: bool,
+    /// The output/result of this step
+    pub output: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Executes a pipeline command (multiple commands in sequence)
+#[tauri::command]
+pub async fn execute_pipeline_command(
+    command_name: String,
+    thread_content: String,
+    args: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<PipelineResult, String> {
+    use orcs_core::slash_command::CommandType;
+
+    // Get the pipeline command
+    let command = state
+        .slash_command_repository
+        .get_command(&command_name)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Command not found: {}", command_name))?;
+
+    // Verify it's a Pipeline type
+    if command.command_type != CommandType::Pipeline {
+        return Err(format!(
+            "Command '{}' is not a pipeline command (type: {:?})",
+            command_name, command.command_type
+        ));
+    }
+
+    // Get pipeline config
+    let config = command
+        .pipeline_config
+        .as_ref()
+        .ok_or("Pipeline command has no pipeline configuration")?;
+
+    tracing::info!(
+        "[SlashCommand] Executing pipeline '{}' with {} steps",
+        command_name,
+        config.steps.len()
+    );
+
+    // Get session_id for task tracking
+    let session_id = if let Some(session_mgr) = state.session_usecase.active_session().await {
+        let app_mode = state.app_mode.lock().await.clone();
+        let session = session_mgr
+            .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+            .await;
+        session.id
+    } else {
+        "unknown".to_string()
+    };
+
+    // Create Task record for tracking
+    let task_id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let step_names: Vec<&str> = config.steps.iter().map(|s| s.command_name.as_str()).collect();
+    let title = format!("Pipeline: {}", step_names.join(" → "));
+
+    let mut task = Task {
+        id: task_id.clone(),
+        session_id,
+        title,
+        description: format!("Executing pipeline: /{}", command_name),
+        status: TaskStatus::Pending,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        completed_at: None,
+        steps_executed: 0,
+        steps_skipped: 0,
+        context_keys: 0,
+        error: None,
+        result: None,
+        execution_details: None,
+        strategy: None,
+        journal_log: None,
+    };
+
+    // Save and emit task created event
+    let _ = state.task_repository.save(&task).await;
+    let event = OrchestratorEventBuilder::info_from_task("Pipeline task created", &task).build();
+    let _ = state.event_sender.send(event);
+
+    // Update to Running
+    task.status = TaskStatus::Running;
+    task.updated_at = Utc::now().to_rfc3339();
+    let _ = state.task_repository.save(&task).await;
+    let event = OrchestratorEventBuilder::info_from_task("Pipeline task started", &task).build();
+    let _ = state.event_sender.send(event);
+
+    // Execute each step in sequence
+    let mut step_results = Vec::new();
+    let mut current_input = thread_content;
+    let mut all_success = true;
+
+    for (idx, step) in config.steps.iter().enumerate() {
+        tracing::info!(
+            "[Pipeline] Executing step {}/{}: /{}",
+            idx + 1,
+            config.steps.len(),
+            step.command_name
+        );
+
+        // Get the step command
+        let step_cmd = match state
+            .slash_command_repository
+            .get_command(&step.command_name)
+            .await
+        {
+            Ok(Some(cmd)) => cmd,
+            Ok(None) => {
+                let error = format!("Step command not found: /{}", step.command_name);
+                step_results.push(PipelineStepResult {
+                    command_name: step.command_name.clone(),
+                    success: false,
+                    output: String::new(),
+                    error: Some(error.clone()),
+                });
+                if config.fail_on_error {
+                    all_success = false;
+                    break;
+                }
+                continue;
+            }
+            Err(e) => {
+                let error = format!("Failed to load step command: {}", e);
+                step_results.push(PipelineStepResult {
+                    command_name: step.command_name.clone(),
+                    success: false,
+                    output: String::new(),
+                    error: Some(error.clone()),
+                });
+                if config.fail_on_error {
+                    all_success = false;
+                    break;
+                }
+                continue;
+            }
+        };
+
+        // Determine args for this step
+        let step_args = step.args.clone().or_else(|| args.clone());
+
+        // Execute based on command type
+        let step_result = match step_cmd.command_type {
+            CommandType::Action => {
+                // Execute action command
+                match super::slash_commands::execute_action_command(
+                    step.command_name.clone(),
+                    current_input.clone(),
+                    step_args,
+                    state.clone(),
+                )
+                .await
+                {
+                    Ok(result) => PipelineStepResult {
+                        command_name: step.command_name.clone(),
+                        success: true,
+                        output: result.result.clone(),
+                        error: None,
+                    },
+                    Err(e) => PipelineStepResult {
+                        command_name: step.command_name.clone(),
+                        success: false,
+                        output: String::new(),
+                        error: Some(e),
+                    },
+                }
+            }
+            CommandType::Prompt => {
+                // For prompt commands, expand and return content
+                let expanded_content = if step_cmd.content.contains("{args}") {
+                    step_cmd
+                        .content
+                        .replace("{args}", step_args.as_deref().unwrap_or(""))
+                } else {
+                    step_cmd.content.clone()
+                };
+                PipelineStepResult {
+                    command_name: step.command_name.clone(),
+                    success: true,
+                    output: expanded_content,
+                    error: None,
+                }
+            }
+            CommandType::Shell => {
+                // Execute shell command
+                match super::slash_commands::execute_shell_command(
+                    step_cmd.content.clone(),
+                    step_cmd.working_dir.clone(),
+                    state.clone(),
+                )
+                .await
+                {
+                    Ok(output) => PipelineStepResult {
+                        command_name: step.command_name.clone(),
+                        success: true,
+                        output,
+                        error: None,
+                    },
+                    Err(e) => PipelineStepResult {
+                        command_name: step.command_name.clone(),
+                        success: false,
+                        output: String::new(),
+                        error: Some(e),
+                    },
+                }
+            }
+            CommandType::Task | CommandType::Pipeline => {
+                // Task and nested Pipeline not supported in pipeline steps
+                PipelineStepResult {
+                    command_name: step.command_name.clone(),
+                    success: false,
+                    output: String::new(),
+                    error: Some(format!(
+                        "Command type {:?} not supported in pipeline steps",
+                        step_cmd.command_type
+                    )),
+                }
+            }
+        };
+
+        // Chain output if configured
+        if config.chain_output && step_result.success {
+            current_input = step_result.output.clone();
+        }
+
+        // Check for failure
+        if !step_result.success {
+            all_success = false;
+            step_results.push(step_result);
+            if config.fail_on_error {
+                break;
+            }
+        } else {
+            task.steps_executed += 1;
+            step_results.push(step_result);
+        }
+    }
+
+    // Update task with final status
+    let completed_at = Utc::now().to_rfc3339();
+    task.updated_at = completed_at.clone();
+    task.completed_at = Some(completed_at);
+
+    let summary = if all_success {
+        format!(
+            "Pipeline completed: {} steps executed successfully",
+            step_results.len()
+        )
+    } else {
+        let failed: Vec<_> = step_results
+            .iter()
+            .filter(|r| !r.success)
+            .map(|r| format!("/{}", r.command_name))
+            .collect();
+        format!("Pipeline failed at: {}", failed.join(", "))
+    };
+
+    if all_success {
+        task.status = TaskStatus::Completed;
+        task.result = Some(summary.clone());
+        let _ = state.task_repository.save(&task).await;
+        let event =
+            OrchestratorEventBuilder::info_from_task("Pipeline task completed", &task).build();
+        let _ = state.event_sender.send(event);
+    } else {
+        task.status = TaskStatus::Failed;
+        task.error = Some(summary.clone());
+        let _ = state.task_repository.save(&task).await;
+        let event =
+            OrchestratorEventBuilder::error_from_task("Pipeline task failed", &task).build();
+        let _ = state.event_sender.send(event);
+    }
+
+    tracing::info!(
+        "[SlashCommand] Pipeline '{}' completed: {}",
+        command_name,
+        summary
+    );
+
+    Ok(PipelineResult {
+        success: all_success,
+        step_results,
+        summary,
+    })
+}
+
 /// Extract recent messages from thread content
 ///
 /// Messages are separated by "---\n" delimiter.

@@ -1,7 +1,29 @@
 /**
  * Type of slash command execution
  */
-export type CommandType = 'prompt' | 'shell' | 'task' | 'action';
+export type CommandType = 'prompt' | 'shell' | 'task' | 'action' | 'pipeline';
+
+/**
+ * A single step in a pipeline
+ */
+export interface PipelineStep {
+  /** Name of the command to execute */
+  commandName: string;
+  /** Optional arguments for this step */
+  args?: string;
+}
+
+/**
+ * Configuration for Pipeline type commands
+ */
+export interface PipelineConfig {
+  /** Ordered list of steps to execute */
+  steps: PipelineStep[];
+  /** Stop execution on first error (default: true) */
+  failOnError: boolean;
+  /** Pass previous step output as input to next step (default: true) */
+  chainOutput: boolean;
+}
 
 /**
  * Configuration for Action type commands
@@ -47,6 +69,8 @@ export interface SlashCommand {
   taskBlueprint?: string;
   /** Configuration for Action type commands (backend, model, etc.) */
   actionConfig?: ActionConfig;
+  /** Configuration for Pipeline type commands */
+  pipelineConfig?: PipelineConfig;
   /**
    * Whether to include this command in system prompts for personas.
    * Default: true for Prompt/Shell/Action, false for Task
@@ -78,6 +102,36 @@ export interface ActionPersonaInfo {
 export interface ActionCommandResult {
   result: string;
   personaInfo?: ActionPersonaInfo;
+}
+
+/**
+ * Result of a single pipeline step execution
+ */
+export interface PipelineStepResult {
+  /** Step index (0-based) */
+  stepIndex: number;
+  /** Command name that was executed */
+  commandName: string;
+  /** Whether the step succeeded */
+  success: boolean;
+  /** Output content from the step */
+  output?: string;
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
+ * Result of executing a pipeline command
+ */
+export interface PipelineResult {
+  /** Overall success status */
+  success: boolean;
+  /** Results from each step */
+  steps: PipelineStepResult[];
+  /** Final combined output */
+  finalOutput?: string;
+  /** Error message if pipeline failed */
+  error?: string;
 }
 
 /**

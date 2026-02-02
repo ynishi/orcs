@@ -66,6 +66,10 @@ pub async fn expand_slash_command(
             // Return empty string or action description
             command.content.clone()
         }
+        CommandType::Pipeline => {
+            // Pipeline commands are handled separately, return description for display
+            command.description.clone()
+        }
     };
 
     // Get workspace info from active session

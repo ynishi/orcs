@@ -17,7 +17,7 @@ import type { MessageType } from '../types/message';
 import type { StatusInfo } from '../types/status';
 import type { Workspace } from '../types/workspace';
 import type { UploadedFile } from '../types/workspace';
-import type { SlashCommand, ExpandedSlashCommand, ActionCommandResult } from '../types/slash_command';
+import type { SlashCommand, ExpandedSlashCommand, ActionCommandResult, PipelineResult } from '../types/slash_command';
 import type { SearchResult } from '../types/search';
 
 export interface SlashCommandResult {
@@ -1031,6 +1031,78 @@ Generate the BlueprintWorkflow now.`;
                 console.error(`Failed to execute action command /${parsed.command}:`, error);
                 await handleAndPersistSystemMessage(
                   conversationMessage(`Action execution failed: ${error}`, 'error', '❌'),
+                  addMessage,
+                  invoke
+                );
+                nextInput = null;
+                suppressUserMessage = true;
+              }
+            } else if (customCommand.type === 'pipeline') {
+              // Execute pipeline command (chain multiple commands)
+              try {
+                // Check if getThreadAsText is available (needed for action steps)
+                if (!getThreadAsText) {
+                  await handleAndPersistSystemMessage(
+                    conversationMessage('Pipeline commands require thread context. Please use from chat panel.', 'error', '❌'),
+                    addMessage,
+                    invoke
+                  );
+                  nextInput = null;
+                  suppressUserMessage = true;
+                } else {
+                  const stepCount = customCommand.pipelineConfig?.steps.length || 0;
+                  await handleAndPersistSystemMessage(
+                    conversationMessage(`Executing pipeline /${parsed.command} (${stepCount} steps)...`, 'info', customCommand.icon || '🔗'),
+                    addMessage,
+                    invoke
+                  );
+
+                  const threadContent = getThreadAsText();
+                  const pipelineResult = await invoke<PipelineResult>('execute_pipeline_command', {
+                    commandName: parsed.command,
+                    threadContent,
+                    args: argsStr || null,
+                  });
+
+                  // Build result message
+                  let resultMessage = `${customCommand.icon || '🔗'} Pipeline /${parsed.command}`;
+                  if (pipelineResult.success) {
+                    resultMessage += ' ✅\n\n';
+                  } else {
+                    resultMessage += ' ❌\n\n';
+                  }
+
+                  // Show step results
+                  for (const step of pipelineResult.steps) {
+                    const stepIcon = step.success ? '✓' : '✗';
+                    resultMessage += `${stepIcon} Step ${step.stepIndex + 1}: /${step.commandName}`;
+                    if (step.error) {
+                      resultMessage += ` - ${step.error}`;
+                    }
+                    resultMessage += '\n';
+                  }
+
+                  if (pipelineResult.finalOutput) {
+                    resultMessage += `\n---\n${pipelineResult.finalOutput}`;
+                  }
+
+                  if (pipelineResult.error) {
+                    resultMessage += `\n\nError: ${pipelineResult.error}`;
+                  }
+
+                  await handleAndPersistSystemMessage(
+                    actionResultMessage(resultMessage),
+                    addMessage,
+                    invoke
+                  );
+
+                  nextInput = null;
+                  suppressUserMessage = true;
+                }
+              } catch (error) {
+                console.error(`Failed to execute pipeline command /${parsed.command}:`, error);
+                await handleAndPersistSystemMessage(
+                  conversationMessage(`Pipeline execution failed: ${error}`, 'error', '❌'),
                   addMessage,
                   invoke
                 );

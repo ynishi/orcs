@@ -14,6 +14,45 @@ pub enum CommandType {
     Task,
     /// Executes a predefined action directly and returns result (e.g., generate_summary)
     Action,
+    /// Executes multiple commands in sequence, passing output between steps
+    Pipeline,
+}
+
+/// A single step in a pipeline execution.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PipelineStep {
+    /// Name of the slash command to execute
+    #[serde(rename = "commandName")]
+    pub command_name: String,
+
+    /// Optional arguments to pass to the command
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<String>,
+}
+
+/// Configuration for Pipeline type commands.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PipelineConfig {
+    /// Steps to execute in sequence
+    pub steps: Vec<PipelineStep>,
+
+    /// Whether to stop execution on first error (default: true)
+    #[serde(default = "default_fail_on_error")]
+    #[serde(rename = "failOnError")]
+    pub fail_on_error: bool,
+
+    /// Whether to pass previous step's output as input to next step (default: true)
+    #[serde(default = "default_chain_output")]
+    #[serde(rename = "chainOutput")]
+    pub chain_output: bool,
+}
+
+fn default_fail_on_error() -> bool {
+    true
+}
+
+fn default_chain_output() -> bool {
+    true
 }
 
 /// Configuration for Action type commands.
@@ -76,6 +115,11 @@ pub struct SlashCommand {
     #[serde(rename = "actionConfig")]
     pub action_config: Option<ActionConfig>,
 
+    /// Configuration for Pipeline type commands (steps to execute)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "pipelineConfig")]
+    pub pipeline_config: Option<PipelineConfig>,
+
     /// Whether to include this command in system prompts for personas.
     /// Default: true for Prompt/Shell/Action, false for Task
     #[serde(default = "default_include_in_system_prompt")]
@@ -112,6 +156,7 @@ impl SlashCommand {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: true,
             is_favorite: false,
             sort_order: None,
@@ -149,6 +194,7 @@ impl SlashCommand {
             args_description: None,
             task_blueprint: None,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: true,
             is_favorite: false,
             sort_order: None,
@@ -188,6 +234,7 @@ impl SlashCommand {
             args_description: None,
             task_blueprint,
             action_config: None,
+            pipeline_config: None,
             include_in_system_prompt: false, // Task commands excluded by default
             is_favorite: false,
             sort_order: None,
@@ -227,6 +274,7 @@ impl SlashCommand {
             args_description: None,
             task_blueprint: None,
             action_config,
+            pipeline_config: None,
             include_in_system_prompt: true,
             is_favorite: false,
             sort_order: None,
@@ -245,5 +293,30 @@ impl SlashCommand {
         let mut cmd = Self::new_action(name, icon, description, content, action_config);
         cmd.args_description = args_description;
         cmd
+    }
+
+    /// Creates a new pipeline-type slash command.
+    /// Pipeline commands execute multiple slash commands in sequence.
+    pub fn new_pipeline(
+        name: String,
+        icon: String,
+        description: String,
+        pipeline_config: PipelineConfig,
+    ) -> Self {
+        Self {
+            name,
+            icon,
+            description,
+            command_type: CommandType::Pipeline,
+            content: String::new(), // Pipeline doesn't use content directly
+            working_dir: None,
+            args_description: None,
+            task_blueprint: None,
+            action_config: None,
+            pipeline_config: Some(pipeline_config),
+            include_in_system_prompt: false, // Pipeline commands excluded by default
+            is_favorite: false,
+            sort_order: None,
+        }
     }
 }

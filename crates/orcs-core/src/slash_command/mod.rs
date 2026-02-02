@@ -10,6 +10,6 @@ pub mod repository;
 pub mod request;
 
 pub use builtin::{BuiltinSlashCommand, builtin_commands, find_builtin_command};
-pub use model::{ActionConfig, CommandType, SlashCommand};
+pub use model::{ActionConfig, CommandType, PipelineConfig, PipelineStep, SlashCommand};
 pub use repository::SlashCommandRepository;
 pub use request::CreateSlashCommandRequest;

@@ -1,12 +1,16 @@
 use std::process::Command;
 
+use chrono::Utc;
 use orcs_application::SessionSupportAgentService;
 use orcs_core::agent::build_enhanced_path;
 use orcs_core::session::PLACEHOLDER_WORKSPACE_ID;
 use orcs_core::slash_command::{CommandType, CreateSlashCommandRequest, SlashCommand};
+use orcs_core::task::{Task, TaskStatus};
 use orcs_core::workspace::manager::WorkspaceStorageService;
+use orcs_execution::tracing_layer::OrchestratorEventBuilder;
 use serde::Serialize;
 use tauri::State;
+use uuid::Uuid;
 
 use crate::app::AppState;
 use crate::slash_commands::{
@@ -247,6 +251,57 @@ pub async fn execute_action_command(
         config
     );
 
+    // Get session_id for task tracking
+    let session_id = if let Some(session_mgr) = state.session_usecase.active_session().await {
+        let app_mode = state.app_mode.lock().await.clone();
+        let session = session_mgr
+            .to_session(app_mode, PLACEHOLDER_WORKSPACE_ID.to_string())
+            .await;
+        session.id
+    } else {
+        "unknown".to_string()
+    };
+
+    // Create Task record for tracking
+    let task_id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let title = format!("/{} action", command_name);
+
+    let mut task = Task {
+        id: task_id.clone(),
+        session_id,
+        title,
+        description: format!("Executing action command: /{}", command_name),
+        status: TaskStatus::Pending,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        completed_at: None,
+        steps_executed: 0,
+        steps_skipped: 0,
+        context_keys: 0,
+        error: None,
+        result: None,
+        execution_details: None,
+        strategy: None,
+        journal_log: None,
+    };
+
+    // Save initial task and send event
+    if let Err(e) = state.task_repository.save(&task).await {
+        tracing::warn!("Failed to save initial action task: {}", e);
+    }
+    let event = OrchestratorEventBuilder::info_from_task("Action task created", &task).build();
+    let _ = state.event_sender.send(event);
+
+    // Update to Running status
+    task.status = TaskStatus::Running;
+    task.updated_at = Utc::now().to_rfc3339();
+    if let Err(e) = state.task_repository.save(&task).await {
+        tracing::warn!("Failed to update action task to Running: {}", e);
+    }
+    let event = OrchestratorEventBuilder::info_from_task("Action task started", &task).build();
+    let _ = state.event_sender.send(event);
+
     // Expand template variables in content
     let mut prompt = command.content.clone();
 
@@ -376,7 +431,7 @@ pub async fn execute_action_command(
             .and_then(|o| o.google_search)
     });
 
-    let result = SessionSupportAgentService::execute_custom_prompt(
+    let execution_result = SessionSupportAgentService::execute_custom_prompt(
         &final_prompt,
         backend,
         model_name,
@@ -384,8 +439,54 @@ pub async fn execute_action_command(
         google_search,
         Some(state.cancel_flag.clone()),
     )
-    .await
-    .map_err(|e| format!("Failed to execute action: {}", e))?;
+    .await;
+
+    // Update task based on result
+    let completed_at = Utc::now().to_rfc3339();
+    task.updated_at = completed_at.clone();
+    task.completed_at = Some(completed_at);
+
+    match &execution_result {
+        Ok(result_text) => {
+            task.status = TaskStatus::Completed;
+            task.result = Some(format!(
+                "Action completed successfully ({} chars)",
+                result_text.len()
+            ));
+            task.steps_executed = 1;
+
+            if let Err(e) = state.task_repository.save(&task).await {
+                tracing::warn!("Failed to save completed action task: {}", e);
+            }
+            let event =
+                OrchestratorEventBuilder::info_from_task("Action task completed", &task).build();
+            let _ = state.event_sender.send(event);
+
+            tracing::info!(
+                "[SlashCommand] Action command '{}' completed successfully",
+                command_name
+            );
+        }
+        Err(e) => {
+            task.status = TaskStatus::Failed;
+            task.error = Some(e.to_string());
+
+            if let Err(save_err) = state.task_repository.save(&task).await {
+                tracing::warn!("Failed to save failed action task: {}", save_err);
+            }
+            let event =
+                OrchestratorEventBuilder::error_from_task("Action task failed", &task).build();
+            let _ = state.event_sender.send(event);
+
+            tracing::error!(
+                "[SlashCommand] Action command '{}' failed: {}",
+                command_name,
+                e
+            );
+        }
+    }
+
+    let result = execution_result.map_err(|e| format!("Failed to execute action: {}", e))?;
 
     // Build persona info for display
     let persona_info = persona.map(|p| ActionPersonaInfo {
@@ -393,11 +494,6 @@ pub async fn execute_action_command(
         icon: p.icon,
         backend: p.backend.as_str().to_string(),
     });
-
-    tracing::info!(
-        "[SlashCommand] Action command '{}' completed successfully",
-        command_name
-    );
 
     Ok(ActionCommandResult {
         result,

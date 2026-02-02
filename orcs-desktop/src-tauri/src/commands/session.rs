@@ -1,5 +1,6 @@
 use std::time::SystemTime;
 
+use chrono::Utc;
 use llm_toolkit::ToPrompt;
 use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
 use orcs_core::schema::{ExecutionModelType, TalkStyleType};
@@ -8,11 +9,14 @@ use orcs_core::session::{
     PLACEHOLDER_WORKSPACE_ID, Session, SessionEvent, SessionRepository,
 };
 use orcs_core::slash_command::{CommandType, SlashCommand, builtin_commands};
+use orcs_core::task::{Task, TaskStatus};
 use orcs_core::workspace::manager::WorkspaceStorageService;
+use orcs_execution::tracing_layer::OrchestratorEventBuilder;
 use orcs_interaction::InteractionResult;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 use tokio::process::Command;
+use uuid::Uuid;
 
 use crate::app::AppState;
 
@@ -1451,7 +1455,41 @@ pub async fn generate_summary(
         agent_config
     );
 
-    let summary = if let Some(config) = agent_config {
+    // Create Task record for tracking
+    let task_id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let mut task = Task {
+        id: task_id.clone(),
+        session_id: session_id.clone(),
+        title: "Generate Summary".to_string(),
+        description: "Generating summary from conversation".to_string(),
+        status: TaskStatus::Pending,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        completed_at: None,
+        steps_executed: 0,
+        steps_skipped: 0,
+        context_keys: 0,
+        error: None,
+        result: None,
+        execution_details: None,
+        strategy: None,
+        journal_log: None,
+    };
+
+    // Save and emit task created event
+    let _ = state.task_repository.save(&task).await;
+    let event = OrchestratorEventBuilder::info_from_task("Summary task created", &task).build();
+    let _ = state.event_sender.send(event);
+
+    // Update to Running
+    task.status = TaskStatus::Running;
+    task.updated_at = Utc::now().to_rfc3339();
+    let _ = state.task_repository.save(&task).await;
+    let event = OrchestratorEventBuilder::info_from_task("Summary task started", &task).build();
+    let _ = state.event_sender.send(event);
+
+    let result = if let Some(config) = agent_config {
         // Use custom agent configuration
         SessionSupportAgentService::generate_summary_with_config(
             &thread_content,
@@ -1468,19 +1506,39 @@ pub async fn generate_summary(
             Some(state.cancel_flag.clone()),
         )
         .await
-        .map_err(|e| format!("Failed to generate summary: {}", e))?
     } else {
         // Use default agent
         let service = SessionSupportAgentService::new();
-        service
-            .generate_summary(&thread_content)
-            .await
-            .map_err(|e| format!("Failed to generate summary: {}", e))?
+        service.generate_summary(&thread_content).await
     };
 
-    tracing::info!("[SessionSupport] Summary generated successfully");
+    // Update task based on result
+    let completed_at = Utc::now().to_rfc3339();
+    task.updated_at = completed_at.clone();
+    task.completed_at = Some(completed_at);
 
-    Ok(summary)
+    match &result {
+        Ok(summary) => {
+            task.status = TaskStatus::Completed;
+            task.result = Some(format!("Summary generated ({} chars)", summary.len()));
+            task.steps_executed = 1;
+            let _ = state.task_repository.save(&task).await;
+            let event =
+                OrchestratorEventBuilder::info_from_task("Summary task completed", &task).build();
+            let _ = state.event_sender.send(event);
+            tracing::info!("[SessionSupport] Summary generated successfully");
+        }
+        Err(e) => {
+            task.status = TaskStatus::Failed;
+            task.error = Some(e.to_string());
+            let _ = state.task_repository.save(&task).await;
+            let event =
+                OrchestratorEventBuilder::error_from_task("Summary task failed", &task).build();
+            let _ = state.event_sender.send(event);
+        }
+    }
+
+    result.map_err(|e| format!("Failed to generate summary: {}", e))
 }
 
 /// Generates an action plan from conversation thread content.
@@ -1499,7 +1557,43 @@ pub async fn generate_action_plan(
         agent_config
     );
 
-    let action_plan = if let Some(config) = agent_config {
+    // Create Task record for tracking
+    let task_id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let mut task = Task {
+        id: task_id.clone(),
+        session_id: session_id.clone(),
+        title: "Generate Action Plan".to_string(),
+        description: "Generating action plan from conversation".to_string(),
+        status: TaskStatus::Pending,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        completed_at: None,
+        steps_executed: 0,
+        steps_skipped: 0,
+        context_keys: 0,
+        error: None,
+        result: None,
+        execution_details: None,
+        strategy: None,
+        journal_log: None,
+    };
+
+    // Save and emit task created event
+    let _ = state.task_repository.save(&task).await;
+    let event =
+        OrchestratorEventBuilder::info_from_task("Action Plan task created", &task).build();
+    let _ = state.event_sender.send(event);
+
+    // Update to Running
+    task.status = TaskStatus::Running;
+    task.updated_at = Utc::now().to_rfc3339();
+    let _ = state.task_repository.save(&task).await;
+    let event =
+        OrchestratorEventBuilder::info_from_task("Action Plan task started", &task).build();
+    let _ = state.event_sender.send(event);
+
+    let result = if let Some(config) = agent_config {
         // Use custom agent configuration
         SessionSupportAgentService::generate_action_plan_with_config(
             &thread_content,
@@ -1516,19 +1610,40 @@ pub async fn generate_action_plan(
             Some(state.cancel_flag.clone()),
         )
         .await
-        .map_err(|e| format!("Failed to generate action plan: {}", e))?
     } else {
         // Use default agent
         let service = SessionSupportAgentService::new();
-        service
-            .generate_action_plan(&thread_content)
-            .await
-            .map_err(|e| format!("Failed to generate action plan: {}", e))?
+        service.generate_action_plan(&thread_content).await
     };
 
-    tracing::info!("[SessionSupport] Action plan generated successfully");
+    // Update task based on result
+    let completed_at = Utc::now().to_rfc3339();
+    task.updated_at = completed_at.clone();
+    task.completed_at = Some(completed_at);
 
-    Ok(action_plan)
+    match &result {
+        Ok(plan) => {
+            task.status = TaskStatus::Completed;
+            task.result = Some(format!("Action plan generated ({} chars)", plan.len()));
+            task.steps_executed = 1;
+            let _ = state.task_repository.save(&task).await;
+            let event =
+                OrchestratorEventBuilder::info_from_task("Action Plan task completed", &task)
+                    .build();
+            let _ = state.event_sender.send(event);
+            tracing::info!("[SessionSupport] Action plan generated successfully");
+        }
+        Err(e) => {
+            task.status = TaskStatus::Failed;
+            task.error = Some(e.to_string());
+            let _ = state.task_repository.save(&task).await;
+            let event =
+                OrchestratorEventBuilder::error_from_task("Action Plan task failed", &task).build();
+            let _ = state.event_sender.send(event);
+        }
+    }
+
+    result.map_err(|e| format!("Failed to generate action plan: {}", e))
 }
 
 /// Generates expertise from conversation thread content.
@@ -1547,7 +1662,41 @@ pub async fn generate_expertise(
         agent_config
     );
 
-    let expertise = if let Some(config) = agent_config {
+    // Create Task record for tracking
+    let task_id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let mut task = Task {
+        id: task_id.clone(),
+        session_id: session_id.clone(),
+        title: "Generate Expertise".to_string(),
+        description: "Generating expertise analysis from conversation".to_string(),
+        status: TaskStatus::Pending,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        completed_at: None,
+        steps_executed: 0,
+        steps_skipped: 0,
+        context_keys: 0,
+        error: None,
+        result: None,
+        execution_details: None,
+        strategy: None,
+        journal_log: None,
+    };
+
+    // Save and emit task created event
+    let _ = state.task_repository.save(&task).await;
+    let event = OrchestratorEventBuilder::info_from_task("Expertise task created", &task).build();
+    let _ = state.event_sender.send(event);
+
+    // Update to Running
+    task.status = TaskStatus::Running;
+    task.updated_at = Utc::now().to_rfc3339();
+    let _ = state.task_repository.save(&task).await;
+    let event = OrchestratorEventBuilder::info_from_task("Expertise task started", &task).build();
+    let _ = state.event_sender.send(event);
+
+    let result = if let Some(config) = agent_config {
         // Use custom agent configuration
         SessionSupportAgentService::generate_expertise_with_config(
             &thread_content,
@@ -1564,19 +1713,39 @@ pub async fn generate_expertise(
             Some(state.cancel_flag.clone()),
         )
         .await
-        .map_err(|e| format!("Failed to generate expertise: {}", e))?
     } else {
         // Use default agent
         let service = SessionSupportAgentService::new();
-        service
-            .generate_expertise(&thread_content)
-            .await
-            .map_err(|e| format!("Failed to generate expertise: {}", e))?
+        service.generate_expertise(&thread_content).await
     };
 
-    tracing::info!("[SessionSupport] Expertise generated successfully");
+    // Update task based on result
+    let completed_at = Utc::now().to_rfc3339();
+    task.updated_at = completed_at.clone();
+    task.completed_at = Some(completed_at);
 
-    Ok(expertise)
+    match &result {
+        Ok(expertise) => {
+            task.status = TaskStatus::Completed;
+            task.result = Some(format!("Expertise generated ({} chars)", expertise.len()));
+            task.steps_executed = 1;
+            let _ = state.task_repository.save(&task).await;
+            let event =
+                OrchestratorEventBuilder::info_from_task("Expertise task completed", &task).build();
+            let _ = state.event_sender.send(event);
+            tracing::info!("[SessionSupport] Expertise generated successfully");
+        }
+        Err(e) => {
+            task.status = TaskStatus::Failed;
+            task.error = Some(e.to_string());
+            let _ = state.task_repository.save(&task).await;
+            let event =
+                OrchestratorEventBuilder::error_from_task("Expertise task failed", &task).build();
+            let _ = state.event_sender.send(event);
+        }
+    }
+
+    result.map_err(|e| format!("Failed to generate expertise: {}", e))
 }
 
 /// Generates comprehensive Concept/Design Issue from conversation thread content.
@@ -1595,7 +1764,43 @@ pub async fn generate_concept_issue(
         agent_config
     );
 
-    let concept_issue = if let Some(config) = agent_config {
+    // Create Task record for tracking
+    let task_id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let mut task = Task {
+        id: task_id.clone(),
+        session_id: session_id.clone(),
+        title: "Generate Concept Issue".to_string(),
+        description: "Generating concept/design issue from conversation".to_string(),
+        status: TaskStatus::Pending,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        completed_at: None,
+        steps_executed: 0,
+        steps_skipped: 0,
+        context_keys: 0,
+        error: None,
+        result: None,
+        execution_details: None,
+        strategy: None,
+        journal_log: None,
+    };
+
+    // Save and emit task created event
+    let _ = state.task_repository.save(&task).await;
+    let event =
+        OrchestratorEventBuilder::info_from_task("Concept Issue task created", &task).build();
+    let _ = state.event_sender.send(event);
+
+    // Update to Running
+    task.status = TaskStatus::Running;
+    task.updated_at = Utc::now().to_rfc3339();
+    let _ = state.task_repository.save(&task).await;
+    let event =
+        OrchestratorEventBuilder::info_from_task("Concept Issue task started", &task).build();
+    let _ = state.event_sender.send(event);
+
+    let result = if let Some(config) = agent_config {
         // Use custom agent configuration
         SessionSupportAgentService::generate_concept_issue_with_config(
             &thread_content,
@@ -1612,19 +1817,41 @@ pub async fn generate_concept_issue(
             Some(state.cancel_flag.clone()),
         )
         .await
-        .map_err(|e| format!("Failed to generate concept/design issue: {}", e))?
     } else {
         // Use default agent
         let service = SessionSupportAgentService::new();
-        service
-            .generate_concept_issue(&thread_content)
-            .await
-            .map_err(|e| format!("Failed to generate concept/design issue: {}", e))?
+        service.generate_concept_issue(&thread_content).await
     };
 
-    tracing::info!("[SessionSupport] Concept/Design Issue generated successfully");
+    // Update task based on result
+    let completed_at = Utc::now().to_rfc3339();
+    task.updated_at = completed_at.clone();
+    task.completed_at = Some(completed_at);
 
-    Ok(concept_issue)
+    match &result {
+        Ok(issue) => {
+            task.status = TaskStatus::Completed;
+            task.result = Some(format!("Concept issue generated ({} chars)", issue.len()));
+            task.steps_executed = 1;
+            let _ = state.task_repository.save(&task).await;
+            let event =
+                OrchestratorEventBuilder::info_from_task("Concept Issue task completed", &task)
+                    .build();
+            let _ = state.event_sender.send(event);
+            tracing::info!("[SessionSupport] Concept/Design Issue generated successfully");
+        }
+        Err(e) => {
+            task.status = TaskStatus::Failed;
+            task.error = Some(e.to_string());
+            let _ = state.task_repository.save(&task).await;
+            let event =
+                OrchestratorEventBuilder::error_from_task("Concept Issue task failed", &task)
+                    .build();
+            let _ = state.event_sender.send(event);
+        }
+    }
+
+    result.map_err(|e| format!("Failed to generate concept/design issue: {}", e))
 }
 
 // ============================================================================

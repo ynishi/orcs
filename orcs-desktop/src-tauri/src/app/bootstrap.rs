@@ -351,6 +351,7 @@ pub async fn bootstrap(event_tx: UnboundedSender<OrchestratorEvent>) -> AppBoots
         task_repository,
         task_repository_concrete,
         task_executor,
+        event_sender: event_tx,
         cancel_flag: Arc::new(AtomicBool::new(false)),
         quick_action_repository,
         quick_action_repository_concrete,

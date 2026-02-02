@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 use orcs_application::session::SessionMetadataService;
 use orcs_application::{AdhocPersonaService, SessionUseCase};
@@ -8,13 +8,15 @@ use orcs_core::{
     quick_action::QuickActionRepository, secret::SecretService, session::AppMode,
     slash_command::SlashCommandRepository, task::TaskRepository, user::UserService,
 };
+use orcs_execution::tracing_layer::OrchestratorEvent;
 use orcs_execution::TaskExecutor;
 use orcs_infrastructure::{
-    AppStateService, AsyncDirDialoguePresetRepository, AsyncDirPersonaRepository,
-    AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
-    ConfigService, FileQuickActionRepository,
-    workspace_storage_service::FileSystemWorkspaceManager,
+    workspace_storage_service::FileSystemWorkspaceManager, AppStateService,
+    AsyncDirDialoguePresetRepository, AsyncDirPersonaRepository, AsyncDirSessionRepository,
+    AsyncDirSlashCommandRepository, AsyncDirTaskRepository, ConfigService,
+    FileQuickActionRepository,
 };
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
 /// Application state shared across Tauri commands.
@@ -39,6 +41,7 @@ pub struct AppState {
     pub task_repository: Arc<dyn TaskRepository>,
     pub task_repository_concrete: Arc<AsyncDirTaskRepository>,
     pub task_executor: Arc<TaskExecutor>,
+    pub event_sender: UnboundedSender<OrchestratorEvent>,
     pub cancel_flag: Arc<AtomicBool>,
     pub quick_action_repository: Arc<dyn QuickActionRepository>,
     #[allow(dead_code)]

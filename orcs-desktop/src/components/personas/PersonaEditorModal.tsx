@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, TextInput, Textarea, Switch, Button, Stack, Group, Select, ColorInput } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
 import { PersonaConfig } from '../../types/agent';
 import { CreatePersonaRequest } from '../../types/persona_request';
@@ -110,7 +111,12 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
   const handleSave = async () => {
     // Validate required fields
     if (!formData.name) {
-      alert('Name is a required field');
+      notifications.show({
+        title: 'Validation Error',
+        message: 'Name is a required field',
+        color: 'red',
+        autoClose: 5000,
+      });
       return;
     }
 
@@ -159,7 +165,12 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
       onSave(createdPersona);
     } catch (error) {
       console.error('Failed to create persona:', error);
-      alert(`Failed to create persona: ${error}`);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to create persona: ${error}`,
+        color: 'red',
+        autoClose: 5000,
+      });
     }
   };
 

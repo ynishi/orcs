@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, TextInput, Textarea, Button, Stack, Group, Select, Checkbox } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
 import { SlashCommand, CommandType } from '../../types/slash_command';
 import type { PersonaConfig } from '../../types/agent';
@@ -88,7 +89,12 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
   const handleSave = () => {
     // Validate required fields
     if (!formData.name || !formData.description || !formData.content) {
-      alert('Name, Description, and Content are required fields');
+      notifications.show({
+        title: 'Validation Error',
+        message: 'Name, Description, and Content are required fields',
+        color: 'red',
+        autoClose: 5000,
+      });
       return;
     }
 

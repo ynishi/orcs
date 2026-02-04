@@ -612,6 +612,19 @@ function App() {
   const addMessageToTabRef = useRef(addMessageToTab);
   const getTabBySessionIdRef = useRef(getTabBySessionId);
   const personasRef = useRef(personas);
+
+  // Performance: Pre-cache persona names to avoid repeated string operations during input
+  const personasWithCache = useMemo(() =>
+    personas.map(p => ({
+      ...p,
+      _lowerName: p.name.toLowerCase(),
+      _underscoreName: p.name.replace(/ /g, '_'),
+      _lowerUnderscoreName: p.name.replace(/ /g, '_').toLowerCase(),
+    })),
+    [personas]
+  );
+  const personasCacheRef = useRef(personasWithCache);
+  const activeParticipantIdsRef = useRef(activeParticipantIds);
   const currentSessionIdRef = useRef(currentSessionId);
   const handleSlashCommandRef =
     useRef<ReturnType<typeof useSlashCommands>['handleSlashCommand'] | null>(
@@ -630,6 +643,14 @@ function App() {
   useEffect(() => {
     personasRef.current = personas;
   }, [personas]);
+
+  useEffect(() => {
+    personasCacheRef.current = personasWithCache;
+  }, [personasWithCache]);
+
+  useEffect(() => {
+    activeParticipantIdsRef.current = activeParticipantIds;
+  }, [activeParticipantIds]);
 
   // 最新のcurrentSessionIdをrefに保持
   useEffect(() => {
@@ -1289,20 +1310,21 @@ function App() {
       if (mentionFilter !== null) {
         // Filter personas by name (case-insensitive)
         // Support both original name and underscore format (e.g., "Ayaka Nakamura" matches "Ayaka_Nakamura")
-        const filtered: Agent[] = personas
+        // Performance: Use pre-cached names from personasCacheRef to avoid repeated string operations
+        const lowerFilter = mentionFilter.toLowerCase();
+        const currentParticipantIds = activeParticipantIdsRef.current;
+        const filtered: Agent[] = personasCacheRef.current
           .filter(p => {
-            const lowerFilter = mentionFilter.toLowerCase();
-            const nameMatch = p.name.toLowerCase().includes(lowerFilter);
-            const underscoreName = p.name.replace(/ /g, '_').toLowerCase();
-            const underscoreMatch = underscoreName.includes(lowerFilter);
+            const nameMatch = p._lowerName.includes(lowerFilter);
+            const underscoreMatch = p._lowerUnderscoreName.includes(lowerFilter);
             return nameMatch || underscoreMatch;
           })
           .map(p => ({
             id: p.id,
-            name: p.name.replace(/ /g, '_'), // Display with underscores for mention input
-            status: activeParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
+            name: p._underscoreName, // Display with underscores for mention input
+            status: currentParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
             description: `${p.role} - ${p.background}`,
-            isActive: activeParticipantIds.includes(p.id),
+            isActive: currentParticipantIds.includes(p.id),
           }));
         setFilteredAgents(filtered);
         setShowAgentSuggestions(filtered.length > 0);
@@ -1313,7 +1335,8 @@ function App() {
     }, 50); // 50ms debounce for responsive suggestions
 
     return () => clearTimeout(timer);
-  }, [activeTabInput, customCommands, personas, activeParticipantIds]);
+    // Performance: personas and activeParticipantIds are accessed via refs to avoid unnecessary re-runs
+  }, [activeTabInput, customCommands]);
 
   // Get thread content as text for action commands
   const getThreadAsText = useCallback((): string => {

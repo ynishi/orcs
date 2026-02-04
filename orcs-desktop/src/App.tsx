@@ -40,7 +40,7 @@ import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages, exportSessionToMarkdown, getAllMessages } from "./types/session";
 import { SlashCommand } from "./types/slash_command";
-import { useTabContext } from "./context/TabContext";
+import { useTabContext, useTabInput } from "./context/TabContext";
 import { useSlashCommands } from "./hooks/useSlashCommands";
 import { Tabs } from "@mantine/core";
 import { ChatPanel } from "./components/chat/ChatPanel";
@@ -61,12 +61,22 @@ type InteractionResult =
 function App() {
   // グローバル状態（タブ非依存）
   const [status, setStatus] = useState<StatusInfo>(getDefaultStatus());
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [filteredCommands, setFilteredCommands] = useState<CommandDefinition[]>([]);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
-  const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
-  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
-  const [selectedAgentIndex, setSelectedAgentIndex] = useState(0);
+  // Performance: サジェスト状態を1つのオブジェクトに統合（state 更新を 7→1 に削減）
+  const [suggestions, setSuggestions] = useState<{
+    showCommands: boolean;
+    filteredCommands: CommandDefinition[];
+    selectedCommandIndex: number;
+    showAgents: boolean;
+    filteredAgents: Agent[];
+    selectedAgentIndex: number;
+  }>({
+    showCommands: false,
+    filteredCommands: [],
+    selectedCommandIndex: 0,
+    showAgents: false,
+    filteredAgents: [],
+    selectedAgentIndex: 0,
+  });
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
   const [tabPreviewCache, setTabPreviewCache] = useState<Record<string, string>>({});
@@ -305,7 +315,6 @@ function App() {
   const {
     tabs,
     activeTabId,
-    activeTabInput, // Performance: TabContext から直接取得（tabs の再計算を経由しない）
     openTab,
     closeTab,
     switchTab: switchToTab,
@@ -313,7 +322,6 @@ function App() {
     updateTabTitle,
     updateTabMessages: _updateTabMessages,
     addMessageToTab,
-    updateTabInput,
     updateTabAttachedFiles,
     addAttachedFileToTab,
     removeAttachedFileFromTab,
@@ -323,6 +331,10 @@ function App() {
     getTab: _getTab,
     getTabBySessionId,
   } = useTabContext();
+
+  // Performance: 入力状態は専用 Context から取得
+  // キー入力時に TabContext consumer が再レンダリングされるのを防ぐ
+  const { activeTabInput, updateTabInput } = useTabInput();
 
   const [autoMode, setAutoMode] = useState<boolean>(false);
   const viewport = useRef<HTMLDivElement>(null);
@@ -1280,10 +1292,11 @@ function App() {
     };
   }, [refreshSessions, switchWorkspaceTabs, openTab, switchToTab, getTabBySessionId, userNickname]);
 
-  // Performance: activeTabInput は TabContext から直接取得（上記の destructuring）
-  // tabs の再計算を経由しないため、入力時のパフォーマンスが向上
+  // Performance: activeTabInput は専用 TabInputContext から取得（上記の useTabInput()）
+  // TabContext の consumer は入力変更で再レンダリングされない
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新（デバウンス化）
+  // Performance: 1回の setSuggestions で全サジェスト状態を更新（state 更新 7→1）
   useEffect(() => {
     const timer = setTimeout(() => {
       const input = activeTabInput;
@@ -1291,45 +1304,44 @@ function App() {
       const spaceIndex = input.indexOf(' ');
       const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
 
+      let showCommands = false;
+      let filteredCommands: CommandDefinition[] = [];
+      let showAgents = false;
+      let filteredAgents: Agent[] = [];
+
       // コマンドサジェスト（コマンド名入力中のみ表示）
       if (isCommandPhase) {
-        const commands = filterCommandsWithCustom(input, customCommands);
-        setFilteredCommands(commands);
-        setShowSuggestions(commands.length > 0);
-        setSelectedSuggestionIndex(0);
-        setShowAgentSuggestions(false);
-      } else {
-        setShowSuggestions(false);
+        filteredCommands = filterCommandsWithCustom(input, customCommands);
+        showCommands = filteredCommands.length > 0;
       }
 
       // エージェントサジェスト（@メンション）
-      const mentionFilter = getCurrentMention(input, cursorPosition);
-
-      if (mentionFilter !== null) {
-        // Filter personas by name (case-insensitive)
-        // Support both original name and underscore format (e.g., "Ayaka Nakamura" matches "Ayaka_Nakamura")
-        // Performance: Use pre-cached names from personasCacheRef to avoid repeated string operations
-        const lowerFilter = mentionFilter.toLowerCase();
-        const currentParticipantIds = activeParticipantIdsRef.current;
-        const filtered: Agent[] = personasCacheRef.current
-          .filter(p => {
-            const nameMatch = p._lowerName.includes(lowerFilter);
-            const underscoreMatch = p._lowerUnderscoreName.includes(lowerFilter);
-            return nameMatch || underscoreMatch;
-          })
-          .map(p => ({
-            id: p.id,
-            name: p._underscoreName, // Display with underscores for mention input
-            status: currentParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
-            description: `${p.role} - ${p.background}`,
-            isActive: currentParticipantIds.includes(p.id),
-          }));
-        setFilteredAgents(filtered);
-        setShowAgentSuggestions(filtered.length > 0);
-        setSelectedAgentIndex(0);
-      } else {
-        setShowAgentSuggestions(false);
+      if (!isCommandPhase) {
+        const mentionFilter = getCurrentMention(input, cursorPosition);
+        if (mentionFilter !== null) {
+          const lowerFilter = mentionFilter.toLowerCase();
+          const currentParticipantIds = activeParticipantIdsRef.current;
+          filteredAgents = personasCacheRef.current
+            .filter(p => p._lowerName.includes(lowerFilter) || p._lowerUnderscoreName.includes(lowerFilter))
+            .map(p => ({
+              id: p.id,
+              name: p._underscoreName,
+              status: currentParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
+              description: `${p.role} - ${p.background}`,
+              isActive: currentParticipantIds.includes(p.id),
+            }));
+          showAgents = filteredAgents.length > 0;
+        }
       }
+
+      setSuggestions({
+        showCommands,
+        filteredCommands,
+        selectedCommandIndex: 0,
+        showAgents,
+        filteredAgents,
+        selectedAgentIndex: 0,
+      });
     }, 50); // 50ms debounce for responsive suggestions
 
     return () => clearTimeout(timer);
@@ -1600,66 +1612,70 @@ function App() {
     }
 
     // エージェントサジェスト表示中のキーボード操作
-    if (showAgentSuggestions) {
+    if (suggestions.showAgents) {
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
-          setSelectedAgentIndex((prev) =>
-            prev > 0 ? prev - 1 : filteredAgents.length - 1
-          );
+          setSuggestions(prev => ({
+            ...prev,
+            selectedAgentIndex: prev.selectedAgentIndex > 0 ? prev.selectedAgentIndex - 1 : prev.filteredAgents.length - 1,
+          }));
           break;
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedAgentIndex((prev) =>
-            prev < filteredAgents.length - 1 ? prev + 1 : 0
-          );
+          setSuggestions(prev => ({
+            ...prev,
+            selectedAgentIndex: prev.selectedAgentIndex < prev.filteredAgents.length - 1 ? prev.selectedAgentIndex + 1 : 0,
+          }));
           break;
         case 'Tab':
           e.preventDefault();
-          selectAgent(filteredAgents[selectedAgentIndex]);
+          selectAgent(suggestions.filteredAgents[suggestions.selectedAgentIndex]);
           break;
         case 'Enter':
           if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
             e.preventDefault();
-            selectAgent(filteredAgents[selectedAgentIndex]);
+            selectAgent(suggestions.filteredAgents[suggestions.selectedAgentIndex]);
           }
           break;
         case 'Escape':
           e.preventDefault();
-          setShowAgentSuggestions(false);
+          setSuggestions(prev => ({ ...prev, showAgents: false }));
           break;
       }
       return;
     }
 
     // コマンドサジェスト表示中のキーボード操作
-    if (showSuggestions) {
+    if (suggestions.showCommands) {
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
-          setSelectedSuggestionIndex((prev) =>
-            prev > 0 ? prev - 1 : filteredCommands.length - 1
-          );
+          setSuggestions(prev => ({
+            ...prev,
+            selectedCommandIndex: prev.selectedCommandIndex > 0 ? prev.selectedCommandIndex - 1 : prev.filteredCommands.length - 1,
+          }));
           break;
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedSuggestionIndex((prev) =>
-            prev < filteredCommands.length - 1 ? prev + 1 : 0
-          );
+          setSuggestions(prev => ({
+            ...prev,
+            selectedCommandIndex: prev.selectedCommandIndex < prev.filteredCommands.length - 1 ? prev.selectedCommandIndex + 1 : 0,
+          }));
           break;
         case 'Tab':
           e.preventDefault();
-          selectCommand(filteredCommands[selectedSuggestionIndex]);
+          selectCommand(suggestions.filteredCommands[suggestions.selectedCommandIndex]);
           break;
         case 'Enter':
           if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
             e.preventDefault();
-            selectCommand(filteredCommands[selectedSuggestionIndex]);
+            selectCommand(suggestions.filteredCommands[suggestions.selectedCommandIndex]);
           }
           break;
         case 'Escape':
           e.preventDefault();
-          setShowSuggestions(false);
+          setSuggestions(prev => ({ ...prev, showCommands: false }));
           break;
       }
       return;
@@ -1670,7 +1686,7 @@ function App() {
   const selectCommand = useCallback((command: CommandDefinition) => {
     if (!activeTabId) return;
     updateTabInput(activeTabId, `/${command.name} `);
-    setShowSuggestions(false);
+    setSuggestions(prev => ({ ...prev, showCommands: false }));
     textareaRef.current?.focus();
   }, [activeTabId, updateTabInput]);
 
@@ -1691,7 +1707,7 @@ function App() {
       updateTabInput(activeTabId, newInput);
     }
 
-    setShowAgentSuggestions(false);
+    setSuggestions(prev => ({ ...prev, showAgents: false }));
     textareaRef.current?.focus();
   }, [activeTabId, getActiveTab, updateTabInput]);
 
@@ -2504,15 +2520,13 @@ function App() {
     // アクティブなタブの入力状態をクリア
     updateTabInput(activeTab.id, "");
     updateTabAttachedFiles(activeTab.id, []);
-    setShowSuggestions(false);
-    setShowAgentSuggestions(false);
+    setSuggestions(prev => ({ ...prev, showCommands: false, showAgents: false }));
     await processInput(currentInput, currentFiles);
   };
 
   const handleRunSlashCommand = useCallback(
     async (command: SlashCommand, args: string) => {
-      setShowSuggestions(false);
-      setShowAgentSuggestions(false);
+      setSuggestions(prev => ({ ...prev, showCommands: false, showAgents: false }));
       if (activeTabId) {
         updateTabInput(activeTabId, '');
       }
@@ -2910,12 +2924,12 @@ function App() {
                       personas={personas}
                       activeParticipantIds={activeParticipantIds}
                       workspace={workspace}
-                      showSuggestions={showSuggestions}
-                      filteredCommands={filteredCommands}
-                      selectedSuggestionIndex={selectedSuggestionIndex}
-                      showAgentSuggestions={showAgentSuggestions}
-                      filteredAgents={filteredAgents}
-                      selectedAgentIndex={selectedAgentIndex}
+                      showSuggestions={suggestions.showCommands}
+                      filteredCommands={suggestions.filteredCommands}
+                      selectedSuggestionIndex={suggestions.selectedCommandIndex}
+                      showAgentSuggestions={suggestions.showAgents}
+                      filteredAgents={suggestions.filteredAgents}
+                      selectedAgentIndex={suggestions.selectedAgentIndex}
                       onSubmit={handleSubmit}
                       onInputChange={handleInputChange}
                       onKeyDown={handleKeyDown}
@@ -2938,7 +2952,7 @@ function App() {
                       onInvokePersona={handleInvokePersona}
                       onSelectCommand={selectCommand}
                       onSelectAgent={selectAgent}
-                      onHoverSuggestion={setSelectedSuggestionIndex}
+                      onHoverSuggestion={(index: number) => setSuggestions(prev => ({ ...prev, selectedCommandIndex: index }))}
                       onSaveSessionToWorkspace={() => {
                         const session = sessions.find(s => s.id === tab.sessionId);
                         if (session) {

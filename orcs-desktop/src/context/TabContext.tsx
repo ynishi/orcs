@@ -76,31 +76,38 @@ export interface SessionTab {
   isDirty: boolean; // 未保存データがあるか
 }
 
+/**
+ * Performance: 入力状態を専用 Context に分離
+ * activeTabInput が変わっても TabContext の consumer は再レンダリングされない
+ */
+export interface TabInputContextValue {
+  activeTabInput: string;
+  updateTabInput: (tabId: string, input: string) => void;
+}
+
 export interface TabContextValue {
   tabs: SessionTab[];
   activeTabId: string | null;
-  activeTabInput: string; // Performance: Direct access to input without tabs recalculation
 
   // タブ操作 (Phase 2: Backend-First)
   openTab: (session: Session, messages: Message[], workspaceId: string, switchToTab?: boolean) => Promise<string>; // 新規タブを開く。既に開いている場合はフォーカス
   closeTab: (tabId: string) => Promise<void>; // タブを閉じる
   switchTab: (tabId: string) => Promise<void>; // タブを切り替える
   switchWorkspace: (workspaceId: string) => Promise<void>; // Workspace切り替え時にタブを切り替える
-  
+
   // メッセージ関連
   updateTabMessages: (tabId: string, messages: Message[]) => void; // タブのメッセージを更新
   addMessageToTab: (tabId: string, message: Message) => void; // タブにメッセージを追加
-  
+
   // タブメタデータ
   updateTabTitle: (tabId: string, title: string) => Promise<void>; // タブのタイトルを更新 (Phase 3: async)
   setTabDirty: (tabId: string, isDirty: boolean) => void; // タブのdirtyフラグを更新
-  
-  // 入力フォーム状態
-  updateTabInput: (tabId: string, input: string) => void; // タブの入力テキストを更新
+
+  // 入力フォーム状態（updateTabInput は TabInputContext に移動）
   updateTabAttachedFiles: (tabId: string, files: File[]) => void; // タブの添付ファイルを更新
   addAttachedFileToTab: (tabId: string, file: File) => void; // タブに添付ファイルを追加
   removeAttachedFileFromTab: (tabId: string, index: number) => void; // タブから添付ファイルを削除
-  
+
   // UI状態
   setTabDragging: (tabId: string, isDragging: boolean) => void; // タブのドラッグ状態を更新
   setTabThinking: (tabId: string, isThinking: boolean, personaName?: string, isNonInteractive?: boolean) => void; // タブのAI思考状態を更新
@@ -119,6 +126,7 @@ export interface TabContextValue {
   closeWorkspaceTabs: (workspaceId: string) => Promise<void>; // 指定ワークスペースのタブを全て閉じる
 }
 
+const TabInputContext = createContext<TabInputContextValue | undefined>(undefined);
 const TabContext = createContext<TabContextValue | undefined>(undefined);
 
 interface TabProviderProps {
@@ -729,32 +737,40 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     return tabs.filter((tab) => tab.workspaceId === workspaceId);
   }, [tabs]);
 
+  // Performance: 入力状態を専用 Context に分離
+  // activeTabInputState が変わっても TabContext の consumer は再レンダリングされない
+  const inputValue = useMemo<TabInputContextValue>(
+    () => ({
+      activeTabInput: activeTabInputState,
+      updateTabInput,
+    }),
+    [activeTabInputState, updateTabInput]
+  );
+
   const value = useMemo<TabContextValue>(
     () => ({
       tabs,
       activeTabId,
-      activeTabInput: activeTabInputState,
 
       // タブ操作
       openTab,
       closeTab,
       switchTab,
       switchWorkspace,
-      
+
       // メッセージ関連
       updateTabMessages,
       addMessageToTab,
-      
+
       // タブメタデータ
       updateTabTitle,
       setTabDirty,
-      
+
       // 入力フォーム状態
-      updateTabInput,
       updateTabAttachedFiles,
       addAttachedFileToTab,
       removeAttachedFileFromTab,
-      
+
       // UI状態
       setTabDragging,
       setTabThinking,
@@ -775,7 +791,6 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     [
       tabs,
       activeTabId,
-      activeTabInputState,
       openTab,
       closeTab,
       switchTab,
@@ -784,7 +799,6 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       addMessageToTab,
       updateTabTitle,
       setTabDirty,
-      updateTabInput,
       updateTabAttachedFiles,
       addAttachedFileToTab,
       removeAttachedFileFromTab,
@@ -802,13 +816,31 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     ]
   );
 
-  return <TabContext.Provider value={value}>{children}</TabContext.Provider>;
+  return (
+    <TabContext.Provider value={value}>
+      <TabInputContext.Provider value={inputValue}>
+        {children}
+      </TabInputContext.Provider>
+    </TabContext.Provider>
+  );
 }
 
 export function useTabContext(): TabContextValue {
   const context = useContext(TabContext);
   if (!context) {
     throw new Error('useTabContext must be used within a TabProvider');
+  }
+  return context;
+}
+
+/**
+ * Performance: 入力状態のみを購読する専用 hook
+ * キー入力で変わるのはこの Context のみ → TabContext の consumer は再レンダリングされない
+ */
+export function useTabInput(): TabInputContextValue {
+  const context = useContext(TabInputContext);
+  if (!context) {
+    throw new Error('useTabInput must be used within a TabProvider');
   }
   return context;
 }

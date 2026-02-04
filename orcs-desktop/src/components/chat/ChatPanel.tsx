@@ -29,7 +29,7 @@ import { ThinkingIndicator } from './ThinkingIndicator';
 import { AutoChatSettingsModal } from './AutoChatSettingsModal';
 import { SlashCommandEditorModal } from '../slash_commands/SlashCommandEditorModal';
 import { QuickActionDock } from './QuickActionDock';
-import { useTabContext } from '../../context/TabContext';
+import { useTabContext, useTabInput } from '../../context/TabContext';
 import type { SessionTab } from '../../context/TabContext';
 import type { StatusInfo } from '../../types/status';
 import type { GitInfo } from '../../types/git';
@@ -153,7 +153,7 @@ function onSaveExecHandlersEqual(
   );
 }
 
-export function ChatPanel({
+export const ChatPanel = memo(function ChatPanel({
   tab,
   activeTabInput,
   isActive,
@@ -211,7 +211,8 @@ export function ChatPanel({
   const hasScrolledForTab = useRef<Set<string>>(new Set()); // Track which tabs have been scrolled
 
   // TabContext for adding messages and managing tab state
-  const { addMessageToTab, setTabThinking, updateTabInput, updateTabAttachedFiles, updateTabMessages } = useTabContext();
+  const { addMessageToTab, setTabThinking, updateTabAttachedFiles, updateTabMessages } = useTabContext();
+  const { updateTabInput } = useTabInput();
 
   // AutoChat settings state
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
@@ -1556,4 +1557,4 @@ export function ChatPanel({
       />
     </Stack>
   );
-}
+});

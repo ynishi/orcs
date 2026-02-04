@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { Session } from '../types/session';
 import type { Message } from '../types/message';
@@ -79,6 +79,7 @@ export interface SessionTab {
 export interface TabContextValue {
   tabs: SessionTab[];
   activeTabId: string | null;
+  activeTabInput: string; // Performance: Direct access to input without tabs recalculation
 
   // タブ操作 (Phase 2: Backend-First)
   openTab: (session: Session, messages: Message[], workspaceId: string, switchToTab?: boolean) => Promise<string>; // 新規タブを開く。既に開いている場合はフォーカス
@@ -133,6 +134,12 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   // Phase 2: フロントエンド専用のUI状態を Map で管理
   const [tabUIStates, setTabUIStates] = useState<Map<string, TabUIState>>(new Map());
 
+  // Performance: input を Ref で分離（tabs の再計算を防ぐ）
+  // state ではなく Ref を使うことで、入力変更が tabs の useMemo をトリガーしない
+  const tabInputsRef = useRef<Map<string, string>>(new Map());
+  // activeTabInput のみを state で管理（入力フィールドの再レンダリング用）
+  const [activeTabInputState, setActiveTabInputState] = useState<string>('');
+
   // Phase 4: セッションメッセージをローカルで管理（リアルタイム更新用）
   // key: sessionId, value: Message[]
   // Backend永続化は saveCurrentSession 時に行う
@@ -167,8 +174,9 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       // 優先順位: ローカル > Backend > デフォルト
       // Note: ローカルが未初期化の場合は Backend から復元（アプリ再起動対応）
       const mergedUIState: TabUIState = {
-        // input: ローカルがあればローカル、なければBackend、なければ空文字
-        input: localUIState?.input ?? openTab.input ?? '',
+        // Performance: input は tabInputsRef から取得（Ref なので依存関係に含まれない）
+        // これにより入力変更が tabs の再計算をトリガーしない
+        input: tabInputsRef.current.get(openTab.id) ?? openTab.input ?? '',
         attachedFiles: localUIState?.attachedFiles ?? defaultUIState.attachedFiles,
         isDragging: localUIState?.isDragging ?? defaultUIState.isDragging,
         isAiThinking: localUIState?.isAiThinking ?? defaultUIState.isAiThinking,
@@ -205,6 +213,16 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   // Phase 2: activeTabId は AppState から取得（Backend SSOT）
   const activeTabId = appState?.activeTabId ?? null;
+
+  // Performance: activeTabId 変更時に activeTabInputState を同期
+  useEffect(() => {
+    if (activeTabId) {
+      const input = tabInputsRef.current.get(activeTabId) ?? '';
+      setActiveTabInputState(input);
+    } else {
+      setActiveTabInputState('');
+    }
+  }, [activeTabId]);
 
   /**
    * 新規タブを開く（既に開いている場合はフォーカス）
@@ -455,28 +473,19 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   /**
    * タブの入力テキストを更新
-   * Phase 2: tabUIStates のみを更新（tabs は computed）
+   * Performance: tabInputsRef (Ref) を更新し、activeTabInputState のみを state 更新
+   * これにより tabs の再計算をトリガーせずに入力を即座に反映
    * Phase 2.2 (V1.6+): Backend同期 (debounce 500ms)
    */
   const updateTabInputTimerRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const updateTabInput = useCallback((tabId: string, input: string) => {
-    // Immediate local state update for responsive UI
-    // Note: タブが存在しない場合も初期化して更新する（遅延初期化パターン）
-    // これにより、app-state:update が先に発火して tabUIStates がまだ初期化されていない
-    // タイミングでも、入力が正しく反映される
-    setTabUIStates((prev) => {
-      const current = prev.get(tabId);
-      const newMap = new Map(prev);
-      if (current) {
-        newMap.set(tabId, { ...current, input });
-      } else {
-        // 初期化されていない場合、Backend から input を取得して初期化
-        // ただし、今回の input で上書きする
-        newMap.set(tabId, { ...getDefaultTabUIState(), input });
-      }
-      return newMap;
-    });
+    // Performance: Ref を更新（state 更新ではないので tabs の再計算をトリガーしない）
+    tabInputsRef.current.set(tabId, input);
+
+    // activeTabInput state のみを更新（入力フィールドの再レンダリング用）
+    // Note: activeTabId との比較は呼び出し側で保証される
+    setActiveTabInputState(input);
 
     // Debounced Backend sync (500ms)
     const timers = updateTabInputTimerRef.current;
@@ -709,6 +718,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     () => ({
       tabs,
       activeTabId,
+      activeTabInput: activeTabInputState,
 
       // タブ操作
       openTab,
@@ -750,6 +760,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     [
       tabs,
       activeTabId,
+      activeTabInputState,
       openTab,
       closeTab,
       switchTab,

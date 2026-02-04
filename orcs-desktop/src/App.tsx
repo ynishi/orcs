@@ -305,6 +305,7 @@ function App() {
   const {
     tabs,
     activeTabId,
+    activeTabInput, // Performance: TabContext から直接取得（tabs の再計算を経由しない）
     openTab,
     closeTab,
     switchTab: switchToTab,
@@ -1279,11 +1280,8 @@ function App() {
     };
   }, [refreshSessions, switchWorkspaceTabs, openTab, switchToTab, getTabBySessionId, userNickname]);
 
-  // 現在のアクティブタブの入力値を取得（メモ化）
-  const activeTabInput = useMemo(() => {
-    const activeTab = tabs.find(t => t.id === activeTabId);
-    return activeTab?.input || '';
-  }, [tabs, activeTabId]);
+  // Performance: activeTabInput は TabContext から直接取得（上記の destructuring）
+  // tabs の再計算を経由しないため、入力時のパフォーマンスが向上
 
   // 入力内容が変更されたときにコマンド/エージェントサジェストを更新（デバウンス化）
   useEffect(() => {

@@ -214,6 +214,12 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   // Phase 2: activeTabId は AppState から取得（Backend SSOT）
   const activeTabId = appState?.activeTabId ?? null;
 
+  // Performance: openTabs を Ref で保持（useEffect の依存配列から除外するため）
+  const openTabsRef = useRef(appState?.openTabs);
+  useEffect(() => {
+    openTabsRef.current = appState?.openTabs;
+  }, [appState?.openTabs]);
+
   // Performance: activeTabId 変更時に activeTabInputState を同期
   // tabInputsRef にない場合は Backend (openTabs) から復元
   useEffect(() => {
@@ -221,7 +227,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       let input = tabInputsRef.current.get(activeTabId);
       if (input === undefined) {
         // Backend から復元（初回アクセス時）
-        const openTab = appState?.openTabs.find(t => t.id === activeTabId);
+        const openTab = openTabsRef.current?.find(t => t.id === activeTabId);
         input = openTab?.input ?? '';
         tabInputsRef.current.set(activeTabId, input);
       }
@@ -229,7 +235,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     } else {
       setActiveTabInputState('');
     }
-  }, [activeTabId, appState?.openTabs]);
+  }, [activeTabId]);
 
   /**
    * 新規タブを開く（既に開いている場合はフォーカス）
@@ -490,9 +496,11 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     // Performance: Ref を更新（state 更新ではないので tabs の再計算をトリガーしない）
     tabInputsRef.current.set(tabId, input);
 
-    // activeTabInput state のみを更新（入力フィールドの再レンダリング用）
-    // Note: activeTabId との比較は呼び出し側で保証される
-    setActiveTabInputState(input);
+    // activeTabInput state のみを更新（アクティブタブの場合のみ）
+    // Fix: 他タブの更新時に activeTabInputState が誤って上書きされるバグを修正
+    if (tabId === activeTabId) {
+      setActiveTabInputState(input);
+    }
 
     // Debounced Backend sync (500ms)
     const timers = updateTabInputTimerRef.current;
@@ -510,7 +518,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
     }, 500);
 
     timers.set(tabId, timer);
-  }, []);
+  }, [activeTabId]);
 
   /**
    * タブの添付ファイルを更新

@@ -62,6 +62,16 @@ export interface PersonaConfig {
 }
 
 /**
+ * PersonaConfig with pre-computed name variants for performance
+ * Used to avoid repeated string operations during input suggestions
+ */
+export interface PersonaWithCache extends PersonaConfig {
+  _lowerName: string;           // name.toLowerCase()
+  _underscoreName: string;      // name.replace(/ /g, '_')
+  _lowerUnderscoreName: string; // name.replace(/ /g, '_').toLowerCase()
+}
+
+/**
  * エージェントステータスに応じたアイコンを取得
  */
 export function getAgentIcon(status: AgentStatus): string {

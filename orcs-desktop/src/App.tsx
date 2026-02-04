@@ -25,7 +25,7 @@ import "./App.css";
 import { Message, MessageType, StreamingDialogueTurn } from "./types/message";
 import { StatusInfo, getDefaultStatus } from "./types/status";
 import { Task } from "./types/task";
-import { Agent } from "./types/agent";
+import { Agent, PersonaWithCache } from "./types/agent";
 import { Session } from "./types/session";
 import { useTaskStore } from "./stores/taskStore";
 import { GitInfo } from "./types/git";
@@ -615,7 +615,7 @@ function App() {
   const personasRef = useRef(personas);
 
   // Performance: Pre-cache persona names to avoid repeated string operations during input
-  const personasWithCache = useMemo(() =>
+  const personasWithCache = useMemo<PersonaWithCache[]>(() =>
     personas.map(p => ({
       ...p,
       _lowerName: p.name.toLowerCase(),
@@ -2895,7 +2895,7 @@ function App() {
                   <Tabs.Panel key={tab.id} value={tab.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <ChatPanel
                       tab={tab}
-                      activeTabInput={activeTabId === tab.id ? activeTabInput : ''}
+                      activeTabInput={activeTabId === tab.id ? activeTabInput : tab.input}
                       isActive={activeTabId === tab.id}
                       currentSessionId={currentSessionId}
                       status={status}

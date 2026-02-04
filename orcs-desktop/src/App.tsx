@@ -40,7 +40,7 @@ import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { convertSessionToMessages, exportSessionToMarkdown, getAllMessages } from "./types/session";
 import { SlashCommand } from "./types/slash_command";
-import { useTabContext, useTabInput } from "./context/TabContext";
+import { useTabContext } from "./context/TabContext";
 import { useSlashCommands } from "./hooks/useSlashCommands";
 import { Tabs } from "@mantine/core";
 import { ChatPanel } from "./components/chat/ChatPanel";
@@ -322,6 +322,7 @@ function App() {
     updateTabTitle,
     updateTabMessages: _updateTabMessages,
     addMessageToTab,
+    updateTabInput,
     updateTabAttachedFiles,
     addAttachedFileToTab,
     removeAttachedFileFromTab,
@@ -331,10 +332,6 @@ function App() {
     getTab: _getTab,
     getTabBySessionId,
   } = useTabContext();
-
-  // Performance: 入力状態は専用 Context から取得
-  // キー入力時に TabContext consumer が再レンダリングされるのを防ぐ
-  const { activeTabInput, updateTabInput } = useTabInput();
 
   const [autoMode, setAutoMode] = useState<boolean>(false);
   const viewport = useRef<HTMLDivElement>(null);
@@ -1292,61 +1289,11 @@ function App() {
     };
   }, [refreshSessions, switchWorkspaceTabs, openTab, switchToTab, getTabBySessionId, userNickname]);
 
-  // Performance: activeTabInput は専用 TabInputContext から取得（上記の useTabInput()）
-  // TabContext の consumer は入力変更で再レンダリングされない
-
-  // 入力内容が変更されたときにコマンド/エージェントサジェストを更新（デバウンス化）
-  // Performance: 1回の setSuggestions で全サジェスト状態を更新（state 更新 7→1）
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const input = activeTabInput;
-      const cursorPosition = textareaRef.current?.selectionStart || input.length;
-      const spaceIndex = input.indexOf(' ');
-      const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
-
-      let showCommands = false;
-      let filteredCommands: CommandDefinition[] = [];
-      let showAgents = false;
-      let filteredAgents: Agent[] = [];
-
-      // コマンドサジェスト（コマンド名入力中のみ表示）
-      if (isCommandPhase) {
-        filteredCommands = filterCommandsWithCustom(input, customCommands);
-        showCommands = filteredCommands.length > 0;
-      }
-
-      // エージェントサジェスト（@メンション）
-      if (!isCommandPhase) {
-        const mentionFilter = getCurrentMention(input, cursorPosition);
-        if (mentionFilter !== null) {
-          const lowerFilter = mentionFilter.toLowerCase();
-          const currentParticipantIds = activeParticipantIdsRef.current;
-          filteredAgents = personasCacheRef.current
-            .filter(p => p._lowerName.includes(lowerFilter) || p._lowerUnderscoreName.includes(lowerFilter))
-            .map(p => ({
-              id: p.id,
-              name: p._underscoreName,
-              status: currentParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
-              description: `${p.role} - ${p.background}`,
-              isActive: currentParticipantIds.includes(p.id),
-            }));
-          showAgents = filteredAgents.length > 0;
-        }
-      }
-
-      setSuggestions({
-        showCommands,
-        filteredCommands,
-        selectedCommandIndex: 0,
-        showAgents,
-        filteredAgents,
-        selectedAgentIndex: 0,
-      });
-    }, 50); // 50ms debounce for responsive suggestions
-
-    return () => clearTimeout(timer);
-    // Performance: personas and activeParticipantIds are accessed via refs to avoid unnecessary re-runs
-  }, [activeTabInput, customCommands]);
+  // Performance: サジェスト計算は handleInputChange 内で行う（useEffect ではなくコールバック起点）
+  // App.tsx が TabInputContext を subscribe しないため、キー入力で App.tsx が再レンダリングされない
+  const suggestionTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const customCommandsRef = useRef(customCommands);
+  useEffect(() => { customCommandsRef.current = customCommands; }, [customCommands]);
 
   // Get thread content as text for action commands
   const getThreadAsText = useCallback((): string => {
@@ -1741,10 +1688,59 @@ function App() {
   }, [activeTabId, personas, processInput]);
 
   // 入力変更ハンドラ（メモ化）
+  // Performance: サジェスト計算もここで行う（useEffect 依存を排除し、App.tsx の TabInputContext 購読を回避）
   const handleInputChange = useCallback((value: string) => {
     if (activeTabId) {
       updateTabInput(activeTabId, value);
     }
+
+    // デバウンス付きサジェスト計算
+    if (suggestionTimerRef.current) {
+      clearTimeout(suggestionTimerRef.current);
+    }
+    suggestionTimerRef.current = setTimeout(() => {
+      const input = value;
+      const cursorPosition = input.length;
+      const spaceIndex = input.indexOf(' ');
+      const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
+
+      let showCommands = false;
+      let filteredCommands: CommandDefinition[] = [];
+      let showAgents = false;
+      let filteredAgents: Agent[] = [];
+
+      if (isCommandPhase) {
+        filteredCommands = filterCommandsWithCustom(input, customCommandsRef.current);
+        showCommands = filteredCommands.length > 0;
+      }
+
+      if (!isCommandPhase) {
+        const mentionFilter = getCurrentMention(input, cursorPosition);
+        if (mentionFilter !== null) {
+          const lowerFilter = mentionFilter.toLowerCase();
+          const currentParticipantIds = activeParticipantIdsRef.current;
+          filteredAgents = personasCacheRef.current
+            .filter(p => p._lowerName.includes(lowerFilter) || p._lowerUnderscoreName.includes(lowerFilter))
+            .map(p => ({
+              id: p.id,
+              name: p._underscoreName,
+              status: currentParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
+              description: `${p.role} - ${p.background}`,
+              isActive: currentParticipantIds.includes(p.id),
+            }));
+          showAgents = filteredAgents.length > 0;
+        }
+      }
+
+      setSuggestions({
+        showCommands,
+        filteredCommands,
+        selectedCommandIndex: 0,
+        showAgents,
+        filteredAgents,
+        selectedAgentIndex: 0,
+      });
+    }, 50);
   }, [activeTabId, updateTabInput]);
 
   // ドラッグ&ドロップハンドラー
@@ -2909,7 +2905,6 @@ function App() {
                   <Tabs.Panel key={tab.id} value={tab.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <ChatPanel
                       tab={tab}
-                      activeTabInput={activeTabId === tab.id ? activeTabInput : tab.input}
                       isActive={activeTabId === tab.id}
                       currentSessionId={currentSessionId}
                       status={status}

@@ -44,7 +44,6 @@ import { notifications } from '@mantine/notifications';
 
 interface ChatPanelProps {
   tab: SessionTab;
-  activeTabInput: string; // Performance: Direct input value from TabContext
   isActive: boolean; // Whether this tab is currently active
   currentSessionId: string | null; // Backend's active session ID
   status: StatusInfo;
@@ -155,7 +154,6 @@ function onSaveExecHandlersEqual(
 
 export const ChatPanel = memo(function ChatPanel({
   tab,
-  activeTabInput,
   isActive,
   currentSessionId,
   status,
@@ -211,8 +209,9 @@ export const ChatPanel = memo(function ChatPanel({
   const hasScrolledForTab = useRef<Set<string>>(new Set()); // Track which tabs have been scrolled
 
   // TabContext for adding messages and managing tab state
-  const { addMessageToTab, setTabThinking, updateTabAttachedFiles, updateTabMessages } = useTabContext();
-  const { updateTabInput } = useTabInput();
+  const { addMessageToTab, setTabThinking, updateTabAttachedFiles, updateTabMessages, updateTabInput } = useTabContext();
+  // Performance: activeTabInput を直接 subscribe（App.tsx は subscribe しない → キー入力で App が再レンダリングされない）
+  const { activeTabInput } = useTabInput();
 
   // AutoChat settings state
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);

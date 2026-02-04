@@ -82,7 +82,6 @@ export interface SessionTab {
  */
 export interface TabInputContextValue {
   activeTabInput: string;
-  updateTabInput: (tabId: string, input: string) => void;
 }
 
 export interface TabContextValue {
@@ -103,7 +102,8 @@ export interface TabContextValue {
   updateTabTitle: (tabId: string, title: string) => Promise<void>; // タブのタイトルを更新 (Phase 3: async)
   setTabDirty: (tabId: string, isDirty: boolean) => void; // タブのdirtyフラグを更新
 
-  // 入力フォーム状態（updateTabInput は TabInputContext に移動）
+  // 入力フォーム状態
+  updateTabInput: (tabId: string, input: string) => void; // タブの入力テキストを更新
   updateTabAttachedFiles: (tabId: string, files: File[]) => void; // タブの添付ファイルを更新
   addAttachedFileToTab: (tabId: string, file: File) => void; // タブに添付ファイルを追加
   removeAttachedFileFromTab: (tabId: string, index: number) => void; // タブから添付ファイルを削除
@@ -739,12 +739,11 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
   // Performance: 入力状態を専用 Context に分離
   // activeTabInputState が変わっても TabContext の consumer は再レンダリングされない
+  // Performance: 入力値のみの Context（読み取り専用）
+  // App.tsx はこの Context を subscribe しない → キー入力で App.tsx が再レンダリングされない
   const inputValue = useMemo<TabInputContextValue>(
-    () => ({
-      activeTabInput: activeTabInputState,
-      updateTabInput,
-    }),
-    [activeTabInputState, updateTabInput]
+    () => ({ activeTabInput: activeTabInputState }),
+    [activeTabInputState]
   );
 
   const value = useMemo<TabContextValue>(
@@ -767,6 +766,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       setTabDirty,
 
       // 入力フォーム状態
+      updateTabInput,
       updateTabAttachedFiles,
       addAttachedFileToTab,
       removeAttachedFileFromTab,
@@ -799,6 +799,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       addMessageToTab,
       updateTabTitle,
       setTabDirty,
+      updateTabInput,
       updateTabAttachedFiles,
       addAttachedFileToTab,
       removeAttachedFileFromTab,

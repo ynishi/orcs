@@ -215,14 +215,21 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   const activeTabId = appState?.activeTabId ?? null;
 
   // Performance: activeTabId 変更時に activeTabInputState を同期
+  // tabInputsRef にない場合は Backend (openTabs) から復元
   useEffect(() => {
     if (activeTabId) {
-      const input = tabInputsRef.current.get(activeTabId) ?? '';
+      let input = tabInputsRef.current.get(activeTabId);
+      if (input === undefined) {
+        // Backend から復元（初回アクセス時）
+        const openTab = appState?.openTabs.find(t => t.id === activeTabId);
+        input = openTab?.input ?? '';
+        tabInputsRef.current.set(activeTabId, input);
+      }
       setActiveTabInputState(input);
     } else {
       setActiveTabInputState('');
     }
-  }, [activeTabId]);
+  }, [activeTabId, appState?.openTabs]);
 
   /**
    * 新規タブを開く（既に開いている場合はフォーカス）

@@ -2895,6 +2895,7 @@ function App() {
                   <Tabs.Panel key={tab.id} value={tab.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <ChatPanel
                       tab={tab}
+                      activeTabInput={activeTabId === tab.id ? activeTabInput : ''}
                       isActive={activeTabId === tab.id}
                       currentSessionId={currentSessionId}
                       status={status}

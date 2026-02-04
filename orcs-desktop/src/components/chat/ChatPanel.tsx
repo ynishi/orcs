@@ -44,6 +44,7 @@ import { notifications } from '@mantine/notifications';
 
 interface ChatPanelProps {
   tab: SessionTab;
+  activeTabInput: string; // Performance: Direct input value from TabContext
   isActive: boolean; // Whether this tab is currently active
   currentSessionId: string | null; // Backend's active session ID
   status: StatusInfo;
@@ -154,6 +155,7 @@ function onSaveExecHandlersEqual(
 
 export function ChatPanel({
   tab,
+  activeTabInput,
   isActive,
   currentSessionId,
   status,
@@ -1435,7 +1437,7 @@ export function ChatPanel({
 
             <Textarea
               ref={textareaRef}
-              value={tab.input}
+              value={activeTabInput}
               onChange={(e) => onInputChange(e.currentTarget.value)}
               onKeyDown={onKeyDown}
               placeholder={

@@ -17,7 +17,7 @@ import type { MessageType } from '../types/message';
 import type { StatusInfo } from '../types/status';
 import type { Workspace } from '../types/workspace';
 import type { UploadedFile } from '../types/workspace';
-import type { SlashCommand, ExpandedSlashCommand, ActionCommandResult, PipelineResult } from '../types/slash_command';
+import type { SlashCommand, ExpandedSlashCommand, ActionCommandResult } from '../types/slash_command';
 import type { SearchResult } from '../types/search';
 
 export interface SlashCommandResult {
@@ -1008,6 +1008,7 @@ Generate the BlueprintWorkflow now.`;
                     commandName: parsed.command,
                     threadContent,
                     args: argsStr || null,
+                    prevOutput: null,
                   });
 
                   // Build command header with persona info if available
@@ -1041,57 +1042,147 @@ Generate the BlueprintWorkflow now.`;
               // Execute pipeline command (chain multiple commands)
               try {
                 // Check if getThreadAsText is available (needed for action steps)
-                if (!getThreadAsText) {
+                // Execute pipeline steps sequentially in frontend
+                const pipelineConfig = customCommand.pipelineConfig;
+                if (!pipelineConfig || pipelineConfig.steps.length === 0) {
                   await handleAndPersistSystemMessage(
-                    conversationMessage('Pipeline commands require thread context. Please use from chat panel.', 'error', '❌'),
+                    conversationMessage('Pipeline has no steps configured.', 'error', '❌'),
                     addMessage,
                     invoke
                   );
                   nextInput = null;
                   suppressUserMessage = true;
                 } else {
-                  const stepCount = customCommand.pipelineConfig?.steps.length || 0;
+                  const stepCount = pipelineConfig.steps.length;
                   await handleAndPersistSystemMessage(
                     conversationMessage(`Executing pipeline /${parsed.command} (${stepCount} steps)...`, 'info', customCommand.icon || '🔗'),
                     addMessage,
                     invoke
                   );
 
-                  const threadContent = getThreadAsText();
-                  const pipelineResult = await invoke<PipelineResult>('execute_pipeline_command', {
-                    commandName: parsed.command,
-                    threadContent,
-                    args: argsStr || null,
-                  });
+                  let prevOutput = '';
+                  let allSuccess = true;
 
-                  // Build result message
-                  let resultMessage = `${customCommand.icon || '🔗'} Pipeline /${parsed.command}`;
-                  if (pipelineResult.success) {
-                    resultMessage += ' ✅\n\n';
-                  } else {
-                    resultMessage += ' ❌\n\n';
-                  }
+                  for (let i = 0; i < pipelineConfig.steps.length; i++) {
+                    const step = pipelineConfig.steps[i];
+                    const stepNum = i + 1;
 
-                  // Show step results
-                  for (const step of pipelineResult.steps) {
-                    const stepIcon = step.success ? '✓' : '✗';
-                    resultMessage += `${stepIcon} Step ${step.stepIndex + 1}: /${step.commandName}`;
-                    if (step.error) {
-                      resultMessage += ` - ${step.error}`;
+                    // Get the step command
+                    const stepCmd = await invoke<SlashCommand | null>('get_slash_command', {
+                      name: step.commandName,
+                    });
+
+                    if (!stepCmd) {
+                      await handleAndPersistSystemMessage(
+                        conversationMessage(`Step ${stepNum}: Command /${step.commandName} not found`, 'error', '❌'),
+                        addMessage,
+                        invoke
+                      );
+                      allSuccess = false;
+                      if (pipelineConfig.failOnError) break;
+                      continue;
                     }
-                    resultMessage += '\n';
+
+                    // Determine args for this step
+                    let stepArgs = step.args || argsStr || '';
+                    // Replace {prev_output} in args if chainOutput is enabled
+                    if (pipelineConfig.chainOutput && stepArgs.includes('{prev_output}')) {
+                      stepArgs = stepArgs.replace(/{prev_output}/g, prevOutput);
+                    }
+
+                    try {
+                      let stepOutput = '';
+
+                      if (stepCmd.type === 'shell') {
+                        // Replace {prev_output} in content
+                        let shellContent = stepCmd.content;
+                        if (pipelineConfig.chainOutput) {
+                          shellContent = shellContent.replace(/{prev_output}/g, prevOutput);
+                        }
+                        shellContent = shellContent.replace(/{args}/g, stepArgs);
+
+                        stepOutput = await invoke<string>('execute_shell_command', {
+                          command: shellContent,
+                          working_dir: stepCmd.workingDir ?? null,
+                        });
+
+                        await handleAndPersistSystemMessage(
+                          shellOutputMessage(`/${step.commandName} ($ ${shellContent})\n\`\`\`\n${stepOutput}\n\`\`\``),
+                          addMessage,
+                          invoke
+                        );
+                      } else if (stepCmd.type === 'prompt') {
+                        // Expand prompt template
+                        let promptContent = stepCmd.content;
+                        if (pipelineConfig.chainOutput) {
+                          promptContent = promptContent.replace(/{prev_output}/g, prevOutput);
+                        }
+                        promptContent = promptContent.replace(/{args}/g, stepArgs);
+
+                        const expanded = await invoke<ExpandedSlashCommand>('expand_command_template', {
+                          commandName: step.commandName,
+                          args: stepArgs,
+                        });
+                        stepOutput = expanded.content;
+
+                        // Replace {prev_output} in expanded content if chainOutput
+                        if (pipelineConfig.chainOutput) {
+                          stepOutput = stepOutput.replace(/{prev_output}/g, prevOutput);
+                        }
+
+                        await handleAndPersistSystemMessage(
+                          conversationMessage(`**Step ${stepNum}: /${step.commandName}**\n\n${stepOutput}`, 'info', stepCmd.icon || '📝'),
+                          addMessage,
+                          invoke
+                        );
+                      } else if (stepCmd.type === 'action') {
+                        const threadContent = getThreadAsText ? getThreadAsText() : '';
+                        const actionResult = await invoke<ActionCommandResult>('execute_action_command', {
+                          commandName: step.commandName,
+                          threadContent,
+                          args: stepArgs || null,
+                          prevOutput: pipelineConfig.chainOutput ? prevOutput : null,
+                        });
+                        stepOutput = actionResult.result;
+
+                        await handleAndPersistSystemMessage(
+                          actionResultMessage(`**Step ${stepNum}: /${step.commandName}**\n\n${stepOutput}`),
+                          addMessage,
+                          invoke
+                        );
+                      } else {
+                        await handleAndPersistSystemMessage(
+                          conversationMessage(`Step ${stepNum}: Command type '${stepCmd.type}' not supported in pipeline`, 'error', '⚠️'),
+                          addMessage,
+                          invoke
+                        );
+                        allSuccess = false;
+                        if (pipelineConfig.failOnError) break;
+                        continue;
+                      }
+
+                      // Update prevOutput for next step
+                      if (pipelineConfig.chainOutput) {
+                        prevOutput = stepOutput;
+                      }
+                    } catch (stepError) {
+                      await handleAndPersistSystemMessage(
+                        conversationMessage(`Step ${stepNum}: /${step.commandName} failed - ${stepError}`, 'error', '❌'),
+                        addMessage,
+                        invoke
+                      );
+                      allSuccess = false;
+                      if (pipelineConfig.failOnError) break;
+                    }
                   }
 
-                  if (pipelineResult.finalOutput) {
-                    resultMessage += `\n---\n${pipelineResult.finalOutput}`;
-                  }
-
-                  if (pipelineResult.error) {
-                    resultMessage += `\n\nError: ${pipelineResult.error}`;
-                  }
-
+                  // Final summary
+                  const summaryIcon = allSuccess ? '✅' : '❌';
+                  const summaryText = allSuccess
+                    ? `Pipeline /${parsed.command} completed successfully`
+                    : `Pipeline /${parsed.command} completed with errors`;
                   await handleAndPersistSystemMessage(
-                    actionResultMessage(resultMessage),
+                    conversationMessage(summaryText, allSuccess ? 'info' : 'error', summaryIcon),
                     addMessage,
                     invoke
                   );

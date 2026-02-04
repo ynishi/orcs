@@ -72,6 +72,9 @@ pub async fn expand_slash_command(
         }
     };
 
+    // Replace {prev_output} with empty string when not in pipeline context
+    content = content.replace("{prev_output}", "");
+
     // Get workspace info from active session
     let workspace = if let Some(session_mgr) = state.session_usecase.active_session().await {
         let app_mode = state.app_mode.lock().await.clone();

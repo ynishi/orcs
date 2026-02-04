@@ -10,6 +10,7 @@ const COMMAND_TYPE_LABELS: Record<SlashCommand['type'], string> = {
   shell: 'Shell',
   task: 'Task',
   action: 'Action',
+  pipeline: 'Pipeline',
 };
 
 const COMMAND_TYPE_COLORS: Record<SlashCommand['type'], string> = {
@@ -17,6 +18,7 @@ const COMMAND_TYPE_COLORS: Record<SlashCommand['type'], string> = {
   shell: 'violet',
   task: 'orange',
   action: 'teal',
+  pipeline: 'cyan',
 };
 
 type FilterType = 'all' | 'favorites' | CommandType;
@@ -381,6 +383,7 @@ export function SlashCommandList({ onMessage, onCommandsUpdated, onRunCommand }:
     { type: 'shell', label: 'Shell', color: 'violet' },
     { type: 'task', label: 'Task', color: 'orange' },
     { type: 'action', label: 'Action', color: 'teal' },
+    { type: 'pipeline', label: 'Pipeline', color: 'cyan' },
   ];
 
   return (

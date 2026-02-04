@@ -224,6 +224,7 @@ pub async fn execute_action_command(
     command_name: String,
     thread_content: String,
     args: Option<String>,
+    prev_output: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<ActionCommandResult, String> {
     // Get the command
@@ -316,6 +317,10 @@ pub async fn execute_action_command(
     // {args} - User arguments
     let args_str = args.as_deref().unwrap_or("");
     prompt = prompt.replace("{args}", args_str);
+
+    // {prev_output} - Previous step output (for pipeline chaining)
+    let prev_output_str = prev_output.as_deref().unwrap_or("");
+    prompt = prompt.replace("{prev_output}", prev_output_str);
 
     // Workspace variables (if available)
     if let Some(session_mgr) = state.session_usecase.active_session().await {
@@ -579,7 +584,11 @@ pub async fn execute_pipeline_command(
     // Create Task record for tracking
     let task_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
-    let step_names: Vec<&str> = config.steps.iter().map(|s| s.command_name.as_str()).collect();
+    let step_names: Vec<&str> = config
+        .steps
+        .iter()
+        .map(|s| s.command_name.as_str())
+        .collect();
     let title = format!("Pipeline: {}", step_names.join(" → "));
 
     let mut task = Task {
@@ -669,11 +678,17 @@ pub async fn execute_pipeline_command(
         // Execute based on command type
         let step_result = match step_cmd.command_type {
             CommandType::Action => {
-                // Execute action command
+                // Execute action command with prev_output for chaining
+                let prev_output = if config.chain_output {
+                    Some(current_input.clone())
+                } else {
+                    None
+                };
                 match super::slash_commands::execute_action_command(
                     step.command_name.clone(),
                     current_input.clone(),
                     step_args,
+                    prev_output,
                     state.clone(),
                 )
                 .await
@@ -694,13 +709,14 @@ pub async fn execute_pipeline_command(
             }
             CommandType::Prompt => {
                 // For prompt commands, expand and return content
-                let expanded_content = if step_cmd.content.contains("{args}") {
-                    step_cmd
-                        .content
-                        .replace("{args}", step_args.as_deref().unwrap_or(""))
-                } else {
-                    step_cmd.content.clone()
-                };
+                let mut expanded_content = step_cmd.content.clone();
+                // Replace {prev_output} with previous step output (if chain_output enabled)
+                if config.chain_output {
+                    expanded_content = expanded_content.replace("{prev_output}", &current_input);
+                }
+                // Replace {args}
+                expanded_content =
+                    expanded_content.replace("{args}", step_args.as_deref().unwrap_or(""));
                 PipelineStepResult {
                     command_name: step.command_name.clone(),
                     success: true,
@@ -708,30 +724,9 @@ pub async fn execute_pipeline_command(
                     error: None,
                 }
             }
-            CommandType::Shell => {
-                // Execute shell command
-                match super::slash_commands::execute_shell_command(
-                    step_cmd.content.clone(),
-                    step_cmd.working_dir.clone(),
-                    state.clone(),
-                )
-                .await
-                {
-                    Ok(output) => PipelineStepResult {
-                        command_name: step.command_name.clone(),
-                        success: true,
-                        output,
-                        error: None,
-                    },
-                    Err(e) => PipelineStepResult {
-                        command_name: step.command_name.clone(),
-                        success: false,
-                        output: String::new(),
-                        error: Some(e),
-                    },
-                }
-            }
-            CommandType::Task | CommandType::Pipeline => {
+            CommandType::Shell | CommandType::Task | CommandType::Pipeline => {
+                // Shell commands in pipeline are handled by frontend
+                // Task and nested Pipeline not supported in pipeline steps
                 // Task and nested Pipeline not supported in pipeline steps
                 PipelineStepResult {
                     command_name: step.command_name.clone(),
@@ -828,6 +823,8 @@ pub async fn execute_shell_command(
     working_dir: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
+    // Replace {prev_output} with empty string when not in pipeline context
+    let command = command.replace("{prev_output}", "");
     tracing::info!("execute_shell_command: Command: {}", command);
     tracing::info!(
         "execute_shell_command: Working dir provided: {:?}",

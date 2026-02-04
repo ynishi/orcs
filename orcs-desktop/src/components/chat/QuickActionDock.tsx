@@ -28,6 +28,7 @@ const COMMAND_TYPE_LABELS: Record<CommandType, string> = {
   shell: 'SHELL',
   task: 'TASK',
   action: 'ACTION',
+  pipeline: 'PIPELINE',
 };
 
 interface QuickActionDockProps {

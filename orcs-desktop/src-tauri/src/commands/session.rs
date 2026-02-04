@@ -1588,16 +1588,14 @@ pub async fn generate_action_plan(
 
     // Save and emit task created event
     let _ = state.task_repository.save(&task).await;
-    let event =
-        OrchestratorEventBuilder::info_from_task("Action Plan task created", &task).build();
+    let event = OrchestratorEventBuilder::info_from_task("Action Plan task created", &task).build();
     let _ = state.event_sender.send(event);
 
     // Update to Running
     task.status = TaskStatus::Running;
     task.updated_at = Utc::now().to_rfc3339();
     let _ = state.task_repository.save(&task).await;
-    let event =
-        OrchestratorEventBuilder::info_from_task("Action Plan task started", &task).build();
+    let event = OrchestratorEventBuilder::info_from_task("Action Plan task started", &task).build();
     let _ = state.event_sender.send(event);
 
     let result = if let Some(config) = agent_config {

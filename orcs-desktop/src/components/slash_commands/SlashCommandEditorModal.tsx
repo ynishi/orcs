@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, TextInput, Textarea, Button, Stack, Group, Select, Checkbox } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
-import { SlashCommand, CommandType, PipelineConfig, PipelineStep } from '../../types/slash_command';
+import { SlashCommand, CommandType, PipelineStep } from '../../types/slash_command';
 import type { PersonaConfig } from '../../types/agent';
 
 /** Get default value for includeInSystemPrompt based on command type */
@@ -284,12 +284,12 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
             }
             description={
               isShellCommand
-                ? 'Command to execute. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
+                ? 'Command to execute. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}, {prev_output} (in pipeline)'
                 : isTaskCommand
                   ? 'Task description that will be executed using ParallelOrchestrator. Can use {args} for runtime arguments.'
                   : isActionCommand
-                    ? 'Prompt template sent to AI. Variables: {session_all}, {session_recent}, {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
-                    : 'Prompt template. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}'
+                    ? 'Prompt template sent to AI. Variables: {session_all}, {session_recent}, {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}, {prev_output} (in pipeline)'
+                    : 'Prompt template. Variables: {workspace}, {workspace_path}, {files}, {git_branch}, {git_status}, {args}, {prev_output} (in pipeline)'
             }
             value={formData.content}
             onChange={(e) => setFormData({ ...formData, content: e.currentTarget.value })}
@@ -361,7 +361,7 @@ export const SlashCommandEditorModal: React.FC<SlashCommandEditorModalProps> = (
               />
               <Checkbox
                 label="Chain output"
-                description="Pass output of each step as input to the next"
+                description="Pass output of each step as {prev_output} variable to next step"
                 checked={formData.pipelineConfig?.chainOutput ?? true}
                 onChange={(e) =>
                   setFormData({

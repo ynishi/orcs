@@ -1,5 +1,5 @@
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use orcs_application::session::SessionMetadataService;
 use orcs_application::{AdhocPersonaService, SessionUseCase};
@@ -8,16 +8,16 @@ use orcs_core::{
     quick_action::QuickActionRepository, secret::SecretService, session::AppMode,
     slash_command::SlashCommandRepository, task::TaskRepository, user::UserService,
 };
-use orcs_execution::tracing_layer::OrchestratorEvent;
 use orcs_execution::TaskExecutor;
+use orcs_execution::tracing_layer::OrchestratorEvent;
 use orcs_infrastructure::{
-    workspace_storage_service::FileSystemWorkspaceManager, AppStateService,
-    AsyncDirDialoguePresetRepository, AsyncDirPersonaRepository, AsyncDirSessionRepository,
-    AsyncDirSlashCommandRepository, AsyncDirTaskRepository, ConfigService,
-    FileQuickActionRepository,
+    AppStateService, AsyncDirDialoguePresetRepository, AsyncDirPersonaRepository,
+    AsyncDirSessionRepository, AsyncDirSlashCommandRepository, AsyncDirTaskRepository,
+    ConfigService, FileQuickActionRepository,
+    workspace_storage_service::FileSystemWorkspaceManager,
 };
-use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
+use tokio::sync::mpsc::UnboundedSender;
 
 /// Application state shared across Tauri commands.
 pub struct AppState {

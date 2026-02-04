@@ -323,6 +323,7 @@ export function ChatPanel({
           commandName,
           threadContent,
           args: null,
+          prevOutput: null,
         });
         setTabThinking(tab.id, false);
 

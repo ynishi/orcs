@@ -108,8 +108,6 @@ export interface ActionCommandResult {
  * Result of a single pipeline step execution
  */
 export interface PipelineStepResult {
-  /** Step index (0-based) */
-  stepIndex: number;
   /** Command name that was executed */
   commandName: string;
   /** Whether the step succeeded */
@@ -127,11 +125,9 @@ export interface PipelineResult {
   /** Overall success status */
   success: boolean;
   /** Results from each step */
-  steps: PipelineStepResult[];
-  /** Final combined output */
-  finalOutput?: string;
-  /** Error message if pipeline failed */
-  error?: string;
+  stepResults: PipelineStepResult[];
+  /** Total execution summary */
+  summary: string;
 }
 
 /**

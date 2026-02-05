@@ -223,12 +223,20 @@ export const ChatPanel = memo(function ChatPanel({
 
   // Refs（依存配列から除外するため）
   const suggestionTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Cleanup: unmount 時にサジェストタイマーをクリア
+  useEffect(() => {
+    return () => {
+      if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current);
+    };
+  }, []);
   const customCommandsRef = useRef(customCommands);
   useEffect(() => { customCommandsRef.current = customCommands; }, [customCommands]);
   const personasCacheRef = useRef(personasWithCache);
   useEffect(() => { personasCacheRef.current = personasWithCache; }, [personasWithCache]);
   const activeParticipantIdsRef = useRef(activeParticipantIds);
   useEffect(() => { activeParticipantIdsRef.current = activeParticipantIds; }, [activeParticipantIds]);
+  const activeTabInputRef = useRef(activeTabInput);
+  useEffect(() => { activeTabInputRef.current = activeTabInput; }, [activeTabInput]);
 
   // 入力変更ハンドラ（内部）: updateTabInput + デバウンス付きサジェスト計算
   const handleInputChange = useCallback((value: string) => {
@@ -288,8 +296,9 @@ export const ChatPanel = memo(function ChatPanel({
   }, [tab.id, updateTabInput]);
 
   // エージェント選択（@メンション補完）
+  // Performance: activeTabInputRef 経由で参照し、keystroke ごとの再生成を回避
   const selectAgent = useCallback((agent: Agent) => {
-    const input = activeTabInput;
+    const input = activeTabInputRef.current;
     const cursorPosition = textareaRef.current?.selectionStart ?? input.length;
     const beforeCursor = input.slice(0, cursorPosition);
     const afterCursor = input.slice(cursorPosition);
@@ -302,7 +311,7 @@ export const ChatPanel = memo(function ChatPanel({
 
     setSuggestions(prev => ({ ...prev, showAgents: false }));
     textareaRef.current?.focus();
-  }, [tab.id, activeTabInput, updateTabInput]);
+  }, [tab.id, updateTabInput]);
 
   // キーボードハンドラ（サジェストナビゲーション + Cmd+Enter送信）
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -661,7 +670,8 @@ export const ChatPanel = memo(function ChatPanel({
     }
 
     // Turn on AutoChat and start
-    const input = tab.input.trim();
+    // Performance fix: tab.input は stale になりうるため activeTabInput を使用
+    const input = activeTabInput.trim();
     const filePaths = tab.attachedFiles.length > 0 ? tab.attachedFiles.map(f => f.name) : undefined;
 
     console.log('[ChatPanel] Starting AutoChat with input:', input);

@@ -25,7 +25,6 @@ import "./App.css";
 import { Message, MessageType, StreamingDialogueTurn } from "./types/message";
 import { StatusInfo, getDefaultStatus } from "./types/status";
 import { Task } from "./types/task";
-import { PersonaWithCache } from "./types/agent";
 import { Session } from "./types/session";
 import { useTaskStore } from "./stores/taskStore";
 import { GitInfo } from "./types/git";
@@ -306,6 +305,7 @@ function App() {
     updateTabMessages: _updateTabMessages,
     addMessageToTab,
     updateTabInput,
+    getTabInput,
     updateTabAttachedFiles,
     addAttachedFileToTab,
     removeAttachedFileFromTab,
@@ -606,18 +606,6 @@ function App() {
   const getTabBySessionIdRef = useRef(getTabBySessionId);
   const personasRef = useRef(personas);
 
-  // Performance: Pre-cache persona names to avoid repeated string operations during input
-  const personasWithCache = useMemo<PersonaWithCache[]>(() =>
-    personas.map(p => ({
-      ...p,
-      _lowerName: p.name.toLowerCase(),
-      _underscoreName: p.name.replace(/ /g, '_'),
-      _lowerUnderscoreName: p.name.replace(/ /g, '_').toLowerCase(),
-    })),
-    [personas]
-  );
-  const personasCacheRef = useRef(personasWithCache);
-  const activeParticipantIdsRef = useRef(activeParticipantIds);
   const currentSessionIdRef = useRef(currentSessionId);
   const handleSlashCommandRef =
     useRef<ReturnType<typeof useSlashCommands>['handleSlashCommand'] | null>(
@@ -636,14 +624,6 @@ function App() {
   useEffect(() => {
     personasRef.current = personas;
   }, [personas]);
-
-  useEffect(() => {
-    personasCacheRef.current = personasWithCache;
-  }, [personasWithCache]);
-
-  useEffect(() => {
-    activeParticipantIdsRef.current = activeParticipantIds;
-  }, [activeParticipantIds]);
 
   // 最新のcurrentSessionIdをrefに保持
   useEffect(() => {
@@ -2303,11 +2283,13 @@ function App() {
     const activeTab = getActiveTab();
     if (!activeTab) return;
 
-    if (!activeTab.input.trim() && activeTab.attachedFiles.length === 0) {
+    // Performance fix: tab.input は stale になりうるため、Ref から最新値を取得
+    const freshInput = getTabInput(activeTab.id);
+    if (!freshInput.trim() && activeTab.attachedFiles.length === 0) {
       return;
     }
 
-    const currentInput = activeTab.input;
+    const currentInput = freshInput;
     const currentFiles = [...activeTab.attachedFiles];
 
     // Check for @mentions and auto-add inactive personas

@@ -104,6 +104,7 @@ export interface TabContextValue {
 
   // 入力フォーム状態
   updateTabInput: (tabId: string, input: string) => void; // タブの入力テキストを更新
+  getTabInput: (tabId: string) => string; // タブの最新入力テキストを取得（Refから直接読み取り、stale回避）
   updateTabAttachedFiles: (tabId: string, files: File[]) => void; // タブの添付ファイルを更新
   addAttachedFileToTab: (tabId: string, file: File) => void; // タブに添付ファイルを追加
   removeAttachedFileFromTab: (tabId: string, index: number) => void; // タブから添付ファイルを削除
@@ -529,6 +530,14 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
   }, [activeTabId]);
 
   /**
+   * タブの最新入力テキストを取得
+   * Performance: tabInputsRef から直接読み取るため、tabs の再計算を待たずに常に最新値を返す
+   */
+  const getTabInput = useCallback((tabId: string): string => {
+    return tabInputsRef.current.get(tabId) ?? '';
+  }, []);
+
+  /**
    * タブの添付ファイルを更新
    * Phase 2: tabUIStates のみを更新（tabs は computed）
    */
@@ -767,6 +776,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
 
       // 入力フォーム状態
       updateTabInput,
+      getTabInput,
       updateTabAttachedFiles,
       addAttachedFileToTab,
       removeAttachedFileFromTab,
@@ -800,6 +810,7 @@ export function TabProvider({ children, onTabSwitched }: TabProviderProps) {
       updateTabTitle,
       setTabDirty,
       updateTabInput,
+      getTabInput,
       updateTabAttachedFiles,
       addAttachedFileToTab,
       removeAttachedFileFromTab,

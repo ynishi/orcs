@@ -2,7 +2,7 @@
  * ChatPanel - 1つのタブ（セッション）のチャット画面を管理
  * TabContextから状態を取得し、軽量なプレゼンテーション層として機能
  */
-import { useRef, useEffect, useState, useCallback, memo } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react';
 import {
   Textarea,
   Button,
@@ -34,9 +34,9 @@ import type { SessionTab } from '../../context/TabContext';
 import type { StatusInfo } from '../../types/status';
 import type { GitInfo } from '../../types/git';
 import type { Workspace } from '../../types/workspace';
-import type { CommandDefinition } from '../../types/command';
-import type { Agent } from '../../types/agent';
-import type { PersonaConfig } from '../../types/agent';
+import { filterCommandsWithCustom, type CommandDefinition } from '../../types/command';
+import type { Agent, PersonaConfig } from '../../types/agent';
+import { getCurrentMention } from '../../utils/mentionParser';
 import type { AutoChatConfig, ContextMode } from '../../types/session';
 import type { Message } from '../../types/message';
 import type { SlashCommand } from '../../types/slash_command';
@@ -59,18 +59,11 @@ interface ChatPanelProps {
   activeParticipantIds: string[];
   workspace: Workspace | null;
 
-  // サジェスト関連
-  showSuggestions: boolean;
-  filteredCommands: CommandDefinition[];
-  selectedSuggestionIndex: number;
-  showAgentSuggestions: boolean;
-  filteredAgents: Agent[];
-  selectedAgentIndex: number;
+  // サジェスト用
+  customCommands: SlashCommand[];
 
   // イベントハンドラー
   onSubmit: (e: React.FormEvent) => void;
-  onInputChange: (value: string) => void;
-  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveFile: (index: number) => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -88,9 +81,6 @@ interface ChatPanelProps {
   onApplyPreset?: (presetId: string) => void;
   onMentionPersona?: (personaId: string) => void;
   onInvokePersona?: (personaId: string) => void;
-  onSelectCommand: (command: CommandDefinition) => void;
-  onSelectAgent: (agent: Agent) => void;
-  onHoverSuggestion: (index: number) => void;
   onSaveSessionToWorkspace?: () => void;
   onPasteAndAttach?: () => Promise<void>;
 }
@@ -170,15 +160,8 @@ export const ChatPanel = memo(function ChatPanel({
   personas,
   activeParticipantIds,
   workspace,
-  showSuggestions,
-  filteredCommands,
-  selectedSuggestionIndex,
-  showAgentSuggestions,
-  filteredAgents,
-  selectedAgentIndex,
+  customCommands,
   onSubmit,
-  onInputChange,
-  onKeyDown,
   onFileSelect,
   onRemoveFile,
   onDragOver,
@@ -196,9 +179,6 @@ export const ChatPanel = memo(function ChatPanel({
   onApplyPreset,
   onMentionPersona,
   onInvokePersona,
-  onSelectCommand,
-  onSelectAgent,
-  onHoverSuggestion,
   onSaveSessionToWorkspace,
   onPasteAndAttach,
 }: ChatPanelProps) {
@@ -212,6 +192,196 @@ export const ChatPanel = memo(function ChatPanel({
   const { addMessageToTab, setTabThinking, updateTabAttachedFiles, updateTabMessages, updateTabInput } = useTabContext();
   // Performance: activeTabInput を直接 subscribe（App.tsx は subscribe しない → キー入力で App が再レンダリングされない）
   const { activeTabInput } = useTabInput();
+
+  // Performance: サジェスト状態を ChatPanel 内で管理（App.tsx の再レンダリングを完全に排除）
+  const [suggestions, setSuggestions] = useState<{
+    showCommands: boolean;
+    filteredCommands: CommandDefinition[];
+    selectedCommandIndex: number;
+    showAgents: boolean;
+    filteredAgents: Agent[];
+    selectedAgentIndex: number;
+  }>({
+    showCommands: false,
+    filteredCommands: [],
+    selectedCommandIndex: 0,
+    showAgents: false,
+    filteredAgents: [],
+    selectedAgentIndex: 0,
+  });
+
+  // Persona キャッシュ（サジェスト用、名前の正規化を事前計算）
+  const personasWithCache = useMemo(() =>
+    personas.map(p => ({
+      ...p,
+      _lowerName: p.name.toLowerCase(),
+      _underscoreName: p.name.replace(/ /g, '_'),
+      _lowerUnderscoreName: p.name.replace(/ /g, '_').toLowerCase(),
+    })),
+    [personas]
+  );
+
+  // Refs（依存配列から除外するため）
+  const suggestionTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const customCommandsRef = useRef(customCommands);
+  useEffect(() => { customCommandsRef.current = customCommands; }, [customCommands]);
+  const personasCacheRef = useRef(personasWithCache);
+  useEffect(() => { personasCacheRef.current = personasWithCache; }, [personasWithCache]);
+  const activeParticipantIdsRef = useRef(activeParticipantIds);
+  useEffect(() => { activeParticipantIdsRef.current = activeParticipantIds; }, [activeParticipantIds]);
+
+  // 入力変更ハンドラ（内部）: updateTabInput + デバウンス付きサジェスト計算
+  const handleInputChange = useCallback((value: string) => {
+    updateTabInput(tab.id, value);
+
+    if (suggestionTimerRef.current) {
+      clearTimeout(suggestionTimerRef.current);
+    }
+    suggestionTimerRef.current = setTimeout(() => {
+      const input = value;
+      const cursorPosition = textareaRef.current?.selectionStart ?? input.length;
+      const spaceIndex = input.indexOf(' ');
+      const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
+
+      let showCommands = false;
+      let filteredCmds: CommandDefinition[] = [];
+      let showAgents = false;
+      let filteredAgs: Agent[] = [];
+
+      if (isCommandPhase) {
+        filteredCmds = filterCommandsWithCustom(input, customCommandsRef.current);
+        showCommands = filteredCmds.length > 0;
+      } else {
+        const mentionFilter = getCurrentMention(input, cursorPosition);
+        if (mentionFilter !== null) {
+          const lowerFilter = mentionFilter.toLowerCase();
+          const currentIds = activeParticipantIdsRef.current;
+          filteredAgs = personasCacheRef.current
+            .filter(p => p._lowerName.includes(lowerFilter) || p._lowerUnderscoreName.includes(lowerFilter))
+            .map(p => ({
+              id: p.id,
+              name: p._underscoreName,
+              status: currentIds.includes(p.id) ? 'running' as const : 'idle' as const,
+              description: `${p.role} - ${p.background}`,
+              isActive: currentIds.includes(p.id),
+            }));
+          showAgents = filteredAgs.length > 0;
+        }
+      }
+
+      setSuggestions({
+        showCommands,
+        filteredCommands: filteredCmds,
+        selectedCommandIndex: 0,
+        showAgents,
+        filteredAgents: filteredAgs,
+        selectedAgentIndex: 0,
+      });
+    }, 50);
+  }, [tab.id, updateTabInput]);
+
+  // コマンド選択
+  const selectCommand = useCallback((command: CommandDefinition) => {
+    updateTabInput(tab.id, `/${command.name} `);
+    setSuggestions(prev => ({ ...prev, showCommands: false }));
+    textareaRef.current?.focus();
+  }, [tab.id, updateTabInput]);
+
+  // エージェント選択（@メンション補完）
+  const selectAgent = useCallback((agent: Agent) => {
+    const input = activeTabInput;
+    const cursorPosition = textareaRef.current?.selectionStart ?? input.length;
+    const beforeCursor = input.slice(0, cursorPosition);
+    const afterCursor = input.slice(cursorPosition);
+    const lastAtIndex = beforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      const newInput = beforeCursor.slice(0, lastAtIndex) + `@${agent.name} ` + afterCursor;
+      updateTabInput(tab.id, newInput);
+    }
+
+    setSuggestions(prev => ({ ...prev, showAgents: false }));
+    textareaRef.current?.focus();
+  }, [tab.id, activeTabInput, updateTabInput]);
+
+  // キーボードハンドラ（サジェストナビゲーション + Cmd+Enter送信）
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Cmd+Enter / Ctrl+Enter で送信
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      setSuggestions(prev => ({ ...prev, showCommands: false, showAgents: false }));
+      onSubmit(e as unknown as React.FormEvent);
+      return;
+    }
+
+    // エージェントサジェストナビゲーション
+    if (suggestions.showAgents) {
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          setSuggestions(prev => ({
+            ...prev,
+            selectedAgentIndex: prev.selectedAgentIndex > 0 ? prev.selectedAgentIndex - 1 : prev.filteredAgents.length - 1,
+          }));
+          return;
+        case 'ArrowDown':
+          e.preventDefault();
+          setSuggestions(prev => ({
+            ...prev,
+            selectedAgentIndex: prev.selectedAgentIndex < prev.filteredAgents.length - 1 ? prev.selectedAgentIndex + 1 : 0,
+          }));
+          return;
+        case 'Tab':
+          e.preventDefault();
+          selectAgent(suggestions.filteredAgents[suggestions.selectedAgentIndex]);
+          return;
+        case 'Enter':
+          if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            selectAgent(suggestions.filteredAgents[suggestions.selectedAgentIndex]);
+          }
+          return;
+        case 'Escape':
+          e.preventDefault();
+          setSuggestions(prev => ({ ...prev, showAgents: false }));
+          return;
+      }
+    }
+
+    // コマンドサジェストナビゲーション
+    if (suggestions.showCommands) {
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          setSuggestions(prev => ({
+            ...prev,
+            selectedCommandIndex: prev.selectedCommandIndex > 0 ? prev.selectedCommandIndex - 1 : prev.filteredCommands.length - 1,
+          }));
+          return;
+        case 'ArrowDown':
+          e.preventDefault();
+          setSuggestions(prev => ({
+            ...prev,
+            selectedCommandIndex: prev.selectedCommandIndex < prev.filteredCommands.length - 1 ? prev.selectedCommandIndex + 1 : 0,
+          }));
+          return;
+        case 'Tab':
+          e.preventDefault();
+          selectCommand(suggestions.filteredCommands[suggestions.selectedCommandIndex]);
+          return;
+        case 'Enter':
+          if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            selectCommand(suggestions.filteredCommands[suggestions.selectedCommandIndex]);
+          }
+          return;
+        case 'Escape':
+          e.preventDefault();
+          setSuggestions(prev => ({ ...prev, showCommands: false }));
+          return;
+      }
+    }
+  }, [suggestions, onSubmit, selectAgent, selectCommand]);
 
   // AutoChat settings state
   const [autoChatSettingsOpened, setAutoChatSettingsOpened] = useState(false);
@@ -278,7 +448,7 @@ export const ChatPanel = memo(function ChatPanel({
       // Handle based on command type
       if (command.type === 'prompt') {
         // For prompt commands, send the expanded content as user input
-        onInputChange(expanded.content);
+        handleInputChange(expanded.content);
       } else if (command.type === 'shell') {
         // For shell commands, execute and show output
         setTabThinking(tab.id, true, `Running /${commandName}`, true);
@@ -361,7 +531,7 @@ export const ChatPanel = memo(function ChatPanel({
         color: 'red',
       });
     }
-  }, [availableSlashCommands, tab.id, onInputChange, setTabThinking, addMessageToTab]);
+  }, [availableSlashCommands, tab.id, handleInputChange, setTabThinking, addMessageToTab]);
 
   // Load AutoChat config from backend when tab changes
   // Only load for active tab to avoid Session ID mismatch errors
@@ -1095,8 +1265,8 @@ export const ChatPanel = memo(function ChatPanel({
 
   // Handle redoing a message (re-send the message text)
   const handleRedo = useCallback((message: Message) => {
-    onInputChange(message.text);
-  }, [onInputChange]);
+    handleInputChange(message.text);
+  }, [handleInputChange]);
 
   // Handle close/open message (add/remove ~~ prefix)
   const handleCloseMessage = useCallback(async (message: Message, isClosed: boolean) => {
@@ -1418,28 +1588,28 @@ export const ChatPanel = memo(function ChatPanel({
           )}
 
           <Box style={{ position: 'relative' }}>
-            {showSuggestions && (
+            {suggestions.showCommands && (
               <CommandSuggestions
-                commands={filteredCommands}
-                selectedIndex={selectedSuggestionIndex}
-                onSelect={onSelectCommand}
-                onHover={onHoverSuggestion}
+                commands={suggestions.filteredCommands}
+                selectedIndex={suggestions.selectedCommandIndex}
+                onSelect={selectCommand}
+                onHover={(index: number) => setSuggestions(prev => ({ ...prev, selectedCommandIndex: index }))}
               />
             )}
 
-            {showAgentSuggestions && (
+            {suggestions.showAgents && (
               <AgentSuggestions
-                agents={filteredAgents}
-                selectedIndex={selectedAgentIndex}
-                onSelect={onSelectAgent}
+                agents={suggestions.filteredAgents}
+                selectedIndex={suggestions.selectedAgentIndex}
+                onSelect={selectAgent}
               />
             )}
 
             <Textarea
               ref={textareaRef}
               value={activeTabInput}
-              onChange={(e) => onInputChange(e.currentTarget.value)}
-              onKeyDown={onKeyDown}
+              onChange={(e) => handleInputChange(e.currentTarget.value)}
+              onKeyDown={handleKeyDown}
               placeholder={
                 executionStrategy === 'mentioned'
                   ? 'Type @PersonaName to mention, or /help for commands... (⌘+Enter to send)'

@@ -25,7 +25,7 @@ import "./App.css";
 import { Message, MessageType, StreamingDialogueTurn } from "./types/message";
 import { StatusInfo, getDefaultStatus } from "./types/status";
 import { Task } from "./types/task";
-import { Agent, PersonaWithCache } from "./types/agent";
+import { PersonaWithCache } from "./types/agent";
 import { Session } from "./types/session";
 import { useTaskStore } from "./stores/taskStore";
 import { GitInfo } from "./types/git";
@@ -33,8 +33,7 @@ import { Navbar } from "./components/navigation/Navbar";
 import { WorkspaceSwitcher } from "./components/workspace/WorkspaceSwitcher";
 import { SettingsMenu } from "./components/settings/SettingsMenu";
 import { parseCommand, extractSlashCommands } from "./utils/commandParser";
-import { filterCommandsWithCustom, CommandDefinition } from "./types/command";
-import { extractMentions, getCurrentMention, normalizeMentionsInText } from "./utils/mentionParser";
+import { extractMentions, normalizeMentionsInText } from "./utils/mentionParser";
 import { handleAndPersistSystemMessage, conversationMessage } from "./utils/systemMessage";
 import { useSessions } from "./hooks/useSessions";
 import { useWorkspace } from "./hooks/useWorkspace";
@@ -61,22 +60,6 @@ type InteractionResult =
 function App() {
   // グローバル状態（タブ非依存）
   const [status, setStatus] = useState<StatusInfo>(getDefaultStatus());
-  // Performance: サジェスト状態を1つのオブジェクトに統合（state 更新を 7→1 に削減）
-  const [suggestions, setSuggestions] = useState<{
-    showCommands: boolean;
-    filteredCommands: CommandDefinition[];
-    selectedCommandIndex: number;
-    showAgents: boolean;
-    filteredAgents: Agent[];
-    selectedAgentIndex: number;
-  }>({
-    showCommands: false,
-    filteredCommands: [],
-    selectedCommandIndex: 0,
-    showAgents: false,
-    filteredAgents: [],
-    selectedAgentIndex: 0,
-  });
   const [navbarOpened, { toggle: toggleNavbar }] = useDisclosure(true);
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
   const [tabPreviewCache, setTabPreviewCache] = useState<Record<string, string>>({});
@@ -1289,11 +1272,7 @@ function App() {
     };
   }, [refreshSessions, switchWorkspaceTabs, openTab, switchToTab, getTabBySessionId, userNickname]);
 
-  // Performance: サジェスト計算は handleInputChange 内で行う（useEffect ではなくコールバック起点）
-  // App.tsx が TabInputContext を subscribe しないため、キー入力で App.tsx が再レンダリングされない
-  const suggestionTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const customCommandsRef = useRef(customCommands);
-  useEffect(() => { customCommandsRef.current = customCommands; }, [customCommands]);
+  // Performance: サジェスト状態は ChatPanel 内で管理 → App.tsx はキー入力で再レンダリングされない
 
   // Get thread content as text for action commands
   const getThreadAsText = useCallback((): string => {
@@ -1549,114 +1528,7 @@ function App() {
   //     .join('\n---\n\n');
   // };
 
-  // キーボードイベントハンドラー
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Cmd+Enter または Ctrl+Enter で送信
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleSubmit(e as any);
-      return;
-    }
-
-    // エージェントサジェスト表示中のキーボード操作
-    if (suggestions.showAgents) {
-      switch (e.key) {
-        case 'ArrowUp':
-          e.preventDefault();
-          setSuggestions(prev => ({
-            ...prev,
-            selectedAgentIndex: prev.selectedAgentIndex > 0 ? prev.selectedAgentIndex - 1 : prev.filteredAgents.length - 1,
-          }));
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          setSuggestions(prev => ({
-            ...prev,
-            selectedAgentIndex: prev.selectedAgentIndex < prev.filteredAgents.length - 1 ? prev.selectedAgentIndex + 1 : 0,
-          }));
-          break;
-        case 'Tab':
-          e.preventDefault();
-          selectAgent(suggestions.filteredAgents[suggestions.selectedAgentIndex]);
-          break;
-        case 'Enter':
-          if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
-            e.preventDefault();
-            selectAgent(suggestions.filteredAgents[suggestions.selectedAgentIndex]);
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          setSuggestions(prev => ({ ...prev, showAgents: false }));
-          break;
-      }
-      return;
-    }
-
-    // コマンドサジェスト表示中のキーボード操作
-    if (suggestions.showCommands) {
-      switch (e.key) {
-        case 'ArrowUp':
-          e.preventDefault();
-          setSuggestions(prev => ({
-            ...prev,
-            selectedCommandIndex: prev.selectedCommandIndex > 0 ? prev.selectedCommandIndex - 1 : prev.filteredCommands.length - 1,
-          }));
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          setSuggestions(prev => ({
-            ...prev,
-            selectedCommandIndex: prev.selectedCommandIndex < prev.filteredCommands.length - 1 ? prev.selectedCommandIndex + 1 : 0,
-          }));
-          break;
-        case 'Tab':
-          e.preventDefault();
-          selectCommand(suggestions.filteredCommands[suggestions.selectedCommandIndex]);
-          break;
-        case 'Enter':
-          if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
-            e.preventDefault();
-            selectCommand(suggestions.filteredCommands[suggestions.selectedCommandIndex]);
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          setSuggestions(prev => ({ ...prev, showCommands: false }));
-          break;
-      }
-      return;
-    }
-  };
-
-  // コマンドを選択（メモ化）
-  const selectCommand = useCallback((command: CommandDefinition) => {
-    if (!activeTabId) return;
-    updateTabInput(activeTabId, `/${command.name} `);
-    setSuggestions(prev => ({ ...prev, showCommands: false }));
-    textareaRef.current?.focus();
-  }, [activeTabId, updateTabInput]);
-
-  // エージェントを選択（メモ化）
-  const selectAgent = useCallback((agent: Agent) => {
-    if (!activeTabId) return;
-    const activeTab = getActiveTab();
-    if (!activeTab) return;
-
-    const input = activeTab.input;
-    const cursorPosition = textareaRef.current?.selectionStart || input.length;
-    const beforeCursor = input.slice(0, cursorPosition);
-    const afterCursor = input.slice(cursorPosition);
-    const lastAtIndex = beforeCursor.lastIndexOf('@');
-
-    if (lastAtIndex !== -1) {
-      const newInput = beforeCursor.slice(0, lastAtIndex) + `@${agent.name} ` + afterCursor;
-      updateTabInput(activeTabId, newInput);
-    }
-
-    setSuggestions(prev => ({ ...prev, showAgents: false }));
-    textareaRef.current?.focus();
-  }, [activeTabId, getActiveTab, updateTabInput]);
+  // Performance: handleKeyDown, selectCommand, selectAgent は ChatPanel に移動済み
 
   // StatusBarからPersonaをメンション挿入（メモ化）
   const handleMentionPersona = useCallback((personaId: string) => {
@@ -1687,61 +1559,7 @@ function App() {
     void processInput(message);
   }, [activeTabId, personas, processInput]);
 
-  // 入力変更ハンドラ（メモ化）
-  // Performance: サジェスト計算もここで行う（useEffect 依存を排除し、App.tsx の TabInputContext 購読を回避）
-  const handleInputChange = useCallback((value: string) => {
-    if (activeTabId) {
-      updateTabInput(activeTabId, value);
-    }
-
-    // デバウンス付きサジェスト計算
-    if (suggestionTimerRef.current) {
-      clearTimeout(suggestionTimerRef.current);
-    }
-    suggestionTimerRef.current = setTimeout(() => {
-      const input = value;
-      const cursorPosition = input.length;
-      const spaceIndex = input.indexOf(' ');
-      const isCommandPhase = input.startsWith('/') && (spaceIndex === -1 || cursorPosition <= spaceIndex);
-
-      let showCommands = false;
-      let filteredCommands: CommandDefinition[] = [];
-      let showAgents = false;
-      let filteredAgents: Agent[] = [];
-
-      if (isCommandPhase) {
-        filteredCommands = filterCommandsWithCustom(input, customCommandsRef.current);
-        showCommands = filteredCommands.length > 0;
-      }
-
-      if (!isCommandPhase) {
-        const mentionFilter = getCurrentMention(input, cursorPosition);
-        if (mentionFilter !== null) {
-          const lowerFilter = mentionFilter.toLowerCase();
-          const currentParticipantIds = activeParticipantIdsRef.current;
-          filteredAgents = personasCacheRef.current
-            .filter(p => p._lowerName.includes(lowerFilter) || p._lowerUnderscoreName.includes(lowerFilter))
-            .map(p => ({
-              id: p.id,
-              name: p._underscoreName,
-              status: currentParticipantIds.includes(p.id) ? 'running' as const : 'idle' as const,
-              description: `${p.role} - ${p.background}`,
-              isActive: currentParticipantIds.includes(p.id),
-            }));
-          showAgents = filteredAgents.length > 0;
-        }
-      }
-
-      setSuggestions({
-        showCommands,
-        filteredCommands,
-        selectedCommandIndex: 0,
-        showAgents,
-        filteredAgents,
-        selectedAgentIndex: 0,
-      });
-    }, 50);
-  }, [activeTabId, updateTabInput]);
+  // Performance: handleInputChange は ChatPanel に移動済み（サジェスト計算含む）
 
   // ドラッグ&ドロップハンドラー
   const handleDragOver = (e: React.DragEvent) => {
@@ -2516,13 +2334,11 @@ function App() {
     // アクティブなタブの入力状態をクリア
     updateTabInput(activeTab.id, "");
     updateTabAttachedFiles(activeTab.id, []);
-    setSuggestions(prev => ({ ...prev, showCommands: false, showAgents: false }));
     await processInput(currentInput, currentFiles);
   };
 
   const handleRunSlashCommand = useCallback(
     async (command: SlashCommand, args: string) => {
-      setSuggestions(prev => ({ ...prev, showCommands: false, showAgents: false }));
       if (activeTabId) {
         updateTabInput(activeTabId, '');
       }
@@ -2919,15 +2735,8 @@ function App() {
                       personas={personas}
                       activeParticipantIds={activeParticipantIds}
                       workspace={workspace}
-                      showSuggestions={suggestions.showCommands}
-                      filteredCommands={suggestions.filteredCommands}
-                      selectedSuggestionIndex={suggestions.selectedCommandIndex}
-                      showAgentSuggestions={suggestions.showAgents}
-                      filteredAgents={suggestions.filteredAgents}
-                      selectedAgentIndex={suggestions.selectedAgentIndex}
+                      customCommands={customCommands}
                       onSubmit={handleSubmit}
-                      onInputChange={handleInputChange}
-                      onKeyDown={handleKeyDown}
                       onFileSelect={handleFileSelect}
                       onRemoveFile={removeAttachedFile}
                       onDragOver={handleDragOver}
@@ -2945,9 +2754,6 @@ function App() {
                       onApplyPreset={handleApplyPreset}
                       onMentionPersona={handleMentionPersona}
                       onInvokePersona={handleInvokePersona}
-                      onSelectCommand={selectCommand}
-                      onSelectAgent={selectAgent}
-                      onHoverSuggestion={(index: number) => setSuggestions(prev => ({ ...prev, selectedCommandIndex: index }))}
                       onSaveSessionToWorkspace={() => {
                         const session = sessions.find(s => s.id === tab.sessionId);
                         if (session) {

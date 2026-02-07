@@ -23,6 +23,19 @@
       ]
     },
     {
+      "identifier": "opener:allow-reveal-item-in-dir",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$APPCONFIG/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$HOME/Library/Application Support/orcs/**" },
+        { "path": "$HOME/.config/orcs/**" },
+        { "path": "$HOME/.local/share/orcs/**" },
+        { "path": "$HOME/.orcs/**" }
+      ]
+    },
+    {
       "identifier": "fs:allow-read-text-file",
       "allow": [
         { "path": "$APPCONFIG/**" },

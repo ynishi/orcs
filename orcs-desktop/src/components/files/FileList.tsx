@@ -1,7 +1,8 @@
 import { Stack, ScrollArea, Group, Text, Box, ActionIcon, TextInput, Badge, Menu, UnstyledButton, Tooltip, Switch } from '@mantine/core';
-import { IconMessage, IconMessages, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown, IconFile, IconFileText, IconBrandJavascript, IconBrandTypescript, IconSettings, IconClipboard, IconFolderShare, IconChecklist, IconPaperclip } from '@tabler/icons-react';
+import { IconMessage, IconMessages, IconExternalLink, IconTrash, IconPencil, IconMessageCircle, IconDotsVertical, IconMessagePlus, IconCopy, IconArchive, IconStar, IconArrowUp, IconArrowDown, IconFile, IconFileText, IconBrandJavascript, IconBrandTypescript, IconSettings, IconClipboard, IconFolderShare, IconChecklist, IconPaperclip, IconFolder } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { invoke } from '@tauri-apps/api/core';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useState, useMemo } from 'react';
 import { UploadedFile } from '../../types/workspace';
 
@@ -399,6 +400,16 @@ export function FileList({ files, onAttachToChat, onOpenFile, onRenameFile, onDe
                   onClick={() => onOpenFile?.(file)}
                 >
                   Open file
+                </Menu.Item>
+
+                {/* Reveal in Finder */}
+                <Menu.Item
+                  leftSection={<IconFolder size={14} />}
+                  onClick={() => {
+                    void revealItemInDir(file.path);
+                  }}
+                >
+                  Reveal in Finder
                 </Menu.Item>
 
                 {/* Rename */}

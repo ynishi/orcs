@@ -209,6 +209,7 @@ mod tests {
             talk_style: Some(TalkStyle::Casual),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::User,
+            default_persona_ids: vec![],
         };
 
         // Save user preset
@@ -239,6 +240,7 @@ mod tests {
             talk_style: Some(TalkStyle::Brainstorm),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
+            default_persona_ids: vec![],
         };
 
         // Attempt to save system preset should fail
@@ -275,6 +277,7 @@ mod tests {
             talk_style: None,
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::User,
+            default_persona_ids: vec![],
         };
 
         // Save
@@ -308,6 +311,7 @@ mod tests {
             talk_style: Some(TalkStyle::Planning),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::User,
+            default_persona_ids: vec![],
         };
         repo.save(&user_preset).await.unwrap();
 

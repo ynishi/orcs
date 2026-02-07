@@ -1,5 +1,6 @@
 //! Dialogue preset DTOs and migrations
 
+use llm_toolkit::agent::dialogue::{ExecutionModel, TalkStyle};
 use orcs_core::dialogue::{DialoguePreset, PresetSource};
 use orcs_core::session::ConversationMode;
 use serde::{Deserialize, Serialize};
@@ -26,7 +27,10 @@ pub struct DialoguePresetV1_0_0 {
     pub source: PresetSource,
 }
 
-/// Migration from V1.0.0 to V1.1.0: Add default_persona_ids field
+/// Migration from V1.0.0 to V1.1.0:
+/// - Add default_persona_ids field
+/// - Convert execution_strategy from JSON String to typed ExecutionModel
+/// - Convert talk_style from JSON String to typed Option<TalkStyle>
 impl MigratesTo<DialoguePresetV1_1_0> for DialoguePresetV1_0_0 {
     fn migrate(self) -> DialoguePresetV1_1_0 {
         DialoguePresetV1_1_0 {
@@ -34,9 +38,10 @@ impl MigratesTo<DialoguePresetV1_1_0> for DialoguePresetV1_0_0 {
             name: self.name,
             icon: self.icon,
             description: self.description,
-            execution_strategy: self.execution_strategy,
+            execution_strategy: serde_json::from_str(&self.execution_strategy)
+                .unwrap_or(ExecutionModel::Broadcast),
             conversation_mode: self.conversation_mode,
-            talk_style: self.talk_style,
+            talk_style: self.talk_style.and_then(|s| serde_json::from_str(&s).ok()),
             created_at: self.created_at,
             source: self.source,
             default_persona_ids: vec![],
@@ -44,7 +49,12 @@ impl MigratesTo<DialoguePresetV1_1_0> for DialoguePresetV1_0_0 {
     }
 }
 
-/// Dialogue preset DTO V1.1.0: Added default_persona_ids
+/// Dialogue preset DTO V1.1.0
+///
+/// Changes from V1.0.0:
+/// - `execution_strategy`: `String` (JSON) -> `ExecutionModel` (typed)
+/// - `talk_style`: `Option<String>` (JSON) -> `Option<TalkStyle>` (typed)
+/// - Added `default_persona_ids`: `Vec<String>`
 #[derive(Debug, Clone, Serialize, Deserialize, Versioned)]
 #[versioned(version = "1.1.0")]
 pub struct DialoguePresetV1_1_0 {
@@ -54,12 +64,10 @@ pub struct DialoguePresetV1_1_0 {
     pub icon: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    /// JSON-serialized ExecutionModel
-    pub execution_strategy: String,
+    pub execution_strategy: ExecutionModel,
     pub conversation_mode: ConversationMode,
-    /// JSON-serialized TalkStyle (None = no style)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub talk_style: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub talk_style: Option<TalkStyle>,
     pub created_at: String,
     #[serde(default)]
     pub source: PresetSource,
@@ -76,10 +84,9 @@ impl IntoDomain<DialoguePreset> for DialoguePresetV1_1_0 {
             name: self.name,
             icon: self.icon,
             description: self.description,
-            execution_strategy: serde_json::from_str(&self.execution_strategy)
-                .unwrap_or(llm_toolkit::agent::dialogue::ExecutionModel::Broadcast),
+            execution_strategy: self.execution_strategy,
             conversation_mode: self.conversation_mode,
-            talk_style: self.talk_style.and_then(|s| serde_json::from_str(&s).ok()),
+            talk_style: self.talk_style,
             created_at: self.created_at,
             source: self.source,
             default_persona_ids: self.default_persona_ids,
@@ -95,12 +102,9 @@ impl FromDomain<DialoguePreset> for DialoguePresetV1_1_0 {
             name: preset.name,
             icon: preset.icon,
             description: preset.description,
-            execution_strategy: serde_json::to_string(&preset.execution_strategy)
-                .unwrap_or_else(|_| r#"{"type":"broadcast"}"#.to_string()),
+            execution_strategy: preset.execution_strategy,
             conversation_mode: preset.conversation_mode,
-            talk_style: preset
-                .talk_style
-                .and_then(|s| serde_json::to_string(&s).ok()),
+            talk_style: preset.talk_style,
             created_at: preset.created_at,
             source: preset.source,
             default_persona_ids: preset.default_persona_ids,

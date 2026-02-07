@@ -70,13 +70,17 @@ pub async fn apply_dialogue_preset(
         .set_conversation_mode(preset.conversation_mode)
         .await;
 
-    if let Some(style) = preset.talk_style {
-        manager.set_talk_style(Some(style)).await;
-    }
+    manager.set_talk_style(preset.talk_style).await;
 
     // Merge default personas (add if not already active, skip duplicates)
     if !preset.default_persona_ids.is_empty() {
-        let active_ids = manager.get_active_participants().await.unwrap_or_default();
+        let active_ids = match manager.get_active_participants().await {
+            Ok(ids) => ids,
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to get active participants, skipping persona merge");
+                vec![]
+            }
+        };
         for persona_id in &preset.default_persona_ids {
             if !active_ids.contains(persona_id) {
                 if let Err(e) = manager.add_participant(persona_id).await {

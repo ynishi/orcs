@@ -51,6 +51,7 @@ interface NavbarProps {
   onConversationModeChange?: (mode: string) => void;
   onTalkStyleChange?: (style: string | null) => void;
   onStrategyChange?: (strategy: string) => void;
+  onPresetsChanged?: () => void;
 
   // Personas
   personas?: import('../../types/agent').PersonaConfig[];
@@ -93,6 +94,7 @@ export function Navbar({
   onConversationModeChange,
   onTalkStyleChange,
   onStrategyChange,
+  onPresetsChanged,
   personas,
   activeParticipantIds,
   executionStrategy,
@@ -236,6 +238,7 @@ export function Navbar({
               onStrategyChange={onStrategyChange}
               onConversationModeChange={onConversationModeChange}
               onTalkStyleChange={onTalkStyleChange}
+              onPresetsChanged={onPresetsChanged}
               executionStrategy={executionStrategy}
               conversationMode={conversationMode}
               talkStyle={talkStyle}

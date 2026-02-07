@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Stack, Button, Group, Text, ScrollArea, ActionIcon, Modal, TextInput, Select, MultiSelect, Tooltip, Badge, Box } from '@mantine/core';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconPlus, IconTrash, IconPencil } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { notifications } from '@mantine/notifications';
 import type { DialoguePreset } from '../../types/conversation';
@@ -11,15 +11,27 @@ interface DialoguePresetListProps {
   onStrategyChange?: (strategy: string) => void;
   onConversationModeChange?: (mode: string) => void;
   onTalkStyleChange?: (style: string | null) => void;
+  onPresetsChanged?: () => void;
   executionStrategy?: string;
   conversationMode?: string;
   talkStyle?: string | null;
 }
 
+const EMPTY_FORM = {
+  name: '',
+  icon: '',
+  description: '',
+  executionStrategy: 'broadcast',
+  conversationMode: 'normal',
+  talkStyle: 'Brainstorm',
+  defaultPersonaIds: [] as string[],
+};
+
 export function DialoguePresetList({
   onStrategyChange,
   onConversationModeChange,
   onTalkStyleChange,
+  onPresetsChanged,
   executionStrategy,
   conversationMode,
   talkStyle,
@@ -27,15 +39,8 @@ export function DialoguePresetList({
   const [presets, setPresets] = useState<DialoguePreset[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpened, setModalOpened] = useState(false);
-  const [newPreset, setNewPreset] = useState({
-    name: '',
-    icon: '',
-    description: '',
-    executionStrategy: 'broadcast',
-    conversationMode: 'normal',
-    talkStyle: 'Brainstorm',
-    defaultPersonaIds: [] as string[],
-  });
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [formState, setFormState] = useState({ ...EMPTY_FORM });
   const personas = usePersonaStore((s) => s.personas);
 
   const loadPresets = async () => {
@@ -59,8 +64,28 @@ export function DialoguePresetList({
     loadPresets();
   }, []);
 
-  const handleCreatePreset = async () => {
-    if (!newPreset.name.trim()) {
+  const openCreateModal = () => {
+    setEditingPresetId(null);
+    setFormState({ ...EMPTY_FORM });
+    setModalOpened(true);
+  };
+
+  const openEditModal = (preset: DialoguePreset) => {
+    setEditingPresetId(preset.id);
+    setFormState({
+      name: preset.name,
+      icon: preset.icon || '',
+      description: preset.description || '',
+      executionStrategy: preset.executionStrategy,
+      conversationMode: preset.conversationMode,
+      talkStyle: preset.talkStyle || 'Brainstorm',
+      defaultPersonaIds: preset.defaultPersonaIds || [],
+    });
+    setModalOpened(true);
+  };
+
+  const handleSavePreset = async () => {
+    if (!formState.name.trim()) {
       notifications.show({
         title: 'Validation Error',
         message: 'Please enter a preset name',
@@ -71,43 +96,40 @@ export function DialoguePresetList({
 
     try {
       const preset: DialoguePreset = {
-        id: crypto.randomUUID(),
-        name: newPreset.name,
-        icon: newPreset.icon || undefined,
-        description: newPreset.description || undefined,
-        executionStrategy: newPreset.executionStrategy as any,
-        conversationMode: newPreset.conversationMode as any,
-        talkStyle: newPreset.talkStyle as any,
-        createdAt: new Date().toISOString(),
+        id: editingPresetId || crypto.randomUUID(),
+        name: formState.name,
+        icon: formState.icon || undefined,
+        description: formState.description || undefined,
+        executionStrategy: formState.executionStrategy as any,
+        conversationMode: formState.conversationMode as any,
+        talkStyle: formState.talkStyle as any,
+        createdAt: editingPresetId
+          ? (presets.find(p => p.id === editingPresetId)?.createdAt || new Date().toISOString())
+          : new Date().toISOString(),
         source: 'user',
-        defaultPersonaIds: newPreset.defaultPersonaIds,
+        defaultPersonaIds: formState.defaultPersonaIds,
       };
 
       await invoke('save_dialogue_preset', { preset });
 
+      const action = editingPresetId ? 'updated' : 'created';
       notifications.show({
         title: 'Success',
-        message: `Preset "${preset.name}" created`,
+        message: `Preset "${preset.name}" ${action}`,
         color: 'green',
       });
 
       setModalOpened(false);
-      setNewPreset({
-        name: '',
-        icon: '',
-        description: '',
-        executionStrategy: 'broadcast',
-        conversationMode: 'normal',
-        talkStyle: 'Brainstorm',
-        defaultPersonaIds: [],
-      });
+      setEditingPresetId(null);
+      setFormState({ ...EMPTY_FORM });
 
       await loadPresets();
+      onPresetsChanged?.();
     } catch (error) {
-      console.error('Failed to create preset:', error);
+      console.error('Failed to save preset:', error);
       notifications.show({
         title: 'Error',
-        message: `Failed to create preset: ${error}`,
+        message: `Failed to save preset: ${error}`,
         color: 'red',
       });
     }
@@ -128,6 +150,7 @@ export function DialoguePresetList({
       });
 
       await loadPresets();
+      onPresetsChanged?.();
     } catch (error) {
       console.error('Failed to delete preset:', error);
       notifications.show({
@@ -138,12 +161,14 @@ export function DialoguePresetList({
     }
   };
 
+  const isEditing = editingPresetId !== null;
+
   return (
     <Stack gap="md" style={{ height: '100%' }}>
       <Group justify="space-between">
         <Text size="lg" fw={700}>Dialogue Presets</Text>
         <Tooltip label="Add preset" withArrow>
-          <ActionIcon variant="subtle" color="blue" onClick={() => setModalOpened(true)}>
+          <ActionIcon variant="subtle" color="blue" onClick={openCreateModal}>
             <IconPlus size={16} />
           </ActionIcon>
         </Tooltip>
@@ -227,12 +252,19 @@ export function DialoguePresetList({
                   border: '1px solid #e0e0e0',
                 }}>
                   {preset.icon && <Text size="lg">{preset.icon}</Text>}
-                  <Stack gap={0} style={{ flex: 1 }}>
+                  <Stack gap={0} style={{ flex: 1, cursor: 'pointer' }} onClick={() => openEditModal(preset)}>
                     <Text size="sm" fw={600}>{preset.name}</Text>
                     {preset.description && (
                       <Text size="xs" c="dimmed">{preset.description}</Text>
                     )}
                   </Stack>
+                  <ActionIcon
+                    color="blue"
+                    variant="subtle"
+                    onClick={() => openEditModal(preset)}
+                  >
+                    <IconPencil size={16} />
+                  </ActionIcon>
                   <ActionIcon
                     color="red"
                     variant="subtle"
@@ -276,54 +308,54 @@ export function DialoguePresetList({
 
       <Modal
         opened={modalOpened}
-        onClose={() => setModalOpened(false)}
-        title="Create New Preset"
+        onClose={() => { setModalOpened(false); setEditingPresetId(null); }}
+        title={isEditing ? 'Edit Preset' : 'Create New Preset'}
         size="md"
       >
         <Stack gap="md">
           <TextInput
             label="Preset Name"
             placeholder="e.g., Quick Brainstorm"
-            value={newPreset.name}
-            onChange={(e) => setNewPreset({ ...newPreset, name: e.target.value })}
+            value={formState.name}
+            onChange={(e) => setFormState({ ...formState, name: e.target.value })}
             required
           />
 
           <TextInput
             label="Icon (Emoji)"
             placeholder="e.g., 💡"
-            value={newPreset.icon}
-            onChange={(e) => setNewPreset({ ...newPreset, icon: e.target.value })}
+            value={formState.icon}
+            onChange={(e) => setFormState({ ...formState, icon: e.target.value })}
           />
 
           <TextInput
             label="Description"
             placeholder="e.g., Broadcast + Concise + Brainstorm"
-            value={newPreset.description}
-            onChange={(e) => setNewPreset({ ...newPreset, description: e.target.value })}
+            value={formState.description}
+            onChange={(e) => setFormState({ ...formState, description: e.target.value })}
           />
 
           <Select
             label="Talk Style"
             data={TALK_STYLES.map(s => ({ value: s.value, label: s.label }))}
-            value={newPreset.talkStyle}
-            onChange={(value) => setNewPreset({ ...newPreset, talkStyle: value || 'Brainstorm' })}
+            value={formState.talkStyle}
+            onChange={(value) => setFormState({ ...formState, talkStyle: value || 'Brainstorm' })}
             required
           />
 
           <Select
             label="Execution Strategy"
             data={EXECUTION_STRATEGIES.map(s => ({ value: s.value, label: s.label }))}
-            value={newPreset.executionStrategy}
-            onChange={(value) => setNewPreset({ ...newPreset, executionStrategy: value || 'broadcast' })}
+            value={formState.executionStrategy}
+            onChange={(value) => setFormState({ ...formState, executionStrategy: value || 'broadcast' })}
             required
           />
 
           <Select
             label="Conversation Mode"
             data={CONVERSATION_MODES.map(m => ({ value: m.value, label: m.label }))}
-            value={newPreset.conversationMode}
-            onChange={(value) => setNewPreset({ ...newPreset, conversationMode: value || 'normal' })}
+            value={formState.conversationMode}
+            onChange={(value) => setFormState({ ...formState, conversationMode: value || 'normal' })}
             required
           />
 
@@ -331,19 +363,19 @@ export function DialoguePresetList({
             label="Default Personas"
             description="Auto-added when preset is applied"
             data={personas.map(p => ({ value: p.id, label: `${p.icon || ''} ${p.name} (${p.role})`.trim() }))}
-            value={newPreset.defaultPersonaIds}
-            onChange={(value) => setNewPreset({ ...newPreset, defaultPersonaIds: value })}
+            value={formState.defaultPersonaIds}
+            onChange={(value) => setFormState({ ...formState, defaultPersonaIds: value })}
             placeholder="Select personas..."
             clearable
             searchable
           />
 
           <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={() => setModalOpened(false)}>
+            <Button variant="subtle" onClick={() => { setModalOpened(false); setEditingPresetId(null); }}>
               Cancel
             </Button>
-            <Button onClick={handleCreatePreset}>
-              Create
+            <Button onClick={handleSavePreset}>
+              {isEditing ? 'Save' : 'Create'}
             </Button>
           </Group>
         </Stack>

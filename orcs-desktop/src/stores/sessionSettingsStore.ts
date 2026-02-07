@@ -53,6 +53,7 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     // Load settings individually with fallback to defaults
     let mode = 'normal';
     let style: string | null = null;
+    let strategy = 'sequential';
     let ctxMode: ContextMode = 'rich';
     let activeIds: string[] = [];
 
@@ -66,6 +67,12 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
       style = await invoke<string | null>('get_talk_style');
     } catch (error) {
       console.warn('[SessionSettingsStore] Failed to load talk style, using default:', error);
+    }
+
+    try {
+      strategy = await invoke<string>('get_execution_strategy');
+    } catch (error) {
+      console.warn('[SessionSettingsStore] Failed to load execution strategy, using default:', error);
     }
 
     try {
@@ -84,6 +91,7 @@ export const useSessionSettingsStore = create<SessionSettingsStore>((set, get) =
     set({
       conversationMode: mode,
       talkStyle: style,
+      executionStrategy: strategy,
       contextMode: ctxMode,
       activeParticipantIds: activeIds,
       isLoaded: true,

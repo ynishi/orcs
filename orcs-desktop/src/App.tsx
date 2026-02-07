@@ -2390,6 +2390,7 @@ function App() {
           executionStrategy={executionStrategy}
           conversationMode={conversationMode}
           talkStyle={talkStyle}
+          onPresetsChanged={refreshDialoguePresets}
           onRefreshPersonas={loadPersonas}
           onRefreshSessions={refreshSessions}
         />

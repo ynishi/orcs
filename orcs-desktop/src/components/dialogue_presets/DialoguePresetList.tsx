@@ -80,7 +80,7 @@ export function DialoguePresetList({
         talkStyle: newPreset.talkStyle as any,
         createdAt: new Date().toISOString(),
         source: 'user',
-        defaultPersonaIds: newPreset.defaultPersonaIds.length > 0 ? newPreset.defaultPersonaIds : undefined,
+        defaultPersonaIds: newPreset.defaultPersonaIds,
       };
 
       await invoke('save_dialogue_preset', { preset });

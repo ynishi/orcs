@@ -257,6 +257,7 @@ mod tests {
         ));
         assert_eq!(brainstorm.conversation_mode, ConversationMode::Concise);
         assert_eq!(brainstorm.talk_style, Some(TalkStyle::Brainstorm));
+        assert!(brainstorm.default_persona_ids.is_empty());
     }
 
     #[test]
@@ -275,5 +276,18 @@ mod tests {
         ));
         assert_eq!(code_review.conversation_mode, ConversationMode::Brief);
         assert_eq!(code_review.talk_style, Some(TalkStyle::Review));
+        assert!(code_review.default_persona_ids.is_empty());
+    }
+
+    #[test]
+    fn test_default_presets_have_empty_default_persona_ids() {
+        let presets = get_default_presets();
+        for preset in &presets {
+            assert!(
+                preset.default_persona_ids.is_empty(),
+                "System preset '{}' should have empty default_persona_ids",
+                preset.id
+            );
+        }
     }
 }

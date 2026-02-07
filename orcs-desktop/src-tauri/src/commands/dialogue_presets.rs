@@ -80,7 +80,11 @@ pub async fn apply_dialogue_preset(
         for persona_id in &preset.default_persona_ids {
             if !active_ids.contains(persona_id) {
                 if let Err(e) = manager.add_participant(persona_id).await {
-                    eprintln!("Failed to add preset persona '{}': {}", persona_id, e);
+                    tracing::warn!(
+                        persona_id = persona_id,
+                        error = %e,
+                        "Failed to add preset persona"
+                    );
                 }
             }
         }

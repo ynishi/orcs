@@ -74,6 +74,18 @@ pub async fn apply_dialogue_preset(
         manager.set_talk_style(Some(style)).await;
     }
 
+    // Merge default personas (add if not already active, skip duplicates)
+    if !preset.default_persona_ids.is_empty() {
+        let active_ids = manager.get_active_participants().await.unwrap_or_default();
+        for persona_id in &preset.default_persona_ids {
+            if !active_ids.contains(persona_id) {
+                if let Err(e) = manager.add_participant(persona_id).await {
+                    eprintln!("Failed to add preset persona '{}': {}", persona_id, e);
+                }
+            }
+        }
+    }
+
     // Save session with app_mode
     let app_mode = state.app_mode.lock().await.clone();
     state

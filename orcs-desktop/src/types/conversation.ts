@@ -163,6 +163,7 @@ export interface DialoguePreset {
   talkStyle?: TalkStyleType; // was talk_style
   createdAt: string; // was created_at
   source: PresetSource;
+  defaultPersonaIds?: string[]; // Persona IDs to auto-add on apply
 }
 
 /**

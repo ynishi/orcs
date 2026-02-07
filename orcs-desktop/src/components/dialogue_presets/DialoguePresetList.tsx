@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Stack, Button, Group, Text, ScrollArea, ActionIcon, Modal, TextInput, Select, Tooltip, Badge, Box } from '@mantine/core';
+import { Stack, Button, Group, Text, ScrollArea, ActionIcon, Modal, TextInput, Select, MultiSelect, Tooltip, Badge, Box } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { invoke } from '@tauri-apps/api/core';
 import { notifications } from '@mantine/notifications';
 import type { DialoguePreset } from '../../types/conversation';
 import { EXECUTION_STRATEGIES, CONVERSATION_MODES, TALK_STYLES, DEFAULT_STYLE_ICON, DEFAULT_STYLE_LABEL } from '../../types/conversation';
+import { usePersonaStore } from '../../stores/personaStore';
 
 interface DialoguePresetListProps {
   onStrategyChange?: (strategy: string) => void;
@@ -33,7 +34,9 @@ export function DialoguePresetList({
     executionStrategy: 'broadcast',
     conversationMode: 'normal',
     talkStyle: 'Brainstorm',
+    defaultPersonaIds: [] as string[],
   });
+  const personas = usePersonaStore((s) => s.personas);
 
   const loadPresets = async () => {
     try {
@@ -77,6 +80,7 @@ export function DialoguePresetList({
         talkStyle: newPreset.talkStyle as any,
         createdAt: new Date().toISOString(),
         source: 'user',
+        defaultPersonaIds: newPreset.defaultPersonaIds.length > 0 ? newPreset.defaultPersonaIds : undefined,
       };
 
       await invoke('save_dialogue_preset', { preset });
@@ -95,6 +99,7 @@ export function DialoguePresetList({
         executionStrategy: 'broadcast',
         conversationMode: 'normal',
         talkStyle: 'Brainstorm',
+        defaultPersonaIds: [],
       });
 
       await loadPresets();
@@ -320,6 +325,17 @@ export function DialoguePresetList({
             value={newPreset.conversationMode}
             onChange={(value) => setNewPreset({ ...newPreset, conversationMode: value || 'normal' })}
             required
+          />
+
+          <MultiSelect
+            label="Default Personas"
+            description="Auto-added when preset is applied"
+            data={personas.map(p => ({ value: p.id, label: `${p.icon || ''} ${p.name} (${p.role})`.trim() }))}
+            value={newPreset.defaultPersonaIds}
+            onChange={(value) => setNewPreset({ ...newPreset, defaultPersonaIds: value })}
+            placeholder="Select personas..."
+            clearable
+            searchable
           />
 
           <Group justify="flex-end" mt="md">

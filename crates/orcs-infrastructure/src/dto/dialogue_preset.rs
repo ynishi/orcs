@@ -24,6 +24,9 @@ pub struct DialoguePresetV1_0_0 {
     pub created_at: String,
     #[serde(default)]
     pub source: PresetSource,
+    /// Persona IDs to auto-add when preset is applied (empty = none)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_persona_ids: Vec<String>,
 }
 
 /// Convert DialoguePresetV1_0_0 DTO to domain model
@@ -40,6 +43,7 @@ impl IntoDomain<DialoguePreset> for DialoguePresetV1_0_0 {
             talk_style: self.talk_style.and_then(|s| serde_json::from_str(&s).ok()),
             created_at: self.created_at,
             source: self.source,
+            default_persona_ids: self.default_persona_ids,
         }
     }
 }
@@ -60,6 +64,7 @@ impl FromDomain<DialoguePreset> for DialoguePresetV1_0_0 {
                 .and_then(|s| serde_json::to_string(&s).ok()),
             created_at: preset.created_at,
             source: preset.source,
+            default_persona_ids: preset.default_persona_ids,
         }
     }
 }

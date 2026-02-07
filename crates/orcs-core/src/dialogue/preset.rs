@@ -76,6 +76,11 @@ pub struct DialoguePreset {
     /// Source of the preset (System or User)
     #[serde(default)]
     pub source: PresetSource,
+
+    /// Persona IDs to automatically add as participants when this preset is applied.
+    /// Uses merge strategy: existing participants are kept, these are added (duplicates ignored).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_persona_ids: Vec<String>,
 }
 
 /// Returns the system-defined default dialogue presets.
@@ -101,6 +106,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             talk_style: Some(TalkStyle::Brainstorm),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
+            default_persona_ids: vec![],
         },
         DialoguePreset {
             id: "preset-code-review".to_string(),
@@ -112,6 +118,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             talk_style: Some(TalkStyle::Review),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
+            default_persona_ids: vec![],
         },
         DialoguePreset {
             id: "preset-discussion".to_string(),
@@ -125,6 +132,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             talk_style: Some(TalkStyle::Debate),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
+            default_persona_ids: vec![],
         },
         DialoguePreset {
             id: "preset-quick-decision".to_string(),
@@ -139,6 +147,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             talk_style: Some(TalkStyle::DecisionMaking),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
+            default_persona_ids: vec![],
         },
         DialoguePreset {
             id: "preset-problem-solving".to_string(),
@@ -153,6 +162,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             talk_style: Some(TalkStyle::ProblemSolving),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
+            default_persona_ids: vec![],
         },
         DialoguePreset {
             id: "preset-planning".to_string(),
@@ -164,6 +174,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             talk_style: Some(TalkStyle::Planning),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
+            default_persona_ids: vec![],
         },
         DialoguePreset {
             id: "preset-casual-chat".to_string(),
@@ -175,6 +186,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             talk_style: Some(TalkStyle::Casual),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
+            default_persona_ids: vec![],
         },
         DialoguePreset {
             id: "preset-research".to_string(),
@@ -189,6 +201,7 @@ pub fn get_default_presets() -> Vec<DialoguePreset> {
             talk_style: Some(TalkStyle::Research),
             created_at: chrono::Utc::now().to_rfc3339(),
             source: PresetSource::System,
+            default_persona_ids: vec![],
         },
     ]
 }

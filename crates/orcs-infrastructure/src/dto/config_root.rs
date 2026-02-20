@@ -69,7 +69,7 @@ pub struct ClaudeModelConfigDTO {
 impl Default for ClaudeModelConfigDTO {
     fn default() -> Self {
         Self {
-            model_name: "claude-sonnet-4-20250514".to_string(),
+            model_name: "claude-sonnet-4-6".to_string(),
         }
     }
 }
@@ -123,7 +123,7 @@ pub struct OpenAIModelConfigDTO {
 impl Default for OpenAIModelConfigDTO {
     fn default() -> Self {
         Self {
-            model_name: "gpt-4o".to_string(),
+            model_name: "gpt-5".to_string(),
         }
     }
 }

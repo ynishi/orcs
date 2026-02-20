@@ -315,14 +315,14 @@ impl Default for ModelSettings {
 /// Claude model configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeModelConfig {
-    /// Model name (e.g., "claude-sonnet-4-20250514")
+    /// Model name (e.g., "claude-sonnet-4-6")
     pub model_name: String,
 }
 
 impl Default for ClaudeModelConfig {
     fn default() -> Self {
         Self {
-            model_name: "claude-sonnet-4-20250514".to_string(),
+            model_name: "claude-sonnet-4-6".to_string(),
         }
     }
 }
@@ -345,14 +345,14 @@ impl Default for GeminiModelConfig {
 /// OpenAI model configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAIModelConfig {
-    /// Model name (e.g., "gpt-4o")
+    /// Model name (e.g., "gpt-5")
     pub model_name: String,
 }
 
 impl Default for OpenAIModelConfig {
     fn default() -> Self {
         Self {
-            model_name: "gpt-4o".to_string(),
+            model_name: "gpt-5".to_string(),
         }
     }
 }

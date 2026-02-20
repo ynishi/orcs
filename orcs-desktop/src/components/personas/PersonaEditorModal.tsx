@@ -6,20 +6,34 @@ import { PersonaConfig } from '../../types/agent';
 import { CreatePersonaRequest } from '../../types/persona_request';
 
 const CLAUDE_MODEL_OPTIONS = [
-  { value: '', label: 'Default (Sonnet 4.5)' },
-  { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5 (2025-11-01) 🧠' },
-  { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1 (2025-08-05)' },
-  { value: 'claude-opus-4-20250514', label: 'Claude Opus 4.0 (2025-05-14)' },
+  { value: '', label: 'Default (Sonnet 4.6)' },
+  { value: 'claude-opus-4-6', label: 'Claude Opus 4.6 🧠' },
+  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+  { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5 (2025-11-01)' },
   { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5 (2025-09-29)' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (2025-10-01)' },
+  { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1 (2025-08-05)' },
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4.0 (2025-05-14)' },
-  { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (2024-10-22)' },
+  { value: 'claude-opus-4-20250514', label: 'Claude Opus 4.0 (2025-05-14)' },
 ];
 
 const GEMINI_MODEL_OPTIONS = [
-  { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview ⚡' },
+  { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview 🧠' },
+  { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview' },
+  { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview ⚡' },
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
   { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+];
+
+const OPENAI_MODEL_OPTIONS = [
+  { value: '', label: 'Default (GPT-5)' },
+  { value: 'gpt-5.2', label: 'GPT-5.2' },
+  { value: 'gpt-5.2-pro', label: 'GPT-5.2 Pro 🧠' },
+  { value: 'gpt-5', label: 'GPT-5' },
+  { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
+  { value: 'gpt-4.1', label: 'GPT-4.1' },
+  { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
 ];
 
 const THINKING_LEVEL_OPTIONS = [
@@ -245,6 +259,18 @@ export const PersonaEditorModal: React.FC<PersonaEditorModalProps> = ({
             placeholder="Select Claude model"
             description="Choose which Claude model to use for this persona"
             data={CLAUDE_MODEL_OPTIONS}
+            value={formData.model_name || ''}
+            onChange={(value) => setFormData({ ...formData, model_name: value || undefined })}
+            clearable
+          />
+        )}
+
+        {formData.backend === 'open_ai_api' && (
+          <Select
+            label="Model"
+            placeholder="Select OpenAI model"
+            description="Choose which OpenAI model to use for this persona"
+            data={OPENAI_MODEL_OPTIONS}
             value={formData.model_name || ''}
             onChange={(value) => setFormData({ ...formData, model_name: value || undefined })}
             clearable

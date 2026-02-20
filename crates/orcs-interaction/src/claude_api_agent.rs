@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::time::Duration;
 
-const DEFAULT_CLAUDE_MODEL: &str = "claude-sonnet-4-20250514";
+const DEFAULT_CLAUDE_MODEL: &str = "claude-sonnet-4-6";
 const BASE_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
@@ -47,7 +47,7 @@ impl ClaudeApiAgent {
     /// 1. secret.json
     /// 2. Environment variables (ANTHROPIC_API_KEY, CLAUDE_MODEL_NAME)
     ///
-    /// Model name defaults to `claude-sonnet-4-20250514` if not specified.
+    /// Model name defaults to `claude-sonnet-4-6` if not specified.
     pub async fn try_from_env() -> Result<Self, AgentError> {
         // Try loading from SecretService first
         if let Ok(service) = SecretServiceImpl::new_default()

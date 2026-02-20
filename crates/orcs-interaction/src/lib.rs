@@ -4,6 +4,7 @@ pub mod kaiba_api_agent;
 pub mod kaiba_memory_sync;
 pub mod local_agents;
 pub mod openai_api_agent;
+pub mod supported_models;
 
 // Re-export API agents for external use
 pub use crate::claude_api_agent::ClaudeApiAgent;

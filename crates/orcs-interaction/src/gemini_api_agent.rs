@@ -28,7 +28,7 @@
 //!
 //! // Custom configuration
 //! let custom_agent = GeminiApiAgent::try_from_env().await?
-//!     .with_model("gemini-3-pro-preview")
+//!     .with_model("gemini-3.1-pro-preview")
 //!     .with_thinking_level("HIGH")
 //!     .with_google_search(true);
 //! # Ok(())
@@ -47,7 +47,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const DEFAULT_GEMINI_MODEL: &str = "gemini-2.5-flash";
-const GEMINI_3_PRO_MODEL: &str = "gemini-3-pro-preview";
+const GEMINI_3_PRO_MODEL: &str = "gemini-3.1-pro-preview";
 const BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /// Agent implementation that talks to the Gemini HTTP API.
@@ -77,6 +77,8 @@ impl GeminiApiAgent {
     /// Loads configuration from secret.json
     ///
     /// Model name defaults to `gemini-2.5-flash` if not specified.
+    ///
+    /// See [`crate::supported_models`] for the full list of supported models and update procedures.
     pub async fn try_from_env() -> Result<Self, AgentError> {
         let service = SecretServiceImpl::new_default().map_err(|e| {
             AgentError::ExecutionFailed(format!("Failed to initialize SecretService: {}", e))
@@ -100,7 +102,7 @@ impl GeminiApiAgent {
     ///
     /// This is a convenience method that:
     /// - Loads API key from secret.json
-    /// - Sets model to gemini-3-pro-preview
+    /// - Sets model to gemini-3.1-pro-preview
     /// - Enables HIGH thinking level
     /// - Optionally enables Google Search tool
     pub async fn try_gemini_3_from_env(enable_search: bool) -> Result<Self, AgentError> {

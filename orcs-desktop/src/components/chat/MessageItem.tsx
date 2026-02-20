@@ -137,21 +137,35 @@ function formatBackendName(backend: string): string {
 function formatModelName(modelName: string | null | undefined): string | null {
   if (!modelName) return null;
 
-  // Claude models
+  // Claude models (order matters: more specific first)
+  if (modelName.includes('claude-opus-4-6')) return 'Opus 4.6';
+  if (modelName.includes('claude-sonnet-4-6')) return 'Sonnet 4.6';
+  if (modelName.includes('claude-opus-4-5')) return 'Opus 4.5';
   if (modelName.includes('claude-sonnet-4-5')) return 'Sonnet 4.5';
+  if (modelName.includes('claude-haiku-4-5')) return 'Haiku 4.5';
+  if (modelName.includes('claude-opus-4-1')) return 'Opus 4.1';
   if (modelName.includes('claude-sonnet-4')) return 'Sonnet 4';
+  if (modelName.includes('claude-opus-4')) return 'Opus 4';
   if (modelName.includes('claude-opus')) return 'Opus';
   if (modelName.includes('claude-haiku')) return 'Haiku';
 
-  // Gemini models
+  // Gemini models (order matters: more specific first)
+  if (modelName.includes('gemini-3.1-pro')) return 'Gemini 3.1 Pro';
+  if (modelName.includes('gemini-3-pro')) return 'Gemini 3 Pro';
+  if (modelName.includes('gemini-3-flash')) return 'Gemini 3 Flash';
+  if (modelName.includes('gemini-2.5-pro')) return 'Gemini 2.5 Pro';
   if (modelName.includes('gemini-2.5-flash')) return 'Gemini 2.5 Flash';
-  if (modelName.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
   if (modelName.includes('gemini-pro')) return 'Gemini Pro';
 
-  // OpenAI models
+  // OpenAI models (order matters: more specific first)
+  if (modelName.includes('gpt-5.2-pro')) return 'GPT-5.2 Pro';
+  if (modelName.includes('gpt-5.2')) return 'GPT-5.2';
+  if (modelName.includes('gpt-5-mini')) return 'GPT-5 Mini';
+  if (modelName.includes('gpt-5')) return 'GPT-5';
+  if (modelName.includes('gpt-4.1-mini')) return 'GPT-4.1 Mini';
+  if (modelName.includes('gpt-4.1')) return 'GPT-4.1';
   if (modelName.includes('gpt-4o')) return 'GPT-4o';
   if (modelName.includes('gpt-4')) return 'GPT-4';
-  if (modelName.includes('gpt-3.5')) return 'GPT-3.5';
 
   // Return first 20 chars if no match
   return modelName.slice(0, 20);

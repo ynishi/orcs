@@ -17,7 +17,7 @@ use std::env;
 use std::time::Duration;
 
 const DEFAULT_KAIBA_URL: &str = "https://kaiba.shuttleapp.rs";
-const DEFAULT_CLAUDE_MODEL: &str = "claude-sonnet-4-20250514"; // Kaiba generates prompts, Claude executes
+const DEFAULT_CLAUDE_MODEL: &str = "claude-sonnet-4-6"; // Kaiba generates prompts, Claude executes
 
 /// Agent implementation that talks to the Kaiba API to retrieve Rei prompts.
 #[derive(Clone)]

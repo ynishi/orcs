@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::time::Duration;
 
-const DEFAULT_OPENAI_MODEL: &str = "gpt-4o";
+const DEFAULT_OPENAI_MODEL: &str = "gpt-5";
 const BASE_URL: &str = "https://api.openai.com/v1/chat/completions";
 
 /// Agent implementation that talks to the OpenAI HTTP API.
@@ -44,7 +44,7 @@ impl OpenAIApiAgent {
     /// 1. secret.json
     /// 2. Environment variables (OPENAI_API_KEY, OPENAI_MODEL_NAME)
     ///
-    /// Model name defaults to `gpt-4o` if not specified.
+    /// Model name defaults to `gpt-5` if not specified.
     pub async fn try_from_env() -> Result<Self, AgentError> {
         // Try loading from SecretService first
         if let Ok(service) = SecretServiceImpl::new_default()
